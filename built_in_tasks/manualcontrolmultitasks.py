@@ -6,7 +6,7 @@ import numpy as np
 from collections import OrderedDict
 import time
 
-from riglib import reward
+from riglib import reward_crist
 from riglib.experiment import traits, Sequence
 
 from riglib.stereo_opengl.window import Window, FPScontrol, WindowDispl2D

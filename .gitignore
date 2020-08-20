@@ -45,3 +45,4 @@ tests/*.mat
 tests/*.hdf
 *.h5
 *.dot
+/DataAnalysis/

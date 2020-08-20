@@ -19,9 +19,10 @@ sec_per_min = 60
 
 class RewardSystem(traits.HasTraits):
     '''
-    Feature for the Crist solenoid reward system
+    Feature for the current reward system in Amy Orsborn Lab - Aug 2020
     '''
     trials_per_reward = traits.Float(1, desc='Number of successful trials before solenoid is opened')
+
     def __init__(self, *args, **kwargs):
         from riglib import reward
         super(RewardSystem, self).__init__(*args, **kwargs)
@@ -32,7 +33,36 @@ class RewardSystem(traits.HasTraits):
         if self.reward is not None:
             self.reportstats['Reward #'] += 1
             if self.reportstats['Reward #'] % self.trials_per_reward == 0:
-                self.reward.reward(self.reward_time*1000.)
+                self.reward.reward(self.reward_time * 1000.)
+        super(RewardSystem, self).reward()
+
+    def _test_reward_end(self, ts):
+        if self.reportstats['Reward #'] % self.trials_per_reward == 0:
+            return ts > self.reward_time
+        else:
+            return True
+
+
+""""" BELOW THIS IS ALL THE OLD CODE ASSOCIATED WITH REWARD FEATURES"""
+
+
+class RewardSystem_Crist(traits.HasTraits):
+    '''
+    Feature for the Crist solenoid reward system
+    '''
+    trials_per_reward = traits.Float(1, desc='Number of successful trials before solenoid is opened')
+
+    def __init__(self, *args, **kwargs):
+        from riglib import reward_crist
+        super(RewardSystem, self).__init__(*args, **kwargs)
+        self.reward = reward_crist.open()
+
+    def _start_reward(self):
+        self.reward_start = self.get_time()
+        if self.reward is not None:
+            self.reportstats['Reward #'] += 1
+            if self.reportstats['Reward #'] % self.trials_per_reward == 0:
+                self.reward.reward(self.reward_time * 1000.)
         super(RewardSystem, self)._start_reward()
 
     def _test_reward_end(self, ts):
@@ -41,8 +71,10 @@ class RewardSystem(traits.HasTraits):
         else:
             return True
 
+
 class TTLReward(traits.HasTraits):
     '''During the reward phase, send a timed TTL pulse to the reward system'''
+
     def __init__(self, *args, **kwargs):
         '''
         Constructor for TTLReward
@@ -106,8 +138,10 @@ class TTLReward(traits.HasTraits):
         base_channel = 0
         comedi.comedi_dio_bitfield2(self.com, subdevice, write_mask, 0x000000, base_channel)
 
+
 class TTLReward_arduino(TTLReward):
     ''' Same idea as TTL reward, using an arduino instead of nidaq (pin 8)'''
+
     def __init__(self, *args, **kwargs):
         self.baudrate_rew = 115200
         import serial
@@ -115,27 +149,29 @@ class TTLReward_arduino(TTLReward):
         super(TTLReward_arduino, self).__init__(*args, **kwargs)
 
     def _start_reward(self):
-        #port = serial.Serial('/dev/arduino_rew', baudrate=self.baudrate_rew)
+        # port = serial.Serial('/dev/arduino_rew', baudrate=self.baudrate_rew)
         self.port.write("a")
         self.reportstats['Reward #'] = self.reportstats['Reward #'] + 1
         self.reward_start = self.get_time() - self.start_time
         super(TTLReward_arduino, self)._start_reward()
-        
+
     def _end_reward(self):
         self.port.write("b")
 
+
 class TTLReward_arduino_tdt(traits.HasTraits):
     ''' Same idea as TTL reward, using an arduino instead of nidaq (pin 8)'''
+
     def __init__(self, *args, **kwargs):
         self.baudrate_rew = 115200
         import serial
-        #self.port = serial.Serial('/dev/ttyACM0', baudrate=self.baudrate_rew)
+        # self.port = serial.Serial('/dev/ttyACM0', baudrate=self.baudrate_rew)
         self.port = serial.Serial('/dev/arduino_neurosync', baudrate=self.baudrate_rew)
-        
+
         super(TTLReward_arduino_tdt, self).__init__(*args, **kwargs)
 
     def _start_reward(self):
-        #port = serial.Serial('/dev/arduino_rew', baudrate=self.baudrate_rew)
+        # port = serial.Serial('/dev/arduino_rew', baudrate=self.baudrate_rew)
         self.port.write("j")
         self.reportstats['Reward #'] = self.reportstats['Reward #'] + 1
         self.reward_start = self.get_time() - self.start_time
@@ -143,16 +179,16 @@ class TTLReward_arduino_tdt(traits.HasTraits):
 
     def _test_reward_end(self, ts):
         return (ts - self.reward_start) > self.reward_time
-        
+
     def _end_reward(self):
         self.port.write("n")
-
 
 
 class JuiceLogging(traits.HasTraits):
     '''
     Save screenshots of the juice camera and link them to the task entry that has been created
     '''
+
     def cleanup(self, database, saveid, **kwargs):
         '''
         See riglib.experiment.Experiment.cleanup for docs on task cleanup.
@@ -180,6 +216,7 @@ class JuiceLogging(traits.HasTraits):
 
 class ArduinoReward(traits.HasTraits):
     '''During the reward phase, send a timed TTL pulse via the Arduino microcontroller to the reward system'''
+
     def __init__(self, *args, **kwargs):
         '''
         Constructor for TTLReward
@@ -196,7 +233,7 @@ class ArduinoReward(traits.HasTraits):
         TTLReward instance
         '''
         self.port = serial.Serial(glob.glob("/dev/ttyACM*")[0], baudrate=115200)
-        #self.port.write('n')
+        # self.port.write('n')
         super(ArduinoReward, self).__init__(*args, **kwargs)
 
     def _start_reward(self):
@@ -232,5 +269,3 @@ class ArduinoReward(traits.HasTraits):
         None
         '''
         self.port.write('b')
-
-
