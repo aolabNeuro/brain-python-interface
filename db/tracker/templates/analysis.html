@@ -1,0 +1,40 @@
+<!-- Webroot interface -->
+<title> BMI 3D Data Analysis </title>
+<h2 style="color:Purple;"> <em>Orsborn lab - BMI3D Interface - Data Analysis</em></h2>
+<head>
+
+  <link rel="stylesheet" href='{{ STATIC_PREFIX }}resources/css/list.css'>
+
+</head>
+<style>
+	body {
+	background-image: linear-gradient(#ffffff,#ddddff);
+	background-color: #accccc;
+	}
+</style>
+<body>
+	<a href="setup">Setup</a><br>
+	<a href="main">Back to Main</a><br>
+
+	<!-- <a href="exp_log/">New experiment</a> -->
+	<div>
+ 	<form>
+        <label for ="filename"> Filename:</label><br>
+        <input type="text" id="filename" name="filename"><br>
+        <button type="submit" class="btn btn-primary">Load Data (.mat)</button>
+ 	</form>
+	</div>
+    <div>
+        <label for ="downsample"> Downsample rate:</label><br>
+        <input type="text" id="downsample" name="dsample"><br>
+
+        <label for ="d_var"> Downsample variable</label><br>
+        <input type="text" id="d_var" name="dvar"><br>
+        <button type="submit" class="btn btn-primary">Downsample</button>
+
+    </div>
+    <div>
+          <button type="submit" class="btn btn-primary">Plot Rastor</button>
+
+    </div>
+</body>
