@@ -10,6 +10,7 @@ import copy
 #from riglib.bmi.state_space_models import StateSpaceEndptVel2D
 #from riglib.bmi.bmi import Decoder, BMISystem, GaussianStateHMM, BMILoop, GaussianState, MachineOnlyFilter
 from riglib import experiment
+from features.optitrack_feature import MotionSimulate
 
 
 class CursorControl(ManualControlMulti, WindowDispl2D):
@@ -41,9 +42,11 @@ class CursorControl(ManualControlMulti, WindowDispl2D):
         self.move_effector()
         super(CursorControl, self)._cycle()
 
-    # do nothing
     def move_effector(self):
-        self.scale_factor = 50
+        self.scale_factor = 0.1
+
+        if isinstance(self, MotionSimulate):
+            self.scale_factor = 1
 
         #get data from motion tracker- take average of all data points since last poll
         #the default regid body yields a 6 degree of freedom
@@ -137,7 +140,6 @@ def target_seq_generator(n_targs, n_trials):
                         [targ[0], 0, targ[1]]])
         k += 1
 
-
 if __name__ == "__main__":
     print('Remember to set window size in stereoOpenGL class')
     gen = target_seq_generator(8, 2)
@@ -145,9 +147,11 @@ if __name__ == "__main__":
     #incorporate the saveHDF feature by blending code
     #see tests\start_From_cmd_line_sim
     from features.optitrack_feature import MotionData
+    from features.hdf_features import SaveHDF
+
     
     base_class = CursorControl
-    feats = [MotionData]
+    feats = [MotionData, SaveHDF]
     Exp = experiment.make(base_class, feats=feats)
     print(Exp)
 
