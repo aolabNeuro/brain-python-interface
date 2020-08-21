@@ -7,6 +7,7 @@ from collections import OrderedDict
 import time
 
 from riglib import reward_crist
+from riglib import reward
 from riglib.experiment import traits, Sequence
 
 from riglib.stereo_opengl.window import Window, FPScontrol, WindowDispl2D
@@ -339,7 +340,7 @@ class ManualControlMulti(Sequence, Window):
             target.hide()
 
     def _start_reward(self):
-        #super(ManualControlMulti, self)._start_reward()
+        super(ManualControlMulti, self)._start_reward()
         self.targets[self.target_index % 2].show()
 
     #### Generator functions ####
