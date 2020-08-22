@@ -1,5 +1,6 @@
 import pickle
 import pyforms
+import csv
 
 from PyQt5 import QtGui
 from pyforms.basewidget import BaseWidget
@@ -63,7 +64,7 @@ class MainList(object):
 
     def addEntry(self, entry):
         self._metadata.append(entry)
-        self.save('metadata.dat')
+        #self.save('metadata.dat')
 
     def removeEntry(self, index):
         return self._metadata.pop(index)
@@ -134,10 +135,10 @@ class MainListWindow(AddMenuFuntionality,MainList, BaseWidget):
         self._mainlist = ControlList('Meta Data', readonly=True, add_function= self.__addEntryBtnAction(), remove_function=self.__rmEntryBtnAction())
         self._mainlist.horizontalHeaders = ['Monkey Name', 'Experimentor', 'Date', 'Session ID', 'File Dir']
 
-        # m_list = MainList()
-        # m_list.load('metadata.pkl')
-        # print(m_list._metadata)
-        #self._mainlist.value = super(MainListWindow,self).load('metadata.pkl')
+        m_list = MainList()
+        m_list.load('metadata.dat')
+        print(m_list._metadata)
+        #self._mainlist.load_form(m_list._metadata)
 
         win = EntryWindow()
         win.parent = self
@@ -174,12 +175,22 @@ class MainListWindow(AddMenuFuntionality,MainList, BaseWidget):
         """
         super(MainListWindow, self).addEntry(entry)
         self._mainlist += [entry._monkeyname, entry._experimentor, entry._date, entry._sessID, entry._dir]
+        self.saveEntry()
         #super(MainListWindow,self).save('metadata.pkl')
         #entry.close()
 
     def removeEntry(self, index):
         super(MainListWindow, self).removeEntry(index)
         self._mainlist -= index
+        self.saveEntry()
+
+    def saveEntry(self):
+        meta_data = {}
+        self._mainlist.save_form(meta_data)
+
+        w = csv.writer(open("output.csv", "w"))
+        for key, val in meta_data.items():
+            w.writerow([key, val])
 
 
 # Execute the application
