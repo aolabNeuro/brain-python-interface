@@ -20,6 +20,7 @@ class System(object):
     #a list of supported commands
     SUPPORTED_COMMANDS = [
         "start_rec",
+        "stop_rec",
         "send_markers",
         'send_rigid_bodies',
         'stop',
@@ -42,7 +43,7 @@ class System(object):
         self.rigid_body_count = 1 #for now,only one rigid body
 
 
-    def start(self, stream_type = "rb"):
+    def start(self, stream_type = "rigid_bodies"):
         """
         stream_type
         """
@@ -70,20 +71,21 @@ class System(object):
         print(f"Connection to c# client \
              {self.optitrack_ip_addr} has been established.")
 
-
         if stream_type in self.SUPPORTED_STREAM_TYPES: 
+            self.stream_type = stream_type
             self.send_command('send_'+stream_type)
+            print(f'stream_type set to {self.stream_type}')
         else:
             raise Exception(f'{stream_type} is not supported \n\n suported stream types are\n{self.SUPPORTED_STREAM_TYPES}')
+        
 
-            
-
+    def sample_stream_data(self, n_grab_frames = 10):
         #automatically pull 10 frames
         # and cal the mean round trip time
         t1 = time.perf_counter()
-        for i in range(N_TEST_FRAMES): self.get()
+        for i in range(n_grab_frames): self.get()
         t2 = time.perf_counter()
-        print(f'time to grab {N_TEST_FRAMES} frames : \
+        print(f'time to grab {n_grab_frames} frames : \
               {(t2 - t1)} s ')
                         
 
@@ -154,9 +156,18 @@ class Simulation(System):
 
 if __name__ == "__main__":
     s = System()
-    s.start()
-    s.send_command("start_rec")
-    #s.send_command("send_markers")
-    time.sleep(5)
+    s.start(stream_type = "rigid_bodies")
+
+    s.sample_stream_data(n_grab_frames = 3)
+    time.sleep(2)
     s.stop()
+    time.sleep(2)
+
+    #start a new ssystem that streams markerset
+    s = System()
+    s.start(stream_type = "markers")
+    s.sample_stream_data(n_grab_frames = 3)
+    time.sleep(2)
+    s.stop()
+
     print("finished")
