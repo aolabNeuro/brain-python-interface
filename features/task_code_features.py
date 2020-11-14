@@ -1,5 +1,5 @@
 
-    
+from riglib.dio import nidaq
     
 class TaskCodeStreamer(object):
 
