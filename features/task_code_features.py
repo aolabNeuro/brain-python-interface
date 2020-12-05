@@ -2,6 +2,7 @@ from riglib.dio.NIUSB6501 import write_to_comedi
     
 class TaskCodeStreamer(object):
 
+    '''
     TaskCodeDict = {
         'wait': 1,
         'target':2, #target appears
@@ -9,6 +10,16 @@ class TaskCodeStreamer(object):
         'targ_transition': 6,
         'reward': 0
     }
+    '''
+    #binary state, reward or not
+    TaskCodeDict = {
+        'wait': 0,
+        'target':0, #target appears
+        'hold': 0,
+        'targ_transition': 0,
+        'reward': 1
+    }
+
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -35,7 +46,6 @@ class TaskCodeStreamer(object):
         else:
             print(f'transition to {condition}')
 
-        set_bit = 1 if condition == 'target' else 0
-        write_to_comedi(set_bit)
+        write_to_comedi(self.TaskCodeDict[condition])
 
         super().set_state(condition, **kwargs)
