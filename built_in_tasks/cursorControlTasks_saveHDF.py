@@ -11,6 +11,7 @@ import copy
 #from riglib.bmi.bmi import Decoder, BMISystem, GaussianStateHMM, BMILoop, GaussianState, MachineOnlyFilter
 from riglib import experiment
 from features.hdf_features import SaveHDF
+from features.task_code_features import TaskCodeStreamer
 
 class CursorControl(ManualControlMulti, WindowDispl2D):
     '''
@@ -113,7 +114,8 @@ if __name__ == "__main__":
     #see tests\start_From_cmd_line_sim
     
     base_class = CursorControl
-    feats = [SaveHDF]
+
+    feats = [SaveHDF, TaskCodeStreamer]
     Exp = experiment.make(base_class, feats=feats)
     print(Exp)
 
