@@ -373,20 +373,42 @@ class SimKFDecoderSup(SimKFDecoder):
     '''
     Construct a KFDecoder based on encoder output in response to states simulated according to the state space model's process noise
     '''
-    def load_decoder(self):
+    def load_decoder(self, supplied_encoder = None, supplied_SSM = None,  n_samples = 2000):
         '''
         Instantiate the neural encoder and "train" the decoder
+
+        update 2020 Dec.:
+        allow training with supplied SSM by adding supplied_enc and supplied_ssm
+
+
+        Parameters:
+            supplied_encoder: SimNeuralEnc and its children classses
+            supplied_SSM: 
+
+        Output:
+            None
         '''
         
         if hasattr(self, 'decoder'):
             print('Already have a decoder!')
         else:
             print("Creating simulation decoder..")
-            print(self.encoder, type(self.encoder))
-            n_samples = 2000
+
+            #select the encoder
+            #prioritize self. encoder
+            if hasattr(self, 'encoder'): encoder = self.encoder
+            elif supplied_encoder: encoder = supplied_encoder
+            else: 
+                print('SimKFDecoderSup: Neither self or supplied decoder is suppleid')
+                print('Decoder not traiined')
+            #if succussful, print out the type of decoder, eh
+            print(encoder, type(encoder))
+
+
+           
             units = self.encoder.get_units()
             n_units = len(units)
-            print('units: ', n_units)
+            print('SimKFDecoderSup: units: ', n_units)
 
             # draw samples from the W distribution
             ssm = self.ssm
@@ -394,21 +416,26 @@ class SimKFDecoderSup(SimKFDecoder):
             mean = np.zeros(A.shape[0])
             mean[-1] = 1
             state_samples = np.random.multivariate_normal(mean, W, n_samples)
+            kin = state_samples.T
 
+            #produce spike samples
             spike_counts = np.zeros([n_units, n_samples])
             self.encoder.call_ds_rate = 1
             for k in range(n_samples):
                 spike_counts[:,k] = np.array(self.encoder(state_samples[k], mode='counts')).ravel()
 
-            kin = state_samples.T
+            #deal with clda
             zscore = False
             if hasattr(self, 'clda_adapt_mFR_stats'):
                 if self.clda_adapt_mFR_stats:
                     zscore = True
             print(' zscore decoder ? : ', zscore)
+
+            #now we can train the decoder. 
             self.decoder = train.train_KFDecoder_abstract(ssm, kin, spike_counts, units, 0.1, zscore=zscore)
             self.encoder.call_ds_rate = 6
-
+            
+            #save the initial decoder parameters
             self.init_neural_features = spike_counts
             self.init_kin_features = kin
 
