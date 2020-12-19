@@ -410,7 +410,7 @@ class SimKFDecoderSup(SimKFDecoder):
 
 
            
-            units = self.encoder.get_units()
+            units = encoder.get_units()
             n_units = len(units)
             print('SimKFDecoderSup: units: ', n_units)
 
@@ -424,9 +424,9 @@ class SimKFDecoderSup(SimKFDecoder):
 
             #produce spike samples
             spike_counts = np.zeros([n_units, n_samples])
-            self.encoder.call_ds_rate = 1
+            encoder.call_ds_rate = 1
             for k in range(n_samples):
-                spike_counts[:,k] = np.array(self.encoder(state_samples[k], mode='counts')).ravel()
+                spike_counts[:,k] = np.array(encoder(state_samples[k], mode='counts')).ravel()
 
             #deal with clda
             zscore = False
@@ -437,7 +437,7 @@ class SimKFDecoderSup(SimKFDecoder):
 
             #now we can train the decoder. 
             self.decoder = train.train_KFDecoder_abstract(ssm, kin, spike_counts, units, 0.1, zscore=zscore)
-            self.encoder.call_ds_rate = 6
+            encoder.call_ds_rate = 6
             
             #save the initial decoder parameters
             self.init_neural_features = spike_counts
