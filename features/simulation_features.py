@@ -416,7 +416,7 @@ class SimKFDecoderSup(SimKFDecoder):
                 ssm = self.ssm
                 print('SimKFDecoderSup:loaded self.ssm')
             elif supplied_SSM: 
-                encoder = supplied_SSM
+                ssm = supplied_SSM
                 print('SimKFDecoderSup:loaded suppled_ssm from function input')
             else: 
                 print('SimKFDecoderSup: Neither self or supplied ssm is suppleid')
