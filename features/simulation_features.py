@@ -408,6 +408,23 @@ class SimKFDecoderSup(SimKFDecoder):
             #if succussful, print out the type of decoder, eh
             print(encoder, type(encoder))
 
+            #also need to select which ssm to use
+            #select the encoder
+            #prioritize loading self. encoder
+            if hasattr(self, 'ssm'): 
+                ssm = self.ssm
+                print('SimKFDecoderSup:loaded self.ssm')
+            elif supplied_SSM: 
+                encoder = supplied_SSM
+                print('SimKFDecoderSup:loaded suppled_ssm from function input')
+            else: 
+                print('SimKFDecoderSup: Neither self or supplied ssm is suppleid')
+                print('Decoder not traiined')
+                return
+            #if succussful, print out the type of decoder, eh
+            print(encoder, type(encoder))
+
+
 
            
             units = encoder.get_units()
@@ -415,7 +432,6 @@ class SimKFDecoderSup(SimKFDecoder):
             print('SimKFDecoderSup: units: ', n_units)
 
             # draw samples from the W distribution
-            ssm = self.ssm
             A, _, W = ssm.get_ssm_matrices()
             mean = np.zeros(A.shape[0])
             mean[-1] = 1
