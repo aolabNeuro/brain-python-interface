@@ -383,7 +383,7 @@ class SimKFDecoderSup(SimKFDecoder):
 
         Parameters:
             supplied_encoder: SimNeuralEnc and its children classses
-            supplied_SSM: 
+            supplied_SSM: ssm used to esablish the decoder. 
 
         Output:
             None
@@ -395,9 +395,13 @@ class SimKFDecoderSup(SimKFDecoder):
             print("Creating simulation decoder..")
 
             #select the encoder
-            #prioritize self. encoder
-            if hasattr(self, 'encoder'): encoder = self.encoder
-            elif supplied_encoder: encoder = supplied_encoder
+            #prioritize loading self. encoder
+            if hasattr(self, 'encoder'): 
+                encoder = self.encoder
+                print('SimKFDecoderSup:loaded self.encoder')
+            elif supplied_encoder: 
+                encoder = supplied_encoder
+                print('SimKFDecoderSup:loaded suppled_encoder from function input')
             else: 
                 print('SimKFDecoderSup: Neither self or supplied decoder is suppleid')
                 print('Decoder not traiined')
