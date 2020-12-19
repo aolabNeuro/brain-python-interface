@@ -403,8 +403,9 @@ class SimKFDecoderSup(SimKFDecoder):
                 encoder = supplied_encoder
                 print('SimKFDecoderSup:loaded suppled_encoder from function input')
             else: 
-                print('SimKFDecoderSup: Neither self or supplied decoder is suppleid')
+                print('SimKFDecoderSup: Neither self or supplied enc is supplied')
                 print('Decoder not traiined')
+                return
             #if succussful, print out the type of decoder, eh
             print(encoder, type(encoder))
 
