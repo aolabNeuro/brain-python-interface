@@ -387,6 +387,10 @@ class SimKFDecoderSup(SimKFDecoder):
 
         Output:
             None
+            however: rele decoder information can be accessed via
+            self.decoder:  KFDecoder object
+            self.init_neural_features : init training data
+            self.init_kin_features:  kinematic states.
         '''
         
         if hasattr(self, 'decoder'):
@@ -450,7 +454,7 @@ class SimKFDecoderSup(SimKFDecoder):
             if hasattr(self, 'clda_adapt_mFR_stats'):
                 if self.clda_adapt_mFR_stats:
                     zscore = True
-            print(' zscore decoder ? : ', zscore)
+            print(' SimKFDecoderSup: zscore decoder ? : ', zscore)
 
             #now we can train the decoder. 
             self.decoder = train.train_KFDecoder_abstract(ssm, kin, spike_counts, units, 0.1, zscore=zscore)
