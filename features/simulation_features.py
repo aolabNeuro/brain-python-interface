@@ -599,8 +599,16 @@ class SimDumbLearner(object):
         self.learn_flag = False
         self.learner = clda.DumbLearner()
 
+#############################
+##### Simulation updaters
+#############################
 
 
+
+
+#############################
+##### Simulation helper functions
+#############################
 def get_enc_setup(sim_mode = 'toy'):
     # sim_mode:str 
     #   std:  mn 20 neurons
