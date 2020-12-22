@@ -582,6 +582,7 @@ class SimPPFDecoderCursorShuffled(object):
 #############################
 ##### Simulation learners
 #############################
+from riglib.bmi import clda
 class SimDumbLearner(object):
     """
     a feature wrapper to set up learner
@@ -595,10 +596,56 @@ class SimDumbLearner(object):
         The "learner" uses knowledge of the task goals to determine the "intended" 
         action of the BMI subject and pairs this intention estimation with actual observations.
         '''
-        from riglib.bmi import clda
+        
         self.learn_flag = False
         self.learner = clda.DumbLearner()
 
+
+class SimFeedbackLearner(object):
+    """
+    a trivial class to set up learner in the BMIloop
+    that uses feedback controller. 
+
+    We need
+    1. batch_size(int): to tell how many data points we are accumulating.
+    
+    CAVEAT:
+        this uses the same feedback control as the encoder does. 
+    
+    with this caveat,
+    we commencer the setup mainly using the setup info from riglib.bmi.clda.FeedbackControllerLearner
+    """
+
+    def __init__(self,*args, **kwargs):
+        """
+        set up function
+        main job is to determine the batch_size
+        default batch size  to 16
+        
+        """
+        #this is another boring python liner. 
+        #highly UNrecommended for its simplicity and readability
+        self.batch_size = kwargs['batch_size'] if 'batch_size' in kwargs else 16
+        print(f'\n {__name__}.{__class__.__name__}: start to create a sim leaner with a batchsize of {self.batch_size}')
+        super().__init__(*args, **kwargs)
+
+    def create_learner(self):
+        """
+        just set up the feedback controller learner
+        """
+
+        if hasattr(self, 'fb_ctrl'):
+            self.learn_flag = True
+            self.learner = clda.FeedbackControllerLearner(self.batch_size, self.fb_ctrl)
+            
+            print('')
+            print(f'{__name__}.{__class__.__name__}: flip the self.learn_flag to true')
+            print(f'{__name__}.{__class__.__name__}: succussfully created a feedback controller learner\n')
+        else:
+            print()
+            print(f'\n {__name__}.{__class__.__name__}: does not have fb_ctrl, sorrry, raise an error\n')
+            raise(ValueError)
+ 
 #############################
 ##### Simulation updaters
 #############################
