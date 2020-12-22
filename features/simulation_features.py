@@ -552,3 +552,42 @@ class SimPPFDecoderCursorShuffled(object):
         # self._init_neural_encoder()
 
         self.decoder = train._train_PPFDecoder_sim_known_beta(self.beta_full[inds], self.encoder.units, dt=1./180)
+
+def get_enc_setup(sim_mode = 'toy'):
+    # sim_mode:str 
+    #   std:  mn 20 neurons
+    #   'toy' # mn 4 neurons
+
+    if sim_mode == 'toy':
+        #by toy, w mn 4 neurons:
+            #first 2 ctrl x velo
+            #lst 2 ctrl y vel
+        # build a observer matrix
+        N_NEURONS = 4
+        N_STATES = 7  # 3 positions and 3 velocities and an offset
+        # build the observation matrix
+        sim_C = np.zeros((N_NEURONS, N_STATES))
+        # control x positive directions
+        sim_C[0, :] = np.array([0, 0, 0, 1, 0, 0, 0])
+        sim_C[1, :] = np.array([0, 0, 0, -1, 0, 0, 0])
+        # control z positive directions
+        sim_C[2, :] = np.array([0, 0, 0, 0, 0, 1, 0])
+        sim_C[3, :] = np.array([0, 0, 0, 0, 0, -1, 0])
+        
+
+    elif sim_mode ==  'std':
+        # build a observer matrix
+        N_NEURONS = 20
+        N_STATES = 7  # 3 positions and 3 velocities and an offset
+        # build the observation matrix
+        sim_C = np.zeros((N_NEURONS, N_STATES))
+        # control x positive directions
+        sim_C[0, :] = np.array([0, 0, 0, 1, 0, 0, 0])
+        sim_C[1, :] = np.array([0, 0, 0, -1, 0, 0, 0])
+        # control z positive directions
+        sim_C[2, :] = np.array([0, 0, 0, 0, 0, 1, 0])
+        sim_C[3, :] = np.array([0, 0, 0, 0, 0, -1, 0])
+    else:
+        raise Exception(f'not recognized mode {sim_mode}')
+    
+    return (N_NEURONS, N_STATES, sim_C)
