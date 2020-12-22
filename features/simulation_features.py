@@ -151,7 +151,22 @@ class SimTime(object):
 ##### Simulation Feedback controllers
 ##### the stuff actually mimicks higher level of the brain
 #############################
+class SimIntentionLQRController(object):
+    """
+    this class uses feedback contro
+    """
+    def __init__(self, *args, **kwargs):
 
+        ssm = state_space_models.StateSpaceEndptVel2D()
+        A, B, W = ssm.get_ssm_matrices()
+        Q = np.mat(np.diag([1., 1, 1, 0, 0, 0, 0]))
+        R = 10000*np.mat(np.diag([1., 1., 1.]))
+        self.fb_ctrl = feedback_controllers.LQRController(A, B, Q, R)
+        
+        print()
+        print(f'{__name__}.{__class__.__name__}: LQRController used \n')
+
+        super().__init__(*args, **kwargs)
 
 
 #############################
