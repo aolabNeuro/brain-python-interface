@@ -578,6 +578,29 @@ class SimPPFDecoderCursorShuffled(object):
 
         self.decoder = train._train_PPFDecoder_sim_known_beta(self.beta_full[inds], self.encoder.units, dt=1./180)
 
+
+#############################
+##### Simulation learners
+#############################
+class SimDumbLearner(object):
+    """
+    a feature wrapper to set up learner
+    this is essentially a replica of bmi.create_learner
+    but copy and paste here for 
+    1. unnessary redundency 
+    2. trivial understanding
+    """
+    def create_learner(self):
+        '''
+        The "learner" uses knowledge of the task goals to determine the "intended" 
+        action of the BMI subject and pairs this intention estimation with actual observations.
+        '''
+        from riglib.bmi import clda
+        self.learn_flag = False
+        self.learner = clda.DumbLearner()
+
+
+
 def get_enc_setup(sim_mode = 'toy'):
     # sim_mode:str 
     #   std:  mn 20 neurons
