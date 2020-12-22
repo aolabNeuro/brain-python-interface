@@ -147,6 +147,16 @@ class SimTime(object):
         '''
         return 1./60
 
+#############################
+##### Simulation Feedback controllers
+##### the stuff actually mimicks higher level of the brain
+#############################
+
+
+
+#############################
+##### Simulation Encoders
+#############################
 
 class SimNeuralEnc(object):
     def __init__(self, *args, **kwargs):
