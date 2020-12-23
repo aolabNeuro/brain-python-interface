@@ -649,8 +649,44 @@ class SimFeedbackLearner(object):
 #############################
 ##### Simulation updaters
 #############################
+class SimSmoothBatch(object):
+    """
+    this loads a simulation wrapper 
+    for riglib.clda.KFSmoothbatch
+    
+    the below is commment on comment, which is very very important
+    it is labeled as a depreciated updater.
+    how can a classical updater be depreciated?
+    it should not be depreciated for R&D purposes!
+    """
+
+    def __init__(self, *arg, **kwargs):
+        """
+        guess what, this function simplify sets up the key params for
+        the eh smoothbatch clda 
+
+        if you have any doubts, please go to riglib.bmi.KFSmoothBatch for a detailed discussion. 
+        for those leaning towards mathematics, can waste your time on Orsborn 2012 or Dangi 2014. 
+        """
+        # honestly don't know what these params
+        #guess we do need to waste time on the foundational papers
+
+        DEFAULT_BATCH_TIME = 12 
+        DEFAULT_HALF_LIFE = 7 
+        #again, no idea, seems related to how long it takes the weight of the past value drops to 1/2 
+
+        self.batch_time = kwargs['batch_time'] if 'batch_time' in kwargs.keys() else DEFAULT_BATCH_TIME
+        self.half_life =  kwargs['half_life'] if 'half_life' in kwargs.keys() else DEFAULT_HALF_LIFE
 
 
+
+        super().__init__(*arg, **kwargs)
+
+
+    def create_updater(self):
+        self.updater =  clda.KFSmoothbatch(self.batch_time, self.half_life)
+        print()
+        print(f'{__class__.__name__}: created an updater with a batch time of {self.batch_time} and a half_life of {self.half_life} \n')
 
 
 #############################
