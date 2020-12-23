@@ -237,7 +237,11 @@ class SimCosineTunedEnc(SimNeuralEnc):
     def _init_neural_encoder(self):
         ## Simulation neural encoder
         from riglib.bmi.sim_neurons import GenericCosEnc#CLDASimCosEnc
-        print('SimCosineTunedEnc SSM:', self.ssm)
+        from riglib.bmi.state_space_models import StateSpaceEndptVel2D
+
+        self.ssm = StateSpaceEndptVel2D()
+
+        print('\nSimCosineTunedEnc SSM:', self.ssm, '\n')
         self.encoder = GenericCosEnc(self.sim_C, self.ssm, return_ts=True, DT=0.1, call_ds_rate=6)
         
     def create_feature_extractor(self):
@@ -484,7 +488,7 @@ class SimKFDecoderSup(SimKFDecoder):
             #now we can train the decoder. 
             self.decoder = train.train_KFDecoder_abstract(ssm, kin, spike_counts, units, 0.1, zscore=zscore)
             encoder.call_ds_rate = 6
-            
+             
             #save the initial decoder parameters
             self.init_neural_features = spike_counts
             self.init_kin_features = kin
@@ -704,7 +708,7 @@ class DebugFeature(object):
     the purpose of this feature is just to set self.debug_flag to true
 
     to plant this flag everywhere, use the following format
-    if hasattr(self, 'debug_flag):
+    if hasattr(self, 'debug_flag'):
         if self.debug_flag: 
             #do your thing
 
