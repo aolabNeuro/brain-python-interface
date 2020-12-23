@@ -18,10 +18,14 @@ if __name__ == "__main__":
     #generate task params
     N_TARGETS = 8
     N_TRIALS = 6
-    DECODER_MODE = 'random' # in this case we load simulation_features.SimKFDecoderRandom
+
+    #random or 
+    DECODER_MODE = 'trainedKF' # in this case we load simulation_features.SimKFDecoderRandom
     ENCODER_TYPE = 'cosine_tuned_encoder'
-    LEARNER_TYPE = 'feedback' # to dumb or not dumb it is a question
-    UPDATER_TYPE = 'smooth_batch'
+    LEARNER_TYPE = 'dumb' # to dumb or not dumb it is a question 'feedback'
+    UPDATER_TYPE = 'none' #none or "smooth_batch"
+
+    DEBUG_FEATURE = True
 
     seq = SimBMIControlMulti.sim_target_seq_generator_multi(
         N_TARGETS, N_TRIALS)
@@ -32,6 +36,7 @@ if __name__ == "__main__":
     # set up assist level
     assist_level = (0, 0)
 
+    base_class = SimBMIControlMulti
     feats = []
 
     #set up intention feedbackcontroller
@@ -40,20 +45,9 @@ if __name__ == "__main__":
 
 
     #set up the encoder
-    if ENCODER_TYPE == 'cosine_tuned_encoder':
+    if ENCODER_TYPE == 'cosine_tuned_encoder' :
         feats.append(SimCosineTunedEnc)
         print(f'{__name__}: selected SimCosineTunedEnc\n')
-        
-
-    #take care the decoder setup
-    if DECODER_MODE == 'random':
-        base_class = SimBMIControlMulti
-        feats.append(SimKFDecoderRandom)
-        print(f'{__name__}: set base class ')
-        print(f'{__name__}: selected SimKFDecoderRandom \n')
-    else: #defaul to a cosEnc and a pre-traind KF DEC
-        base_class = SimBMICosEncKFDec
-        print(f'{__name__}: set baseclass to SimBMICosEncKFDec\n')
 
 
     #now, we can set up a dumb/or not-dumb learner
@@ -62,7 +56,19 @@ if __name__ == "__main__":
         feats.append(SimFeedbackLearner)
     else:
         from features.simulation_features import SimDumbLearner
-        feats.append(SimFeedbackLearner)
+        feats.append(SimDumbLearner)
+
+       #take care the decoder setup
+    if DECODER_MODE == 'random':
+        feats.append(SimKFDecoderRandom)
+        print(f'{__name__}: set base class ')
+        print(f'{__name__}: selected SimKFDecoderRandom \n')
+    else: #defaul to a cosEnc and a pre-traind KF DEC
+        from features.simulation_features import SimKFDecoderSup
+        feats.append(SimKFDecoderSup)
+        print(f'{__name__}: set decoder to SimKFDecoderSup\n')
+
+    
 
     #you know what? 
     #learner only collects firing rates labeled with estimated estimates
@@ -72,7 +78,12 @@ if __name__ == "__main__":
         from features.simulation_features import SimSmoothBatch
         feats.append(SimSmoothBatch)
     else: #defaut to none 
-        raise(f'{__name__}: need to specify an updater')
+        print(f'{__name__}: need to specify an updater')
+
+
+    if DEBUG_FEATURE: 
+        from features.simulation_features import DebugFeature
+        feats.append(DebugFeature)
 
     #sav everthing in a kw
     kwargs = dict()
