@@ -689,9 +689,32 @@ class SimSmoothBatch(object):
         print(f'{__class__.__name__}: created an updater with a batch time of {self.batch_time} and a half_life of {self.half_life} \n')
 
 
+
+
+
+
+
 #############################
-##### Simulation helper functions
+##### Simulation helper classes/ features
 #############################
+
+
+class DebugFeature(object):
+    """
+    the purpose of this feature is just to set self.debug_flag to true
+
+    to plant this flag everywhere, use the following format
+    if hasattr(self, 'debug_flag):
+        if self.debug_flag: 
+            #do your thing
+
+    
+    """
+    def __init__(self, *args, **kwargs):
+        self.debug_flag = True
+        print(f'{__class__.__name__}:set debug flag to {self.debug_flag}')
+        super().__init__(*args, **kwargs)
+
 def get_enc_setup(sim_mode = 'toy'):
     # sim_mode:str 
     #   std:  mn 20 neurons
