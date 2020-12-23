@@ -20,6 +20,8 @@ if __name__ == "__main__":
     N_TRIALS = 6
     DECODER_MODE = 'random' # in this case we load simulation_features.SimKFDecoderRandom
     ENCODER_TYPE = 'cosine_tuned_encoder'
+    LEARNER_TYPE = 'feedback' # to dumb or not dumb it is a question
+    UPDATER_TYPE = 'smooth_batch'
 
     seq = SimBMIControlMulti.sim_target_seq_generator_multi(
         N_TARGETS, N_TRIALS)
@@ -54,13 +56,31 @@ if __name__ == "__main__":
         print(f'{__name__}: set baseclass to SimBMICosEncKFDec\n')
 
 
+    #now, we can set up a dumb/or not-dumb learner
+    if LEARNER_TYPE == 'feedback':
+        from features.simulation_features import SimFeedbackLearner
+        feats.append(SimFeedbackLearner)
+    else:
+        from features.simulation_features import SimDumbLearner
+        feats.append(SimFeedbackLearner)
+
+    #you know what? 
+    #learner only collects firing rates labeled with estimated estimates
+    #we would also need to use the labeled data
+    #to update the decoder.
+    if UPDATER_TYPE == 'smooth_batch':
+        from features.simulation_features import SimSmoothBatch
+        feats.append(SimSmoothBatch)
+    else: #defaut to none 
+        raise(f'{__name__}: need to specify an updater')
+
     #sav everthing in a kw
     kwargs = dict()
     kwargs['sim_C'] = sim_C
 
     #spawn the task
     Exp = experiment.make(base_class, feats=feats)
-    print(Exp)
+    #print(Exp)
     exp = Exp(seq, **kwargs)
     exp.init()
     exp.run()  # start the task
