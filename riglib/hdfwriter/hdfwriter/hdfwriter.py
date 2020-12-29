@@ -37,6 +37,7 @@ class HDFWriter(object):
         self.data = {}
         self.msgs = {}
         self.f = []
+        self.h5_file_name = filename
     
     def register(self, name, dtype, include_msgs=True):
         '''
@@ -134,5 +135,5 @@ class HDFWriter(object):
         Close the HDF file so that it saves properly after the process terminates
         '''
         self.h5.close()
-        print("Closed hdf")
+        print(f"Closed hdf with filename: {self.h5_file_name}")
 
