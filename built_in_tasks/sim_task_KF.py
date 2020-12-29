@@ -16,16 +16,41 @@ this task uses
 if __name__ == "__main__":
 
     #generate task params
-    N_TARGETS = 8
-    N_TRIALS = 6
+    N_TARGETS = 1
+    N_TRIALS = 1
 
     #random or 
+    """
+    DECODER_MODE = 'random' # in this case we load simulation_features.SimKFDecoderRandom
+    ENCODER_TYPE = 'cosine_tuned_encoder'
+    LEARNER_TYPE = 'feedback' # to dumb or not dumb it is a question 'feedback'
+    UPDATER_TYPE = 'smooth_batch' #none or "smooth_batch"
+
+    """
+
+    #clda on trained decoder
+    #expect to get worse
+
+
+    DECODER_MODE = 'trainedKF' # in this case we load simulation_features.SimKFDecoderRandom
+    ENCODER_TYPE = 'cosine_tuned_encoder'
+    LEARNER_TYPE = 'feedback' # to dumb or not dumb it is a question 'feedback'
+    UPDATER_TYPE = 'smooth_batch' #none or "smooth_batch"
+
+
+
+    """
+    #clda on random 
     DECODER_MODE = 'trainedKF' # in this case we load simulation_features.SimKFDecoderRandom
     ENCODER_TYPE = 'cosine_tuned_encoder'
     LEARNER_TYPE = 'dumb' # to dumb or not dumb it is a question 'feedback'
     UPDATER_TYPE = 'none' #none or "smooth_batch"
+    """
 
-    DEBUG_FEATURE = True
+    SAVE_HDF = True
+
+
+    DEBUG_FEATURE = False
 
     seq = SimBMIControlMulti.sim_target_seq_generator_multi(
         N_TARGETS, N_TRIALS)
@@ -84,6 +109,8 @@ if __name__ == "__main__":
     if DEBUG_FEATURE: 
         from features.simulation_features import DebugFeature
         feats.append(DebugFeature)
+    
+    if SAVE_HDF: feats.append(SaveHDF)
 
     #sav everthing in a kw
     kwargs = dict()
@@ -95,4 +122,12 @@ if __name__ == "__main__":
     exp = Exp(seq, **kwargs)
     exp.init()
     exp.run()  # start the task
+
+
+    #we clearn up and get the saved hdf file
+    N_SLEEP_TIME = 5
+    print(f'{__name__} :sleep {N_SLEEP_TIME} seconds for hdf file to finish')
+    time.sleep(N_SLEEP_TIME)
+    
+    exp.cleanup_hdf()
 
