@@ -488,7 +488,7 @@ class SimKFDecoderSup(SimKFDecoder):
             #now we can train the decoder. 
             self.decoder = train.train_KFDecoder_abstract(ssm, kin, spike_counts, units, 0.1, zscore=zscore)
             encoder.call_ds_rate = 6
-             
+            
             #save the initial decoder parameters
             self.init_neural_features = spike_counts
             self.init_kin_features = kin
@@ -675,8 +675,8 @@ class SimSmoothBatch(object):
         # honestly don't know what these params
         #guess we do need to waste time on the foundational papers
 
-        DEFAULT_BATCH_TIME = 12 
-        DEFAULT_HALF_LIFE = 7 
+        DEFAULT_BATCH_TIME = 60
+        DEFAULT_HALF_LIFE = 1 
         #again, no idea, seems related to how long it takes the weight of the past value drops to 1/2 
 
         self.batch_time = kwargs['batch_time'] if 'batch_time' in kwargs.keys() else DEFAULT_BATCH_TIME
