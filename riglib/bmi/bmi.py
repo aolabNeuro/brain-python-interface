@@ -1342,6 +1342,7 @@ class BMILoop(object):
                 first_update = data[k]
         
             table_col_names = list(first_update.keys())
+            print(f'{__name__}: clda table names')
             print(table_col_names)
             dtype = []
             shapes = []
