@@ -23,7 +23,10 @@ def mask_and_shift(data, bit_mask):
   significant set bit
   l
   """
-  return np.bitwise_and(data, bit_mask) >> ffs(bit_mask)
+  return np.bitwise_and(data, np.uint64(bit_mask)) >> np.uint64(ffs(bit_mask))
+
+def test_mask_and_shift():
+  return
 
 if __name__ == "__main__":
 
@@ -34,15 +37,36 @@ if __name__ == "__main__":
     last_sample = sample[1][-1]
     print(f'last digital value of all channels: {last_sample}')
 
-    long_data = np.squeeze(np.int_(last_sample))
+    long_data = np.squeeze(np.uint64(last_sample))
     print(f'after some conversion: {long_data}')
 
-    masks = [0xff, 0xff00, 0xff0000, 0xff000000]
+    binary_rep = np.binary_repr(long_data)
+    print(f'binary representation:')
+    print(binary_rep + '\n')
+
+    bits = list(binary_rep)
+    print(''.join(bits[-8:]))
+    print(''.join(bits[-16:-8]))
+    print(''.join(bits[-24:-16]))
+    print(''.join(bits[-32:-24]))
+    print(''.join(bits[-40:-32]))
+    print(''.join(bits[-48:-40]))
+    print(''.join(bits[-56:-48]))
+    print(''.join(bits[-64:-56]))
+
+    masks = [0xff, 
+            0xff00, 
+            0xff0000, 
+            0xff000000, 
+            0xff00000000,
+            0xff0000000000,
+            0xff000000000000,
+            0xff00000000000000]
 
     #code_num_1 = mask_and_shift(long_data,0xff)
     
 
-    print(f'print the channels of in groups of 8')
+    print(f'\nprint the channels of in groups of 8')
     print('MSB <- LSB')
     for m in masks:
         code_num_1 = mask_and_shift(long_data,m)
