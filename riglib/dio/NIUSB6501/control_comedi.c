@@ -2,8 +2,6 @@
 #include <comedilib.h>
 #include <unistd.h>
 
-//this c program needs to be compiled first
-//cc control_comedi.c -lcomedi -lm -o control_comedi
 
 /*
 To-do
@@ -34,6 +32,15 @@ int main(int argc,char *argv[])
 	int chan;
 	int mask;
 	int data;
+	int base_channel = 0;
+	int N_CHANNEL = 24;
+
+	for(int i = 0;i<N_CHANNEL;i++){
+					
+			retval = comedi_dio_config(it, subdev, i, COMEDI_OUTPUT);
+			//printf("channel set:%d, retbit %d \n", i, retval);
+
+	}
 
 	switch(mode){
 		case 0: //write to channel
@@ -53,7 +60,8 @@ int main(int argc,char *argv[])
 
 			sscanf(argv[2], "%x", &mask);
 			sscanf(argv[3],"%x", &data);
-			retval = comedi_dio_bitfield(it, subdev, mask, &data);
+			printf("before, channel set to %x, data set to %x \n", mask,  data);
+			retval = comedi_dio_bitfield2(it, subdev, mask, &data, base_channel);
 			printf("channel set to %x, data set to %x \n", mask,  data);
 
 			break;
