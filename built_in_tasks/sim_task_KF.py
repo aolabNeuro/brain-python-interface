@@ -1,6 +1,6 @@
 from bmimultitasks import SimBMIControlMulti, SimBMICosEncKFDec
 from features import SaveHDF
-from features.simulation_features import get_enc_setup, SimKFDecoderRandom, SimCosineTunedEnc,SimIntentionLQRController
+from features.simulation_features import get_enc_setup, SimKFDecoderRandom, SimCosineTunedEnc,SimIntentionLQRController, SimHDF
 from riglib import experiment
 
 import time
@@ -17,35 +17,45 @@ if __name__ == "__main__":
 
     #generate task params
     N_TARGETS = 1
-    N_TRIALS = 1
+    N_TRIALS = 3
+    tuning_level = 70
+    clda_batch_time = 60
+    clda_half_life = 60
 
-    #random or 
-    """
+
+    #clda on random  matrix 
+    '''
     DECODER_MODE = 'random' # in this case we load simulation_features.SimKFDecoderRandom
     ENCODER_TYPE = 'cosine_tuned_encoder'
     LEARNER_TYPE = 'feedback' # to dumb or not dumb it is a question 'feedback'
     UPDATER_TYPE = 'smooth_batch' #none or "smooth_batch"
 
-    """
+    
+
+
 
     #clda on trained decoder
     #expect to get worse
+    '''
 
-
+    
     DECODER_MODE = 'trainedKF' # in this case we load simulation_features.SimKFDecoderRandom
     ENCODER_TYPE = 'cosine_tuned_encoder'
     LEARNER_TYPE = 'feedback' # to dumb or not dumb it is a question 'feedback'
     UPDATER_TYPE = 'smooth_batch' #none or "smooth_batch"
+    
 
 
 
-    """
-    #clda on random 
+
+
+    #on random 
+    '''
     DECODER_MODE = 'trainedKF' # in this case we load simulation_features.SimKFDecoderRandom
     ENCODER_TYPE = 'cosine_tuned_encoder'
     LEARNER_TYPE = 'dumb' # to dumb or not dumb it is a question 'feedback'
     UPDATER_TYPE = 'none' #none or "smooth_batch"
-    """
+    '''
 
     SAVE_HDF = True
 
@@ -56,7 +66,7 @@ if __name__ == "__main__":
         N_TARGETS, N_TRIALS)
 
     #neuron set up : 'std (20 neurons)' or 'toy (4 neurons)' 
-    N_NEURONS, N_STATES, sim_C = get_enc_setup(sim_mode = 'toy')
+    N_NEURONS, N_STATES, sim_C = get_enc_setup(sim_mode = 'toy', tuning_level=tuning_level)
 
     # set up assist level
     assist_level = (0, 0)
@@ -110,11 +120,14 @@ if __name__ == "__main__":
         from features.simulation_features import DebugFeature
         feats.append(DebugFeature)
     
-    if SAVE_HDF: feats.append(SaveHDF)
+    if SAVE_HDF: feats.append(SimHDF)
 
     #sav everthing in a kw
     kwargs = dict()
     kwargs['sim_C'] = sim_C
+
+    kwargs['batch_time'] = clda_batch_time
+    kwargs['half_life'] = clda_half_life
 
     #spawn the task
     Exp = experiment.make(base_class, feats=feats)
