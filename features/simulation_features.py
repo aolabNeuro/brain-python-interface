@@ -75,6 +75,23 @@ class SimHDF(object):
         None
         '''
         self.msgs.append((msg, -1))
+    
+    def set_state(self, condition, **kwargs):
+        '''
+        mimicks hdf_features 
+        Save task state transitions to HDF
+
+        Parameters
+        ----------
+        condition: string
+            Name of new state to transition into. The state name must be a key in the 'status' dictionary attribute of the task
+
+        Returns
+        -------
+        None
+        '''
+        self.sendMsg(condition)
+        super(SimHDF, self).set_state(condition, **kwargs)
 
     def _cycle(self):
         super(SimHDF, self)._cycle()
@@ -131,8 +148,6 @@ class SimTime(object):
         Simulates time based on Delta*cycle_count, where the update_rate is specified as an instance attribute
         '''
         try:
-            if not (self.cycle_count % (60*10)):
-                print(self.cycle_count/(60*10.))
             return self.cycle_count * self.update_rate
 
         except:
