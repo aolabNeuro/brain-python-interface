@@ -7,6 +7,22 @@ COMEDI_DIO_WRITE = 0 #this writes to a channel
 COMEDI_DIO_BITFIELD = 1 #tis writes to multiple channel
 MODULE_FOLDER_PATH = os.path.dirname(__file__)
 
+
+def check_comedi() -> bool:
+    '''
+    this function checks whether 
+    comedi is working by simply checking the return has the comedi string in it
+    it is knd of useless
+    '''
+    cmd = 'cat /proc/comedi'
+    
+    retval = subprocess_write(cmd, debug=True)
+
+    if 'comedi' in retval.decode("utf-8"): 
+        return True
+    else: 
+        return False
+
 def write_to_comedi(data, mask = 255, debug = False):
     '''
     data: an integer bet. 0 and 255 (inclusive) that maps to the 8 bit channels. 
@@ -47,6 +63,25 @@ def time_write_to_comedi():
 
     return t2 - t1
 
+def subprocess_write(cmd:str, debug:bool = False) -> bytes:
+    '''
+    helper function that writes a command and returns a string
+    note that it only returns the first line
+    '''
+    if debug: print(f'{__name__}: system command: {cmd}')
+
+    proc = subprocess.Popen(split(cmd), 
+                        stderr= subprocess.PIPE,
+                        stdout= subprocess.PIPE,
+                        stdin= subprocess.PIPE,
+                        shell = False)
+    retval = (proc.stdout.readline())
+
+    if debug: print(f'{__name__}: one line received: {retval}')
+
+    proc.stdout.flush()
+
+    return retval
 
 
 if __name__ == "__main__":
