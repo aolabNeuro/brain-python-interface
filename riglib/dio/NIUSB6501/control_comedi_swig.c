@@ -11,7 +11,7 @@ comedi_t* ni;
 int subdev = 0;		/* change this to your input subdevice */
 int base_channel = 0;
 
-extern uchar init(char* dev) {
+extern uchar comedi_init(char* dev) {
     uint i, nchan;
     ni = comedi_open(dev);
     if (ni == NULL) {
@@ -27,7 +27,7 @@ extern uchar init(char* dev) {
     return 0;
 }
 
-extern int set_bits_in_nidaq(int mask, int data) {
+extern int set_bits_in_nidaq_using_mask_and_data(int mask, int data) {
 
     int retval = comedi_dio_bitfield2(ni, subdev, mask, &data, base_channel);
     return retval;
