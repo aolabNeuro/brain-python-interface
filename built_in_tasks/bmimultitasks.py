@@ -4,8 +4,10 @@ BMI tasks in the new structure, i.e. inheriting from manualcontrolmultitasks
 import numpy as np
 import time, random
 
-from riglib.experiment import traits, experiment
+from riglib.experiment import traits, experiment, Sequence
 from features.bmi_task_features import LinearlyDecreasingAssist, LinearlyDecreasingHalfLife
+from built_in_tasks.plantlist import plantlist
+
 
 import os
 from riglib.bmi import clda, assist, extractor, train, goal_calculators, ppfdecoder
@@ -657,3 +659,369 @@ class SimBMIVelocityLinDec(SimBMICosEncLinDec):
 
         super(SimBMICosEncLinDec, self).__init__(*args, **kwargs)
         
+
+from built_in_tasks.target_graphics import VirtualCircularTarget
+class ControlMultiNoWindow(Sequence):
+    '''
+    models after manualControlMultiTasks
+        perserves the trial structure
+        but gets rid of the display completely
+
+    simulation happens in the mind, who needs a screen.  
+    learning happens in our brain not on the screen
+    Author Si Jia, Jan 2021
+    '''
+
+    '''
+    for the class attributs
+    copied and pastes most of the stuff.
+    but the following is not included from manualCursorControl
+
+    background = (0,0,0,1)
+    cursor_color = (.5,0,.5,1)
+
+    target_color = (1,0,0,.5)
+    cursor_visible = False # Determines when to hide the cursor.
+
+    '''
+
+    starting_pos = (5, 0, 5)
+
+    status = dict(
+        wait = dict(start_trial="target", stop=None),
+        target = dict(enter_target="hold", timeout="timeout_penalty", stop=None),
+        hold = dict(leave_early="hold_penalty", hold_complete="targ_transition", stop=None),
+        targ_transition = dict(trial_complete="reward",trial_abort="wait", trial_incomplete="target", stop=None),
+        timeout_penalty = dict(timeout_penalty_end="targ_transition", stop=None),
+        hold_penalty = dict(hold_penalty_end="targ_transition", stop=None),
+        reward = dict(reward_end="wait")
+    )
+
+    trial_end_states = ['reward', 'timeout_penalty', 'hold_penalty']
+
+    RED = (1,0,0,.5)
+    _target_color = RED
+
+    #initial state
+    state = "wait"
+    target_index = -1 # Helper variable to keep track of which target to display within a trial
+    tries = 0 # Helper variable to keep track of the number of failed attempts at a given trial.
+
+    no_data_count = 0 # Counter for number of missing data frames in a row
+    scale_factor = 3.0 #scale factor for converting hand movement to screen movement (1cm hand movement = 3.5cm cursor movement)
+
+    sequence_generators = ['centerout_2D_discrete', 'centerout_2D_discrete_offset', 'point_to_point_3D', 'centerout_3D', 'centerout_3D_cube', 'centerout_2D_discrete_upper','centerout_2D_discrete_rot', 'centerout_2D_discrete_multiring',
+        'centerout_2D_discrete_randorder', 'centeroutback_2D', 'centeroutback_2D_farcatch', 'centeroutback_2D_farcatch_discrete',
+        'outcenterout_2D_discrete', 'outcenter_2D_discrete', 'rand_target_sequence_3d', 'rand_target_sequence_2d', 'rand_target_sequence_2d_centerout',
+        'rand_target_sequence_2d_partial_centerout', 'rand_multi_sequence_2d_centerout2step', 'rand_pt_to_pt',
+        'centerout_2D_discrete_far', 'centeroutback_2D_v2','centerout_2D_discrete_eyetracker_calibration']
+    is_bmi_seed = True
+
+
+    # Runtime settable traits
+    reward_time = traits.Float(.2, desc="Length of juice reward")
+    target_radius = traits.Float(2, desc="Radius of targets in cm")
+    
+    hold_time = traits.Float(.2, desc="Length of hold required at targets")
+    hold_penalty_time = traits.Float(1, desc="Length of penalty time for target hold error")
+    timeout_time = traits.Float(10, desc="Time allowed to go between targets")
+    timeout_penalty_time = traits.Float(1, desc="Length of penalty time for timeout error")
+    max_attempts = traits.Int(10, desc='The number of attempts at a target before\
+        skipping to the next one')
+    # session_length = traits.Float(0, desc="Time until task automatically stops. Length of 0 means no auto stop.")
+    marker_num = traits.Int(14, desc="The index of the motiontracker marker to use for cursor position")
+
+
+    plant_hide_rate = traits.Float(0.0, desc='If the plant is visible, specifies a percentage of trials where it will be hidden')    
+    plant_type_options = list(plantlist.keys())
+    plant_type = traits.OptionsList(*plantlist, bmi3d_input_options=list(plantlist.keys()))
+    plant_visible = traits.Bool(True, desc='Specifies whether entire plant is displayed or just endpoint')
+    cursor_radius = traits.Float(.5, desc="Radius of cursor")
+
+
+
+    def __init__(self, *args, **kwargs):
+        super(ControlMultiNoWindow, self).__init__(*args, **kwargs)
+        #self.cursor_visible = True
+
+        # Initialize the plant
+        if not hasattr(self, 'plant'):
+            self.plant = plantlist[self.plant_type]
+        #self.plant_vis_prev = True
+
+
+        # Instantiate the targets
+        instantiate_targets = kwargs.pop('instantiate_targets', True)
+        if instantiate_targets:
+            target1 = VirtualCircularTarget(target_radius=self.target_radius, target_color=self._target_color)
+            target2 = VirtualCircularTarget(target_radius=self.target_radius, target_color=self._target_color)
+
+            self.targets = [target1, target2]
+
+        # Initialize target location variable
+        self.target_location = np.array([0, 0, 0])
+
+        # Declare any plant attributes which must be saved to the HDF file at the _cycle rate
+        for attr in self.plant.hdf_attrs:
+            self.add_dtype(*attr)
+
+    def init(self):
+        self.add_dtype('target', 'f8', (3,))
+        self.add_dtype('target_index', 'i', (1,))
+        super(ControlMultiNoWindow, self).init()
+
+
+    def _cycle(self):
+        '''
+        Calls any update functions necessary 
+        '''
+        self.task_data['target'] = self.target_location.copy()
+        self.task_data['target_index'] = self.target_index
+
+
+        self.move_effector()
+
+        ## Save plant status to HDF file
+        plant_data = self.plant.get_data_to_save()
+        for key in plant_data:
+            self.task_data[key] = plant_data[key]
+
+        super(ControlMultiNoWindow, self)._cycle()
+
+
+    def move_effector(self):
+        '''
+        mainly for sim, default do don't do anything
+        '''
+        pass
+
+
+    def run(self):
+        '''
+        See experiment.Experiment.run for documentation. 
+        '''
+        # Fire up the plant. For virtual/simulation plants, this does little/nothing.
+        self.plant.start()
+        try:
+            super(ControlMultiNoWindow, self).run()
+        finally:
+            self.plant.stop()
+
+    def update_report_stats(self):
+        '''
+        see experiment.Experiment.update_report_stats for docs
+        '''
+        super(ControlMultiNoWindow, self).update_report_stats()
+        self.reportstats['Trial #'] = self.calc_trial_num()
+        self.reportstats['Reward/min'] = np.round(self.calc_events_per_min('reward', 120.), decimals=2)
+
+
+
+
+       #### TEST FUNCTIONS ####
+    def _test_enter_target(self, ts):
+        '''
+        return true if the distance between center of cursor and target is smaller than the cursor radius
+        '''
+        cursor_pos = self.plant.get_endpoint_pos()
+        d = np.linalg.norm(cursor_pos - self.target_location)
+        return d <= (self.target_radius - self.cursor_radius)
+        
+    def _test_leave_early(self, ts):
+        '''
+        return true if cursor moves outside the exit radius
+        '''
+        cursor_pos = self.plant.get_endpoint_pos()
+        d = np.linalg.norm(cursor_pos - self.target_location)
+        rad = self.target_radius - self.cursor_radius
+        return d > rad
+
+    def _test_hold_complete(self, ts):
+        return ts>=self.hold_time
+
+    def _test_timeout(self, ts):
+        return ts>self.timeout_time
+
+    def _test_timeout_penalty_end(self, ts):
+        return ts>self.timeout_penalty_time
+
+    def _test_hold_penalty_end(self, ts):
+        return ts>self.hold_penalty_time
+
+    def _test_trial_complete(self, ts):
+        return self.target_index==self.chain_length-1
+
+    def _test_trial_incomplete(self, ts):
+        return (not self._test_trial_complete(ts)) and (self.tries<self.max_attempts)
+
+    def _test_trial_abort(self, ts):
+        return (not self._test_trial_complete(ts)) and (self.tries==self.max_attempts)
+
+    def _test_reward_end(self, ts):
+        return ts>self.reward_time
+
+
+        #### STATE FUNCTIONS ####
+    def _parse_next_trial(self):
+        self.targs = self.next_trial
+
+
+    def _start_wait(self):
+        super(ControlMultiNoWindow, self)._start_wait()
+        self.tries = 0
+        self.target_index = -1
+
+        self.chain_length = self.targs.shape[0] #Number of sequential targets in a single trial
+
+
+    def _start_target(self):
+        self.target_index += 1
+
+        #move a target to current location (target1 and target2 alternate moving) and set location attribute
+        target = self.targets[self.target_index % 2]
+        self.target_location = self.targs[self.target_index]
+        target.move_to_position(self.target_location)
+        #target.cue_trial_start()
+
+
+    def _start_hold(self):
+        #make next target visible unless this is the final target in the trial
+        idx = (self.target_index + 1)
+        if idx < self.chain_length: 
+            target = self.targets[idx % 2]
+            target.move_to_position(self.targs[idx])
+
+
+    def _end_hold(self):
+        # change current target color to green
+        #self.targets[self.target_index % 2].cue_trial_end_success()
+        pass
+
+
+
+    def _start_hold_penalty(self):
+
+        self.tries += 1
+        self.target_index = -1
+
+    def _start_timeout_penalty(self):
+
+        self.tries += 1
+        self.target_index = -1
+
+
+    def _start_targ_transition(self):
+        pass
+
+    def _start_reward(self):
+        pass
+
+
+
+
+class BMIControlMultiNoWindow(BMILoop, LinearlyDecreasingAssist, ControlMultiNoWindow):
+    '''
+    Target capture task with cursor position controlled by BMI output.
+    Cursor movement can be assisted toward target by setting assist_level > 0.
+    '''
+
+    #background = (.5,.5,.5,1) # Set the screen background color to grey
+    reset = traits.Int(0, desc='reset the decoder state to the starting configuration')
+
+    ordered_traits = ['session_length', 'assist_level', 'assist_level_time', 'reward_time','timeout_time','timeout_penalty_time']
+    exclude_parent_traits = ['marker_count', 'marker_num', 'goal_cache_block']
+
+    static_states = [] # states in which the decoder is not run
+    hidden_traits = ['arm_hide_rate', 'arm_visible', 'hold_penalty_time', 'rand_start', 'reset', 'target_radius', 'window_size']
+
+    is_bmi_seed = False
+
+    #cursor_color_adjust = traits.OptionsList(*list(target_colors.keys()), bmi3d_input_options=list(target_colors.keys()))
+
+    def __init__(self, *args, **kwargs):     
+        super(BMIControlMultiNoWindow, self).__init__(*args, **kwargs)
+
+    def init(self, *args, **kwargs):
+        sph = self.plant.graphics_models[0]
+        #sph.color = target_colors[self.cursor_color_adjust] no window, no color
+        sph.radius = self.cursor_radius
+        self.plant.cursor_radius = self.cursor_radius   
+        self.plant.cursor.radius = self.cursor_radius
+        super(BMIControlMultiNoWindow, self).init(*args, **kwargs)
+
+
+    #the following two functions from BMIControlMulti
+    def _start_wait(self):
+        self.wait_time = 0.
+        super(BMIControlMultiNoWindow, self)._start_wait()
+
+    def _test_start_trial(self, ts):
+        return ts > self.wait_time and not self.pause
+
+
+    def move_effector(self, *args, **kwargs):
+        pass
+
+    def create_assister(self):
+        # Create the appropriate type of assister object
+        start_level, end_level = self.assist_level
+        kwargs = dict(decoder_binlen=self.decoder.binlen, target_radius=self.target_radius)
+        if hasattr(self, 'assist_speed'):
+            kwargs['assist_speed'] = self.assist_speed
+
+        if isinstance(self.decoder.ssm, StateSpaceEndptVel2D) and isinstance(self.decoder, ppfdecoder.PPFDecoder):
+            self.assister = OFCEndpointAssister()
+        elif isinstance(self.decoder.ssm, StateSpaceEndptVel2D):
+            self.assister = SimpleEndpointAssister(**kwargs)
+        else:
+            raise NotImplementedError("Cannot assist for this type of statespace: %r" % self.decoder.ssm)        
+        
+        print(self.assister)
+
+    def create_goal_calculator(self):
+        if isinstance(self.decoder.ssm, StateSpaceEndptVel2D):
+            self.goal_calculator = goal_calculators.ZeroVelocityGoal(self.decoder.ssm)
+        elif isinstance(self.decoder.ssm, StateSpaceNLinkPlanarChain) and self.decoder.ssm.n_links == 2:
+            self.goal_calculator = goal_calculators.PlanarMultiLinkJointGoal(self.decoder.ssm, self.plant.base_loc, self.plant.kin_chain, multiproc=False, init_resp=None)
+        elif isinstance(self.decoder.ssm, StateSpaceNLinkPlanarChain) and self.decoder.ssm.n_links == 4:
+            shoulder_anchor = self.plant.base_loc
+            chain = self.plant.kin_chain
+            q_start = self.plant.get_intrinsic_coordinates()
+            x_init = np.hstack([q_start, np.zeros_like(q_start), 1])
+            x_init = np.mat(x_init).reshape(-1, 1)
+
+            cached = True
+
+            if cached:
+                goal_calc_class = goal_calculators.PlanarMultiLinkJointGoalCached
+                multiproc = False
+            else:
+                goal_calc_class = goal_calculators.PlanarMultiLinkJointGoal
+                multiproc = True
+
+            self.goal_calculator = goal_calc_class(namelist.tentacle_2D_state_space, shoulder_anchor, 
+                                                   chain, multiproc=multiproc, init_resp=x_init)
+        else:
+            raise ValueError("Unrecognized decoder state space!")
+
+    def get_target_BMI_state(self, *args):
+        '''
+        Run the goal calculator to determine the target state of the task
+        '''
+        if isinstance(self.goal_calculator, goal_calculators.PlanarMultiLinkJointGoalCached):
+            task_eps = np.inf
+        else:
+            task_eps = 0.5
+        ik_eps = task_eps/10
+        data, solution_updated = self.goal_calculator(self.target_location, verbose=False, n_particles=500, eps=ik_eps, n_iter=10, q_start=self.plant.get_intrinsic_coordinates())
+        target_state, error = data
+
+        if isinstance(self.goal_calculator, goal_calculators.PlanarMultiLinkJointGoal) and error > task_eps and solution_updated:
+            self.goal_calculator.reset()
+
+        return np.array(target_state).reshape(-1,1)
+
+    def _end_timeout_penalty(self):
+        if self.reset:
+            self.decoder.filt.state.mean = self.init_decoder_mean
+            self.hdf.sendMsg("reset")

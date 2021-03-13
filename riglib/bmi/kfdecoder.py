@@ -8,6 +8,7 @@ from scipy.io import loadmat
 from . import bmi
 import pickle
 import re
+import copy
 
 class KalmanFilter(bmi.GaussianStateHMM):
     """
@@ -50,6 +51,17 @@ class KalmanFilter(bmi.GaussianStateHMM):
             self.W = np.mat(W)
             self.C = np.mat(C)
             self.Q = np.mat(Q)
+            self.K = np.nan
+            self.KC = np.nan
+
+            self.obs_t = np.nan
+            self.pred_state_mean = np.nan
+            self.post_state_mean = np.nan
+
+            self.pred_state_P = np.nan
+            self.post_state_P = np.nan
+            
+
 
             if is_stochastic is None:
                 n_states = self.A.shape[0]
@@ -129,6 +141,9 @@ class KalmanFilter(bmi.GaussianStateHMM):
         using_control_input = (Bu is not None) or (u is not None) or (x_target is not None)
         pred_state = self._ssm_pred(st, target_state=x_target, Bu=Bu, u=u, F=F)
 
+        self.pred_state_mean = copy.deepcopy(pred_state.mean)
+        self.pred_state_P = copy.deepcopy(pred_state.cov)
+
         C, Q = self.C, self.Q
         P = pred_state.cov
 
@@ -146,6 +161,15 @@ class KalmanFilter(bmi.GaussianStateHMM):
             post_state.mean += -KC*pred_state.mean + K*obs_t
 
         post_state.cov = (I - KC) * P 
+
+    
+        #save everything
+        self.obs_t = np.mat(obs_t)
+        self.KC = np.mat(KC)
+        self.K = np.mat(K)
+
+        self.post_state_mean = copy.deepcopy(post_state.mean)
+        self.post_state_P = copy.deepcopy(post_state.cov)
 
         return post_state
 

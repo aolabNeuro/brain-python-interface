@@ -75,6 +75,23 @@ class SimHDF(object):
         None
         '''
         self.msgs.append((msg, -1))
+    
+    def set_state(self, condition, **kwargs):
+        '''
+        mimicks hdf_features 
+        Save task state transitions to HDF
+
+        Parameters
+        ----------
+        condition: string
+            Name of new state to transition into. The state name must be a key in the 'status' dictionary attribute of the task
+
+        Returns
+        -------
+        None
+        '''
+        self.sendMsg(condition)
+        super(SimHDF, self).set_state(condition, **kwargs)
 
     def _cycle(self):
         super(SimHDF, self)._cycle()
@@ -131,8 +148,6 @@ class SimTime(object):
         Simulates time based on Delta*cycle_count, where the update_rate is specified as an instance attribute
         '''
         try:
-            if not (self.cycle_count % (60*10)):
-                print(self.cycle_count/(60*10.))
             return self.cycle_count * self.update_rate
 
         except:
@@ -675,14 +690,16 @@ class SimSmoothBatch(object):
         # honestly don't know what these params
         #guess we do need to waste time on the foundational papers
 
-        DEFAULT_BATCH_TIME = 60
-        DEFAULT_HALF_LIFE = 1 
+        DEFAULT_BATCH_TIME = 1
+        DEFAULT_HALF_LIFE = 60 
         #again, no idea, seems related to how long it takes the weight of the past value drops to 1/2 
 
         self.batch_time = kwargs['batch_time'] if 'batch_time' in kwargs.keys() else DEFAULT_BATCH_TIME
         self.half_life =  kwargs['half_life'] if 'half_life' in kwargs.keys() else DEFAULT_HALF_LIFE
 
-
+        #we are going to print out the rhos, sort of thing. 
+        rho = np.exp(np.log(0.5)/(self.half_life/self.batch_time))
+        print(f'{__name__}.{__class__.__name__}: rho in this simulation is  {rho}\n')
 
         super().__init__(*arg, **kwargs)
 
@@ -719,10 +736,18 @@ class DebugFeature(object):
         print(f'{__class__.__name__}:set debug flag to {self.debug_flag}')
         super().__init__(*args, **kwargs)
 
-def get_enc_setup(sim_mode = 'toy'):
-    # sim_mode:str 
-    #   std:  mn 20 neurons
-    #   'toy' # mn 4 neurons
+def get_enc_setup(sim_mode = 'toy', tuning_level = 1):
+    '''
+    sim_mode:str 
+       std:  mn 20 neurons
+       'toy' # mn 4 neurons
+
+    tuning_level: float 
+        the tuning level at which a particular direction the firng rate is tuned
+        the higeer the better
+    '''
+
+    print(f'{__name__}: get_enc_setup has a tuning_level of {tuning_level} \n')
 
     if sim_mode == 'toy':
         #by toy, w mn 4 neurons:
@@ -733,12 +758,14 @@ def get_enc_setup(sim_mode = 'toy'):
         N_STATES = 7  # 3 positions and 3 velocities and an offset
         # build the observation matrix
         sim_C = np.zeros((N_NEURONS, N_STATES))
+
+
         # control x positive directions
-        sim_C[0, :] = np.array([0, 0, 0, 1, 0, 0, 0])
-        sim_C[1, :] = np.array([0, 0, 0, -1, 0, 0, 0])
+        sim_C[0, :] = np.array([0, 0, 0, tuning_level, 0, 0, 0])
+        sim_C[1, :] = np.array([0, 0, 0, -tuning_level, 0, 0, 0])
         # control z positive directions
-        sim_C[2, :] = np.array([0, 0, 0, 0, 0, 1, 0])
-        sim_C[3, :] = np.array([0, 0, 0, 0, 0, -1, 0])
+        sim_C[2, :] = np.array([0, 0, 0, 0, 0, tuning_level, 0])
+        sim_C[3, :] = np.array([0, 0, 0, 0, 0, -tuning_level, 0])
         
 
     elif sim_mode ==  'std':
@@ -748,11 +775,11 @@ def get_enc_setup(sim_mode = 'toy'):
         # build the observation matrix
         sim_C = np.zeros((N_NEURONS, N_STATES))
         # control x positive directions
-        sim_C[0, :] = np.array([0, 0, 0, 1, 0, 0, 0])
-        sim_C[1, :] = np.array([0, 0, 0, -1, 0, 0, 0])
+        sim_C[0, :] = np.array([0, 0, 0, tuning_level, 0, 0, 0])
+        sim_C[1, :] = np.array([0, 0, 0, -tuning_level, 0, 0, 0])
         # control z positive directions
-        sim_C[2, :] = np.array([0, 0, 0, 0, 0, 1, 0])
-        sim_C[3, :] = np.array([0, 0, 0, 0, 0, -1, 0])
+        sim_C[2, :] = np.array([0, 0, 0, 0, 0, tuning_level, 0])
+        sim_C[3, :] = np.array([0, 0, 0, 0, 0, -tuning_level, 0])
     else:
         raise Exception(f'not recognized mode {sim_mode}')
     

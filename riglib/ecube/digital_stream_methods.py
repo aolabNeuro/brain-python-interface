@@ -21,7 +21,7 @@ def ffs(x):
 def mask_and_shift(data, bit_mask):
   """Apply bit mask and shift to the least
   significant set bit
-  l
+  author leo: 
   """
   return np.bitwise_and(data, np.uint64(bit_mask)) >> np.uint64(ffs(bit_mask))
 
