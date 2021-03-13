@@ -1,4 +1,10 @@
 from riglib.dio.NIUSB6501 import write_to_comedi
+import time
+
+'''
+TO-DO 
+this needs abstracton and encapsulation
+'''
     
 class TaskCodeStreamer(object):
 
@@ -14,11 +20,13 @@ class TaskCodeStreamer(object):
     #binary state, reward or not
     TaskCodeDict = {
         'wait': 0,
-        'target':0, #target appears
-        'hold': 0,
-        'targ_transition': 0,
-        'reward': 1
+        'target':1, #target appears
+        'hold': 2,
+        'targ_transition': 3,
+        'reward': 4,
+        'None':255
     }
+    NONE_CODE = 255
 
 
     def __init__(self, *args, **kwargs):
@@ -43,9 +51,27 @@ class TaskCodeStreamer(object):
         '''
         if condition in self.TaskCodeDict.keys():
             print(f'transition to {condition} with task code {self.TaskCodeDict[condition]}')
+            write_to_comedi(self.TaskCodeDict[condition])
+        elif condition is None:
+            print(f'transition to {condition}')
+            write_to_comedi(self.NONE_CODE)
         else:
             print(f'transition to {condition}')
 
-        write_to_comedi(self.TaskCodeDict[condition])
+        
 
         super().set_state(condition, **kwargs)
+
+
+
+if __name__ == "__main__":
+    #testing script
+    #that flashes every 0.4 second
+
+    while 1:
+        write_to_comedi(0)
+        time.sleep(0.2)
+
+        write_to_comedi(255)
+        time.sleep(0.2)
+    

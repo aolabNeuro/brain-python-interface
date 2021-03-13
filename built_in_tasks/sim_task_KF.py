@@ -1,5 +1,6 @@
 from bmimultitasks import SimBMIControlMulti, SimBMICosEncKFDec
 from features import SaveHDF
+from features.task_code_features import TaskCodeStreamer
 from features.simulation_features import get_enc_setup, SimKFDecoderRandom, SimCosineTunedEnc,SimIntentionLQRController
 from riglib import experiment
 
@@ -17,7 +18,7 @@ if __name__ == "__main__":
 
     #generate task params
     N_TARGETS = 1
-    N_TRIALS = 1
+    N_TRIALS = 3
 
     #random or 
     """
@@ -31,7 +32,7 @@ if __name__ == "__main__":
     #clda on trained decoder
     #expect to get worse
 
-
+    """
     DECODER_MODE = 'trainedKF' # in this case we load simulation_features.SimKFDecoderRandom
     ENCODER_TYPE = 'cosine_tuned_encoder'
     LEARNER_TYPE = 'feedback' # to dumb or not dumb it is a question 'feedback'
@@ -40,17 +41,16 @@ if __name__ == "__main__":
 
 
     """
-    #clda on random 
+    #no clda 
     DECODER_MODE = 'trainedKF' # in this case we load simulation_features.SimKFDecoderRandom
     ENCODER_TYPE = 'cosine_tuned_encoder'
     LEARNER_TYPE = 'dumb' # to dumb or not dumb it is a question 'feedback'
     UPDATER_TYPE = 'none' #none or "smooth_batch"
-    """
+    
 
     SAVE_HDF = True
-
-
     DEBUG_FEATURE = False
+    TASK_CODE_STREAMER = True
 
     seq = SimBMIControlMulti.sim_target_seq_generator_multi(
         N_TARGETS, N_TRIALS)
@@ -109,6 +109,8 @@ if __name__ == "__main__":
     if DEBUG_FEATURE: 
         from features.simulation_features import DebugFeature
         feats.append(DebugFeature)
+
+    if TASK_CODE_STREAMER: feats.append(TaskCodeStreamer)
     
     if SAVE_HDF: feats.append(SaveHDF)
 
