@@ -39,7 +39,7 @@ if __name__ == "__main__":
     '''
 
     
-    DECODER_MODE = 'trainedKF' # in this case we load simulation_features.SimKFDecoderRandom
+    DECODER_MODE = 'random' # in this case we load simulation_features.SimKFDecoderRandom
     ENCODER_TYPE = 'cosine_tuned_encoder'
     LEARNER_TYPE = 'feedback' # to dumb or not dumb it is a question 'feedback'
     UPDATER_TYPE = 'smooth_batch' #none or "smooth_batch"
@@ -69,7 +69,7 @@ if __name__ == "__main__":
     N_NEURONS, N_STATES, sim_C = get_enc_setup(sim_mode = 'toy', tuning_level=tuning_level)
 
     # set up assist level
-    assist_level = (0, 0)
+    assist_level = (1, 0)
 
     base_class = SimBMIControlMulti
     feats = []
@@ -128,6 +128,7 @@ if __name__ == "__main__":
 
     kwargs['batch_time'] = clda_batch_time
     kwargs['half_life'] = clda_half_life
+    kwargs['assist_level'] = assist_level
 
     #spawn the task
     Exp = experiment.make(base_class, feats=feats)
@@ -135,6 +136,7 @@ if __name__ == "__main__":
     exp = Exp(seq, **kwargs)
     exp.init()
     exp.run()  # start the task
+    exp.decoder.plot_K()
 
 
     #we clearn up and get the saved hdf file

@@ -267,6 +267,31 @@ class SimCosineTunedEnc(SimNeuralEnc):
             n_subbins=self.decoder.n_subbins, units=self.decoder.units, task=self)
         self._add_feature_extractor_dtype()
 
+class SimCosineTunedEncWithPoissonNoises(SimCosineTunedEnc):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__( *args, **kwargs)
+
+        #assert 'percent_poission_noise' in kwargs.keys()
+        self.percent_poisson_noise = kwargs['percent_noise']
+        self.fixed_noise_level = kwargs['fixed_noise_level']
+        self.noise_mode = kwargs['noise_mode']
+
+        print(f'{__class__}: added CosineTunedEncWithNoise ')
+
+    
+    def _init_neural_encoder(self):
+        ## Simulation neural encoder
+        from riglib.bmi.sim_neurons import GenericCosEncWithNoise
+        from riglib.bmi.state_space_models import StateSpaceEndptVel2D
+
+        self.ssm = StateSpaceEndptVel2D()
+
+        print('\n using encoder with additional noises ', self.ssm, '\n')
+        self.encoder = GenericCosEncWithNoise(self.sim_C, self.ssm, noise_profile= self.percent_poisson_noise,
+                                            return_ts=True, DT=0.1, call_ds_rate=6)
+        
+
 class SimNormCosineTunedEnc(SimNeuralEnc):
 
     def _init_neural_encoder(self):
@@ -370,6 +395,24 @@ class SimKFDecoder(object):
     def __init__(self, *args, **kwargs):
         super(SimKFDecoder, self).__init__(*args, **kwargs)
 
+    def init(self, *args, **kwargs):
+        units = self.encoder.get_units()
+        n_units = len(units)
+        NUM_STATES  = 7 
+        self.add_dtype('obs_t', 'f8', (n_units,1))
+        self.add_dtype('K', 'f8', (NUM_STATES,n_units))
+        self.add_dtype('KC', 'f8', (NUM_STATES,NUM_STATES))
+
+        self.add_dtype('pred_state_mean', 'f8', (NUM_STATES,1))
+        self.add_dtype('post_state_mean', 'f8', (NUM_STATES,1))
+
+        self.add_dtype('pred_state_P', 'f8', (NUM_STATES,NUM_STATES))
+        self.add_dtype('post_state_P', 'f8', (NUM_STATES,NUM_STATES))
+
+        print(f'{__name__}: added tracking of K matrix')
+
+        super().init(*args, **kwargs)
+
     def change_dec_ssm(self):
         decoder_old = self.decoder_old
         ssm_old = decoder_old.ssm
@@ -417,6 +460,9 @@ class SimKFDecoderSup(SimKFDecoder):
     '''
     Construct a KFDecoder based on encoder output in response to states simulated according to the state space model's process noise
     '''
+
+
+
     def load_decoder(self, supplied_encoder = None, supplied_SSM = None,  n_samples = 2000):
         '''
         Instantiate the neural encoder and "train" the decoder
@@ -551,6 +597,8 @@ class SimKFDecoderShuffled(SimKFDecoder):
         self.encoder.call_ds_rate = 6
         super(SimKFDecoderShuffled, self).load_decoder()
 
+    
+
 class SimKFDecoderRandom(SimKFDecoder):
     def load_decoder(self):
         '''
@@ -655,6 +703,7 @@ class SimFeedbackLearner(object):
 
         if hasattr(self, 'fb_ctrl'):
             self.learn_flag = True
+            print(f'{__name__}: batch size is {self.batch_size}')
             self.learner = clda.FeedbackControllerLearner(self.batch_size, self.fb_ctrl)
             
             print('')
@@ -736,7 +785,7 @@ class DebugFeature(object):
         print(f'{__class__.__name__}:set debug flag to {self.debug_flag}')
         super().__init__(*args, **kwargs)
 
-def get_enc_setup(sim_mode = 'toy', tuning_level = 1):
+def get_enc_setup(sim_mode = 'toy', tuning_level = 1, n_neurons = 4):
     '''
     sim_mode:str 
        std:  mn 20 neurons
@@ -744,7 +793,7 @@ def get_enc_setup(sim_mode = 'toy', tuning_level = 1):
 
     tuning_level: float 
         the tuning level at which a particular direction the firng rate is tuned
-        the higeer the better
+        the higher the better
     '''
 
     print(f'{__name__}: get_enc_setup has a tuning_level of {tuning_level} \n')
@@ -770,7 +819,7 @@ def get_enc_setup(sim_mode = 'toy', tuning_level = 1):
 
     elif sim_mode ==  'std':
         # build a observer matrix
-        N_NEURONS = 20
+        N_NEURONS = 25
         N_STATES = 7  # 3 positions and 3 velocities and an offset
         # build the observation matrix
         sim_C = np.zeros((N_NEURONS, N_STATES))
@@ -780,7 +829,34 @@ def get_enc_setup(sim_mode = 'toy', tuning_level = 1):
         # control z positive directions
         sim_C[2, :] = np.array([0, 0, 0, 0, 0, tuning_level, 0])
         sim_C[3, :] = np.array([0, 0, 0, 0, 0, -tuning_level, 0])
+
+    elif sim_mode == 'rot_90':
+        #the directions are along the four axes
+        N_NEURONS = n_neurons
+        N_STATES = 7
+        sim_C = _get_alternate_encoder_setup_matrix(N_NEURONS, N_STATES, tuning_level)
     else:
         raise Exception(f'not recognized mode {sim_mode}')
     
     return (N_NEURONS, N_STATES, sim_C)
+
+def _get_alternate_encoder_setup_matrix(N_NEURONS, N_STATES, tuning_level):
+    from itertools import cycle
+    axial_angle_iterator = cycle([0, np.pi / 2, np.pi, np.pi * 3 / 2])
+
+    X_VEL_IND = 3
+    Y_VEL_IND = 5
+
+    sim_C = np.zeros((N_NEURONS, N_STATES))
+    x_weights = np.zeros(N_NEURONS)
+    y_weights = np.zeros(N_NEURONS)
+
+    for i in range(N_NEURONS):
+        current_angle = next(axial_angle_iterator)
+        x_weights[i] = np.cos(current_angle) * tuning_level
+        y_weights[i] = np.sin(current_angle) * tuning_level
+
+    sim_C[:,X_VEL_IND] = x_weights
+    sim_C[:,Y_VEL_IND] = y_weights
+
+    return sim_C

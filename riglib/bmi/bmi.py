@@ -531,7 +531,6 @@ class Decoder(object):
         if ax == None:
             plt.figure()
             ax = plt.subplot(111)
-            ax.hold(True)
 
         if C.shape[1] > 2:
             state_inds = [self.states.index(x) for x in plot_states]
@@ -544,7 +543,12 @@ class Decoder(object):
             C = C*-1
         for k in range(n_neurons):
             unit_str = '%d%s' % (self.units[k,0], chr(96 + self.units[k,1]))
-            ax.plot([0, C[k, x]], [0, C[k, z]], label=unit_str, linestyle=linestyles[k/7 % len(linestyles)], **kwargs)
+            ax.plot([0, C[k, x]], [0, C[k, z]], 
+                    label=unit_str, 
+                    linestyle=linestyles[int(k/7) % len(linestyles)], 
+                    **kwargs)
+
+
         ax.legend(bbox_to_anchor=(1.1, 1.05), prop=dict(size=8))
         try:
             ax.set_xlabel(plot_states[0])
