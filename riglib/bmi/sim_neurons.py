@@ -171,7 +171,9 @@ class GenericCosEnc(object):
         return ts_data
 
 class GenericCosEncWithNoise(GenericCosEnc):
-    def __init__(self, C, ssm, noise_profile = None,
+
+
+    def __init__(self, C, ssm, noise_mode, noise_profile = None,
                             return_ts=False, DT=0.1, call_ds_rate=6):
         '''
         Constructor for CosEncWithVariableNoises
@@ -187,25 +189,47 @@ class GenericCosEncWithNoise(GenericCosEnc):
                 #exactly the same function signature.
         super().__init__(C,ssm, return_ts = return_ts, DT =DT, call_ds_rate=call_ds_rate)
 
-        self._initialize_noise_profile(noise_profile)
+        self._initialize_noise_profile(noise_profile, noise_mode)
 
-    def _initialize_noise_profile(self, noise_profile):
+    def _initialize_noise_profile(self, noise_profile, noise_mode , FIXED_NOISE_RATE = 100):
         
         #get the neuron number
-        n_neurons  = self.C.shape[0]
+        self.n_neurons  = self.C.shape[0]
+
+        self.noise_mode = noise_mode
+        self.FIXED_NOISE_RATE = FIXED_NOISE_RATE
+
+        self._select_gen_noise_function()
 
         if noise_profile is None:
             self.noise_profile = np.zeros(n_neurons)
         else:
             #make sure the same number of neurons
-            assert (n_neurons,1) == noise_profile.shape
+            assert (self.n_neurons,1) == noise_profile.shape
             self.noise_profile = noise_profile
+
+    def _select_gen_noise_function(self):
+
+        self.noise_models_dict = {
+            'fixed_poisson': self._gen_fixed_poisson_noise,
+            'relative_poisson':self._gen_relative_poisson_noise,
+            'fixed_gaussian':self._gen_fixed_gaussian_noise,
+            'relative_gaussian':self._gen_relative_gaussian_noise
+        }
+
+        if self.noise_mode not in self.noise_models_dict.keys():
+            raise Exception(f'unsupported noise model {self.noise_mode}')
+
+        self._gen_noise = self.noise_models_dict[self.noise_mode]
+
+        print(self._gen_noise)
+
 
     def return_spikes(self, rates, mode=None):
 
         counts = self._generate_poisson_counts(rates)
-
-        counts = counts + self._gen_noise()
+        counts = counts + self._gen_noise(counts)
+        counts[counts < 0] = 0 #floor the counts to zero
 
         if np.logical_or(mode=='ts', np.logical_and(mode is None, self.return_ts)):
             return self.gen_time_stamped_spikes(counts, mode = mode)
@@ -219,12 +243,23 @@ class GenericCosEncWithNoise(GenericCosEnc):
 
         return np.random.poisson(rates * self.DT)
 
-    def _gen_noise(self):
-        #add the additive noise
-        FIXED_NOISE_RATE = 100
+    def _gen_fixed_poisson_noise(self, counts):
+        '''
+        counts not used, for compatibility
+        '''
+        return np.random.poisson(self.noise_profile * self.FIXED_NOISE_RATE)
 
-        return np.random.poisson(self.noise_profile * FIXED_NOISE_RATE)
+    def _gen_relative_poisson_noise(self, counts):
+        '''
+        relative to the counts
+        '''
+        return np.random.poisson(self.noise_profile * counts)
 
+    def _gen_fixed_gaussian_noise(self, counts):
+        return np.random.standard_normal(counts.shape) * self.noise_profile * self.FIXED_NOISE_RATE
+    
+    def _gen_relative_gaussian_noise(self, counts):
+        return np.random.standard_normal(counts.shape) * self.noise_profile * counts
 
     def gen_time_stamped_spikes(self, counts, mode = None):
 
@@ -245,80 +280,6 @@ class GenericCosEncWithNoise(GenericCosEnc):
         return ts
 
         
-
-
-class  CosEncWithPoissonNoise(GenericCosEnc):
-
-    def __init__(self, C, ssm, noise_profile = None,
-                               return_ts=False, DT=0.1, call_ds_rate=6):
-        '''
-        Constructor for CosEncWithVariableNoises
-
-        Parameters
-        ----------
-
-
-        Returns
-        -------
-
-        '''
-                #exactly the same function signature.
-        super().__init__(C,ssm, return_ts = return_ts, DT =DT, call_ds_rate=call_ds_rate)
-
-        self._initialize_noise_profile(noise_profile)
-
-    def _initialize_noise_profile(self, noise_profile):
-        
-        #get the neuron number
-        n_neurons  = self.C.shape[0]
-
-        if noise_profile is None:
-            self.noise_profile = np.zeros(n_neurons)
-        else:
-            #make sure the same number of neurons
-            assert (n_neurons,1) == noise_profile.shape
-            self.noise_profile = noise_profile
-        
-    def return_spikes(self, rates, mode=None):
-        
-        # Floor firing rates at 0 Hz
-        rates[rates < 0] = 0 
-        counts = np.random.poisson(rates * self.DT)
-
-        #add the additive noise
-        FIXED_NOISE_RATE = 100
-        #noise_rates = self.noise_profile * counts
-        counts = counts + np.random.poisson(self.noise_profile * FIXED_NOISE_RATE)
-
-        if np.logical_or(mode=='ts', np.logical_and(mode is None, self.return_ts)):
-            return self.gen_time_stamped_spikes(counts, mode = mode)
-        
-        elif np.logical_or(mode=='counts', np.logical_and(mode is None, self.return_ts is False)):
-            return counts
-
-    def gen_time_stamped_spikes(self, counts, mode = None):
-
-        
-        ts = []
-        n_neurons = self.n_neurons
-        
-        for k, ind in enumerate(self.unit_inds):
-
-            # separate spike counts into individual time-stamps
-            n_spikes = int(counts[k])
-            fake_time = (self.call_count + 0.5)* 1./60
-            if n_spikes > 0:
-
-                spike_data = [(fake_time, ind, 1) for m in range(n_spikes)] 
-                ts += (spike_data)
-
-        ts = np.array(ts, dtype=ts_dtype)
-        return ts
-
-
-        
-
-
 class FACosEnc(GenericCosEnc):
     '''
     Simulate neurons where rate is linear function of underlying factor modulation, rate param through Poisson
