@@ -13,7 +13,7 @@ from riglib.stereo_opengl import ik
 from riglib import plants
 
 from riglib.stereo_opengl.window import Window
-from .target_graphics import *
+from target_graphics import *
 
 ## Plants
 # List of possible "plants" that a subject could control either during manual or brain control
