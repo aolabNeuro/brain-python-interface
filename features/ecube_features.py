@@ -107,6 +107,43 @@ class RecordECube(traits.HasTraits):
             raise ConnectionError(self.ecube_status)
         super().run()
 
+
+class EcubeData(object):
+    '''Stream ecube neural data.
+    modeled after blackrock_features.blackrockData
+    '''
+
+    blackrock_channels = None
+    DEFAULT_HEADSTAGE = 2
+    DEFAULT_CHANNELS = (321,321)
+
+    def init(self):
+        '''
+        Secondary init function. See riglib.experiment.Experiment.init()
+        '''
+
+        from riglib import source
+        from riglib.ecube import Broadband, make
+
+        ecube = make(Broadband, headstages=[self.DEFAULT_HEADSTAGE], channels=[self.DEFAULT_CHANNELS])
+        self.neurondata = source.DataSource(ecube)
+
+        super(EcubeData, self).init()
+
+    def run(self):
+        '''
+        Code to execute immediately prior to the beginning of the task FSM executing, or after the FSM has finished running. 
+        See riglib.experiment.Experiment.run(). This 'run' method starts the 'neurondata' source before the FSM begins execution
+        and stops it after the FSM has completed. 
+        '''
+
+        self.neurondata.start()
+        try:
+            super(EcubeData, self).run()
+        finally:
+            self.neurondata.stop()
+
+
 class TestExperiment():
     state = None
     def __init__(self, *args, **kwargs):
