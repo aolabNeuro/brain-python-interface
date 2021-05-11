@@ -267,15 +267,14 @@ class SimCosineTunedEnc(SimNeuralEnc):
             n_subbins=self.decoder.n_subbins, units=self.decoder.units, task=self)
         self._add_feature_extractor_dtype()
 
-class SimCosineTunedEncWithPoissonNoises(SimCosineTunedEnc):
+class SimCosineTunedEncWithNoise(SimCosineTunedEnc):
 
     def __init__(self, *args, **kwargs):
         super().__init__( *args, **kwargs)
 
-        #assert 'percent_poission_noise' in kwargs.keys()
-        self.percent_poisson_noise = kwargs['percent_noise']
-        self.fixed_noise_level = kwargs['fixed_noise_level']
         self.noise_mode = kwargs['noise_mode']
+        self.percent_poisson_noise = kwargs['percent_noise']
+        if 'fixed_noise_level' in kwargs.keys(): self.fixed_noise_level = kwargs['fixed_noise_level'] 
 
         print(f'{__class__}: added CosineTunedEncWithNoise ')
 
@@ -288,8 +287,9 @@ class SimCosineTunedEncWithPoissonNoises(SimCosineTunedEnc):
         self.ssm = StateSpaceEndptVel2D()
 
         print('\n using encoder with additional noises ', self.ssm, '\n')
-        self.encoder = GenericCosEncWithNoise(self.sim_C, self.ssm, noise_profile= self.percent_poisson_noise,
-                                            return_ts=True, DT=0.1, call_ds_rate=6)
+        self.encoder = GenericCosEncWithNoise(self.sim_C, self.ssm, 
+                                              self.noise_mode, noise_profile= self.percent_poisson_noise,
+                                              return_ts=True, DT=0.1, call_ds_rate=6)
         
 
 class SimNormCosineTunedEnc(SimNeuralEnc):
@@ -400,7 +400,6 @@ class SimKFDecoder(object):
         n_units = len(units)
         NUM_STATES  = 7 
         self.add_dtype('obs_t', 'f8', (n_units,1))
-        self.add_dtype('K', 'f8', (NUM_STATES,n_units))
         self.add_dtype('KC', 'f8', (NUM_STATES,NUM_STATES))
 
         self.add_dtype('pred_state_mean', 'f8', (NUM_STATES,1))
@@ -409,9 +408,16 @@ class SimKFDecoder(object):
         self.add_dtype('pred_state_P', 'f8', (NUM_STATES,NUM_STATES))
         self.add_dtype('post_state_P', 'f8', (NUM_STATES,NUM_STATES))
 
+        self.k_mat_params = list()
         print(f'{__name__}: added tracking of K matrix')
 
         super().init(*args, **kwargs)
+
+    def _cycle(*args, **kwargs):
+        super()._cycle(*args, **kwargs)
+
+        self.k_mat_params.append(self.decoder.filt.K)
+
 
     def change_dec_ssm(self):
         decoder_old = self.decoder_old

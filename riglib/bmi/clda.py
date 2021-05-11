@@ -1017,7 +1017,6 @@ class KFSmoothbatch(Updater):
         determine the C_hat and Q_hat of new batch. Then combine with 
         old parameters using step-size rho
         """
-        print(f"{__class__.__name__}: calculating new SB parameters")
         C_old          = decoder.kf.C
         Q_old          = decoder.kf.Q
         drives_neurons = decoder.drives_neurons

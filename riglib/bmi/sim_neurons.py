@@ -218,7 +218,7 @@ class GenericCosEncWithNoise(GenericCosEnc):
         }
 
         if self.noise_mode not in self.noise_models_dict.keys():
-            raise Exception(f'unsupported noise model {self.noise_mode}')
+            raise Exception(f'unsupported noise model {self.noise_mode},  and available modes are {self.noise_models_dict.keys()}')
 
         self._gen_noise = self.noise_models_dict[self.noise_mode]
 
