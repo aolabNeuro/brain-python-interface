@@ -1,6 +1,11 @@
 from bmimultitasks import SimBMIControlMulti, SimBMICosEncKFDec
 from features import SaveHDF
+<<<<<<< HEAD
+from features.task_code_features import TaskCodeStreamer
+from features.simulation_features import get_enc_setup, SimKFDecoderRandom, SimCosineTunedEnc,SimIntentionLQRController
+=======
 from features.simulation_features import get_enc_setup, SimKFDecoderRandom, SimCosineTunedEnc,SimIntentionLQRController, SimHDF
+>>>>>>> cd76cda088fabeed8a08d30b2a3f1eb478d76105
 from riglib import experiment
 
 import time
@@ -18,9 +23,12 @@ if __name__ == "__main__":
     #generate task params
     N_TARGETS = 1
     N_TRIALS = 3
+<<<<<<< HEAD
+=======
     tuning_level = 70
     clda_batch_time = 60
     clda_half_life = 60
+>>>>>>> cd76cda088fabeed8a08d30b2a3f1eb478d76105
 
 
     #clda on random  matrix 
@@ -38,8 +46,16 @@ if __name__ == "__main__":
     #expect to get worse
     '''
 
+<<<<<<< HEAD
+    """
+=======
     
+<<<<<<< HEAD
     DECODER_MODE = 'random' # in this case we load simulation_features.SimKFDecoderRandom
+=======
+>>>>>>> cd76cda088fabeed8a08d30b2a3f1eb478d76105
+    DECODER_MODE = 'trainedKF' # in this case we load simulation_features.SimKFDecoderRandom
+>>>>>>> 8728e3967b64bb04584a8a00023bc458f9ddf38f
     ENCODER_TYPE = 'cosine_tuned_encoder'
     LEARNER_TYPE = 'feedback' # to dumb or not dumb it is a question 'feedback'
     UPDATER_TYPE = 'smooth_batch' #none or "smooth_batch"
@@ -48,19 +64,27 @@ if __name__ == "__main__":
 
 
 
+<<<<<<< HEAD
+    """
+    #no clda 
+=======
 
     #on random 
     '''
+>>>>>>> cd76cda088fabeed8a08d30b2a3f1eb478d76105
     DECODER_MODE = 'trainedKF' # in this case we load simulation_features.SimKFDecoderRandom
     ENCODER_TYPE = 'cosine_tuned_encoder'
     LEARNER_TYPE = 'dumb' # to dumb or not dumb it is a question 'feedback'
     UPDATER_TYPE = 'none' #none or "smooth_batch"
+<<<<<<< HEAD
+    
+=======
     '''
+>>>>>>> cd76cda088fabeed8a08d30b2a3f1eb478d76105
 
     SAVE_HDF = True
-
-
     DEBUG_FEATURE = False
+    TASK_CODE_STREAMER = True
 
     seq = SimBMIControlMulti.sim_target_seq_generator_multi(
         N_TARGETS, N_TRIALS)
@@ -119,6 +143,8 @@ if __name__ == "__main__":
     if DEBUG_FEATURE: 
         from features.simulation_features import DebugFeature
         feats.append(DebugFeature)
+
+    if TASK_CODE_STREAMER: feats.append(TaskCodeStreamer)
     
     if SAVE_HDF: feats.append(SimHDF)
 

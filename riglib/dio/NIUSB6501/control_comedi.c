@@ -60,7 +60,6 @@ int main(int argc,char *argv[])
 
 			sscanf(argv[2], "%x", &mask);
 			sscanf(argv[3],"%x", &data);
-			printf("before, channel set to %x, data set to %x \n", mask,  data);
 			retval = comedi_dio_bitfield2(it, subdev, mask, &data, base_channel);
 			printf("channel set to %x, data set to %x \n", mask,  data);
 
@@ -69,7 +68,6 @@ int main(int argc,char *argv[])
 
 	}
 
-	printf("status from the action to %d\n", retval);
 
 
 		
@@ -78,7 +76,6 @@ int main(int argc,char *argv[])
 		return 1;
 	}
 	
-	printf("set channel 0 to %d\n", set_bit);	
 
 
 	return 0;
