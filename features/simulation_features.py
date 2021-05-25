@@ -775,6 +775,33 @@ class SimSmoothBatch(object):
 #############################
 
 
+class TimeCountDown(object):
+    
+    def __init__(self, *args, **kwargs):
+
+        super().__init__(*args, **kwargs)
+
+        self.TOTAL_RUNNNING_TIME = kwargs.pop('total_exp_time', 10)
+        fps = 60
+        self.total_frames = self.TOTAL_RUNNNING_TIME * fps
+        self.left_frames = self.total_frames
+
+        print(f'TimeCountDown: assume  fps to be {fps}')
+
+    def _cycle(self, *args, **kwargs):
+        #basically just counts down
+        self.left_frames -= 1
+
+        #TODO: determine how to  end the experiment:
+        #for now,  we just 
+        if self.left_frames == 0:
+            self.state = None
+        #and the experiemnt would be able to safely exit. 
+
+        super()._cycle(*args, **kwargs)
+
+
+
 class DebugFeature(object):
     """
     the purpose of this feature is just to set self.debug_flag to true
@@ -841,10 +868,14 @@ def get_enc_setup(sim_mode = 'toy', tuning_level = 1, n_neurons = 4):
         N_NEURONS = n_neurons
         N_STATES = 7
         sim_C = _get_alternate_encoder_setup_matrix(N_NEURONS, N_STATES, tuning_level)
+
+    elif sim_mode == 'rand':
+        N_STATES = 7
+        sim_C = _get_rand_encoder_matrix(n_neurons,  N_STATES, tuning_level)
     else:
         raise Exception(f'not recognized mode {sim_mode}')
     
-    return (N_NEURONS, N_STATES, sim_C)
+    return (n_neurons, N_STATES, sim_C)
 
 def _get_alternate_encoder_setup_matrix(N_NEURONS, N_STATES, tuning_level):
     from itertools import cycle
@@ -864,5 +895,20 @@ def _get_alternate_encoder_setup_matrix(N_NEURONS, N_STATES, tuning_level):
 
     sim_C[:,X_VEL_IND] = x_weights
     sim_C[:,Y_VEL_IND] = y_weights
+
+    return sim_C
+
+def _get_rand_encoder_matrix(n_neurons,  N_STATES, tuning_level):
+    #sample 2 pi:
+    prefered_angles_in_rad = np.random.uniform(low = 0, high = 2 * np.pi, size = n_neurons)
+
+    sim_C = np.zeros((n_neurons, N_STATES))
+
+    X_VEL_IND = 3
+    Y_VEL_IND = 5
+
+    #calculate the matrices
+    sim_C[:,X_VEL_IND] = np.cos(prefered_angles_in_rad) * tuning_level
+    sim_C[:,Y_VEL_IND] = np.sin(prefered_angles_in_rad) * tuning_level
 
     return sim_C
