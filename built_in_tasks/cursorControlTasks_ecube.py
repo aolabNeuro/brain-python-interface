@@ -11,7 +11,6 @@ import copy
 #from riglib.bmi.bmi import Decoder, BMISystem, GaussianStateHMM, BMILoop, GaussianState, MachineOnlyFilter
 from riglib import experiment
 from features.hdf_features import SaveHDF
-from features.task_code_features import TaskCodeStreamer
 
 class CursorControl(ManualControlMulti, WindowDispl2D):
     '''
@@ -29,6 +28,7 @@ class CursorControl(ManualControlMulti, WindowDispl2D):
 
     def init(self):
         pygame.init()
+        self.count_array = list()
 
         
 
@@ -46,16 +46,31 @@ class CursorControl(ManualControlMulti, WindowDispl2D):
         
         data = self.neurondata.get()
 
-        DURATION = 5
 
-        print("Received {} packets in {} seconds ({} Hz)".format(data.shape[0], DURATION, data.shape[0]/DURATION))
-        
+        #print("Received {} packets in {} seconds ({} Hz)".format(data.shape[0], DURATION, data.shape[0]/DURATION))
+        voltsperbit = 1.907348633e-7
         ts = [d['timestamp'] for d in data]
-        print("First timestamp: {} ns ({:.5f} s)\tLast timestamp {} ns ({:.5f} s)".format(
-            ts[0], ts[0]/1e9, ts[-1], ts[-1]/1e9
-        ))
-        
+
+        threshold = 30000
+
+        curr_pos = copy.deepcopy(self.plant.get_endpoint_pos())
+
+        if len(ts) > 0:
+            #values = np.where(data[0]['data'] > threshold) 
+            arr = data[0]['data'] * voltsperbit
+
+            self.count_array.append(arr)
+            
+            count_val_dim_1, count_val_dim_2 = np.where(arr < -0.0005)
+
+            curr_pos[0] += count_val_dim_1.size * 0.005
+
+            self.plant.set_endpoint_pos(curr_pos)
+            #np.save('rec.txt', arr)
+            
         super(CursorControl, self)._cycle()
+
+        
 
     # do nothing
     def move_effector(self):
