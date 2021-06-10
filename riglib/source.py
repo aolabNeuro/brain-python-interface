@@ -203,6 +203,63 @@ class DataSource(RPCProcess):
         '''
         self.stream.set()
 
+class ecubeDataSource(DataSource):
+    def get(self, n_pts, channels):
+        '''
+        Return the most recent n_pts of data from the specified channels.
+
+        Parameters
+        ----------
+        n_pts : int
+            Number of data points to read
+        channels : ignored for now
+
+        Returns
+        -------
+        list of np.recarray objects
+            Datatype of each record array is the dtype of the DataSourceSystem
+        '''
+        if self.status.value <= 0:
+            raise Exception('\n\nError starting datasource: %s\n\n' % self.name)
+                
+        self.lock.acquire()
+        i = (self.idx.value % self.max_len) * self.slice_size
+        
+        #return all data in the ringbuffer
+        if self.idx.value < self.max_len:
+            data = self.data[:i]
+        else:
+            data = self.data[i:]+self.data[:i]
+            
+        self.last_idx = self.idx.value
+        self.lock.release()
+
+
+        try:
+            data = np.frombuffer(data, dtype=self.source.dtype)
+        except:
+            print("can't get fromstring...")
+        
+        print(f'n_pts:{n_pts}')
+        num_packets = int(np.ceil(n_pts / 25000 * 34)) #25000 is the update freq and 33 is the packet
+
+        #return the last n_pts packets
+        #TODO, channels here are ignored because we assume ecube channels are specified
+        #when making the ecube datasource.
+        data = data[-num_packets:]
+        data = np.array(data['data']) #the dimensions of this are (n_pt, 728, num_channels)
+
+        #transpose axes
+        data = np.transpose(data, (2, 0,1))
+        num_channels, num_pt, NUM_PT_PER_PACKET = data.shape
+        print(f'ecubeDataSource: {num_pt}')
+        print(f'ecubeDataSource:pt_per_packet: {NUM_PT_PER_PACKET}')
+        data = np.reshape(data, (num_channels, num_packets * NUM_PT_PER_PACKET))
+
+        data = data[:, -n_pts:]
+
+        return data
+
 
 class MultiChanDataSource(mp.Process):
     '''
