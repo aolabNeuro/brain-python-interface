@@ -29,7 +29,7 @@ from riglib.stereo_opengl.primitives import Line
 from riglib.bmi.state_space_models import StateSpaceEndptVel2D, StateSpaceNLinkPlanarChain
 
 
-from .target_capture_task import ScreenTargetCapture
+from target_capture_task import ScreenTargetCapture
 
 target_colors = {"blue":(0,0,1,0.5),
 "yellow": (1,1,0,0.5),
@@ -346,3 +346,43 @@ class BMIControlMulti2DWindow(BMIControlMulti, WindowDispl2D):
 
     def _test_start_trial(self, ts):
         return ts > self.wait_time and not self.pause
+
+class BMIControlMulti2DFullBMI(BMIControlMulti):
+    def load_decoder(self):
+        from riglib.bmi import state_space_models
+        ssm = state_space_models.StateSpaceEndptVel2D()
+        
+        channels = np.zeros((150, 2))
+
+        self.decoder = train.rand_KFDecoder(ssm, channels)
+        super(BMIControlMulti2DFullBMI, self).load_decoder()
+
+    def create_feature_extractor(self):
+        from riglib.bmi import extractor
+
+        #TODO this needs to be changed to be the proper channel count
+        channels = np.arange(10)
+        self.extractor = extractor.LFPMTMPowerExtractor(self.neurondata, channels)
+
+        self._add_feature_extractor_dtype()
+
+
+if __name__ == "__main__":
+    from target_capture_task import ScreenTargetCapture
+    gen = ScreenTargetCapture.centerout_2D()
+
+    #incorporate the saveHDF feature by blending code
+    #see tests\start_From_cmd_line_sim
+    
+    base_class = BMIControlMulti2DFullBMI
+
+    from features.ecube_features import EcubeData
+
+    feats = [EcubeData]
+    Exp = riglib.experiment.make(base_class, feats=feats)
+    print(Exp)
+
+    exp = Exp(gen)
+    exp.init()
+    exp.run() #start the task
+    
