@@ -7,7 +7,7 @@ import time
 where to calculate spikes?
 '''
 
-from riglib.source import DataSourceSystem
+from riglib.source import DataSourceSystem, MultiChanDataSource
 class Broadband(DataSourceSystem):
     '''
     Wrapper class for pyecubestream compatible with using in DataSource for

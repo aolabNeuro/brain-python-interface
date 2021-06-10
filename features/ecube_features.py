@@ -42,10 +42,25 @@ class RecordECube(traits.HasTraits):
         ecube_session = make_ecube_session_name(saveid) # usually correct, but might be wrong if running overnight!
 
         # Stop recording
-        time.sleep(1) # Need to wait for a bit since the recording system has some latency and we don't want to stop prematurely
+        time.sleep(1) # Need to wait for a     def init(self, *args, **kwargs):
+        '''
+        Secondary init function. See riglib.experiment.Experiment.init()
+        '''
+
+        from riglib import source
+        from riglib.ecube import Broadband, make
+
+        ecube = make(Broadband, headstages=[self.DEFAULT_HEADSTAGE], channels=[self.DEFAULT_CHANNELS])
+        self.neurondata = source.DataSource(ecube)
+
+        Duration = 5
+        print(f'EcubeData: sleep for 5 seconds')
+        time.sleep(Duration)
+
+        print(f'EcubeData: sleep finished, neuron data available as self.neurondata')
+        super(EcubeData, self).init(*args, **kwargs)
+
         try:
-            ec = pyeCubeStream.eCubeStream(debug=True)
-            active = ec.listremotesessions()
             for session in active:
                 if str(saveid) in session:
                     ecube_session = session
@@ -112,12 +127,10 @@ class EcubeData(object):
     '''Stream ecube neural data.
     modeled after blackrock_features.blackrockData
     '''
+    DEFAULT_HEADSTAGE = 8
+    DEFAULT_CHANNELS = (1,10)
 
-    blackrock_channels = None
-    DEFAULT_HEADSTAGE = 2
-    DEFAULT_CHANNELS = (321,321)
-
-    def init(self):
+    def init(self, *args, **kwargs):
         '''
         Secondary init function. See riglib.experiment.Experiment.init()
         '''
@@ -126,11 +139,11 @@ class EcubeData(object):
         from riglib.ecube import Broadband, make
 
         ecube = make(Broadband, headstages=[self.DEFAULT_HEADSTAGE], channels=[self.DEFAULT_CHANNELS])
-        self.neurondata = source.DataSource(ecube)
+        self.neurondata = source.ecubeDataSource(ecube)
 
-        super(EcubeData, self).init()
+        super(EcubeData, self).init(*args, **kwargs)
 
-    def run(self):
+    def run(self, *args, **kwargs):
         '''
         Code to execute immediately prior to the beginning of the task FSM executing, or after the FSM has finished running. 
         See riglib.experiment.Experiment.run(). This 'run' method starts the 'neurondata' source before the FSM begins execution
@@ -138,8 +151,13 @@ class EcubeData(object):
         '''
 
         self.neurondata.start()
+
+        Duration = 5
+        print(f'EcubeData: sleep for 5 seconds')
+        time.sleep(Duration)
+        print(f'EcubeData: finished sleeping')
         try:
-            super(EcubeData, self).run()
+            super(EcubeData, self).run(*args, **kwargs)
         finally:
             self.neurondata.stop()
 
@@ -152,9 +170,15 @@ class TestExperiment():
     def pre_init(saveid, **kwargs):
         pass
 
+    def init(self, *args, **kwargs):
+        pass
+
     def start(self):
         import time
         time.sleep(1)
+
+    def run(self,*args, **kwargs):
+        pass
 
     def cleanup(self, database, saveid, **kwargs):
         pass
@@ -165,15 +189,21 @@ class TestExperiment():
     def join(self):
         pass
 
-class TestClass(RecordECube, TestExperiment):
+class TestClass(EcubeData, TestExperiment):
     pass
 
 if __name__ == "__main__":
 
-    TestClass.pre_init(saveid=10)
+    #TestClass.pre_init(saveid=10)
     exp = TestClass()
-    exp.start()
-    exp.cleanup(None, 10)
+    exp.init()
+    exp.run()
+    
+
+
+    #print(exp.neurondata.get())
+
+    #exp.cleanup(None, 10)
     # from riglib import experiment
     # proc = experiment.task_wrapper.TaskWrapper(
     #     subj=None, params=dict(), target_class=TestClass, saveid=10)
