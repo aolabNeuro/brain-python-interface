@@ -374,7 +374,7 @@ class LFPMTMPowerExtractor(object):
 
     feature_type = 'lfp_power'
 
-    def __init__(self, source, channels=[], bands=default_bands, win_len=0.2, NW=3, fs=1000, **kwargs):
+    def __init__(self, source, channels=[], bands=default_bands, win_len=0.2, NW=3, fs=25000, **kwargs):
         '''
         Constructor for LFPMTMPowerExtractor, which extracts LFP power using the multi-taper method
 
@@ -398,10 +398,8 @@ class LFPMTMPowerExtractor(object):
         self.bands = bands
         self.win_len = win_len
         self.NW = NW
-        if source is not None:
-            self.fs = source.source.update_freq
-        else:
-            self.fs = fs
+  
+        self.fs = fs
 
         extractor_kwargs = dict()
         extractor_kwargs['channels'] = self.channels
@@ -417,7 +415,7 @@ class LFPMTMPowerExtractor(object):
 
         self.n_pts = int(self.win_len * self.fs)
         self.nfft = 2**int(np.ceil(np.log2(self.n_pts)))  # nextpow2(self.n_pts)
-        fft_freqs = np.arange(0., fs, float(fs)/self.nfft)[:self.nfft/2 + 1]
+        fft_freqs = np.arange(0., fs, float(fs)/self.nfft)[:int(self.nfft/2 + 1)]
         self.fft_inds = dict()
         for band_idx, band in enumerate(bands):
             self.fft_inds[band_idx] = [freq_idx for freq_idx, freq in enumerate(fft_freqs) if band[0] <= freq < band[1]]
@@ -494,8 +492,11 @@ class LFPMTMPowerExtractor(object):
             Extracted features to be saved in the task.         
         '''
         cont_samples = self.get_cont_samples(*args, **kwargs)  # dims of channels x time
+
+        print(f'lfp extractor: {cont_samples.shape}')
         lfp_power = self.extract_features(cont_samples)
 
+        print(f'lfp extractor: {lfp_power.shape}')
         return dict(lfp_power=lfp_power)
 
     @classmethod
