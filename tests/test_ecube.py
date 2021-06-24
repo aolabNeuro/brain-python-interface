@@ -2,18 +2,24 @@ import time
 from riglib import source
 from riglib.ecube import Broadband, make
 import numpy as np
+import matplotlib.pyplot as plt
 
 DURATION = 10
 
-ecube = make(Broadband, headstages=[8], channels=[(1,10)])
+ecube = make(Broadband, headstages=[7], channels=[(1,10)])
 ds = source.ecubeDataSource(ecube)
 ds.start()
 time.sleep(DURATION)
-data = ds.get(10, 10)
+data = ds.get(25000, 10)
 ds.stop()
 
 print(data.dtype)
 print(data.shape)
+
+#plot one channel
+plt.plot(data[0,:])
+plt.show()
+
 
 if 'timestamp' in data.dtype:
     print("Received {} packets in {} seconds ({} Hz)".format(data.shape[0], DURATION, data.shape[0]/DURATION))

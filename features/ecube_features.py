@@ -127,8 +127,8 @@ class EcubeData(object):
     '''Stream ecube neural data.
     modeled after blackrock_features.blackrockData
     '''
-    DEFAULT_HEADSTAGE = 8
-    DEFAULT_CHANNELS = (1,10)
+    DEFAULT_HEADSTAGE = 7
+    DEFAULT_CHANNELS = (1,2)
 
     def init(self, *args, **kwargs):
         '''

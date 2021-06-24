@@ -360,8 +360,8 @@ class BinnedSpikeCountsExtractor(FeatureExtractor):
 # bands should be a list of tuples representing ranges
 #   e.g., bands = [(0, 10), (10, 20), (130, 140)] for 0-10, 10-20, and 130-140 Hz
 start = 0
-end   = 150
-step  = 10
+end   = 300
+step  = 20
 default_bands = []
 for freq in range(start, end, step):
     default_bands.append((freq, freq+step))
@@ -493,10 +493,10 @@ class LFPMTMPowerExtractor(object):
         '''
         cont_samples = self.get_cont_samples(*args, **kwargs)  # dims of channels x time
 
-        print(f'lfp extractor: {cont_samples.shape}')
+        #print(f'lfp extractor: {cont_samples.shape}')
         lfp_power = self.extract_features(cont_samples)
 
-        print(f'lfp extractor: {lfp_power.shape}')
+        #print(f'lfp extractor: {lfp_power.shape}')
         return dict(lfp_power=lfp_power)
 
     @classmethod

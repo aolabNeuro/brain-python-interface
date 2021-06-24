@@ -240,8 +240,10 @@ class ecubeDataSource(DataSource):
         except:
             print("can't get fromstring...")
         
-        print(f'n_pts:{n_pts}')
+        
         num_packets = int(np.ceil(n_pts / 25000 * 34)) #25000 is the update freq and 33 is the packet
+        #make sure we have at least one packet.
+        num_packets = np.max((num_packets, 1))
 
         #return the last n_pts packets
         #TODO, channels here are ignored because we assume ecube channels are specified
@@ -252,8 +254,13 @@ class ecubeDataSource(DataSource):
         #transpose axes
         data = np.transpose(data, (2, 0,1))
         num_channels, num_pt, NUM_PT_PER_PACKET = data.shape
+
+        '''
+        print(f'n_pts:{n_pts}')
+        print(f'ecubeDataSource: num_channels {num_channels}')
         print(f'ecubeDataSource: {num_pt}')
         print(f'ecubeDataSource:pt_per_packet: {NUM_PT_PER_PACKET}')
+        '''
         data = np.reshape(data, (num_channels, num_packets * NUM_PT_PER_PACKET))
 
         data = data[:, -n_pts:]

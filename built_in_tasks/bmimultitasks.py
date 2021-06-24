@@ -352,7 +352,7 @@ class BMIControlMulti2DFullBMI(BMIControlMulti):
         from riglib.bmi import state_space_models
         ssm = state_space_models.StateSpaceEndptVel2D()
         
-        channels = np.zeros((150, 2))
+        channels = np.zeros((30, 2))
 
         self.decoder = train.rand_KFDecoder(ssm, channels)
         super(BMIControlMulti2DFullBMI, self).load_decoder()
@@ -361,7 +361,7 @@ class BMIControlMulti2DFullBMI(BMIControlMulti):
         from riglib.bmi import extractor
 
         #TODO this needs to be changed to be the proper channel count
-        channels = np.arange(10)
+        channels = np.arange(2)
         self.extractor = extractor.LFPMTMPowerExtractor(self.neurondata, channels)
 
         self._add_feature_extractor_dtype()
@@ -377,8 +377,9 @@ if __name__ == "__main__":
     base_class = BMIControlMulti2DFullBMI
 
     from features.ecube_features import EcubeData
+    from features.hdf_features import SaveHDF
 
-    feats = [EcubeData]
+    feats = [EcubeData, SaveHDF]
     Exp = riglib.experiment.make(base_class, feats=feats)
     print(Exp)
 
