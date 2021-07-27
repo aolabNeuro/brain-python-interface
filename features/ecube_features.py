@@ -127,10 +127,10 @@ class EcubeData(object):
     '''Stream ecube neural data.
     modeled after blackrock_features.blackrockData
     '''
-    DEFAULT_HEADSTAGE = 7
+    DEFAULT_HEADSTAGE = [7]
     DEFAULT_CHANNELS = (1,2)
 
-    def init(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         '''
         Secondary init function. See riglib.experiment.Experiment.init()
         '''
@@ -138,10 +138,49 @@ class EcubeData(object):
         from riglib import source
         from riglib.ecube import Broadband, make
 
-        ecube = make(Broadband, headstages=[self.DEFAULT_HEADSTAGE], channels=[self.DEFAULT_CHANNELS])
+        #set up which headstages to use
+        #TODO: make this as a trait that can be linked to the channel mapping
+        self.set_up_headstage(**kwargs)
+        self.set_up_channels(**kwargs)
+        self.check_hs_channel_compatibility()
+
+        ecube = make(Broadband, headstages=self.selected_head_stages, channels=self.selected_channels)
         self.neurondata = source.ecubeDataSource(ecube)
 
-        super(EcubeData, self).init(*args, **kwargs)
+        super(EcubeData, self).__init__(*args, **kwargs)
+
+    def set_up_headstage(self, **kwargs):
+        if 'headstages' in kwargs.keys():
+            self.selected_head_stages = kwargs['headstages']
+
+            if type(self.selected_head_stages) == int:
+                self.selected_head_stages = [self.selected_head_stages]
+
+        else :
+            self.selected_head_stages = self.DEFAULT_HEADSTAGE
+            import warnings
+            warnings.warn(f'no headstages specfied for ecube streaming, defaults to use HS {self.DEFAULT_HEADSTAGE}')
+
+    def set_up_channels(self, **kwargs):
+        if 'channels' in kwargs.keys():
+            self.selected_channels = kwargs['channels']
+
+            if type(self.selected_channels) == int:
+                self.selected_channels = [self.selected_channels]
+
+        else :
+            self.selected_channels = [self.DEFAULT_CHANNELS]
+            import warnings
+            warnings.warn(f'no channels specfied for ecube streaming, defaults to use HS {self.DEFAULT_CHANNELS}')
+
+    def check_hs_channel_compatibility(self):
+        """
+        make sure that each headstage has its associated list of channels
+        """
+        num_hs = len(self.selected_head_stages)
+        num_list_channels = len(self.selected_channels)
+
+        assert num_hs == num_list_channels
 
     def run(self, *args, **kwargs):
         '''

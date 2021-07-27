@@ -50,7 +50,7 @@ class DataSourceSystem(object):
 
 
 class DataSource(RPCProcess):
-    def __init__(self, source, bufferlen=10, name=None, send_data_to_sink_manager=True, source_kwargs=dict(), **kwargs):
+    def __init__(self, source, bufferlen=100, name=None, send_data_to_sink_manager=True, source_kwargs=dict(), **kwargs):
         '''
         Parameters
         ----------
@@ -221,18 +221,29 @@ class ecubeDataSource(DataSource):
         '''
         if self.status.value <= 0:
             raise Exception('\n\nError starting datasource: %s\n\n' % self.name)
-                
+        
+        num_packets = int(np.ceil(n_pts / 25000 * 34)) #25000 is the update freq and 33 is the packet
+        
         self.lock.acquire()
+        
         i = (self.idx.value % self.max_len) * self.slice_size
         
-        #return all data in the ringbuffer
-        if self.idx.value < self.max_len:
+        if self.idx.value < num_packets:
             data = self.data[:i]
         else:
-            data = self.data[i:]+self.data[:i]
-            
-        self.last_idx = self.idx.value
+            current_ring_pos = self.idx.value % self.max_len
+
+            if current_ring_pos >= num_packets:
+                start_pos = (current_ring_pos-num_packets) * self.slice_size
+                stop_pos = current_ring_pos * self.slice_size
+                data = self.data[start_pos: stop_pos]
+            else:
+                past_ind = num_packets - current_ring_pos
+                data = self.data[-past_ind * self.slice_size:] + self.data[:current_ring_pos * self.slice_size]
+    
+        
         self.lock.release()
+
 
 
         try:
@@ -240,10 +251,6 @@ class ecubeDataSource(DataSource):
         except:
             print("can't get fromstring...")
         
-        
-        num_packets = int(np.ceil(n_pts / 25000 * 34)) #25000 is the update freq and 33 is the packet
-        #make sure we have at least one packet.
-        num_packets = np.max((num_packets, 1))
 
         #return the last n_pts packets
         #TODO, channels here are ignored because we assume ecube channels are specified

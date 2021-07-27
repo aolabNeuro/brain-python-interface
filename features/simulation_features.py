@@ -500,3 +500,49 @@ class SimPPFDecoderCursorShuffled(object):
         # self._init_neural_encoder()
 
         self.decoder = train._train_PPFDecoder_sim_known_beta(self.beta_full[inds], self.encoder.units, dt=1./180)
+
+import numpy as np
+from riglib.bmi.kfdecoder import KalmanFilter
+def change_target_kalman_filter_with_a_C_mat(target_kf, C:np.matrix, Q:np.matrix = np.nan, debug:bool = True):
+    """
+    this function replaces the observation matrix of target_kf to C and
+    replace the noise model 
+    """
+    
+    if not isinstance(target_kf, KalmanFilter):
+        raise Exception(f'{target_kf} is not an instance of riglib.bmi.kfdecoder.KalmanFilter' )
+    
+    C_before = target_kf.C
+    C_xpose_Q_inv_before = target_kf.C_xpose_Q_inv
+    C_xpose_Q_inv_C_before = target_kf.C_xpose_Q_inv_C
+    
+    if Q is np.nan: Q = target_kf.Q
+    
+    #calculate the new terms
+    C_xpose_Q_inv = C.T * np.linalg.pinv(Q)
+    C_xpose_Q_inv_C = C.T * np.linalg.pinv(Q) * C
+    
+    #reassign
+    target_kf.C = C
+    target_kf.Q = Q
+    target_kf.C_xpose_Q_inv = C_xpose_Q_inv
+    target_kf.C_xpose_Q_inv_C = C_xpose_Q_inv_C
+    
+    if debug:
+        print('C matrix before')
+        print(C_before)
+        
+        print('C matrix after')
+        print(target_kf.C )
+        
+        print('C_xpose_Q_inv before:')
+        print(C_xpose_Q_inv_before)
+        
+        print('C_xpose_Q_inv_C after:')
+        print(target_kf.C_xpose_Q_inv)
+              
+        print('C_xpose_Q_inv_C_before:')
+        print(C_xpose_Q_inv_C_before)
+        
+        print('C_xpose_Q_inv_C after:')
+        print(target_kf.C_xpose_Q_inv_C)

@@ -327,7 +327,7 @@ class BMIControlMulti(BMILoop, LinearlyDecreasingAssist, ScreenTargetCapture):
 
 
 class BMIControlMulti2DWindow(BMIControlMulti, WindowDispl2D):
-    fps = 20.
+    fps = 60.
     def __init__(self,*args, **kwargs):
         super(BMIControlMulti2DWindow, self).__init__(*args, **kwargs)
 
@@ -352,21 +352,52 @@ class BMIControlMulti2DFullBMI(BMIControlMulti):
         from riglib.bmi import state_space_models
         ssm = state_space_models.StateSpaceEndptVel2D()
         
-        channels = np.zeros((30, 2))
+        num_features = 256
+
+        channels = np.zeros((num_features , 2)) # this is technically the units where (# of features, 2)
 
         self.decoder = train.rand_KFDecoder(ssm, channels)
+        #this is where we need to cheat. 
+        print(f'bmimultitasks:{self.decoder.filt.C.shape}')
+
+        """
+        sim_C = np.array([[ 0.,  0.,  0.,  1,  0.,  0.,  0.],
+         [ 0.,  0.,  0., 0,  0.,  0.,  0.],
+         [ 0.,  0.,  0.,  0.,  0.,  -1.,  0.],
+         [ 0.,  0.,  0.,  0.,  0., 0.,  0.]])
+        """
+
+        #TODO: how is the number of feature communicated to the extractor properly. 
+        sim_C = np.zeros((num_features, 7))
+        sim_C[0,3] = 1
+        sim_C[2,5] = -1
+
+        from features.simulation_features import change_target_kalman_filter_with_a_C_mat
+        change_target_kalman_filter_with_a_C_mat(self.decoder.filt, sim_C, debug=False)
+
+        print(f'bmimultitasks C mat:{self.decoder.filt.C}')
+
         super(BMIControlMulti2DFullBMI, self).load_decoder()
 
+    
     def create_feature_extractor(self):
         from riglib.bmi import extractor
-
-        #TODO this needs to be changed to be the proper channel count
-        channels = np.arange(2)
-        self.extractor = extractor.LFPMTMPowerExtractor(self.neurondata, channels)
+        bands = [(51, 100), (210, 260)] #for looking at band ower peaks at 71 and 241 Hz.
+        num_channels = 128
+        channels = np.arange(num_channels)
+        self.extractor = extractor.LFPMTMPowerExtractor(self.neurondata, channels, bands = bands)
 
         self._add_feature_extractor_dtype()
+    '''
 
+    #direct observation 
+    #comment this out for later work. 
+    def create_feature_extractor(self):
+        from riglib.bmi import extractor
+        self.extractor = extractor.DirectObsExtractor(self.neurondata)
 
+        self._add_feature_extractor_dtype()
+    '''
 if __name__ == "__main__":
     from target_capture_task import ScreenTargetCapture
     gen = ScreenTargetCapture.centerout_2D()
@@ -383,7 +414,13 @@ if __name__ == "__main__":
     Exp = riglib.experiment.make(base_class, feats=feats)
     print(Exp)
 
-    exp = Exp(gen)
+    kwargs = dict()
+    kwargs['headstages'] = (7)
+    channels = [(1,128)]
+    kwargs['channels'] = channels
+
+    exp = Exp(gen, **kwargs)
     exp.init()
+    #print(exp.frame_rate)
     exp.run() #start the task
     
