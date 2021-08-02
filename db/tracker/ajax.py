@@ -1,28 +1,29 @@
 '''
-Handlers for AJAX (Javascript) functions used in the web interface to start 
+Handlers for AJAX (Javascript) functions used in the web interface to start
 experiments and train BMI decoders
 '''
 import json, datetime
-
+import logging
+import io, traceback
 import numpy as np
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.db.models import ProtectedError
 
 from riglib import experiment
-
 from .json_param import Parameters
+from .models import TaskEntry, Feature, Sequence, Task, Generator, Subject, DataFile, System, Decoder, KeyValueStore, import_by_path
+from .tasktrack import Track
 
-from .models import TaskEntry, Feature, Sequence, Task, Generator, Subject, DataFile, System, Decoder
-
-import db.trainbmi as trainbmi
 import logging
 import io, traceback
 
-from . import exp_tracker
+from . import exp_tracker # Wrapper for tasktrack.Track
+from . import trainbmi
 
 http_request_queue = []
 
-
+@csrf_exempt
 def train_decoder_ajax_handler(request, idx):
     '''
     AJAX handler for creating a new decoder.
@@ -32,7 +33,7 @@ def train_decoder_ajax_handler(request, idx):
     request : Django HttpRequest
         POST data containing details for how to train the decoder (type, units, update rate, etc.)
     idx : int
-        ID number of the models.TaskEntry record with the data used to train the Decoder.
+        ID number of the TaskEntry record with the data used to train the Decoder.
 
     Returns
     -------
@@ -65,7 +66,7 @@ def train_decoder_ajax_handler(request, idx):
 
 class encoder(json.JSONEncoder):
     '''
-    Encoder for JSON data that defines how the data should be returned. 
+    Encoder for JSON data that defines how the data should be returned.
     '''
     def default(self, o):
         if isinstance(o, np.ndarray):
@@ -112,23 +113,34 @@ def task_info(request, idx, dbname='default'):
         if isset == "true": # box for the feature checked
             feat = Feature.objects.using(dbname).get(name=name)
             feats.append(feat)
-    
-    task_info = dict(params=task.params(feats=feats), generators=task.get_generators())
+
+    filter_kwargs = {'template': True, 'task__id': idx}
+    templates = TaskEntry.objects.using(dbname).filter(**filter_kwargs).order_by("-date")
+    template_info = [{'id': t.id, 'name': t.entry_name} for t in templates]
+
+    subject = {
+        'type': 'Enum',
+        'required': True,
+        'default': '',
+        'desc': 'Who',
+        'hidden': 'visible',
+        'options':  Subject.get_all_subjects()
+    }
+    metadata = {'subject': subject}
+
+    task_info = dict(params=task.params(feats=feats), generators=task.get_generators(), \
+        templates=template_info, metadata=metadata)
 
     task_cls = task.get(feats=feats)
     if issubclass(task_cls, experiment.Sequence):
         task_info['sequence'] = task.sequences()
-
-    if hasattr(task_cls, 'annotations'):
-        task_info['annotations'] = task_cls.annotations
-    else:
-        task_info['annotations'] = []
+    task_info['controls'] = task.controls(feats=feats)
 
     return _respond(task_info)
 
 def exp_info(request, idx, dbname='default'):
     '''
-    Get information about the task
+    Get information about the tasks that have already run
 
     Parameters
     ----------
@@ -139,14 +151,12 @@ def exp_info(request, idx, dbname='default'):
 
     Returns
     -------
-    JSON-encoded dictionary 
+    JSON-encoded dictionary
         Data containing features, parameters, and any report data from the TaskEntry
     '''
     entry = TaskEntry.objects.using(dbname).get(pk=idx)
     try:
         entry_data = entry.to_json()
-        tracker = exp_tracker.get()
-        entry_data["state"] = tracker.get_status()
     except:
         print("##### Error trying to access task entry data: id=%s, dbname=%s" % (idx, dbname))
         import traceback
@@ -156,6 +166,19 @@ def exp_info(request, idx, dbname='default'):
         print("#####")
     else:
         return _respond(entry_data)
+
+@csrf_exempt
+def add_sequence(request):
+    
+    print(request.POST)
+    sequence = json.loads(request.POST['sequence'])
+    task_id = json.loads(request.POST.get('task'))
+    seq = Sequence.from_json(sequence)
+    task =  Task.objects.get(pk=task_id)
+    seq.task = task
+    seq.save()
+    
+    return _respond(dict(id=seq.id, name=seq.name))   
 
 def hide_entry(request, idx):
     '''
@@ -177,13 +200,45 @@ def show_entry(request, idx):
     entry.save()
     return _respond(dict())
 
+def remove_entry(request, idx):
+    print("Remove entry %d" % idx)
+    entry = TaskEntry.objects.get(pk=idx)
+    try:
+        DataFile.objects.filter(entry=entry.id).delete()
+    except DataFile.DoesNotExist:
+        pass
+    try:
+        Decoder.objects.filter(entry=entry.id).delete()
+    except Decoder.DoesNotExist:
+        pass
+    entry.delete()
+    return _respond(dict())
+
+def template_entry(request, idx):
+    '''
+    See documentation for exp_info
+    '''
+    entry = TaskEntry.objects.get(pk=idx)
+    entry.template = True
+    entry.save()
+    return _respond(dict())
+
+def untemplate_entry(request, idx):
+    '''
+    See documentation for exp_info
+    '''
+    entry = TaskEntry.objects.get(pk=idx)
+    entry.template = False
+    entry.save()
+    return _respond(dict())
+    
 def backup_entry(request, idx):
     '''
     See documentation for exp_info
     '''
     entry = TaskEntry.objects.get(pk=idx)
     entry.backup = True
-    entry.save()    
+    entry.save()
     return _respond(dict())
 
 def unbackup_entry(request, idx):
@@ -192,7 +247,7 @@ def unbackup_entry(request, idx):
     '''
     entry = TaskEntry.objects.get(pk=idx)
     entry.backup = False
-    entry.save()    
+    entry.save()
     return _respond(dict())
 
 def gen_info(request, idx):
@@ -212,24 +267,25 @@ def start_next_exp(request):
 @csrf_exempt
 def start_experiment(request, save=True, execute=True):
     '''
-    Handles presses of the 'Start Experiment' and 'Test' buttons in the browser 
+    Handles presses of the 'Start Experiment' and 'Test' buttons in the browser
     interface
     '''
     #make sure we don't have an already-running experiment
-    tracker = exp_tracker.get()
+    tracker = Track.get_instance()
     if len(tracker.status.value) != 0:
         print("Task is running, exp_tracker.status.value:", tracker.status.value)
         return _respond(dict(status="running", msg="Already running task!"))
 
     # Try to start the task, and if there are any errors, send them to the browser interface
-    try:        
+    try:
         data = json.loads(request.POST['data'])
 
         task =  Task.objects.get(pk=data['task'])
         feature_names = list(data['feats'].keys())
-        Exp = task.get(feats=feature_names)
+        subject_name = data['metadata'].pop('subject')
+        subject = Subject.objects.get(name=subject_name)
 
-        entry = TaskEntry.objects.create(subject_id=data['subject'], task_id=task.id)
+        entry = TaskEntry.objects.create(subject_id=subject.id, task_id=task.id)
         if 'entry_name' in data:
             entry.entry_name = data['entry_name']
         if 'date' in data and data['date'] != "Today" and len(data['date'].split("-")) == 3:
@@ -240,25 +296,33 @@ def start_experiment(request, save=True, execute=True):
         params = Parameters.from_html(data['params'])
         entry.params = params.to_json()
         feats = Feature.getall(feature_names)
-        kwargs = dict(subj=entry.subject.id, base_class=task.get(), 
+        kwargs = dict(subj=entry.subject.id, base_class=task.get(),
             feats=feats, params=params)
+        metadata = Parameters.from_html(data['metadata'])
+        entry.metadata = metadata.to_json()
 
         # Save the target sequence to the database and link to the task entry, if the task type uses target sequences
-        if issubclass(Exp, experiment.Sequence):
-            print("creating seq")
-            print("data['sequence'] POST data")
-            print(data['sequence'])
+        if issubclass(task.get(feats=feature_names), experiment.Sequence):
             seq = Sequence.from_json(data['sequence'])
             seq.task = task
             if save:
                 seq.save()
             entry.sequence = seq
             kwargs['seq'] = seq
-        
-        response = dict(status="testing", subj=entry.subject.name, 
+
+        response = dict(status="testing", subj=entry.subject.name,
                         task=entry.task.name)
 
         if save:
+            # tag software version using the git hash
+            import git
+            repo = git.repo.Repo(__file__, search_parent_directories=True)
+            sw_version = repo.commit().hexsha[:8]
+            repo_dirty = repo.is_dirty(index=True, working_tree=True, untracked_files=False)
+            if repo_dirty:
+                sw_version += '.dirty'
+            entry.sw_version = sw_version
+
             # Save the task entry to database
             entry.save()
 
@@ -269,13 +333,13 @@ def start_experiment(request, save=True, execute=True):
 
             response['date'] = entry.date.strftime("%h %d, %Y %I:%M %p")
             response['status'] = "running"
-            response['idx'] = entry.id
+            response['idx'] = entry.ui_id
 
             # Give the entry ID to the runtask as a kwarg so that files can be linked after the task is done
             kwargs['saveid'] = entry.id
         else:
             entry.delete()
-        
+
         # Start the task FSM and tracker
         if execute:
             tracker.runtask(**kwargs)
@@ -289,10 +353,14 @@ def start_experiment(request, save=True, execute=True):
         # Generate an HTML response with the traceback of any exceptions thrown
         import io
         import traceback
+        from .tasktrack import log_str
         err = io.StringIO()
         traceback.print_exc(None, err)
+        traceback.print_exc() # print again to console
         err.seek(0)
-        traceback.print_exc()
+        log_str(err.read()) # log to tasktracker
+        err.seek(0)
+        tracker.reset() # make sure task is stopped
         return _respond(dict(status="error", msg=err.read()))
 
 def rpc(fn):
@@ -302,18 +370,18 @@ def rpc(fn):
     Parameters
     ----------
     fn : callable
-        Function which takes a single argument, the tracker object. 
+        Function which takes a single argument, the tracker object.
         Return values from this function are ignored.
 
     Returns
     -------
-    JSON-encoded dictionary 
+    JSON-encoded dictionary
     '''
-    tracker = exp_tracker.get()
+    tracker = Track.get_instance()
 
     # make sure that there exists an experiment to interact with
     if tracker.status.value not in [b"running", b"testing"]:
-        print("rpc not possible", str(tracker.status.value))
+        print("Task not running!", str(tracker.status.value))
         return _respond(dict(status="error", msg="No task running, so cannot run command!"))
 
     try:
@@ -335,7 +403,7 @@ def _respond_err(e):
     Parameters
     ----------
     e : Exception
-        Error & traceback to convert to string format. 
+        Error & traceback to convert to string format.
 
     Returns
     -------
@@ -345,7 +413,7 @@ def _respond_err(e):
     err = io.StringIO()
     traceback.print_exc(None, err)
     err.seek(0)
-    return _respond(dict(status="error", msg=err.read()))        
+    return _respond(dict(status="error", msg=err.read()))
 
 @csrf_exempt
 def stop_experiment(request):
@@ -387,19 +455,18 @@ def reward_drain(request, onoff):
     return HttpResponse('Turning reward %s' % onoff)
 
 def populate_models(request):
-    """ Database initialization code. When 'db.tracker' is imported, it goes through the database and ensures that 
+    """ Database initialization code. When 'db.tracker' is imported, it goes through the database and ensures that
     1) at least one subject is present
     2) all the tasks from 'tasklist' appear in the db
     3) all the features from 'featurelist' appear in the db
-    4) all the generators from all the tasks appear in the db 
+    4) all the generators from all the tasks appear in the db
     """
-    from . import models
-    subjects = models.Subject.objects.all()
+    subjects = Subject.objects.all()
     if len(subjects) == 0:
-        subj = models.Subject(name='testing')
+        subj = Subject(name='testing')
         subj.save()
 
-    for m in [models.Task, models.Feature, models.Generator, models.System]:
+    for m in [Generator, System]:
         m.populate()
 
     return HttpResponse("Updated Tasks, features generators, and systems")
@@ -408,122 +475,131 @@ def populate_models(request):
 def add_new_task(request):
     from . import models
     name, import_path = request.POST['name'], request.POST['import_path']
-    
+
     #  verify import path
     if import_path == '':
         import_path = "riglib.experiment.Experiment"
 
     try:
-        models.import_by_path(import_path)
+        import_by_path(import_path)
     except:
         import traceback
         traceback.print_exc()
         return _respond(dict(msg="import path invalid!", status="error"))
 
-    task = models.Task(name=name, import_path=import_path)
+    task = Task(name=name, import_path=import_path)
     task.save()
 
     # add any new generators for the task
-    models.Generator.populate()
+    Generator.remove_unused()       
+    Generator.populate()
 
     task_data = dict(id=task.id, name=task.name, import_path=task.import_path)
     return _respond(dict(msg="Added new task: %s" % task.name, status="success", data=task_data))
 
 @csrf_exempt
-def update_task_import_path(request):
-    from . import models
-    task_id, import_path = request.POST['id'], request.POST['import_path']
-
-    # verify import path
-    if import_path == '':
-        import_path = "riglib.experiment.Experiment"
-
+def remove_task(request):
+    id = request.POST.get('id')
+    task = Task.objects.filter(id=id)
     try:
-        models.import_by_path(import_path)
-    except:
-        import traceback
-        traceback.print_exc()
-        return _respond(dict(msg="import path invalid!", status="error"))
-
-    task = models.Task.objects.get(id=task_id)
-    task.import_path = import_path
-    task.save()
-
-    task_data = dict(id=task.id, name=task.name, import_path=task.import_path)
-    return _respond(dict(msg="Updated task import path: %s" % task.name, status="success", data=task_data))
+        entry = TaskEntry.objects.filter(task=id).values_list('id', flat=True)
+    except TaskEntry.DoesNotExist:
+        entry = None
+    if entry is None or len(entry) == 0:
+        try:
+            Sequence.objects.filter(task=id).delete()
+        except Sequence.DoesNotExist:
+            pass
+        task.delete()
+        return _respond(dict(msg="Removed task", status="success"))
+    else:
+        return _respond(dict(msg="Couldn't remove task, experiments {0} use it.".format(list(entry)), status="error"))
 
 @csrf_exempt
 def add_new_subject(request):
-    from . import models 
     subject_name = request.POST['subject_name']
-    subj = models.Subject(name=subject_name)
+    subj = Subject(name=subject_name)
     subj.save()
 
     return _respond(dict(msg="Added new subject: %s" % subj.name, status="success", data=dict(id=subj.id, name=subj.name)))
 
 @csrf_exempt
+def remove_subject(request):
+    id = request.POST.get('id')
+    try:
+        Subject.objects.filter(id=id).delete()
+        return _respond(dict(msg="Removed subject", status="success"))
+    except ProtectedError:
+        return _respond(dict(msg="Couldn't remove subject, there must be valid experiments that use it", status="error"))
+
+@csrf_exempt
 def add_new_system(request):
-    from . import models
-    sys = models.System(name=request.POST['name'], path=request.POST['path'], 
+    sys = System(name=request.POST['name'], path=request.POST['path'],
         processor_path=request.POST['processor_path'])
     sys.save()
 
-    return _respond(dict(msg="Added new system: %s" % sys.name, status="success"))
+    system_data = dict(id=sys.id, name=sys.name)
+    return _respond(dict(msg="Added new system: %s" % sys.name, status="success", data=system_data))
 
 @csrf_exempt
-def enable_features(request):
+def remove_system(request):
+    from . import models
+    id = request.POST.get('id')
+    try:
+        System.objects.filter(id=id).delete()
+        return _respond(dict(msg="Removed system", status="success"))
+    except ProtectedError:
+        return _respond(dict(msg="Couldn't remove system, there must be valid experiments that use it", status="error"))
+
+@csrf_exempt
+def toggle_features(request):
     from features import built_in_features
     from . import models
 
     name = request.POST.get('name')
-    if name in built_in_features:
-        # check if the feature is already installed
-        existing_features = models.Feature.objects.filter(name=name)
+    
+    # check if the feature is already installed
+    existing_features = Feature.objects.filter(name=name)
 
-        if len(existing_features) > 0:
-            # disable the feature
-            models.Feature.objects.filter(name=name).delete()
-            msg = "Disabled built-in feature: %s" % str(name)
-        else:
-            import_path = built_in_features[name].__module__ + '.' + built_in_features[name].__qualname__
-            feat = models.Feature(name=name, import_path=import_path)
-            feat.save()
-            msg = "Disabled built-in feature: %s" % str(feat.name)
-
-    return _respond(dict(msg=msg, status="success"))
+    if len(existing_features) > 0:
+        # disable the feature
+        Feature.objects.filter(name=name).delete()
+        msg = "Disabled feature: %s" % str(name)
+        return _respond(dict(msg=msg, status="success"))
+    elif name in built_in_features:
+        import_path = built_in_features[name].__module__ + '.' + built_in_features[name].__qualname__
+        feat = Feature(name=name, import_path=import_path)
+        feat.save()
+        msg = "Enabled built-in feature: %s" % str(feat.name)
+        return _respond(dict(msg=msg, status="success", id=feat.id))
+    else:
+        # something is wrong
+        return _respond(dict(msg="feature not valid!", status="error"))   
 
 @csrf_exempt
 def add_new_feature(request):
     from . import models
     name, import_path = request.POST['name'], request.POST['import_path']
-    feat = models.Feature(name=name, import_path=import_path)
+
+    #  verify import path
+    try:
+        import_by_path(import_path)
+    except:
+        import traceback
+        traceback.print_exc()
+        return _respond(dict(msg="import path invalid!", status="error"))
+
+    feat = Feature(name=name, import_path=import_path)
     feat.save()
     
     feature_data = dict(id=feat.id, name=feat.name, import_path=feat.import_path)
     return _respond(dict(msg="Added new feature: %s" % feat.name, status="success", data=feature_data))
 
 @csrf_exempt
-def update_feature_import_path(request):
-    feature_id, feature_path = request.POST['id'], request.POST['import_path']
-
-    try:
-        models.import_by_path(import_path)
-    except:
-        import traceback
-        traceback.print_exc()
-        return _respond(dict(msg="import path invalid!", status="error"))    
-
-    feat = models.Feature.objects.get(id=feature_id)
-    feat.import_path = import_path
-    feat.save()
-
-    return _respond(dict(msg="Updated feature import path: %s" % feat.name, status="success"))
-
-@csrf_exempt
 def setup_run_upkeep(request):
     # Update the list of generators
     from . import models
-    models.Generator.populate()
+    Generator.populate()
     return HttpResponse("Updated generators!")
 
 @csrf_exempt
@@ -539,13 +615,28 @@ def get_report(request):
     return rpc(report_fn)
 
 @csrf_exempt
-def record_annotation(request):
-    return rpc(lambda tracker: tracker.task_proxy.record_annotation(request.POST["annotation"]))
-    
+def trigger_control(request):
+    '''
+    Trigger an action via controls on the web interface
+    '''
+    def control_fn(tracker):
+        try:
+            method = getattr(tracker.task_proxy, request.POST["control"])
+            if "params" in request.POST:
+                params = json.loads(request.POST.get("params"))
+                print(method)
+                return method(**params)
+            else:
+                return method()
+        except Exception as e:
+            traceback.print_exc()
+
+    return rpc(control_fn)
+
 @csrf_exempt
 def get_status(request):
     """ Send the task tracker's status back to the frontend """
-    tracker = exp_tracker.get()
+    tracker = Track.get_instance()
     if tracker.task_kwargs is None:
         saveid = None
     else:
@@ -556,16 +647,15 @@ def get_status(request):
 @csrf_exempt
 def save_entry_name(request):
     from . import models
-    te_rec = models.TaskEntry.objects.get(id=request.POST["id"])
+    te_rec = TaskEntry.objects.get(id=request.POST["id"])
     te_rec.entry_name = request.POST["entry_name"]
     te_rec.save()
     return _respond(dict(status="success", msg="Saved entry name: %s" % te_rec.entry_name))
 
-@csrf_exempt
 def update_built_in_feature_import_paths(request):
     """For built-in features, update the import path based on the features module"""
     from . import models
-    for feat in models.Feature.objects.all():
+    for feat in Feature.objects.all():
         feat.get(update_builtin=True)
     return _respond(dict(status="success", msg="Updated built-in feature paths!"))
 
@@ -575,16 +665,23 @@ def update_database_storage_path(request):
     db_storage_path = request.POST['db_storage_path']
 
     if db_name == 'default':
-        models.KeyValueStore.set("data_path", db_storage_path)
+        KeyValueStore.set("data_path", db_storage_path)
         return _respond(dict(status="success", msg="Updated storage path for %s db" % db_name))
     else:
         return _respond(dict(status="error", msg="Not yet implemented for non-default tables!"))
 
 def save_recording_sys(request):
     from . import models
-    models.KeyValueStore.set('recording_sys', request.POST['selected_recording_sys'])
-    print(models.KeyValueStore.get('recording_sys'))
-    ret_msg = "Set recording_sys to %s" % models.KeyValueStore.get('recording_sys')
+    KeyValueStore.set('recording_sys', request.POST['selected_recording_sys'])
+    print(KeyValueStore.get('recording_sys'))
+    ret_msg = "Set recording_sys to %s" % KeyValueStore.get('recording_sys')
+    return _respond(dict(status="success", msg=ret_msg))
+
+def save_rig_name(request):
+    from . import models
+    KeyValueStore.set('rig_name', request.POST['rig_name'])
+    print(KeyValueStore.get('rig_name'))
+    ret_msg = "Set rig_name to %s" % KeyValueStore.get('rig_name')
     return _respond(dict(status="success", msg=ret_msg))
 
 @csrf_exempt
@@ -595,6 +692,10 @@ def setup_handler(request):
         return update_database_storage_path(request)
     elif action == "save_recording_sys":
         return save_recording_sys(request)
+    elif action == "save_rig_name":
+        return save_rig_name(request)
+    elif action == "update_built_in_feature_paths":
+        return update_built_in_feature_import_paths(request)
     else:
         return _respond(dict(status="error", msg="Unrecognized data type: %s" % data_type))
 

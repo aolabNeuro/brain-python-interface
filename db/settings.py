@@ -1,4 +1,3 @@
-
 '''
 Django config file mostly auto-generated when a django project is created.
 See https://docs.djangoproject.com/en/dev/intro/tutorial01/ for an introduction
@@ -8,11 +7,7 @@ on how to customize this file test
 import os, glob, re
 cwd = os.path.split(os.path.abspath(__file__))[0]
 
-import djcelery
-djcelery.setup_loader()
 # Django settings for db project.
-
-
 DEBUG = True
 TEMPLATE_DEBUG = DEBUG
 
@@ -51,7 +46,7 @@ def get_sqlite3_databases():
     return dbs
 
 #DATABASES = get_sqlite3_databases()
-DATABASES = { 'default': { 'ENGINE': 'django.db.backends.sqlite3', 'NAME': 'db.sql', } }
+#DATABASES = { 'default': { 'ENGINE': 'django.db.backends.sqlite3', 'NAME': 'db.sql', } }
 
 '''
 DATABASES = {
@@ -73,6 +68,16 @@ DATABASES = {
     },
 }
 '''
+
+DATABASES = {}
+DATABASES['default'] = {
+    'ENGINE': 'django.db.backends.mysql',
+    'NAME': 'rig1',
+    'HOST': 'aolab.wanprc.washington.edu',
+    'PORT': '3306',
+    'USER': 'aolab',
+    'PASSWORD': 'Securepassword1@#' # Very secure wow
+}
 
 # Local time zone for this installation. Choices can be found here:
 # http://en.wikipedia.org/wiki/List_of_tz_zones_by_name
@@ -154,15 +159,13 @@ STATICFILES_DIRS = (
 )
 ADMIN_MEDIA_PREFIX = '/static/admin/'
 INSTALLED_APPS = (
+    'db.tracker',
     'django.contrib.auth',
     'django.contrib.admin',    
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'djcelery',
-    'tracker.apps.TrackerConfig',
-    'trainbmi'
 )
 
 TEMPLATES = [
@@ -171,7 +174,7 @@ TEMPLATES = [
         'DIRS': [],
         'APP_DIRS': True,
         'OPTIONS': {
-            'environment': 'tracker.jinja2.environment'
+            'environment': 'db.tracker.jinja2.environment'
         },
     },
     {
@@ -192,4 +195,7 @@ TEMPLATES = [
 APPEND_SLASH=False
 
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost', "testserver"]
+ALLOWED_HOSTS = ['*'] #['127.0.0.1', 'localhost', "testserver"]
+
+CELERY_BROKER_URL = 'amqp://bmi3d:verysecurel0l@aolab.wanprc.washington.edu:5672//'
+
