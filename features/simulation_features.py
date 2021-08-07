@@ -105,6 +105,25 @@ class SimClock(object):
     def tick(self, *args, **kwargs):
         pass
 
+    def get_time(self):
+        '''
+        Simulates time based on Delta*cycle_count, where the update_rate is specified as an instance attribute
+        '''
+        try:
+            return self.cycle_count * self.update_rate
+
+        except:
+            # loop_counter has not been initialized yet, return 0
+            return 0
+
+    @property 
+    def update_rate(self):
+        '''
+        Attribute for update rate of task. Using @property in case any future modifications
+        decide to change fps on initialization
+        '''
+        return 1./60
+
 class SimClockTick(object):
     '''
     Summary: A simulation pygame.clock to use in simulations that inherit from experiment.Experiment, to overwrite
@@ -413,7 +432,7 @@ class SimKFDecoder(object):
 
         super().init(*args, **kwargs)
 
-    def _cycle(*args, **kwargs):
+    def _cycle(self, *args, **kwargs):
         super()._cycle(*args, **kwargs)
 
         self.k_mat_params.append(self.decoder.filt.K)
