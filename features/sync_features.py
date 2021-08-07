@@ -1,5 +1,5 @@
 from riglib.experiment import traits
-from riglib.gpio import NIGPIO, DigitalWave
+from riglib.gpio import NIGPIO, DigitalWave, TestGPIO
 import numpy as np
 import tables
 import time
@@ -42,7 +42,7 @@ def decode_event(dictionary, value):
         return ordered_list[-1][0], 0
     return None
 
-class NIDAQSync(traits.HasTraits):
+class HDFSync(traits.HasTraits):
 
     sync_params = dict(
         sync_protocol = 'rig1',
@@ -61,7 +61,7 @@ class NIDAQSync(traits.HasTraits):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.sync_gpio = NIGPIO()
+        self.sync_gpio = TestGPIO()
         self.sync_every_cycle = True
 
     def init(self, *args, **kwargs):
@@ -153,7 +153,18 @@ class NIDAQSync(traits.HasTraits):
             for param in self.sync_params.keys():
                 h5file.root.sync_events.attrs[param] = self.sync_params[param]
             h5file.close()
-    
+
+class NIDAQSync(HDFSync):
+    """
+    this class replaces the NIDAQ output with a dummy hardware output class (GPIO)
+    so all sync information (clock etc, ) is saved to the hdf file.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.sync_gpio = NIGPIO()
+
+
+
 import copy
 import pygame
 from built_in_tasks.target_graphics import VirtualRectangularTarget
