@@ -13,7 +13,7 @@ from riglib.stereo_opengl import ik
 from riglib import plants
 
 from riglib.stereo_opengl.window import Window
-from .target_graphics import *
+from target_graphics import *
 
 ## Plants
 # List of possible "plants" that a subject could control either during manual or brain control
@@ -263,7 +263,10 @@ class TargetCapture(Sequence):
         self.reportstats['Trial #'] = self.calc_trial_num()
         self.reportstats['Reward/min'] = np.round(self.calc_events_per_min('reward', 120.), decimals=2)
 
-class ScreenTargetCapture(TargetCapture, Window):
+
+
+
+class ConcreteTargetCapture(TargetCapture):
     """Concrete implementation of TargetCapture task where targets
     are acquired by "holding" a cursor in an on-screen target"""
 
@@ -301,13 +304,12 @@ class ScreenTargetCapture(TargetCapture, Window):
         self.plant_vis_prev = True
         self.cursor_vis_prev = True
 
-        # Add graphics models for the plant and targets to the window
-        if hasattr(self.plant, 'graphics_models'):
-            for model in self.plant.graphics_models:
-                self.add_model(model)
 
+        
         # Instantiate the targets
         instantiate_targets = kwargs.pop('instantiate_targets', True)
+
+        self.target_location = np.array([0,0,0])
         if instantiate_targets:
 
             # Need two targets to have the ability for delayed holds
@@ -323,6 +325,9 @@ class ScreenTargetCapture(TargetCapture, Window):
     def init(self):
         self.add_dtype('trial', 'u4', (1,))
         self.add_dtype('plant_visible', '?', (1,))
+
+        self.add_dtype('target', 'f8',(3,))
+        self.add_dtype('target_index', 'i', (1,))
         super().init()
 
     def _cycle(self):
@@ -396,17 +401,19 @@ class ScreenTargetCapture(TargetCapture, Window):
             # Instantiate the targets here so they don't show up in any states that might come before "wait"
             for target in self.targets:
                 for model in target.graphics_models:
-                    self.add_model(model)
-                    target.hide()
+                    #self.add_model(model)
+                    #target.hide()
+                    pass
 
     def _start_target(self):
         super()._start_target()
 
         # Show target if it is hidden (this is the first target, or previous state was a penalty)
         target = self.targets[self.target_index % 2]
+        self.target_location = self.targs[self.target_index]
         if self.target_index == 0:
             target.move_to_position(self.targs[self.target_index])
-            target.show()
+            #target.show()
             self.sync_event('TARGET_ON', self.gen_indices[self.target_index])
 
     def _start_hold(self):
@@ -421,7 +428,7 @@ class ScreenTargetCapture(TargetCapture, Window):
         if next_idx < self.chain_length:
             target = self.targets[next_idx % 2]
             target.move_to_position(self.targs[next_idx])
-            target.show()
+            #target.show()
             self.sync_event('TARGET_ON', self.gen_indices[next_idx])
         else:
             # This delay state should only last 1 cycle, don't sync anything
@@ -436,7 +443,7 @@ class ScreenTargetCapture(TargetCapture, Window):
         elif self.target_index + 1 < self.chain_length:
 
             # Hide the current target if there are more
-            self.targets[self.target_index % 2].hide()
+            #self.targets[self.target_index % 2].hide()
             self.sync_event('TARGET_OFF', self.gen_indices[self.target_index])
 
     def _start_hold_penalty(self):
@@ -444,7 +451,7 @@ class ScreenTargetCapture(TargetCapture, Window):
         super()._start_hold_penalty()
         # Hide targets
         for target in self.targets:
-            target.hide()
+            #target.hide()
             target.reset()
 
     def _end_hold_penalty(self):
@@ -456,7 +463,7 @@ class ScreenTargetCapture(TargetCapture, Window):
         super()._start_delay_penalty()
         # Hide targets
         for target in self.targets:
-            target.hide()
+            #target.hide()
             target.reset()
 
     def _end_delay_penalty(self):
@@ -468,7 +475,7 @@ class ScreenTargetCapture(TargetCapture, Window):
         super()._start_timeout_penalty()
         # Hide targets
         for target in self.targets:
-            target.hide()
+            #target.hide()
             target.reset()
 
     def _end_timeout_penalty(self):
@@ -485,7 +492,7 @@ class ScreenTargetCapture(TargetCapture, Window):
 
         # Hide targets
         for target in self.targets:
-            target.hide()
+            #target.hide()
             target.reset()
 
     #### Generator functions ####
@@ -634,6 +641,31 @@ class ScreenTargetCapture(TargetCapture, Window):
             pts = pts+(boundaries[0], boundaries[2], boundaries[4])
             yield idx+np.arange(chain_length), pts
             idx += chain_length
+
+class ScreenTargetCapture(ConcreteTargetCapture, Window):
+    """
+    a task that is mixed with Window display
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Add graphics models for the plant and targets to the window
+        if hasattr(self.plant, 'graphics_models'):
+            for model in self.plant.graphics_models:
+                self.add_model(model)
+
+    
+        #### STATE FUNCTIONS ####
+    def _start_wait(self):
+        super()._start_wait()
+
+        if self.calc_trial_num() == 0:
+
+            # Instantiate the targets here so they don't show up in any states that might come before "wait"
+            for target in self.targets:
+                for model in target.graphics_models:
+                    self.add_model(model)
+                    target.hide()
 
 class ScreenReachAngle(ScreenTargetCapture):
     '''
