@@ -3,7 +3,7 @@
 # Set display
 HOST=`hostname -s`
 if [ "$HOST" = "pagaiisland2" ]; then
-    export DISPLAY=':0.1'
+    export DISPLAY=':0.0'
 elif [ "$HOST" = "peco" ]; then
     export DISPLAY=$(grep nameserver /etc/resolv.conf | awk '{print $2}'):0.0
     export LIBGL_ALWAYS_INDIRECT=1

@@ -78,6 +78,7 @@ class TestLaser(unittest.TestCase):
         exp.init()
         exp.run()
 
+    @unittest.skip("Need arduino connected for this to pass")
     def test_dio_pulse_width(self):
         from riglib.gpio import ArduinoGPIO, DigitalWave
         import time
@@ -112,10 +113,19 @@ class TestLaser(unittest.TestCase):
             wave.join()
             time.sleep(0.1)
 
+    def test_teensy(self):
+        from riglib.gpio import ArduinoGPIO, DigitalWave
+        import time
+        gpio = ArduinoGPIO('/dev/teensylaser')
+        ch = 13
+        gpio.write(ch, 1)
+        time.sleep(1)
+        gpio.write(ch, 0)
+
 class TestSync(unittest.TestCase):
 
     def test_dictionary(self):
-        default_dict = sync_features.NIDAQSync.sync_params['event_sync_dict']
+        default_dict = sync_features.rig1_sync_events
         self.assertEqual(default_dict['TARGET_ON'] + 4, sync_features.encode_event(default_dict, 'TARGET_ON', 4))
         for k in default_dict.keys():
             event_data = 0
