@@ -391,8 +391,8 @@ class Window2D():
     '''
     def screen_init(self):
         super().screen_init()
-        glBlendEquation(GL_MAX)
-        glBlendFunc(GL_ONE, GL_ONE) # temporary solution to weird blending issue with spheres
+        #glBlendEquation(GL_MAX)
+        #glBlendFunc(GL_ONE, GL_ONE) # temporary solution to weird blending issue with spheres
 
     def _get_renderer(self):
         return render.Renderer2D(self.screen_cm)
