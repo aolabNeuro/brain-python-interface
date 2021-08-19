@@ -385,7 +385,7 @@ class WindowDispl2D():
         pass
 
 
-class Window2D():
+class Window2D(Window):
     '''
     Render the world in 2D without lighting
     '''
@@ -393,8 +393,8 @@ class Window2D():
         super().screen_init()
         # glBlendEquation(GL_MAX)
         # glBlendFunc(GL_ONE, GL_ONE) # temporary solution to weird blending issue with spheres
-        glBlendEquation(GL_FUNC_ADD)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_CONSTANT_ALPHA) #Possible fix for shading issue
+        # glBlendEquation(GL_MAX)
+        # glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_CONSTANT_ALPHA) #Possible fix for shading issue
 
     def _get_renderer(self):
         return render.Renderer2D(self.screen_cm)
