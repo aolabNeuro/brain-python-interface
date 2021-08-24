@@ -158,7 +158,7 @@ class Renderer2D(Renderer):
         programs['default'] = "passthru", "default"
         super().__init__(screen_cm, np.nan, 1, 1024, shaders=shaders, programs=programs)
         w, h = screen_cm
-        self.projection = orthographic(w, h, 1, 1024)
+        self.projection = orthographic(w, h, -1024, 1024)
 
 def test():
     import pygame
