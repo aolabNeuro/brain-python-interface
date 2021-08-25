@@ -1035,3 +1035,54 @@ class BMIControlMultiNoWindow(BMILoop, LinearlyDecreasingAssist, ConcreteTargetC
         if self.reset:
             self.decoder.filt.state.mean = self.init_decoder_mean
             self.hdf.sendMsg("reset")
+
+
+class SimpleTargetCapture(BMIControlMultiNoWindow):
+    status = dict(
+        wait = dict(start_trial="target"),
+        target = dict(enter_target="wait", timeout="wait")
+    )
+
+
+    #the following two functions from BMIControlMulti
+    def _start_wait(self):
+        self.wait_time = 0.
+        super(SimpleTargetCapture, self)._start_wait()
+        
+
+
+    def _test_start_trial(self, ts):
+        return ts > self.wait_time and not self.pause
+
+    def _test_enter_target(self, ts):
+        '''
+        return true if the distance between center of cursor and target is smaller than the cursor radius
+        '''
+        cursor_pos = self.plant.get_endpoint_pos()
+        d = np.linalg.norm(cursor_pos - self.targs[self.target_index])
+ 
+        entered_target = (d <= (self.target_radius - self.cursor_radius))
+        
+        if entered_target: self.sync_event('REWARD')
+        return entered_target
+
+    def _test_timeout(self, time_in_state):
+
+        timed_out = time_in_state > self.timeout_time
+        if timed_out: self.sync_event('HOLD_PENALTY')
+        return timed_out
+
+
+    def _start_target(self):
+        super()._start_target()
+        
+
+        # Show target if it is hidden (this is the first target, or previous state was a penalty)
+        target = self.targets[self.target_index % 2]
+        self.target_location = self.targs[self.target_index]
+
+        target.move_to_position(self.targs[self.target_index])
+        #target.show()
+        self.sync_event('TARGET_ON', self.gen_indices[self.target_index])
+        
+        self.decoder.filt.state.mean = np.matrix((0,0,0,0,0,0,1)).T
