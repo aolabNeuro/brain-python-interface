@@ -66,7 +66,7 @@ def offaxis_frusta(winsize, fov, near, far, focal_dist, iod, flip=False, flip_z=
     # calculate the perspective matrix for the left eye and for the right eye
     left = frustum(-right+fshift, right+fshift, top, -top, near, far)
     right = frustum(-right-fshift, right-fshift, top, -top, near, far)
-    
+
     # multiply in the iod (intraocular distance) modelview transform
     lxfm, rxfm = np.eye(4), np.eye(4)
     lxfm[:3,-1] = [0.5*iod, 0, 0]
@@ -82,6 +82,34 @@ def offaxis_frusta(winsize, fov, near, far, focal_dist, iod, flip=False, flip_z=
     return np.dot(flip_mat, np.dot(left, lxfm)), np.dot(flip_mat, np.dot(right, rxfm))
 
     #return np.dot(left, lxfm), np.dot(right, rxfm)
+
+def offaxis_frustum_magnifier(h, w, d,d_eye, z_near, far, iod, flip = False, flip_z = False):
+
+    top = h / 2 * z_near / (d + d_eye)
+
+    print(f'top :{top}')
+    right = z_near * w / 2 / (d + d_eye)
+    print(f'right: {right}')
+
+    fshift = iod/2
+
+    # calculate the perspective matrix for the left eye and for the right eye
+    left = frustum(-right+fshift, right+fshift, top, -top,  z_near, far)
+    right = frustum(-right-fshift, right-fshift, top, -top, z_near, far)
+
+       # multiply in the iod (intraocular distance) modelview transform
+    lxfm, rxfm = np.eye(4), np.eye(4)
+    lxfm[:3,-1] = [0.5*iod, 0, 0]
+    rxfm[:3,-1] = [-0.5*iod, 0, 0]
+    flip_mat = np.eye(4)
+
+
+    if flip:
+        flip_mat[0,0] = -1
+    if flip_z:
+        flip_mat[1,1] = -1
+
+    return np.dot(flip_mat, np.dot(left, lxfm)), np.dot(flip_mat, np.dot(right, rxfm))
 
 def cloudy_tex(size=(512,512)):
     '''Generates 1/f distributed noise and puts it into a texture. Looks like clouds'''

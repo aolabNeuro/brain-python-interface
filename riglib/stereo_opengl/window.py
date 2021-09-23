@@ -34,10 +34,16 @@ except ImportError:
 from riglib.stereo_opengl.primitives import Shape2D
 
 monitor_res = dict(
-    test_monitor = (1680, 1050),
+    test_monitor = (960, 540),
     monitor_2D = (2560, 1440),
-    monitor_3D = (1920*2, 1080),
+    monitor_3D = (2160, 1200),
 )
+
+D_eye_to_opengl_screen = 15.386 #mm
+H_half_real_size = 3.6 #mm
+H_half_opengl_screen_size = 5.6553 #mm, used in screen half height
+IOD = 6.4
+
 
 class Window(LogExperiment):
     '''
@@ -49,14 +55,16 @@ class Window(LogExperiment):
 
     # XPS computer
     # window_size = (1920*2, 1080)
-    window_size = traits.Tuple(monitor_res['monitor_2D'], desc='Window size, in pixels')
+    window_size = traits.Tuple(monitor_res['monitor_3D'], desc='Window size, in pixels')
     background = traits.Tuple((0.,0.,0.,1.), desc="Background color (R,G,B,A)")
-    fullscreen = traits.Bool(True, desc="Fullscreen window")
+    fullscreen = traits.Bool(False, desc="Fullscreen window")
 
     #Screen parameters, all in centimeters -- adjust for monkey
-    screen_dist = traits.Float(44.5+3, desc="Screen to eye distance (cm)")
-    screen_half_height = traits.Float(10.75, desc="Screen half height (cm)")
-    iod = traits.Float(2.5, desc="Intraocular distance (cm)")     # intraocular distance
+    #screen_dist = traits.Float(44.5+3, desc="Screen to eye distance (cm)")
+    screen_dist = traits.Float(D_eye_to_opengl_screen, desc="Screen to eye distance (cm)")
+    screen_half_height = traits.Float(H_half_real_size, desc="Screen half height (cm)")
+    #screen_half_height = traits.Float(10.75, desc="Screen half height (cm)")
+    iod = traits.Float(IOD, desc="Intraocular distance (cm)")     # intraocular distance
 
     show_environment = traits.Int(0, desc="Show wireframe box around environment")
 
@@ -72,8 +80,11 @@ class Window(LogExperiment):
 
         # os.popen('sudo vbetool dpms on')
         self.fov = np.degrees(np.arctan(self.screen_half_height/self.screen_dist))*2
+
+        print(f'fov: {self.fov}')
         self.screen_cm = [2 * self.screen_half_height * self.window_size[0]/self.window_size[1], 2 * self.screen_half_height]
 
+        print(f'screen in mm {self.screen_cm}')
         if self.show_environment:
             self.add_model(Box())
 
@@ -104,8 +115,8 @@ class Window(LogExperiment):
         glClearColor(*self.background)
         glClearDepth(1.0)
         glDepthMask(GL_TRUE)
-        glEnable(GL_CULL_FACE) # temporary solution to alpha blending issue with spheres. just draw the front half of the sphere
-        glCullFace(GL_FRONT) # actually it's the back half of the sphere we want since everything is mirrored
+        #glEnable(GL_CULL_FACE) # temporary solution to alpha blending issue with spheres. just draw the front half of the sphere
+        #glCullFace(GL_FRONT) # actually it's the back half of the sphere we want since everything is mirrored
 
         self.renderer = self._get_renderer()
 
@@ -119,7 +130,7 @@ class Window(LogExperiment):
         pygame.mouse.set_visible(False)
 
     def _get_renderer(self):
-        near = 1
+        near =  D_eye_to_opengl_screen
         far = 1024
         return stereo.MirrorDisplay(self.window_size, self.fov, near, far, self.screen_dist, self.iod)
 
