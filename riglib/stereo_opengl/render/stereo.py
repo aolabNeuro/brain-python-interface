@@ -6,7 +6,7 @@ import numpy as np
 from OpenGL.GL import *
 
 from .render import Renderer
-from ..utils import offaxis_frusta
+from ..utils import offaxis_frusta, offaxis_frustum_magnifier
 
 class LeftRight(Renderer):
     def __init__(self, window_size, fov, near, far, focal_dist, iod, **kwargs):
@@ -16,6 +16,8 @@ class LeftRight(Renderer):
     
     def draw(self, root, **kwargs):
         w, h = self.size
+        w = int(w)
+        h = int(h)
         glViewport(0, 0, w, h)
         super(LeftRight, self).draw(root, p_matrix=self.projections[0], **kwargs)
         glViewport(w, 0, w, h)
@@ -33,9 +35,23 @@ class MirrorDisplay(Renderer):
     '''The mirror display requires a left-right flip, otherwise the sides are messed up'''
     def __init__(self, window_size, fov, near, far, focal_dist, iod, **kwargs):
         w, h = window_size
-        super(MirrorDisplay, self).__init__((w/2,h), fov, near, far, **kwargs)
+
+        shaders = dict()
+        shaders['passthru'] = GL_VERTEX_SHADER, "passthrough2d.v.glsl"
+        shaders['default'] = GL_FRAGMENT_SHADER, "none.f.glsl"
+        programs = dict()
+        programs['default'] = "passthru", "default"
+        #super().__init__(screen_cm, np.nan, 1, 1024, shaders=shaders, programs=programs)
+
+        super(MirrorDisplay, self).__init__((w/2,h), fov, near, far,shaders = shaders,
+        programs = programs,  **kwargs)
         flip = kwargs.pop('flip', True)
         self.projections = offaxis_frusta((w/2, h), fov, near, far, focal_dist, iod, flip=flip)
+        #self.projections = offaxis_frustum_magnifier(144, 129.6,190.0, 5.886,15.386,190,iod,flip = flip)
+        
+        
+        print('print out the projections')
+        print(self.projections)
     
     def draw(self, root, **kwargs):
         '''
