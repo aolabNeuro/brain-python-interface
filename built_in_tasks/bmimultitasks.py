@@ -1086,3 +1086,83 @@ class SimpleTargetCapture(BMIControlMultiNoWindow):
         self.sync_event('TARGET_ON', self.gen_indices[self.target_index])
         
         self.decoder.filt.state.mean = np.matrix((0,0,0,0,0,0,1)).T
+
+class SimpleTargetCaptureWithHold(BMIControlMultiNoWindow):
+
+    """
+    this is mainly a simulation task where the user is instructed to move and cursor into the target and hold there. 
+
+    """
+
+    status = dict(
+        wait = dict(start_trial="target"),
+        target = dict(enter_target="hold", timeout="wait"),
+        hold = dict(leave_early="wait", hold_complete="wait"),
+    )
+
+    #the following two functions from BMIControlMulti
+    def _start_wait(self):
+        self.wait_time = 0.
+        super(SimpleTargetCaptureWithHold, self)._start_wait()
+        
+
+    def _test_start_trial(self, ts):
+        return ts > self.wait_time and not self.pause
+
+    def _test_enter_target(self, ts):
+        '''
+        return true if the distance between center of cursor and target is smaller than the cursor radius
+        '''
+        cursor_pos = self.plant.get_endpoint_pos()
+        d = np.linalg.norm(cursor_pos - self.targs[self.target_index])
+ 
+        entered_target = (d <= (self.target_radius - self.cursor_radius))
+        
+        #if entered_target: self.sync_event('CURSOR_ENTER_TARGET')
+        return entered_target
+
+
+
+    def _test_timeout(self, time_in_state):
+
+        timed_out = time_in_state > self.timeout_time
+        if timed_out: self.sync_event('TIMEOUT_PENALTY')
+        return timed_out
+
+
+    def _test_leave_early(self, ts):
+        '''
+        return true if cursor moves outside the exit radius
+        '''
+        cursor_pos = self.plant.get_endpoint_pos()
+        d = np.linalg.norm(cursor_pos - self.target_location)
+        rad = self.target_radius - self.cursor_radius
+
+        leave_early = d > rad
+
+        if leave_early: self.sync_event('HOLD_PENALTY')
+        return leave_early
+
+    
+    def _test_hold_complete(self, ts):
+        hold_complete = ts>=self.hold_time
+
+        if hold_complete: self.sync_event('REWARD')
+
+        return hold_complete
+
+
+    def _start_target(self):
+        super()._start_target()
+        
+
+        # Show target if it is hidden (this is the first target, or previous state was a penalty)
+        target = self.targets[self.target_index % 2]
+        self.target_location = self.targs[self.target_index]
+
+        target.move_to_position(self.targs[self.target_index])
+        #target.show()
+        #self.sync_event('TARGET_ON', self.gen_indices[self.target_index])
+        
+        self.decoder.filt.state.mean = np.matrix((0,0,0,0,0,0,1)).T
+
