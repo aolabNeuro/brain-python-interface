@@ -312,6 +312,9 @@ class Experiment(ThreadedFSM, traits.HasTraits, metaclass=ExperimentMeta):
         elif trait_params['type'] == 'Instance':
             raise ValueError("You should use the 'InstanceFromDB' trait instead of the 'Instance' trait!")
 
+        elif trait_params['type'] == "ChannelMapping":
+            trait_params['options'] = (ctraits[trait_name].mapping_type, ctraits[trait_name].bmi3d_query_kwargs)
+
         elif trait_params['type'] == "Enum":
             raise ValueError("You should use the 'OptionsList' trait instead of the 'Enum' trait!")
 

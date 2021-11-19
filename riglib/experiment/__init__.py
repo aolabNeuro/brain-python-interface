@@ -14,6 +14,7 @@ try:
     import traits.api as traits
 except ImportError:
     import enthought.traits.api as traits
+from riglib import drmap
 
 
 class InstanceFromDB(traits.Instance):
@@ -40,8 +41,12 @@ class DataFile(InstanceFromDB):
 
 class ChannelMapping(traits.Instance):
     def __init__(self, *args, **kwargs):
+        if 'mapping_type' in kwargs:
+            self.mapping_type = kwargs['mapping_type']
+        else:
+            raise ValueError("If using trait 'ChannelMapping', must specify mapping_type!")
         self.bmi3d_query_kwargs = kwargs.pop('bmi3d_query_kwargs', dict())
-        super().__init__(*args, **kwargs)
+        super().__init__(drmap.Mapping, *args, **kwargs)
 
 class OptionsList(traits.Enum):
     '''
