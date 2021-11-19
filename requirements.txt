@@ -30,3 +30,4 @@ hdfwriter==0.1.4
 jinja2==2.11.2
 pymysql==1.0.2
 psutil==5.8.0
+anvil-uplink==0.3

@@ -164,6 +164,14 @@ class Task(models.Model):
                 # look up database records which match the model type & filter parameters
                 insts = Model.objects.filter(**filter_kwargs).order_by("-date")
                 params[trait_name]['options'] = [(i.pk, i.path) for i in insts]
+            
+            if params[trait_name]['type'] in ['ChannelMapping']:
+                mdl_name, filter_kwargs = params[trait_name]['options']
+
+                # Connect to external database to filter channel mappings
+                from riglib.drmap import client
+                mappings = client.get_most_recent_mappings(mdl_name, filter_kwargs)
+                params[trait_name]['options'] = [(m['key'], m['display_name']) for m in mappings]
 
             if trait_name in values:
                 params[trait_name]['value'] = values[trait_name]

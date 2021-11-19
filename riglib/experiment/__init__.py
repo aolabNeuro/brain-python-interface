@@ -38,6 +38,10 @@ class DataFile(InstanceFromDB):
         kwargs['bmi3d_db_model'] = 'DataFile'
         super(DataFile, self).__init__(*args, **kwargs)
 
+class ChannelMapping(traits.Instance):
+    def __init__(self, *args, **kwargs):
+        self.bmi3d_query_kwargs = kwargs.pop('bmi3d_query_kwargs', dict())
+        super().__init__(*args, **kwargs)
 
 class OptionsList(traits.Enum):
     '''
@@ -52,6 +56,7 @@ class OptionsList(traits.Enum):
 
 traits.InstanceFromDB = InstanceFromDB
 traits.DataFile = DataFile
+traits.ChannelMapping = ChannelMapping
 traits.OptionsList = OptionsList
 
 

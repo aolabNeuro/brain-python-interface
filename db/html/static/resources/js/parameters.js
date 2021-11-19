@@ -63,6 +63,7 @@ Parameters.prototype.append = function(desc) {
         "Instance":         this.add_instance,
         "InstanceFromDB":   this.add_instance,
         "DataFile":         this.add_instance,
+        "ChannelMapping":   this.add_instance,
         "String":           this.add_string,
         "Enum":             this.add_enum,
         "OptionsList":      this.add_enum,

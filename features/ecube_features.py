@@ -32,6 +32,8 @@ class RecordECube(traits.HasTraits):
     headstage_connector = traits.Int(7, desc="Which headstage input to record (1-indexed)")
     headstage_channels = traits.Tuple((1, 1), desc="Range of headstage channels to record (1-indexed)")
     ecube_status = None
+    channel_mapping = traits.ChannelMapping()
+
 
     def cleanup(self, database, saveid, **kwargs):
         '''

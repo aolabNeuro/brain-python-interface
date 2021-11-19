@@ -89,6 +89,10 @@ def norm_trait(trait, value):
         if isinstance(value, int):
             record = models.DataFile.objects.get(pk=value)
             value = record.get()
+    elif ttype == 'ChannelMapping':
+        from riglib.drmap import client
+        if isinstance(value, str):
+            value = client.get_mapping(value)
     elif ttype == 'Bool':
         if value == 'on':
             value = True

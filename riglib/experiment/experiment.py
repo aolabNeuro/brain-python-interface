@@ -193,7 +193,7 @@ class Experiment(ThreadedFSM, traits.HasTraits, metaclass=ExperimentMeta):
         ## Figure out which traits to not save to the HDF file
         ## Large/complex python objects cannot be saved as HDF file attributes
         ctraits = self.class_traits()
-        self.object_trait_names = [ctr for ctr in list(ctraits.keys()) if ctraits[ctr].trait_type.__class__.__name__ in ['Instance', 'InstanceFromDB', 'DataFile']]
+        self.object_trait_names = [ctr for ctr in list(ctraits.keys()) if ctraits[ctr].trait_type.__class__.__name__ in ['Instance', 'InstanceFromDB', 'DataFile', 'ChannelMapping']]
 
         if self.verbose: print("finished executing Experiment.__init__")
 
