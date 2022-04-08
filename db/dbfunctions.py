@@ -1107,6 +1107,27 @@ def get_initiate_rate(entry):
             count+=1
     return count/(length/60.0)
 
+def get_files_server(entries):
+    '''
+    Gets the hdf and ecube files associated with each task entry. This function is specific to aolab's bmi3d and server
+
+    Args:
+        entries: list of task entries. each list item is a TaskEntry object
+
+    Returns:
+        hdf_files : list of hdf_filenames along with server path for each entry
+        ecube_files: list of ecube_filenames along with server path for each entry
+    '''
+    hdf_files = []
+    ecube_files = []
+    mnt_dir = '/mnt'
+    for te in entries:
+        if (te.system.name == 'hdf'):
+            hdf_files.append(os.path.join(mnt_dir, te.system.name, os.path.basename(te.path)))
+        if (te.system.name == 'ecube'):
+            ecube_files.append(os.path.join(mnt_dir, te.system.name, os.path.basename(te.path)))
+    return hdf_files, ecube_files
+
 def get_reward_rate(entry):
     '''
     Returns average # of trials completed per minute.
@@ -1249,6 +1270,7 @@ def min_trials(min_trial_count):
         except:
             return False
     return fn
+
 
 ##########
 ## Filters
