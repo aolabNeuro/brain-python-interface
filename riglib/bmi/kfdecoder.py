@@ -369,7 +369,7 @@ class KalmanFilter(bmi.GaussianStateHMM):
             
         # ML estimate of C and Q
         if regularizer is None:
-            C = np.mat(np.linalg.lstsq(X.T, Y.T)[0].T)
+            C = np.mat(np.linalg.lstsq(X.T, Y.T, rcond=None)[0].T)
         else:
             x = X.T
             y = Y.T
