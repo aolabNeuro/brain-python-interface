@@ -10,6 +10,7 @@ import queue
 import time
 import re
 import os
+from numpy.core.fromnumeric import trace
 import tables
 import datetime
 import copy
@@ -1343,6 +1344,7 @@ class BMILoop(object):
                     ignore_none=ignore_none)
         except:
             import traceback
+            traceback.print_exc()
             traceback.print_exc(file=log_file)
         log_file.close()
 
@@ -1362,7 +1364,7 @@ class BMILoop(object):
         -------
         None
         '''
-        log_file = open(os.path.expandvars('$HOME/code/bmi3d/log/clda_hdf_log'), 'w')
+        log_file = open(os.path.expandvars('$HOME/code/bmi3d/log/clda_hdf_log'), 'a')
 
         compfilt = tables.Filters(complevel=5, complib="zlib", shuffle=True)
         if len(data) > 0:

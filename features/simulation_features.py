@@ -307,7 +307,7 @@ class SimCosineTunedEncWithNoise(SimCosineTunedEnc):
 
         print('\n using encoder with additional noises ', self.ssm, '\n')
         self.encoder = GenericCosEncWithNoise(self.sim_C, self.ssm, 
-                                              self.noise_mode, noise_profile= self.percent_poisson_noise,
+                                              self.noise_mode, noise_profile= self.percent_poisson_noise, fixed_noise_rate = self.fixed_noise_level, 
                                               return_ts=True, DT=0.1, call_ds_rate=6)
         
 
@@ -562,7 +562,7 @@ class SimKFDecoderSup(SimKFDecoder):
             spike_counts = np.zeros([n_units, n_samples])
             encoder.call_ds_rate = 1
             for k in range(n_samples):
-                spike_counts[:,k] = np.array(encoder(state_samples[k], mode='counts')).ravel()
+                spike_counts[:,k] = np.array(encoder(state_samples[k,:].reshape(-1,1), mode='counts')).ravel()
 
             #deal with clda
             zscore = False
@@ -837,7 +837,7 @@ class DebugFeature(object):
         print(f'{__class__.__name__}:set debug flag to {self.debug_flag}')
         super().__init__(*args, **kwargs)
 
-def get_enc_setup(sim_mode = 'toy', tuning_level = 1, n_neurons = 4):
+def get_enc_setup(sim_mode = 'two_gaussian_peaks', tuning_level = 1, n_neurons = 4):
     '''
     sim_mode:str 
        std:  mn 20 neurons

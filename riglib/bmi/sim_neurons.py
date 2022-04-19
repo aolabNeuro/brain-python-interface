@@ -173,7 +173,7 @@ class GenericCosEnc(object):
 class GenericCosEncWithNoise(GenericCosEnc):
 
 
-    def __init__(self, C, ssm, noise_mode, noise_profile = None,
+    def __init__(self, C, ssm, noise_mode, noise_profile = None, fixed_noise_rate = 100, 
                             return_ts=False, DT=0.1, call_ds_rate=6):
         '''
         Constructor for CosEncWithVariableNoises
@@ -189,7 +189,7 @@ class GenericCosEncWithNoise(GenericCosEnc):
                 #exactly the same function signature.
         super().__init__(C,ssm, return_ts = return_ts, DT =DT, call_ds_rate=call_ds_rate)
 
-        self._initialize_noise_profile(noise_profile, noise_mode)
+        self._initialize_noise_profile(noise_profile, noise_mode, FIXED_NOISE_RATE = fixed_noise_rate)
 
     def _initialize_noise_profile(self, noise_profile, noise_mode , FIXED_NOISE_RATE = 100):
         

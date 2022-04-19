@@ -515,7 +515,7 @@ class ConcreteTargetCapture(TargetCapture):
                 yield [0], np.array(pos)
 
     @staticmethod
-    def out_2D(nblocks=100, ntargets=8, distance=10, origin=(0,0,0)):
+    def out_2D(nblocks=500, ntargets=8, distance=10, origin=(0,0,0)):
         '''
         Generates a sequence of 2D (x and z) targets at a given distance from the origin
 
