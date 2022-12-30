@@ -10,9 +10,9 @@ import numpy as np
 
 
 class PipeWrapper(object):
-    def __init__(self, pipe=None, log_filename='', cmd_event=None, **kwargs):
+    def __init__(self, pipe=None, log_filename='hdf_sink.log', cmd_event=None, **kwargs):
         self.pipe = pipe
-        self.log_filename = log_filename
+        self.log_filename = "hdf_sink.log"
         self.cmd_event = cmd_event
 
     def log_error(self, err, mode='a'):
@@ -165,7 +165,7 @@ class RPCProcess(mp.Process):
         super().__init__()
         self.cmd_pipe = None
         self.data_pipe = None
-        self.log_filename = log_filename
+        self.log_filename = "hdf_log.log"
 
         self.target = None
         self.target_class = target_class
