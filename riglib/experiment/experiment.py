@@ -797,7 +797,8 @@ class Sequence(LogExperiment):
         new information needed to start the trial. If the generator runs out, the task stops.
         '''
         if self.debug:
-            print("_start_wait")
+            # print("_start_wait")
+            pass
 
         try:
             self.next_trial = next(self.gen)
