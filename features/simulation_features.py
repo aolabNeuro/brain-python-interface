@@ -784,8 +784,21 @@ class SimSmoothBatch(object):
         print(f'{__class__.__name__}: created an updater with a batch time of {self.batch_time} and a half_life of {self.half_life} \n')
 
 
-
-
+class SimSmoothBatchFullFeature(SimSmoothBatch):
+    """
+    This is the full feature version of the SimSmoothBatch
+    """
+    def __init__(self, *arg, **kwargs):
+        
+        super().__init__(*arg, **kwargs)
+        
+        self._num_full_features = kwargs['number_of_features']
+    
+    def create_updater(self):
+        self.updater =  clda.KFSmoothBatchFullFeature(self.batch_time, self.half_life, self._num_full_features)
+        print()
+        print(f'{__class__.__name__}: created an FULL FEATURE updater with a batch time of {self.batch_time} and a half_life of {self.half_life} \n')
+        
 
 
 

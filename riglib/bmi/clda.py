@@ -1043,7 +1043,104 @@ class KFSmoothbatch(Updater):
             'mFR':mFR, 'sdFR':sdFR, 'rho':rho }
         return new_params
 
+class KFSmoothBatchFullFeature(KFSmoothbatch):
+    update_kwargs = dict(steady_state=True)
+    def __init__(self, batch_time, half_life, 
+                 number_of_features, number_of_states = 7):
+        '''
+        Constructor for KFSmoothbatch
 
+        Parameters
+        ----------
+        batch_time : float
+            Time over which to collect sample data
+        half_life : float
+            Time over which parameters are half-overwritten
+
+        Return
+        ------
+        KFSmoothbatch instance
+        '''
+        super(KFSmoothbatch, self).__init__(self.calc, multiproc=False)
+        self.half_life = half_life
+        self.batch_time = batch_time
+        self.rho = np.exp(np.log(0.5) / (self.half_life/batch_time))
+        
+        self._full_C = np.zeros((number_of_features, number_of_states))
+        self._full_Q = np.zeros((number_of_features, number_of_features))
+        self._full_mFR = np.zeros(number_of_features)
+        self._full_sdFR = np.zeros(number_of_features)
+        
+    def calc(self, intended_kin=None, spike_counts=None, decoder=None, half_life=None, **kwargs):
+        """
+        Smoothbatch calculations
+
+        Run least-squares on (intended_kinematics, spike_counts) to 
+        determine the C_hat and Q_hat of new batch. Then combine with 
+        old parameters using step-size rho
+        """
+        C_old          = self._full_C
+        Q_old          = self._full_Q
+        drives_neurons = decoder.drives_neurons # TODO: check if this has any real infuence
+        mFR_old        = self._full_mFR
+        sdFR_old       = self._full_sdFR
+
+        spike_counts = kwargs['unselected_spike_counts']
+
+        C_hat, Q_hat = kfdecoder.KalmanFilter.MLE_obs_model(
+            intended_kin, spike_counts, include_offset=False, drives_obs=drives_neurons)
+
+        if not (half_life is None):
+            rho = np.exp(np.log(0.5)/(half_life/self.batch_time))
+        else:
+            rho = self.rho 
+
+        #  apply CLDA
+        C = (1-rho)*C_hat + rho*C_old
+        Q = (1-rho)*Q_hat + rho*Q_old
+
+        mFR = (1-rho)*np.mean(spike_counts.T, axis=0) + rho*mFR_old
+        sdFR = (1-rho)*np.std(spike_counts.T, axis=0) + rho*sdFR_old
+        
+        self._update_the_matrices(C,Q, mFR, sdFR, **kwargs)
+        
+        # select the active neurons
+        # not all neurons are selected to drive state updates at the same time
+        if "active_feat_set" in kwargs:
+            active_feat_set = kwargs['active_feat_set']
+            C, Q, mFR, sdFR = self.select_decoder_matrices(active_feat_set, C, Q, mFR, sdFR)
+            
+            print(__class__.__name__ + ": " + str(len(active_feat_set)) + " neurons selected")
+        
+        D = C.T @ np.linalg.pinv(Q) @ C
+    
+        new_params = {'kf.C':C, 'kf.Q':Q, 
+            'kf.C_xpose_Q_inv_C':D, 'kf.C_xpose_Q_inv':C.T @ np.linalg.pinv(Q),
+            'mFR':mFR, 'sdFR':sdFR, 'rho':rho }
+        
+        return new_params
+
+    def _update_the_matrices(self, C, Q, mFR, sdFR, **kwargs):
+        
+        self._full_C = C
+        self._full_Q = Q
+        self._full_mFR = mFR
+        self._full_sdFR = sdFR
+        
+        
+    
+    def select_decoder_matrices(self, active_feat_set, C, Q, mFR, sdFR):
+        '''
+        Select the decoder matrices for the active features
+        '''
+        # select the active neurons
+        C_selected = C[active_feat_set, :]
+        Q_selected = Q[active_feat_set, :][:, active_feat_set]
+        mFR_selected = mFR[active_feat_set]
+        sdFR_selected = sdFR[active_feat_set]
+        
+        return C_selected, Q_selected, mFR_selected, sdFR_selected
+        
 class KFOrthogonalPlantSmoothbatch(KFSmoothbatch):
     '''This module is deprecated. See KFRML_IVC'''
     def __init__(self, *args, **kwargs):

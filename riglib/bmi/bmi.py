@@ -1330,7 +1330,7 @@ class BMILoop(object):
         Re-open the HDF file and save any extra task data kept in RAM
         '''
         super(BMILoop, self).cleanup_hdf()
-        log_file = open(os.path.join(os.getenv("HOME"), 'code/bmi3d/log/clda_log'), 'w')
+        log_file = open('clda_log.log', 'w')
         log_file.write(str(self.state) + '\n')
         try:
             from . import clda
