@@ -1116,7 +1116,8 @@ class KFSmoothBatchFullFeature(KFSmoothbatch):
     
         new_params = {'kf.C':C, 'kf.Q':Q, 
             'kf.C_xpose_Q_inv_C':D, 'kf.C_xpose_Q_inv':C.T @ np.linalg.pinv(Q),
-            'mFR':mFR, 'sdFR':sdFR, 'rho':rho }
+            'mFR':mFR, 'sdFR':sdFR, 'rho':rho,
+            'selected_decoder_features_flag': True }
         
         return new_params
 

@@ -792,12 +792,12 @@ class SimSmoothBatchFullFeature(SimSmoothBatch):
         
         super().__init__(*arg, **kwargs)
         
-        self._num_full_features = kwargs['number_of_features']
+        self._num_full_features = kwargs['n_starting_feats'] # keep track of how many features start from begining
     
     def create_updater(self):
         self.updater =  clda.KFSmoothBatchFullFeature(self.batch_time, self.half_life, self._num_full_features)
         print()
-        print(f'{__class__.__name__}: created an FULL FEATURE updater with a batch time of {self.batch_time} and a half_life of {self.half_life} \n')
+        print(f'{__class__.__name__}: created a FULL FEATURE updater with a batch time of {self.batch_time} and a half_life of {self.half_life} \n')
         
 
 
