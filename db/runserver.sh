@@ -11,11 +11,12 @@ elif [ "$HOST" = "pagaiisland-surface" ]; then
     export DISPLAY=localhost:0
     export LIBGL_ALWAYS_INDIRECT=0
     echo "success"
-elif [ "$HOST" = "booted-server" ]; then
+elif [ "$HOST" = "booted-server" ]; then # this is Churro computer
+    # set DISPLAY var based on BMI3D_PORT var
     export DISPLAY=':1'
-    Xvnc :1 -securityTypes None -geometry 1920x1080 -nocursor &
+    Xvnc :1 -securityTypes None -geometry 1920x1080 -nocursor & # replace :1 with DISPLAY
     eval "$(conda shell.bash hook)"
-    conda activate bmi3d
+    conda activate bmi3d # may not work? remove?
 fi
 
 # Find the BMI3D directory
@@ -100,7 +101,7 @@ trap "kill 0" EXIT
 
 # Start python processes
 cd $BMI3D
-python manage.py runserver 0.0.0.0:8000 --noreload &
+python manage.py runserver 0.0.0.0:8000 --noreload & # if BMI3D_PORT exists, use it instead
 if [ "$HOST" = "pagaiisland2" ]; then
     celery -A db.tracker worker -l INFO &
 fi
