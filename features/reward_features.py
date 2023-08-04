@@ -62,7 +62,7 @@ class PelletReward(RewardSystem):
     '''
     
     '''
-
+    # rewards_per_trial = traits.Int(1, desc='Number of reward pellets per successful trial')
     # tablet_name = traits.Float(1, desc='Number of successful trials before solenoid is opened') # dropdown menu with booted-1 and booted-2 as options
     
     def __init__(self, *args, **kwargs):
