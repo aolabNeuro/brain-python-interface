@@ -43,7 +43,7 @@ Report.prototype.activate = function() {
     //var on_windows = window.navigator.userAgent.indexOf("Windows") > 0;
     if (!this.ws) {  // && !on_windows) { some websocket issues on windows..
         // Create a new JS WebSocket object
-        this.ws = new WebSocket("ws://"+hostname.split(":")[0]+":8001/connect");
+        this.ws = new WebSocket("ws://"+hostname.split(":")[0]+":8001/connect"); // hostname.split(":")[1] + 1 (end of hostname should be either 8000 or 8002)
 
         this.ws.onmessage = function(evt) {
             debug(evt.data);

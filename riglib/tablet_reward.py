@@ -40,9 +40,13 @@ def open():
 import requests
 class RemoteReward():
 
-    def __init__(self):
+    def __init__(self, tablet_name):
+        
+        if tablet_name == 'booted-1':
+            self.hostName = "192.168.0.200"
+        elif tablet_name == 'booted-2':
+            # set self.hostName according to little tablet 2 address on router, maybe need to ask Leo/Drew to set?
 
-        self.hostName = "192.168.0.200"
         self.serverPort = 8080
 
     def trigger(self):
