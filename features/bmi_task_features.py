@@ -11,6 +11,30 @@ sec_per_min = 60
 ########################################################################################################
 # Decoder/BMISystem add-ons
 ########################################################################################################
+class UnitDropout(traits.HasTraits):
+    '''
+    Randomly removes units from the decoder. Compatible with lindecoder.py only.
+    '''
+
+    def init(self):
+        super().init()
+        self.decoder_unit_mask = np.ones((len(self.decoder.units),), dtype='bool')
+        new_dtype = np.dtype(self.trial_dtype.descr + [('decoder_unit_mask', '?', self.decoder_unit_mask.shape)])
+        self.trial_dtype = new_dtype
+        if not hasattr(self.decoder.filt, "update_mask"):
+            raise ValueError(f"FeatureDropout feature not supported by decoder {repr(self.decoder)}")
+
+    def _start_wait(self):
+        '''
+        Override the decoder to drop a random unit. Keep a record of what's going on in the `trial` data.
+        '''
+        self.decoder_unit_mask[:] = True
+        self.decoder_unit_mask[np.random.choice(len(self.decoder_unit_mask), 1)] = False
+        self.decoder.filt.update_mask(self.decoder_unit_mask)
+        self.trial_record['decoder_unit_mask'] = self.decoder_unit_mask
+        super()._start_wait()
+
+
 class NormFiringRates(traits.HasTraits):
     ''' Docstring '''
     
