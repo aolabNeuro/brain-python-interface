@@ -373,6 +373,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     fps = traits.Float(60, desc="Rate at which the FSM is called in Hz") # originally set by class Experiment
     trajectory_amplitude = traits.Float(1, desc='Scale factor applied to the trajectory')
     disturbance_amplitude = traits.Float(1, desc='Scale factors applied to the disturbance')
+    always_1d = traits.Bool(False, desc='If true, only allow 1d movement')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -387,8 +388,10 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.cursor_vis_prev = True
         self.lookahead = 30 # number of frames to create a "lookahead" window of 0.5 seconds (half the screen)
         self.original_limit1d = self.limit1d # keep track of original settable trait
-        self.limit1d = False # allow 2d movement before center-hold initiation
         
+        if not self.always_1d:
+            self.limit1d = False # allow 2d movement before center-hold initiation
+
         # Add graphics models for the plant and targets to the window
         if hasattr(self.plant, 'graphics_models'):
             for model in self.plant.graphics_models:
@@ -517,8 +520,9 @@ class ScreenTargetTracking(TargetTracking, Window):
                 self.add_model(model)
                 self.bar.hide()
 
-        # Allow 2d movement
-        self.limit1d = False
+        if not self.always_1d:
+            # Allow 2d movement
+            self.limit1d = False
 
         # Set up for progress bar
         self.bar_width = 12        
