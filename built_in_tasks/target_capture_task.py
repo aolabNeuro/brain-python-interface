@@ -1062,3 +1062,113 @@ class SequenceCapture(ScreenTargetCapture):
 
             yield indices, targs
 
+
+class HandConstrainedEyeCapture(ScreenTargetCapture):
+    '''
+    Saccade task, but subjects need to hold an initial target with their hand
+    '''
+
+    fixation_dist = traits.Float(2.5, desc="Distance from center that is considered a broken fixation")
+    fixation_penalty_time = traits.Float(1.0, desc="Time in fixation penalty state")
+    fixation_target_color = traits.OptionsList("cyan", *target_colors, desc="Color of the center target under fixation state", bmi3d_input_options=list(target_colors.keys()))
+    
+    status = dict(
+        wait = dict(start_trial="target"),
+        target = dict(timeout="timeout_penalty",gaze_target="fixation"),
+        fixation = dict(enter_target="hold", fixation_break="target"), # must hold an initial hand-target and eye-target to initiate a trial
+        hold = dict(leave_target="hold_penalty", hold_complete="delay", fixation_break="fixation_penalty"), # must hold an initial hand-target and eye-target
+        delay = dict(leave_target="delay_penalty", delay_complete="targ_transition", fixation_break="fixation_penalty"),
+        targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target"),
+        timeout_penalty = dict(timeout_penalty_end="targ_transition", end_state=True),
+        hold_penalty = dict(hold_penalty_end="targ_transition", end_state=True),
+        delay_penalty = dict(delay_penalty_end="targ_transition", end_state=True),
+        fixation_penalty = dict(fixation_penalty_end="targ_transition",end_state=True),
+        reward = dict(reward_end="wait", stoppable=False, end_state=True)
+    )
+ 
+    def _parse_next_trial(self):
+        '''Check that the generator has the required data'''
+        self.gen_indices, self.targs = self.next_trial # TODO make targets for both hands and eyes
+
+        # Update the data sinks with trial information
+        self.trial_record['trial'] = self.calc_trial_num()
+        for i in range(len(self.gen_indices)):
+            self.trial_record['index'] = self.gen_indices[i]
+            self.trial_record['target'] = self.targs[i]
+            self.sinks.send("trials", self.trial_record)
+
+    def _test_gaze_target(self,ts):
+        '''
+        Check whether eye positions from a target are within the fixation distance
+        '''
+        # Distance of an eye position from a target position
+        eye_pos = self.calibrated_eye_pos
+        d_eye = np.linalg.norm(eye_pos - self.targs[self.target_index])
+        return d_eye <= self.fixation_dist
+        
+    def _test_fixation_break(self,ts):
+        '''
+        Triggers the fixation_penalty state when eye positions are outside fixation distance
+        '''
+        # Distance of an eye position from a target position
+        eye_pos = self.calibrated_eye_pos
+        d_eye = np.linalg.norm(eye_pos - self.targs[self.target_index])
+        return (d_eye > self.fixation_dist) or self.pause
+    
+    def _test_fixation_penalty_end(self,ts):
+        return (ts > self.fixation_penalty_time)
+    
+    def _test_enter_target(self, ts):
+        '''
+        return true if the distance between center of cursor and target is smaller than the cursor radius
+        '''
+        cursor_pos = self.plant.get_endpoint_pos()
+        d = np.linalg.norm(cursor_pos - self.targs[0]) # hand must be within the initial target
+        return d <= (self.target_radius - self.cursor_radius) or self.pause
+
+    def _test_leave_target(self, ts):
+        '''
+        return true if cursor moves outside the exit radius
+        '''
+        cursor_pos = self.plant.get_endpoint_pos()
+        d = np.linalg.norm(cursor_pos - self.targs[0]) # hand must be within the initial target
+        return d > (self.target_radius - self.cursor_radius) or self.pause
+    
+    def _start_wait(self):
+        super()._start_wait()
+        self.num_fixation_state = 0 # Initialize fixation state
+
+    def _start_target(self):
+        if self.num_fixation_state == 0:
+            super()._start_target() # target index shouldn't be incremented after fixation break loop
+        else:
+            self.sync_event('FIXATION', 0)
+            self.targets[0].reset() # reset target color after fixation break
+
+    def _start_hold_fixation(self):
+        self.num_fixation_state = 1
+        self.targets[0].sphere.color = target_colors[self.fixation_target_color] # change target color in fixation state
+        if self.target_index == 0:
+            self.sync_event('FIXATION', 1)
+    
+    def _start_timeout_penalty(self):
+        super()._start_timeout_penalty()
+        self.num_fixation_state = 0
+
+    def _start_hold(self):
+        super()._start_hold()
+        self.num_fixation_state = 0 # because target state comes again after hold state in a trial
+
+    def _start_fixation_penalty(self):
+        self._increment_tries()
+        self.sync_event('FIXATION_PENALTY') 
+
+        # Hide targets
+        for target in self.targets:
+            target.hide()
+            target.reset()
+
+    def _end_fixation_penalty(self):
+        self.sync_event('TRIAL_END')
+
+    
