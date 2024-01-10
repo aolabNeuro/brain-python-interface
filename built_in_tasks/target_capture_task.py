@@ -1067,6 +1067,7 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
     '''
     Saccade task, but subjects need to hold an initial target with their hand
     '''
+    # TODO make different color targets for hand cursor
 
     fixation_dist = traits.Float(2.5, desc="Distance from center that is considered a broken fixation")
     fixation_penalty_time = traits.Float(1.0, desc="Time in fixation penalty state")
@@ -1086,9 +1087,11 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
         reward = dict(reward_end="wait", stoppable=False, end_state=True)
     )
  
+    sequence_generators = ['row_target','sac_hand_2d']
+
     def _parse_next_trial(self):
         '''Check that the generator has the required data'''
-        self.gen_indices, self.targs = self.next_trial # TODO make targets for both hands and eyes
+        self.gen_indices, self.targs, self.gen_indices_hand, self.targs_hand = self.next_trial
 
         # Update the data sinks with trial information
         self.trial_record['trial'] = self.calc_trial_num()
@@ -1103,7 +1106,8 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
         '''
         # Distance of an eye position from a target position
         eye_pos = self.calibrated_eye_pos
-        d_eye = np.linalg.norm(eye_pos - self.targs[self.target_index])
+        target_pos = np.delete(self.targs[self.target_index],1)
+        d_eye = np.linalg.norm(eye_pos - target_pos)
         return d_eye <= self.fixation_dist
         
     def _test_fixation_break(self,ts):
@@ -1112,7 +1116,8 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
         '''
         # Distance of an eye position from a target position
         eye_pos = self.calibrated_eye_pos
-        d_eye = np.linalg.norm(eye_pos - self.targs[self.target_index])
+        target_pos = np.delete(self.targs[self.target_index],1)
+        d_eye = np.linalg.norm(eye_pos - target_pos)
         return (d_eye > self.fixation_dist) or self.pause
     
     def _test_fixation_penalty_end(self,ts):
@@ -1123,7 +1128,7 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
         return true if the distance between center of cursor and target is smaller than the cursor radius
         '''
         cursor_pos = self.plant.get_endpoint_pos()
-        d = np.linalg.norm(cursor_pos - self.targs[0]) # hand must be within the initial target
+        d = np.linalg.norm(cursor_pos - self.targs_hand[0]) # hand must be within the initial target
         return d <= (self.target_radius - self.cursor_radius) or self.pause
 
     def _test_leave_target(self, ts):
@@ -1131,7 +1136,7 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
         return true if cursor moves outside the exit radius
         '''
         cursor_pos = self.plant.get_endpoint_pos()
-        d = np.linalg.norm(cursor_pos - self.targs[0]) # hand must be within the initial target
+        d = np.linalg.norm(cursor_pos - self.targs_hand[0]) # hand must be within the initial target
         return d > (self.target_radius - self.cursor_radius) or self.pause
     
     def _start_wait(self):
@@ -1171,4 +1176,66 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
     def _end_fixation_penalty(self):
         self.sync_event('TRIAL_END')
 
-    
+    # Generator functions
+    @staticmethod
+    def row_target(nblocks=100, ntargets=4, origin=(0,0,0)):
+        '''
+        Generates a sequence of 2D (x and z) targets at a given distance from the origin
+
+        Parameters
+        ----------
+        nblocks : int
+            The number of ntarget pairs in the sequence.
+        ntargets : int
+            The number of equally spaced targets
+        distance : float
+            The distance in cm between the center and peripheral targets.
+        origin : 3-tuple
+            Location of the central targets around which the peripheral targets span
+
+        Returns
+        -------
+        [nblocks*ntargets x 1] array of tuples containing trial indices and [1 x 3] target coordinates
+
+        '''
+        rng = np.random.default_rng()
+        for _ in range(nblocks):
+            order = np.arange(ntargets) + 1 # target indices, starting from 1
+            rng.shuffle(order)
+            x_pos_candidate = [-6,-2,2,6]
+            for t in range(ntargets):
+                idx = order[t]
+                x_pos = x_pos_candidate[idx-1]
+                pos = np.array([x_pos,0,0]).T
+                yield [idx], [pos + origin]
+
+    @staticmethod
+    def sac_hand_2d(nblocks=100, ntargets=4, distance=10, origin1=(0,0,-5.0), origin2=(0,0,5.0)):
+        '''
+        Pairs of hand targets and eye targets
+
+        Returns
+        -------
+        [nblocks*ntargets x 1] array of tuples containing trial indices and [2 x 3] target coordinates
+        '''
+
+        gen_hand = HandConstrainedEyeCapture.row_target(nblocks=100, ntargets=4, origin=origin1)
+        gen_eye1 = HandConstrainedEyeCapture.row_target(nblocks=100, ntargets=4, origin=origin1)
+        gen_eye2 = HandConstrainedEyeCapture.row_target(nblocks=100, ntargets=4, origin=origin2)
+        for _ in range(nblocks*ntargets):
+            idx, pos = next(gen_hand)
+            targs = np.zeros([1, 3])
+            targs[0,:] = pos[0]
+            indices = np.zeros([1,1])
+            indices[0] = idx
+
+            idx1, pos1 = next(gen_eye1)
+            idx2, pos2 = next(gen_eye2)
+            targs_eye = np.zeros([2, 3])
+            targs_eye[0,:] = pos1[0]
+            targs_eye[1,:] = pos2[0]
+            indices_eye = np.zeros([2,1])
+            indices_eye[0] = idx1
+            indices_eye[1] = idx2
+
+            yield indices_eye, targs_eye, indices, targs
