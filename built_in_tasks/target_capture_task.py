@@ -284,7 +284,7 @@ class ScreenTargetCapture(TargetCapture, Window):
     plant_visible = traits.Bool(True, desc='Specifies whether entire plant is displayed or just endpoint')
     cursor_radius = traits.Float(.5, desc='Radius of cursor in cm')
     cursor_color = traits.OptionsList("dark_purple", *target_colors, desc='Color of cursor endpoint', bmi3d_input_options=list(target_colors.keys()))
-    cursor_bounds = traits.Tuple((-10., 10., 0., 0., -10., 10.), desc='(x min, x max, y min, y max, z min, z max)')
+    cursor_bounds = traits.Tuple((-18., 18., 0., 0., -10., 10.), desc='(x min, x max, y min, y max, z min, z max)')
     starting_pos = traits.Tuple((5., 0., 5.), desc='Where to initialize the cursor') 
 
     def __init__(self, *args, **kwargs):
@@ -1069,13 +1069,14 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
     '''
     # TODO make different color targets for hand cursor
 
-    fixation_dist = traits.Float(2.5, desc="Distance from center that is considered a broken fixation")
+    fixation_radius = traits.Float(2.5, desc="Distance from center that is considered a broken fixation")
     fixation_penalty_time = traits.Float(1.0, desc="Time in fixation penalty state")
-    fixation_target_color = traits.OptionsList("cyan", *target_colors, desc="Color of the center target under fixation state", bmi3d_input_options=list(target_colors.keys()))
-    
+    fixation_target_color = traits.OptionsList("cyan", *target_colors, desc="Color of the eye target under fixation state", bmi3d_input_options=list(target_colors.keys()))
+    eye_target_color = traits.OptionsList("white", *target_colors, desc="Color of the eye target", bmi3d_input_options=list(target_colors.keys()))
+
     status = dict(
         wait = dict(start_trial="target"),
-        target = dict(timeout="timeout_penalty",gaze_target="fixation"),
+        target = dict(timeout="timeout_penalty",gaze_target="fixation",leave_target2="hold_penalty"),
         fixation = dict(enter_target="hold", fixation_break="target"), # must hold an initial hand-target and eye-target to initiate a trial
         hold = dict(leave_target="hold_penalty", hold_complete="delay", fixation_break="fixation_penalty"), # must hold an initial hand-target and eye-target
         delay = dict(leave_target="delay_penalty", delay_complete="targ_transition", fixation_break="fixation_penalty"),
@@ -1089,12 +1090,28 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
  
     sequence_generators = ['row_target','sac_hand_2d']
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Instantiate the targets
+        instantiate_targets = kwargs.pop('instantiate_targets', True)
+        if instantiate_targets:
+
+            # Target 1 and 2 are for saccade. Target 3 is for hand
+            target1 = VirtualCircularTarget(target_radius=self.fixation_radius, target_color=target_colors[self.eye_target_color])
+            target2 = VirtualCircularTarget(target_radius=self.fixation_radius, target_color=target_colors[self.eye_target_color])
+            target3 = VirtualCircularTarget(target_radius=self.target_radius, target_color=target_colors[self.target_color])
+            # TODO Fixation radius should be the same as the target radius????
+
+            self.targets = [target1, target2]
+            self.targets_hand = [target3]
+
     def _parse_next_trial(self):
         '''Check that the generator has the required data'''
-        self.gen_indices, self.targs, self.gen_indices_hand, self.targs_hand = self.next_trial
+        self.gen_indices, self.targs, self.gen_indices_hand, self.targs_hand = self.next_trial # 2 target positions for hand and eye
 
         # Update the data sinks with trial information
-        self.trial_record['trial'] = self.calc_trial_num()
+        self.trial_record['trial'] = self.calc_trial_num() # TODO save both eye and hand target positions
         for i in range(len(self.gen_indices)):
             self.trial_record['index'] = self.gen_indices[i]
             self.trial_record['target'] = self.targs[i]
@@ -1138,19 +1155,54 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
         cursor_pos = self.plant.get_endpoint_pos()
         d = np.linalg.norm(cursor_pos - self.targs_hand[0]) # hand must be within the initial target
         return d > (self.target_radius - self.cursor_radius) or self.pause
+
+    def _test_leave_target2(self, ts):
+        '''
+        return true if cursor moves outside the exit radius (This is for the second target state)
+        '''
+        if self.target_index > 0:
+            cursor_pos = self.plant.get_endpoint_pos()
+            d = np.linalg.norm(cursor_pos - self.targs_hand[0]) # hand must be within the initial target
+            return d > (self.target_radius - self.cursor_radius) or self.pause
     
     def _start_wait(self):
         super()._start_wait()
-        self.num_fixation_state = 0 # Initialize fixation state
+        # Initialize fixation state
+        self.num_fixation_state = 0
+
+        if self.calc_trial_num() == 0:
+
+            # Instantiate the targets here so they don't show up in any states that might come before "wait"
+            for target in self.targets:
+                for model in target.graphics_models:
+                    self.add_model(model)
+                    target.hide()
+
+            for target in self.targets_hand:
+                for model in target.graphics_models:
+                    self.add_model(model)
+                    target.hide()
 
     def _start_target(self):
         if self.num_fixation_state == 0:
             super()._start_target() # target index shouldn't be incremented after fixation break loop
+
+            # Show target if it is hidden (this is the first target, or previous state was a penalty)
+            target = self.targets[self.target_index % 2]
+            target_hand = self.targets_hand[0]
+            if self.target_index == 0:
+                target.move_to_position(self.targs[self.target_index])
+                target.show()
+                self.sync_event('TARGET_ON', self.gen_indices[self.target_index])
+
+                target_hand.move_to_position(self.targs_hand[0]) # TODO sync_event for hand target
+                target_hand.show()
+                
         else:
             self.sync_event('FIXATION', 0)
             self.targets[0].reset() # reset target color after fixation break
 
-    def _start_hold_fixation(self):
+    def _start_fixation(self):
         self.num_fixation_state = 1
         self.targets[0].sphere.color = target_colors[self.fixation_target_color] # change target color in fixation state
         if self.target_index == 0:
@@ -1159,10 +1211,25 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
     def _start_timeout_penalty(self):
         super()._start_timeout_penalty()
         self.num_fixation_state = 0
+        for target in self.targets_hand:
+            target.hide()
+            target.reset()
 
     def _start_hold(self):
         super()._start_hold()
         self.num_fixation_state = 0 # because target state comes again after hold state in a trial
+
+    def _start_hold_penalty(self):
+        super()._start_hold_penalty()
+        for target in self.targets_hand:
+            target.hide()
+            target.reset()
+
+    def _start_delay_penalty(self):
+        super()._start_delay_penalty()
+        for target in self.targets_hand:
+            target.hide()
+            target.reset()
 
     def _start_fixation_penalty(self):
         self._increment_tries()
@@ -1170,6 +1237,10 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
 
         # Hide targets
         for target in self.targets:
+            target.hide()
+            target.reset()
+
+        for target in self.targets_hand:
             target.hide()
             target.reset()
 
@@ -1202,7 +1273,7 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
         for _ in range(nblocks):
             order = np.arange(ntargets) + 1 # target indices, starting from 1
             rng.shuffle(order)
-            x_pos_candidate = [-6,-2,2,6]
+            x_pos_candidate = [-9,-3,3,9]
             for t in range(ntargets):
                 idx = order[t]
                 x_pos = x_pos_candidate[idx-1]
@@ -1210,7 +1281,7 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
                 yield [idx], [pos + origin]
 
     @staticmethod
-    def sac_hand_2d(nblocks=100, ntargets=4, distance=10, origin1=(0,0,-5.0), origin2=(0,0,5.0)):
+    def sac_hand_2d(nblocks=100, ntargets=4, distance=10, origin1=(0,0,-1.0), origin2=(0,0,-5.5), origin3=(0,0,5.5)):
         '''
         Pairs of hand targets and eye targets
 
@@ -1220,8 +1291,8 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
         '''
 
         gen_hand = HandConstrainedEyeCapture.row_target(nblocks=100, ntargets=4, origin=origin1)
-        gen_eye1 = HandConstrainedEyeCapture.row_target(nblocks=100, ntargets=4, origin=origin1)
-        gen_eye2 = HandConstrainedEyeCapture.row_target(nblocks=100, ntargets=4, origin=origin2)
+        gen_eye1 = HandConstrainedEyeCapture.row_target(nblocks=100, ntargets=4, origin=origin2)
+        gen_eye2 = HandConstrainedEyeCapture.row_target(nblocks=100, ntargets=4, origin=origin3)
         for _ in range(nblocks*ntargets):
             idx, pos = next(gen_hand)
             targs = np.zeros([1, 3])
