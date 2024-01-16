@@ -1125,7 +1125,7 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
         eye_pos = self.calibrated_eye_pos
         target_pos = np.delete(self.targs[self.target_index],1)
         d_eye = np.linalg.norm(eye_pos - target_pos)
-        return d_eye <= self.fixation_dist
+        return d_eye <= self.fixation_radius
         
     def _test_fixation_break(self,ts):
         '''
@@ -1135,7 +1135,7 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
         eye_pos = self.calibrated_eye_pos
         target_pos = np.delete(self.targs[self.target_index],1)
         d_eye = np.linalg.norm(eye_pos - target_pos)
-        return (d_eye > self.fixation_dist) or self.pause
+        return (d_eye > self.fixation_radius) or self.pause
     
     def _test_fixation_penalty_end(self,ts):
         return (ts > self.fixation_penalty_time)
