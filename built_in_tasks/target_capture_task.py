@@ -1076,9 +1076,9 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
 
     status = dict(
         wait = dict(start_trial="target"),
-        target = dict(timeout="timeout_penalty",gaze_target="fixation",leave_target2="hold_penalty"),
-        fixation = dict(enter_target="hold", fixation_break="target"), # must hold an initial hand-target and eye-target to initiate a trial
-        hold = dict(leave_target="hold_penalty", hold_complete="delay", fixation_break="fixation_penalty"), # must hold an initial hand-target and eye-target
+        target = dict(timeout="timeout_penalty",enter_target="hold",leave_target2="hold_penalty"),
+        hold = dict(leave_target="target", gaze_target="fixation"), # must hold an initial hand-target and eye-target
+        fixation = dict(hold_complete="delay", fixation_break="fixation_penalty"), # must hold an initial hand-target and eye-target to initiate a trial
         delay = dict(leave_target="delay_penalty", delay_complete="targ_transition", fixation_break="fixation_penalty"),
         targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target"),
         timeout_penalty = dict(timeout_penalty_end="targ_transition", end_state=True),
@@ -1168,7 +1168,7 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
     def _start_wait(self):
         super()._start_wait()
         # Initialize fixation state
-        self.num_fixation_state = 0
+        self.num_hold_state = 0
 
         if self.calc_trial_num() == 0:
 
@@ -1184,49 +1184,54 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
                     target.hide()
 
     def _start_target(self):
-        if self.num_fixation_state == 0:
-            super()._start_target() # target index shouldn't be incremented after fixation break loop
+        if self.num_hold_state == 0:
+            self.target_index += 1 # target index shouldn't be incremented after hold break loop
 
             # Show target if it is hidden (this is the first target, or previous state was a penalty)
-            target = self.targets[self.target_index % 2]
             target_hand = self.targets_hand[0]
             if self.target_index == 0:
-                target.move_to_position(self.targs[self.target_index])
-                target.show()
-                self.sync_event('TARGET_ON', self.gen_indices[self.target_index])
-
                 target_hand.move_to_position(self.targs_hand[0]) # TODO sync_event for hand target
                 target_hand.show()
+                self.sync_event('TARGET_ON', self.gen_indices[self.target_index])
                 
         else:
-            self.sync_event('FIXATION', 0)
-            self.targets[0].reset() # reset target color after fixation break
+            target = self.targets[self.target_index % 2]
+            target.hide() # hide hand target
 
     def _start_fixation(self):
-        self.num_fixation_state = 1
+        self.num_hold_state = 0
         self.targets[0].sphere.color = target_colors[self.fixation_target_color] # change target color in fixation state
         if self.target_index == 0:
             self.sync_event('FIXATION', 1)
     
     def _start_timeout_penalty(self):
         super()._start_timeout_penalty()
-        self.num_fixation_state = 0
+        self.num_hold_state = 0
         for target in self.targets_hand:
             target.hide()
             target.reset()
 
     def _start_hold(self):
         super()._start_hold()
-        self.num_fixation_state = 0 # because target state comes again after hold state in a trial
+        self.num_hold_state = 1
 
+        # Show target if it is hidden (this is the first target, or previous state was a penalty)
+        target = self.targets[self.target_index % 2]
+        if self.target_index == 0:
+            target.move_to_position(self.targs[self.target_index])
+            target.show()
+            
     def _start_hold_penalty(self):
         super()._start_hold_penalty()
+        self.num_hold_state = 0
+        # Hide targets
         for target in self.targets_hand:
             target.hide()
             target.reset()
 
     def _start_delay_penalty(self):
         super()._start_delay_penalty()
+        # Hide targets
         for target in self.targets_hand:
             target.hide()
             target.reset()
