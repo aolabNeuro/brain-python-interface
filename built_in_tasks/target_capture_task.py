@@ -1079,7 +1079,7 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
         wait = dict(start_trial="target"),
         target = dict(timeout="timeout_penalty",enter_target="hold"),
         hold = dict(leave_target2="hold_penalty",leave_target="target", gaze_target="fixation"), # must hold an initial hand-target and eye-target
-        fixation = dict(hold_complete="delay", fixation_break="fixation_penalty"), # must hold an initial hand-target and eye-target to initiate a trial
+        fixation = dict(leave_target="delay_penalty",hold_complete="delay", fixation_break="fixation_penalty"), # must hold an initial hand-target and eye-target to initiate a trial
         delay = dict(leave_target="delay_penalty", delay_complete="targ_transition", fixation_break="fixation_penalty"),
         targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target"),
         timeout_penalty = dict(timeout_penalty_end="targ_transition", end_state=True),
@@ -1220,8 +1220,7 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
 
     def _start_fixation(self):
         self.num_hold_state = 0
-        self.targets[0].sphere.color = target_colors[self.fixation_target_color] # change target color in fixation state
-        #if self.target_index == 0:
+        self.targets[self.target_index].sphere.color = target_colors[self.fixation_target_color] # change target color in fixation state
         self.sync_event('FIXATION', self.gen_indices[self.target_index])
 
     def _start_delay(self):

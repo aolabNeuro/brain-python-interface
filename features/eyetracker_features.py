@@ -331,7 +331,7 @@ class EyeCalibration(traits.HasTraits):
             print("Calibration complete:", self.eye_coeff)
 
         # Set up eye cursor
-        self.eye_cursor = VirtualCircularTarget(target_radius=1.0, target_color=(0., 1., 0., 0.75))
+        self.eye_cursor = VirtualCircularTarget(target_radius=.5, target_color=(0., 1., 0., 0.75))
         self.target_location = np.array(self.starting_pos).copy()
         self.calibrated_eye_pos = np.zeros((1,2))*np.nan
         for model in self.eye_cursor.graphics_models:
