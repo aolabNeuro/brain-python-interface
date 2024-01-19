@@ -1223,6 +1223,12 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
         self.targets[self.target_index].sphere.color = target_colors[self.fixation_target_color] # change target color in fixation state
         self.sync_event('FIXATION', self.gen_indices[self.target_index])
 
+    def _while_fixation(self):
+        pass
+
+    def _end_fixation(self):
+        pass
+
     def _start_delay(self):
         # Make next target visible unless this is the final target in the trial
         next_idx = (self.target_index + 1)

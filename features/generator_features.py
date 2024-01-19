@@ -6,6 +6,7 @@ import random
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 from riglib.experiment import traits
+from built_in_tasks.target_graphics import *
 
 class Autostart(traits.HasTraits):
     '''
@@ -94,6 +95,58 @@ class MultiHoldTime(traits.HasTraits):
         else:
             multi_hold_time = self.multi_hold_time[self.target_index]
         return time_in_state > multi_hold_time
+
+class Progressbar_fixation(traits.HasTraits):
+
+    progress_bar_color = traits.OptionsList("blue", *target_colors, desc="Color of the eye target", bmi3d_input_options=list(target_colors.keys()))
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Instantiate the targets
+        instantiate_targets = kwargs.pop('instantiate_targets', True)
+        if instantiate_targets:
+
+            # Target 1 and 2 are for saccade. Target 3 is for hand
+            self.bar = VirtualCircularTarget(target_radius=0.5, target_color=target_colors[self.progress_bar_color], starting_pos=[-5,0,-5])
+
+    def _start_wait(self):
+        super()._start_wait()
+
+        if self.calc_trial_num() == 0:
+
+            for model in self.bar.graphics_models:
+                self.add_model(model)
+                self.bar.hide()
+
+    def _start_fixation(self):
+        super()._start_fixation()
+        self.fixation_frame_index = 0
+
+    def _while_fixation(self):
+        super()._while_fixation()
+        self.fixation_frame_index += 1
+        fixation_time = self.fixation_frame_index*2/self.fps
+        if fixation_time <= self.hold_time:
+            radius = fixation_time/self.hold_time*(self.fixation_radius-self.fixation_radius_buffer)
+        else:
+            radius = (self.fixation_radius-self.fixation_radius_buffer)
+
+        if hasattr(self, 'bar'):
+            for model in self.bar.graphics_models:
+                self.remove_model(model)
+            del self.bar
+
+        self.bar = VirtualCircularTarget(target_radius=radius, target_color=target_colors[self.progress_bar_color], \
+                                         starting_pos=self.targs[self.target_index]+[0,-0.5,0]) # [0,-0.5,0] is for visualization
+        for model in self.bar.graphics_models:
+            self.add_model(model)
+        self.bar.show()
+
+    def _start_targ_transition(self):
+        super()._start_targ_transition()
+        self.bar.hide()
+
 
 class RandomDelay(traits.HasTraits):
     '''
