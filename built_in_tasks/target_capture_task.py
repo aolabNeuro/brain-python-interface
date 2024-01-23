@@ -1077,7 +1077,7 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
 
     status = dict(
         wait = dict(start_trial="target"),
-        target = dict(timeout="timeout_penalty",enter_target="hold"),
+        target = dict(leave_target2="hold_penalty",timeout="timeout_penalty",enter_target="hold"),
         hold = dict(leave_target2="hold_penalty",leave_target="target", gaze_target="fixation"), # must hold an initial hand-target and eye-target
         fixation = dict(leave_target="delay_penalty",hold_complete="delay", fixation_break="fixation_penalty"), # must hold an initial hand-target and eye-target to initiate a trial
         delay = dict(leave_target="delay_penalty", delay_complete="targ_transition", fixation_break="fixation_penalty"),
@@ -1099,8 +1099,8 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
         if instantiate_targets:
 
             # Target 1 and 2 are for saccade. Target 3 is for hand
-            target1 = VirtualCircularTarget(target_radius=self.fixation_radius-self.fixation_radius_buffer, target_color=target_colors[self.eye_target_color])
-            target2 = VirtualCircularTarget(target_radius=self.fixation_radius-self.fixation_radius_buffer, target_color=target_colors[self.eye_target_color])
+            target1 = VirtualCircularTarget(target_radius=self.fixation_radius, target_color=target_colors[self.eye_target_color])
+            target2 = VirtualCircularTarget(target_radius=self.fixation_radius, target_color=target_colors[self.eye_target_color])
             target3 = VirtualCircularTarget(target_radius=self.target_radius, target_color=target_colors[self.target_color])
 
             self.targets = [target1, target2]
@@ -1109,7 +1109,7 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
     # def init(self):
     #     super().init()
     #     self.trial_dtype = np.dtype([('trial', 'u4'), ('index', 'u4'), ('target', 'f8', (3,)),('index_hold', 'u4'), ('target_hold', 'f8', (3,))])
-    #     #self.add_dtype('calibrated_eye', 'f8', (2,))
+    #     
     #     super(TargetCapture, self).init()
         
     def _parse_next_trial(self):
@@ -1133,7 +1133,7 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
         eye_pos = self.calibrated_eye_pos
         target_pos = np.delete(self.targs[self.target_index],1)
         d_eye = np.linalg.norm(eye_pos - target_pos)
-        return d_eye <= self.fixation_radius
+        return (d_eye <= self.fixation_radius + self.fixation_radius_buffer) or self.pause
         
     def _test_fixation_break(self,ts):
         '''
@@ -1143,7 +1143,7 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
         eye_pos = self.calibrated_eye_pos
         target_pos = np.delete(self.targs[self.target_index],1)
         d_eye = np.linalg.norm(eye_pos - target_pos)
-        return (d_eye > self.fixation_radius) or self.pause
+        return (d_eye > self.fixation_radius + self.fixation_radius_buffer) or self.pause
     
     def _test_fixation_penalty_end(self,ts):
         return (ts > self.fixation_penalty_time)
@@ -1290,6 +1290,13 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
     def _end_fixation_penalty(self):
         self.sync_event('TRIAL_END')
 
+    def _start_reward(self):
+        super()._start_reward()
+        # Hide targets
+        for target in self.targets_hand:
+            target.hide()
+            target.reset()        
+
     # Generator functions
     @staticmethod
     def row_target(nblocks=100, ntargets=3, dx=3., origin=(0,0,0)):
@@ -1353,3 +1360,34 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
             indices_eye[1] = [idx2[0] + ntargets]
 
             yield indices_eye, targs_eye, indices, targs
+
+
+class ScreenTargetCapture_Saccade(ScreenTargetCapture):
+    
+    fixation_radius_buffer = traits.Float(.5, desc="additional radius for eye target")
+    target_color = traits.OptionsList("white", *target_colors, desc="Color of the target", bmi3d_input_options=list(target_colors.keys()))
+    fixation_target_color = traits.OptionsList("cyan", *target_colors, desc="Color of the eye target under fixation state", bmi3d_input_options=list(target_colors.keys()))
+
+    def _test_enter_target(self, ts):
+        '''
+        Check whether eye positions from a target are within the fixation distance
+        '''
+        # Distance of an eye position from a target position
+        eye_pos = self.calibrated_eye_pos
+        target_pos = np.delete(self.targs[self.target_index],1)
+        d_eye = np.linalg.norm(eye_pos - target_pos)
+        return (d_eye <= self.target_radius + self.fixation_radius_buffer) or self.pause
+
+    def _test_leave_target(self, ts):
+        '''
+        Check whether eye positions from a target are outside the fixation distance
+        '''
+        # Distance of an eye position from a target position
+        eye_pos = self.calibrated_eye_pos
+        target_pos = np.delete(self.targs[self.target_index],1)
+        d_eye = np.linalg.norm(eye_pos - target_pos)
+        return (d_eye > self.target_radius + self.fixation_radius_buffer) or self.pause
+    
+    def _start_hold(self):
+        super()._start_hold()
+        self.targets[self.target_index].sphere.color = target_colors[self.fixation_target_color] # change target color in fixating the target
