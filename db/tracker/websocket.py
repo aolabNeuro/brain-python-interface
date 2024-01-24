@@ -70,8 +70,12 @@ class Server(mp.Process):
 
         import asyncio
         asyncio.set_event_loop(asyncio.new_event_loop())
+        
+        if os.environ.get('BMI3D_PORT') is not None: # set BMI3D_PORT to 8000 or 8002 in two separate shortcut scripts, one per tablet
+            application.listen(int(os.environ.get('BMI3D_PORT')) + 1)
+        else:
+            application.listen(8001)        
 
-        application.listen(8001)
         self.ioloop = tornado.ioloop.IOLoop.current()
         self.ioloop.add_handler(self._pipe, self._send, self.ioloop.READ)
         self.ioloop.add_handler(self._outp, self._stdout, self.ioloop.READ)

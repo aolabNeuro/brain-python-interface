@@ -624,6 +624,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         # Check if the trial is over and there are no more target frames to display
         if self.frame_index+self.lookahead >= np.shape(self.targs)[0]:
             self.trial_timed_out = True
+            
 
     def _start_tracking_out(self):
         super()._start_tracking_out()
@@ -650,6 +651,7 @@ class ScreenTargetTracking(TargetTracking, Window):
 
         # Check if the trial is over and there are no more target frames to display
         if self.frame_index+self.lookahead >= np.shape(self.targs)[0]:
+            cursor_pos = [5., 5., -8.]
             self.trial_timed_out = True
 
     def _start_timeout_penalty(self):
