@@ -307,13 +307,19 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
         self.hdf.sendMsg("reset")
         
     @control_decorator
-    def toggle_fixed(self):
+    def update_zscore(self):
         # This is a temporary solution - LRS Jan 2024
-        self.decoder.filt.fixed = not self.decoder.filt.fixed
-        self.hdf.sendMsg(f"fixed = {self.decoder.filt.fixed}")
-        print(f"fixed = {self.decoder.filt.fixed}")
-        print(f"Mean: {self.decoder.filt.attr['offset']}")
-        print(f"Std: {self.decoder.filt.attr['scale']}")
+        # Assumes you're using a lindecoder with a reasonably large buffer (>2 minutes)
+        self.decoder.filt.fix_norm_attr() # Should be already!
+        self.decoder.filt._update_scale_attr()
+        self.hdf.sendMsg(f"updated zscore")
+        mFR = self.decoder.filt.attr['offset'].copy()
+        sdFR = self.decoder.filt.attr['scale'].copy()
+        self.decoder.init_zscore(mFR, sdFR)
+        self.hdf.sendAttr("task", "session_mFR", mFR)
+        self.hdf.sendAttr("task", "session_sdFR", sdFR)
+        n_units = self.decoder.filt.n_units
+        self.decoder.filt.update_norm_attr(offset=np.zeros(n_units), scale=np.ones(n_units))
 
     @control_decorator
     def toggle_clda(self):
