@@ -337,6 +337,7 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
     @control_decorator
     def update_zscore(self):
         # This is a temporary solution - LRS Jan 2024
+        # Only works if the decoder currently has mFR == 0 and sdFR == 1
         # Assumes you're using a lindecoder with a reasonably large buffer (>2 minutes)
         self.decoder.filt.fix_norm_attr() # Should be already!
         self.decoder.filt._update_scale_attr()
