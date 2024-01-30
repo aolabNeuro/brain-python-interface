@@ -199,6 +199,7 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
 
     reset = traits.Int(0, desc='reset the decoder state to the starting configuration. 1 for always, 2 for only on timeout')
     cursor_color = traits.OptionsList("orange", *target_colors, desc='Color of cursor endpoint', bmi3d_input_options=list(target_colors.keys()))
+    save_zscore = traits.Bool(False, desc="save a decoder zscored from this task")
 
     static_states = ['reward'] # states in which the decoder is not run
 
@@ -295,6 +296,33 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
             self.decoder.filt.state.mean = self.init_decoder_mean.copy()
             self.hdf.sendMsg("reset")
 
+    def _start_None(self):
+        super()._start_None()
+
+        # Optionally save a new decoder zscored from this task
+        if (not self.save_zscore) or (self.saveid is None):
+            return
+        
+        if not (np.all(self.decoder.mFR == 0) and np.all(self.decoder.sdFR) == 1):
+            return
+
+        # This is linear mapping specific - needs updating
+        self.decoder.filt.fix_norm_attr()
+        self.decoder.filt._update_scale_attr()
+        mFR = self.decoder.filt.attr['offset'].copy()
+        sdFR = self.decoder.filt.attr['scale'].copy()
+        n_units = self.decoder.filt.n_units
+        self.decoder.filt.update_norm_attr(offset=np.zeros(n_units), scale=np.ones(n_units))
+
+        # The rest should work with any decoder
+        self.decoder.init_zscore(mFR, sdFR)
+        filename = self.decoder.save()
+
+        from db.tracker import dbq
+        suffix = f"zscored_online_in_{self.saveid}"
+        dbq.save_bmi(suffix, self.saveid, filename)
+
+
     @classmethod
     def get_desc(cls, params, log_summary):
         duration = round(log_summary['runtime'] / 60, 1)
@@ -312,6 +340,7 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
         # Assumes you're using a lindecoder with a reasonably large buffer (>2 minutes)
         self.decoder.filt.fix_norm_attr() # Should be already!
         self.decoder.filt._update_scale_attr()
+        print(f"updated zscore")
         self.hdf.sendMsg(f"updated zscore")
         mFR = self.decoder.filt.attr['offset'].copy()
         sdFR = self.decoder.filt.attr['scale'].copy()
