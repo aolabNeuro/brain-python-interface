@@ -301,6 +301,7 @@ class EyeCalibration(traits.HasTraits):
 
     taskid_for_eye_calibration = traits.Int(0, desc="directory where hdf file lives")
     show_eye_pos = traits.Bool(False, desc="Whether to show eye positions")
+    eye_target_calibration = traits.Bool(False, desc="Whether to regress eye positions against target positions")
 
     def __init__(self, *args, **kwargs): #, start_pos, calibration):
         super(EyeCalibration,self).__init__(*args, **kwargs)
@@ -324,10 +325,33 @@ class EyeCalibration(traits.HasTraits):
 
             # calculate coefficients to calibrate eye data
             events = bmi3d_data['events']
-            self.eye_coeff,_,_,_ = aopy.preproc.calc_eye_calibration\
-                (bmi3d_data['cursor_interp'],bmi3d_metadata['cursor_interp_samplerate'],\
-                eye_interp[:,:4], bmi3d_metadata['cursor_interp_samplerate'],events['timestamp'], events['code'],return_datapoints=True)
 
+            if not self.eye_target_calibration:
+                self.eye_coeff,_,_,_ = aopy.preproc.calc_eye_calibration\
+                    (bmi3d_data['cursor_interp'],bmi3d_metadata['cursor_interp_samplerate'],\
+                    eye_interp[:,:4], bmi3d_metadata['cursor_interp_samplerate'],events['timestamp'], events['code'],return_datapoints=True)
+
+            else:
+                def get_target_locations(data, target_indices):
+
+                    try:
+                        trials = data['trials']
+                    except:
+                        trials = data['bmi3d_trials']
+                    locations = np.nan*np.zeros((len(target_indices), 3))
+                    for i in range(len(target_indices)):
+                        trial_idx = np.where(trials['index'] == target_indices[i])[0]
+                        if len(trial_idx) > 0:
+                            locations[i,:] = trials['target'][trial_idx[0]][[0,2,1]] # use x,y,z format
+                        else:
+                            raise ValueError(f"Target index {target_indices[i]} not found")
+                    return np.round(locations,4)
+
+                target_pos = get_target_locations(bmi3d_data, [1,2,3,4])
+                
+                self.eye_coeff, _ = aopy.preproc.calc_eye_target_calibration(eye_interp[:,:4], \
+                    bmi3d_metadata['cursor_interp_samplerate'], events['timestamp'], events['code'], target_pos)
+            
             print("Calibration complete:", self.eye_coeff)
 
         # Set up eye cursor
