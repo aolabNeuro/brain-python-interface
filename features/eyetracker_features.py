@@ -347,7 +347,7 @@ class EyeCalibration(traits.HasTraits):
                             raise ValueError(f"Target index {target_indices[i]} not found")
                     return np.round(locations,4)
 
-                target_pos = get_target_locations(bmi3d_data, [1,2,3,4])
+                target_pos = get_target_locations(bmi3d_data, [1,2,3,4,5,6,7,8])
                 
                 self.eye_coeff, _ = aopy.preproc.calc_eye_target_calibration(eye_interp[:,:4], \
                     bmi3d_metadata['cursor_interp_samplerate'], events['timestamp'], events['code'], target_pos)
