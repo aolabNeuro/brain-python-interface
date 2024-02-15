@@ -7,7 +7,7 @@ import traceback
 from riglib.experiment import traits
 from riglib.gpio import ArduinoGPIO, DigitalWave
 import numpy as np
-from riglib.qwalor_laser import QwalorLaserSerial
+from riglib.lasers.qwalor_laser import QwalorLaserSerial
 
 class CrystaLaser(traits.HasTraits):
     ''' Adds an arduino-controlled crystalaser to self.lasers.'''
