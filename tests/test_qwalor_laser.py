@@ -2,7 +2,8 @@ import serial
 import pyfirmata, time
 import serial.tools.list_ports
 import numpy as np
-from riglib import qwalor_laser
+from riglib.lasers import qwalor_laser
+from riglib.lasers import optical_switch
 
 # The following command can be used for finding available ports
 # python -m serial.tools.list_ports
@@ -48,6 +49,7 @@ class LaserTests(unittest.TestCase):
                 laser.off()
                 time.sleep(0.5)
 
+    @unittest.skip("only run if needed")
     def test_dual_channel(self):
         n_trials = 10
         iti = 0.1
@@ -117,6 +119,43 @@ class LaserTests(unittest.TestCase):
         print(f"laser took {t_end-t_begin:.2f} s to run {n_trials} trials of {width} width and {iti} iti")
         time.sleep(0.5)
         laser.off()
+
+class OpticalSwitchTests(unittest.TestCase):
+
+    def test_connect(self):
+
+        switch = serial.Serial('/dev/ttyACM1', 115200, timeout=10)
+        
+        # Check status
+        switch.write(bytearray([17]))
+        ret = int.from_bytes(switch.read(), 'big')
+        print()
+        print(f"ready: {ret}")
+
+    def test_class(self):
+        switch = optical_switch.LFiberOpticalSwitch('/dev/ttyACM1')
+        ret = switch.check_status()
+        print(f'class returned: {ret}')
+
+        t0 = time.perf_counter()
+        ret = switch.set_channel(5)
+        t1 = time.perf_counter()
+        print(f"switch took {1000*(t1 - t0):0.2f} ms")
+
+        time.sleep(1)
+
+        t0 = time.perf_counter()
+        ret = switch.reset()
+        t1 = time.perf_counter()
+        print(f"switch took {1000*(t1 - t0):0.2f} ms")
+
+        time.sleep(1)
+
+        t0 = time.perf_counter()
+        ret = switch.set_channel(13)
+        t1 = time.perf_counter()
+        print(f"switch took {1000*(t1 - t0):0.2f} ms")
+
 
 
 if __name__ == '__main__':

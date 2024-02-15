@@ -1,8 +1,8 @@
 import serial
-from .gpio import CustomBoard
+from ..gpio import CustomBoard
 import time
 import numpy as np
-from . import singleton
+from .. import singleton
 
 # condigPacket is 4 bytes configuration command and contains the laser information
 # configPacket[0] : Channel (red, green, blue, white) & Mode (off, continuous, sin, inverted sin, square waveform)
