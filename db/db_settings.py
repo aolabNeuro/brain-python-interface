@@ -76,7 +76,10 @@ default_db = rig_defaults['default_db']
 if default_db not in DATABASES:
     print('No databases configured. Setting test_aopy as default database.')
     default_db = 'test_aopy'
-DATABASES['default'] = DATABASES[default_db]
+if os.environ.get('BMI3D_TEST_DATABASE'):
+    DATABASES['default'] = DATABASES['test']
+else:
+    DATABASES['default'] = DATABASES[default_db]
 
 # Django settings for db project.
 DEBUG = True

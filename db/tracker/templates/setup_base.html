@@ -248,7 +248,11 @@
   </style>
 </head>
 
+{% if test_db %}
+<body style="background-color:#cfba74">
+{% else %}
 <body>
+{% endif %}
   <a href="/">Back</a>
   <div class="alert alert-info" role="alert" id="alert_field" style="display: none">
   </div>
