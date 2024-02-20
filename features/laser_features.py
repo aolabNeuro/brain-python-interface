@@ -81,7 +81,7 @@ class QwalorLaser(traits.HasTraits):
 class SwitchedQwalorLaser(QwalorLaser):
 
     n_channels = 16 # number of channels on the optical switch
-    stimulation_site = traits.Array(-1*np.ones((n_channels,)), 
+    stimulation_site = traits.Array(value=[-1]*n_channels, 
                                     desc="Where was the laser stimulation at each connected channel. -1 means the channel is not connected.")
 
     def init(self, *args, **kwargs):
