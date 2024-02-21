@@ -8,7 +8,7 @@ class LFiberOpticalSwitch:
     Communication to the LFiber 1x16 optical switch
     '''
 
-    def __init__(self, port='/dev/lfiberswitch', channels=16, timeout=10):
+    def __init__(self, port='/dev/lfiberswitch', channels=16, timeout=3):
         self.conn = serial.Serial(port, 115200, timeout=timeout)
         self.channels = channels
             

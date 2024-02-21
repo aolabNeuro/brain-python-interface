@@ -88,14 +88,14 @@ class SwitchedQwalorLaser(QwalorLaser):
 
         # Attempt to open the laser connection, but fail gracefully if it is unavailable
         try:
-            for ch in range(1, self.n_channels+1):
+            for ch in range(1, len(self.stimulation_site)+1):
 
                 # Skip channels that are not connected
                 if self.stimulation_site[ch-1] == -1:
                     continue
 
                 # Add the laser to the list of available lasers
-                laser = QwalorLaserSwitched(arduino_port=self.qwalor_channel, switch_channel=ch)
+                laser = QwalorLaserSwitched(laser_channel=self.qwalor_channel, switch_channel=ch)
                 laser.port = laser.trigger_pin
                 laser.name = f'qwalor_laser_switch_ch{ch}'
                 self.lasers.append(laser)

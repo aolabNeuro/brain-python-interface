@@ -185,9 +185,9 @@ class QwalorLaserSwitched(QwalorLaserSerial):
         config packets to the laser. That way we can have multiple computers talking to the laser at once.
         '''
         super().__init__(laser_channel, arduino_port, arduino_pin)
-        QwalorLink.get_instance() # make sure the switch is initialized
+        OpticalSwitchLink.get_instance() # make sure the switch is initialized
         self.switch_channel = switch_channel
 
     def set_active(self):
-        link = QwalorLink.get_instance()
+        link = OpticalSwitchLink.get_instance()
         link.set_channel(self.switch_channel)
