@@ -122,6 +122,7 @@ class LaserTests(unittest.TestCase):
 
 class OpticalSwitchTests(unittest.TestCase):
 
+    @unittest.skip("only run if needed")
     def test_connect(self):
 
         switch = serial.Serial('/dev/ttyACM1', 115200, timeout=10)
@@ -138,21 +139,42 @@ class OpticalSwitchTests(unittest.TestCase):
         print(f'class returned: {ret}')
 
         t0 = time.perf_counter()
-        ret = switch.set_channel(5)
+        ret = switch.set_channel(1)
         t1 = time.perf_counter()
         print(f"switch took {1000*(t1 - t0):0.2f} ms")
 
-        time.sleep(1)
+        time.sleep(0.1)
 
         t0 = time.perf_counter()
         ret = switch.reset()
         t1 = time.perf_counter()
         print(f"switch took {1000*(t1 - t0):0.2f} ms")
 
-        time.sleep(1)
+        time.sleep(0.1)
 
         t0 = time.perf_counter()
-        ret = switch.set_channel(13)
+        ret = switch.set_channel(2)
+        t1 = time.perf_counter()
+        print(f"switch took {1000*(t1 - t0):0.2f} ms")
+
+        time.sleep(0.1)
+
+        t0 = time.perf_counter()
+        ret = switch.set_channel(4)
+        t1 = time.perf_counter()
+        print(f"switch took {1000*(t1 - t0):0.2f} ms")
+
+        time.sleep(0.1)
+
+        t0 = time.perf_counter()
+        ret = switch.set_channel(8)
+        t1 = time.perf_counter()
+        print(f"switch took {1000*(t1 - t0):0.2f} ms")
+
+        time.sleep(0.1)
+
+        t0 = time.perf_counter()
+        ret = switch.set_channel(15)
         t1 = time.perf_counter()
         print(f"switch took {1000*(t1 - t0):0.2f} ms")
 

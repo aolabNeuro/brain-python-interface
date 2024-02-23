@@ -28,10 +28,6 @@ TEST=false
 [[ "$@" =~ '-log' ]] && LOG=true
 [[ "$@" =~ '-test' ]] && TEST=true
 
-echo "$@"
-echo "$LOG"
-echo "$TEST"
-
 # Start logging
 if [ "$LOG" == "false" ]
 then 
@@ -102,6 +98,7 @@ git --git-dir=$BMI3D/.git --work-tree=$BMI3D status >> $BMI3D/log/runserver_log
 if  test -f "$BMI3D/env/bin/activate"; then 
     source $BMI3D/env/bin/activate
 else
+    source ~/miniconda3/etc/profile.d/conda.sh
     eval "$(conda shell.bash hook)"
     conda activate bmi3d
 fi
