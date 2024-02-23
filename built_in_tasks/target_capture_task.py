@@ -1299,7 +1299,7 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
 
     # Generator functions
     @staticmethod
-    def row_target(nblocks=100, ntargets=3, dx=3., origin=(0,0,0)):
+    def row_target(nblocks=100, ntargets=3, dx=5.,offset1=(0,0,-7.5),offset2=(0,0,-2.),offset3=(0,0,6.),origin=(0,0,0)):
         '''
         Generates a sequence of 2D (x and z) targets at a given distance from the origin
 
@@ -1321,17 +1321,29 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
         '''
         rng = np.random.default_rng()
         for _ in range(nblocks):
-            order = np.arange(ntargets) + 1 # target indices, starting from 1
+            order = np.arange(ntargets**3)
             rng.shuffle(order)
             x_pos_candidate = [-dx,0,dx]
-            for t in range(ntargets):
-                idx = order[t]
-                x_pos = x_pos_candidate[idx-1]
-                pos = np.array([x_pos,0,0]).T
-                yield [idx], [pos + origin]
+            for t in range(ntargets**3):
+                idx = np.base_repr(order[t],3).zfill(3) # convert a decimal number to ternary
+
+                # Target index for hand target, initial eye target, final eye target
+                idx1 = int(idx[0])
+                idx2 = int(idx[1])
+                idx3 = int(idx[2])
+
+                # Get positions for each target
+                x_pos1 = x_pos_candidate[idx1]
+                x_pos2 = x_pos_candidate[idx2]
+                x_pos3 = x_pos_candidate[idx3]
+                pos1 = np.array([x_pos1,0,0]).T
+                pos2 = np.array([x_pos2,0,0]).T
+                pos3 = np.array([x_pos3,0,0]).T
+
+                yield [idx1],[idx2],[idx3],[pos1+offset1+origin],[pos2+offset2+origin],[pos3+offset3+origin]
 
     @staticmethod
-    def sac_hand_2d(nblocks=100, ntargets=3, dx=10, origin1=(0,0,-1.0), origin2=(0,0,-5.5), origin3=(0,0,5.5)):
+    def sac_hand_2d(nblocks=100, ntargets=3, dx=10,offset1=(0,0,-7.5),offset2=(0,0,-2.),offset3=(0,0,6.),origin=(0,0,0)):
         '''
         Pairs of hand targets and eye targets
 
@@ -1340,24 +1352,20 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
         [nblocks*ntargets x 1] array of tuples containing trial indices and [2 x 3] target coordinates
         '''
 
-        gen_hand = HandConstrainedEyeCapture.row_target(nblocks=100, ntargets=ntargets, dx=dx, origin=origin1)
-        gen_eye1 = HandConstrainedEyeCapture.row_target(nblocks=100, ntargets=ntargets, dx=dx, origin=origin2)
-        gen_eye2 = HandConstrainedEyeCapture.row_target(nblocks=100, ntargets=ntargets, dx=dx, origin=origin3)
-        for _ in range(nblocks*ntargets):
-            idx, pos = next(gen_hand)
+        gen = HandConstrainedEyeCapture.row_target(nblocks=nblocks, ntargets=ntargets, dx=dx, offset1=(0,0,-7.5),offset2=(0,0,-2.),offset3=(0,0,6.),origin=(0,0,0))
+        for _ in range(nblocks*(ntargets**3)):
+            idx1,idx2,idx3,pos1,pos2,pos3 = next(gen)
             targs = np.zeros([1, 3])
-            targs[0,:] = pos[0]
+            targs[0,:] = pos1[0]
             indices = np.zeros([1,1])
-            indices[0] = idx
+            indices[0] = idx1
 
-            idx1, pos1 = next(gen_eye1)
-            idx2, pos2 = next(gen_eye2)
             targs_eye = np.zeros([2, 3])
-            targs_eye[0,:] = pos1[0]
-            targs_eye[1,:] = pos2[0]
+            targs_eye[0,:] = pos2[0]
+            targs_eye[1,:] = pos3[0]
             indices_eye = np.zeros([2,1])
-            indices_eye[0] = idx1
-            indices_eye[1] = [idx2[0] + ntargets]
+            indices_eye[0] = idx2
+            indices_eye[1] = [idx3[0] + ntargets]
 
             yield indices_eye, targs_eye, indices, targs
 
