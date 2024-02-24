@@ -284,7 +284,7 @@ class ScreenTargetCapture(TargetCapture, Window):
     plant_visible = traits.Bool(True, desc='Specifies whether entire plant is displayed or just endpoint')
     cursor_radius = traits.Float(.5, desc='Radius of cursor in cm')
     cursor_color = traits.OptionsList("dark_purple", *target_colors, desc='Color of cursor endpoint', bmi3d_input_options=list(target_colors.keys()))
-    cursor_bounds = traits.Tuple((-18., 18., 0., 0., -10., 10.), desc='(x min, x max, y min, y max, z min, z max)')
+    cursor_bounds = traits.Tuple((-10., 10., 0., 0., -10., 10.), desc='(x min, x max, y min, y max, z min, z max)')
     starting_pos = traits.Tuple((5., 0., 5.), desc='Where to initialize the cursor') 
 
     def __init__(self, *args, **kwargs):
@@ -1065,7 +1065,8 @@ class SequenceCapture(ScreenTargetCapture):
 
 class HandConstrainedEyeCapture(ScreenTargetCapture):
     '''
-    Saccade task, but subjects need to hold an initial target with their hand
+    Saccade task with holding another target with hand. Subjects need to hold an initial target with their hand. 
+    Then they need to fixate the first eye target and make a saccade for the second eye target 
     '''
 
     fixation_radius = traits.Float(2.5, desc="Distance from center that is considered a broken fixation")
@@ -1168,7 +1169,7 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
         super()._start_wait()
         # Redefine chain length because targs in this task has both eye and hand targets
         self.chain_length = len(self.targets)
-        
+
         # Initialize fixation state
         self.num_hold_state = 0
 
@@ -1293,9 +1294,9 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
 
     # Generator functions
     @staticmethod
-    def row_target(nblocks=100, ntargets=3, dx=5.,offset1=(0,0,-2),offset2=(0,0,6.),offset3=(0,0,-7.5),origin=(0,0,0)):
+    def row_target(nblocks=20, ntargets=3, dx=5.,offset1=(0,0,-2),offset2=(0,0,6.),offset3=(0,0,-7.5),origin=(0,0,0)):
         '''
-        Generates a sequence of 2D (x and z) targets at a given distance from the origin
+        Generates a sequence of 3D for 2 eye targets and 1 hand target at a given distance from the origin
 
         Parameters
         ----------
@@ -1304,9 +1305,15 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
         ntargets : int
             The number of equally spaced targets
         distance : float
-            The distance in cm between the center and peripheral targets.
+            The distance in cm between targets
+        offset1 : 3-tuple
+            y location of the first eye target
+        offset2 : 3-tuple
+            y location of the second eye target
+        offset3 : 3-tuple
+            y location of the hand target
         origin : 3-tuple
-            Location of the central targets around which the peripheral targets span
+            Location of the central targets
 
         Returns
         -------
@@ -1337,13 +1344,13 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
                 yield [idx1],[idx2],[idx3],[pos1+offset1+origin],[pos2+offset2+origin],[pos3+offset3+origin]
 
     @staticmethod
-    def sac_hand_2d(nblocks=100, ntargets=3, dx=10,offset1=(0,0,-2),offset2=(0,0,6.),offset3=(0,0,-7.5),origin=(0,0,0)):
+    def sac_hand_2d(nblocks=20, ntargets=3, dx=10,offset1=(0,0,-2),offset2=(0,0,6.),offset3=(0,0,-7.5),origin=(0,0,0)):
         '''
         Pairs of hand targets and eye targets
 
         Returns
         -------
-        [nblocks*ntargets x 1] array of tuples containing trial indices and [2 x 3] target coordinates
+        [nblocks*ntargets x 1] array of tuples containing trial indices and [3 x 3] target coordinates
         '''
 
         gen = HandConstrainedEyeCapture.row_target(nblocks=nblocks,ntargets=ntargets,dx=dx,offset1=offset1,offset2=offset2,offset3=offset3,origin=origin)
@@ -1364,7 +1371,11 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
 
 
 class ScreenTargetCapture_Saccade(ScreenTargetCapture):
-    
+    '''
+    Center-out saccade task. The controller for the cursor position is eye position.
+    Hand cursor is also visible. You should remove the hand cursor by setting cursor_radius to 0 as needed.
+    '''
+
     fixation_radius_buffer = traits.Float(.5, desc="additional radius for eye target")
     target_color = traits.OptionsList("white", *target_colors, desc="Color of the target", bmi3d_input_options=list(target_colors.keys()))
     fixation_target_color = traits.OptionsList("cyan", *target_colors, desc="Color of the eye target under fixation state", bmi3d_input_options=list(target_colors.keys()))

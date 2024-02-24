@@ -252,7 +252,7 @@ class TrackingTask(ManualControlMixin, ScreenTargetTracking):
 
 class SequenceTask(ManualControlMixin, SequenceCapture):
     '''
-    Sequence task
+    Sequence task. Subjects need to capture 3 targets. The last target appears while reaching to the 2st target.
     '''
     pass
 
@@ -264,7 +264,7 @@ class HandConstrainedSaccadeTask(ManualControlMixin, HandConstrainedEyeCapture):
 
 class SaccadeTask(ManualControlMixin, ScreenTargetCapture_Saccade):
     '''
-    Saccade task
+    Center out saccade task. The controller for the cursor is eye positions. The target color changes when subjects fixate the target.
     '''
     pass
 
