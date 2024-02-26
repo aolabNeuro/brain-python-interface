@@ -7,7 +7,7 @@ import traceback
 from riglib.experiment import traits
 from riglib.gpio import ArduinoGPIO, DigitalWave
 import numpy as np
-from riglib.qwalor_laser import QwalorLaserSerial
+from riglib.lasers.qwalor_laser import QwalorLaserSerial, QwalorLaserSwitched
 
 class CrystaLaser(traits.HasTraits):
     ''' Adds an arduino-controlled crystalaser to self.lasers.'''
@@ -77,6 +77,38 @@ class QwalorLaser(traits.HasTraits):
             self.termination_err.seek(0)
             self.state = None
         super().run()
+
+class SwitchedQwalorLaser(QwalorLaser):
+
+    n_channels = 16 # number of channels on the optical switch
+    stimulation_site = traits.Array(value=[-1]*n_channels, 
+                                    desc="Where was the laser stimulation at each connected channel. -1 means the channel is not connected.")
+
+    def init(self, *args, **kwargs):
+
+        # Attempt to open the laser connection, but fail gracefully if it is unavailable
+        try:
+            for ch in range(1, len(self.stimulation_site)+1):
+
+                # Skip channels that are not connected
+                if self.stimulation_site[ch-1] == -1:
+                    continue
+
+                # Add the laser to the list of available lasers
+                laser = QwalorLaserSwitched(laser_channel=self.qwalor_channel, switch_channel=ch)
+                laser.port = laser.trigger_pin
+                laser.name = f'qwalor_laser_switch_ch{ch}'
+                self.lasers.append(laser)
+                
+            time.sleep(3) # some extra time to make sure the lasers are initialized
+            self.qwalor_laser_status = 'ok'
+
+        except Exception as e:
+            traceback.print_exc()
+            self.qwalor_laser_status = 'Couldn\'t connect to laser modulator, make it is turned on!'
+            
+        super().init(*args, **kwargs)
+
 
 class MultiQwalorLaser(traits.HasTraits):
     '''
@@ -180,7 +212,7 @@ class LaserState(traits.HasTraits):
         "pulses are generated (s). Time of 0. is unlimited.")
     laser_rand_start = traits.Bool(True, desc="Randomize the timing of the first laser pulse")
     laser_rand_order = traits.Bool(True, desc="Randomize the order of the laser channels")
-
+    lasers_per_trial = traits.Int(0, desc="Number of lasers to use per trial. 0 means use all available lasers.")
 
     def __init__(self, *args, **kwargs):
         self.laser_threads = []
@@ -228,6 +260,8 @@ class LaserState(traits.HasTraits):
         order = np.arange(len(self.lasers)).astype(int)
         if self.laser_rand_order:
             np.random.shuffle(order)
+            if self.lasers_per_trial > 0:
+                order = order[:self.lasers_per_trial] # only use a random subset of the lasers
         self.laser_waves = []
         for idx in order:
             laser = self.lasers[idx]

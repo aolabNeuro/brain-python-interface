@@ -1,7 +1,7 @@
 import time
 from built_in_tasks.force_task import DiskMatching
 from built_in_tasks.manualcontrolmultitasks import TrackingTask, rotations, ManualControl, ScreenTargetTracking
-from built_in_tasks.othertasks import Conditions, LaserConditions
+from built_in_tasks.othertasks import Conditions, LaserConditions, SweptLaserConditions
 from built_in_tasks.target_capture_task import ScreenTargetCapture
 from built_in_tasks.passivetasks import YouTube
 from features.generator_features import Autostart
@@ -102,6 +102,10 @@ class TestSeqGenerators(unittest.TestCase):
     # @unittest.skip("")
     def test_dual_laser_wave(self):
         seq = LaserConditions.dual_laser_square_wave(duty_cycle_1=0.025, duty_cycle_2=0.025, phase_delay_2=0.1)
+        print(seq[0])
+
+    def test_swept_laser_pulse(self):
+        seq = SweptLaserConditions.single_laser_pulse()
         print(seq[0])
 
     def test_corners(self):

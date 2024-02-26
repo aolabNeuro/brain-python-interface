@@ -251,7 +251,11 @@
 </script>
 </head>
 
+{% if test_db %}
+<body style="background-color:#cfba74">
+{% else %}
 <body>
+{% endif %}
   <div id="banner">
     <a href="/">Back</a>
     <input id="toggle_table" type="checkbox" checked="on" name="hist_checkbox"><span class="checkboxtext">History</span>
