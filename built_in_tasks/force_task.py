@@ -8,7 +8,7 @@ from riglib.stereo_opengl.window import Window
 from .target_graphics import *
 
 disk_colors = {
-    'target': (0.25, 0.25, 0.25, 0.75),
+    'target': (0.4, 0.4, 0.4, 0.75),
     'target_bright': (0.5, 0.5, 0.5, 0.75),
     'cursor': (1, 1, 1, 0.5),
 }
