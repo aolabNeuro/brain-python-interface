@@ -1363,9 +1363,9 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
             targs[2,:] = pos3[0]
 
             indices = np.zeros([3,1])
-            indices[0] = idx1
-            indices[1] = [idx2[0] + ntargets]
-            indices[1] = [idx3[0] + ntargets]
+            indices[0] = idx1[0]
+            indices[1] = idx2[0] + ntargets
+            indices[2] = idx3[0]
 
             yield indices, targs
 
