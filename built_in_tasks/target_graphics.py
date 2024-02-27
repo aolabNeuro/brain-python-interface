@@ -230,7 +230,7 @@ class VirtualTorusTarget(VirtualCircularTarget):
     def __init__(self, inner_radius=2, outer_radius=3, target_color=(1, 0, 0, .5), starting_pos=np.zeros(3)):
         self.target_color = target_color
         self.major_radius = np.mean([inner_radius, outer_radius])
-        self.minor_radius = np.abs(outer_radius - inner_radius)
+        self.minor_radius = np.abs(outer_radius - inner_radius)/2
         self.target_color = target_color
         self.position = starting_pos
         self.int_position = starting_pos

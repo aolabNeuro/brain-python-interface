@@ -19,11 +19,11 @@ class DiskMatchingMixin(traits.HasTraits):
     """
  
     # Runtime settable traits
-    disk_cursor_offset = traits.Float(-0.09, desc="offset from raw joystick value to disk cursor radius")
+    disk_cursor_offset = traits.Float(0., desc="offset from raw joystick value to disk cursor radius")
     disk_cursor_gain = traits.Float(50., desc="conversion from raw joystick value to disk cursor radius")
-    disk_cursor_bounds = traits.Tuple((0.5, 8), desc="(min, max) radius (in cm) of the disk cursor")
-    disk_target_radius = traits.Tuple((2, 5), desc="(min, max) radius (in cm) of the disk target")
-    disk_target_tolerance = traits.Float(0.5, desc="allowed cm difference in radius between disk cursor and disk target")
+    disk_cursor_bounds = traits.Tuple((0.5, 8.), desc="(min, max) radius (in cm) of the disk cursor")
+    disk_target_radius = traits.Tuple((2., 5.), desc="(min, max) inner radius (in cm) of the disk target")
+    disk_target_tolerance = traits.Float(0.5, desc="distance from inner to outer radius (in cm) of disk target")
     disk_target_color = traits.OptionsList("target", *disk_colors, desc="Color of the disk target", bmi3d_input_options=list(disk_colors.keys()))
     disk_cursor_color = traits.OptionsList("cursor", *disk_colors, desc='Color of disk cursor ', bmi3d_input_options=list(disk_colors.keys()))
     disk_pos = traits.Tuple((0., 0., 0.), desc='Where to locate the disks') 
@@ -98,12 +98,12 @@ class DiskMatching(DiskMatchingMixin, Window, LogExperiment):
         return not self.pause
 
     def _test_enter_target(self, ts):
-        d = abs(self.disk_cursor_radius - self.disk_target_radius_trial)
-        return d <= self.disk_target_tolerance
+        d = self.disk_cursor_radius - self.disk_target_radius_trial
+        return (d >= 0) and (d <= self.disk_target_tolerance)
 
     def _test_leave_target(self, ts):
-        d = abs(self.disk_cursor_radius - self.disk_target_radius_trial)
-        return d > self.disk_target_tolerance
+        d = self.disk_cursor_radius - self.disk_target_radius_trial
+        return (d > self.disk_target_tolerance) or (d < 0)
 
     def _test_hold_complete(self, ts):
         return ts > self.hold_time_trial
@@ -130,14 +130,13 @@ class DiskMatching(DiskMatchingMixin, Window, LogExperiment):
         if not self.disk_hold_penalty:
             self.disk_target_radius_trial = np.random.uniform(*self.disk_target_radius)
             self.hold_time_trial = np.random.uniform(*self.hold_time)
-            print("New target radius:", self.disk_target_radius_trial)
 
     def _start_target(self):
         self.sync_event('TARGET_ON', 0xd)
         
         self.task_data['disk_target_size'] = self.disk_target_radius_trial
-        inner_radius = self.disk_target_radius_trial - self.disk_target_tolerance/2
-        outer_radius = self.disk_target_radius_trial + self.disk_target_tolerance/2
+        inner_radius = self.disk_target_radius_trial
+        outer_radius = self.disk_target_radius_trial + self.disk_target_tolerance
         self.disk_target = VirtualTorusTarget(inner_radius, outer_radius, target_color=disk_colors[self.disk_target_color], starting_pos=self.disk_pos)
         for model in self.disk_target.graphics_models:
             self.add_model(model)
