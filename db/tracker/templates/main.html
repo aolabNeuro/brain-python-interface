@@ -1,6 +1,10 @@
 <!-- Webroot interface -->
 
+{% if test_db %}
+<body style="background-color:#cfba74">
+{% else %}
 <body>
+{% endif %}
 	<a href="setup">Setup</a><br>
 	<a href="exp_log/">Experiment Log</a><br>
 	<!-- <a href="exp_log/">New experiment</a> -->
