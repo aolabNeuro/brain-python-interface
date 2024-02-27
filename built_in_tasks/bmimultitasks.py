@@ -73,6 +73,7 @@ class SimpleEndpointAssister(Assister):
         self.decoder_binlen = kwargs.pop('decoder_binlen', 0.1)
         self.assist_speed = kwargs.pop('assist_speed', 5.)
         self.target_radius = kwargs.pop('target_radius', 2.)
+        self.assist_noise = kwargs.pop('assist_noise', 0.)
 
     def calc_assisted_BMI_state(self, current_state, target_state, assist_level, mode=None, **kwargs):
         '''    Docstring    '''
@@ -85,14 +86,14 @@ class SimpleEndpointAssister(Assister):
             decoder_binlen = self.decoder_binlen
             speed = self.assist_speed * decoder_binlen
             target_radius = self.target_radius
-            Bu = self.endpoint_assist_simple(cursor_pos, target_pos, decoder_binlen, speed, target_radius, assist_level)
+            Bu = self.endpoint_assist_simple(cursor_pos, target_pos, decoder_binlen, speed, target_radius, self.assist_noise)
             assist_weight = assist_level
 
         # return Bu, assist_weight
         return dict(x_assist=Bu, assist_level=assist_weight)
 
     @staticmethod
-    def endpoint_assist_simple(cursor_pos, target_pos, decoder_binlen=0.1, speed=0.5, target_radius=2., assist_level=0.):
+    def endpoint_assist_simple(cursor_pos, target_pos, decoder_binlen=0.1, speed=0.5, target_radius=2., assist_noise=0.):
         '''
         Estimate the next state using a constant velocity estimate moving toward the specified target
 
@@ -108,8 +109,8 @@ class SimpleEndpointAssister(Assister):
             Speed of the machine-assisted cursor
         target_radius: float
             Radius of the target. When the cursor is inside the target, the machine assisted cursor speed decreases.
-        assist_level: float
-            Scalar between (0, 1) where 1 indicates full machine control and 0 indicates full neural control.
+        assist_noise: float
+            Noise added to the assist speed to vary the timing of the trajectories
 
         Returns
         -------
@@ -121,9 +122,9 @@ class SimpleEndpointAssister(Assister):
         dir_to_target = diff_vec / (np.spacing(1) + dist_to_target)
 
         if dist_to_target > target_radius:
-            assist_cursor_pos = cursor_pos + speed*dir_to_target
+            assist_cursor_pos = cursor_pos + np.random.uniform(1-assist_noise,1+assist_noise)*speed*dir_to_target
         else:
-            assist_cursor_pos = cursor_pos + speed*diff_vec/2
+            assist_cursor_pos = cursor_pos + np.random.uniform(1-assist_noise,1+assist_noise)*speed*diff_vec/2
 
         assist_cursor_vel = (assist_cursor_pos-cursor_pos)/decoder_binlen
         x_assist = np.hstack([assist_cursor_pos, assist_cursor_vel, 1])
@@ -198,6 +199,8 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
     '''
 
     reset = traits.Int(0, desc='reset the decoder state to the starting configuration. 1 for always, 2 for only on timeout')
+    assist_speed = traits.Float(2., desc="speed of assister in cm/s")
+    assist_noise = traits.Float(0., desc="noise added to cursor speed in cm/s")
     cursor_color = traits.OptionsList("orange", *target_colors, desc='Color of cursor endpoint', bmi3d_input_options=list(target_colors.keys()))
     save_zscore = traits.Bool(False, desc="save a decoder zscored from this task")
 
@@ -216,8 +219,8 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
         # Create the appropriate type of assister object
         start_level, end_level = self.assist_level
         kwargs = dict(decoder_binlen=self.decoder.binlen, target_radius=self.target_radius)
-        if hasattr(self, 'assist_speed'):
-            kwargs['assist_speed'] = self.assist_speed
+        kwargs['assist_speed'] = self.assist_speed
+        kwargs['assist_noise'] = self.assist_noise
 
         if isinstance(self.decoder.ssm, StateSpaceEndptVel2D) and isinstance(self.decoder, ppfdecoder.PPFDecoder):
             self.assister = OFCEndpointAssister()
