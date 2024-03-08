@@ -1242,15 +1242,21 @@ class BMILoop(object):
         action of the BMI subject and pairs this intention estimation with actual observations.
         '''
         from . import clda
-        self.learn_flag = False
-        self.learner = clda.DumbLearner()
+        # self.learn_flag = False
+        # self.learner = clda.DumbLearner()
+        learner_batch_size = 5 # Samples to update intended kinematics with
+        self.learner = clda.OFCLearner(learner_batch_size, self.decoder.filt.A, self.decoder.filt.B, self.decoder.filt.F)
 
     def create_updater(self):
         '''
         The "updater" uses the output batches of data from the learner and an update rule to
         alter the decoder parameters to better match the intention estimates.
         '''
-        self.updater = None
+        from . import clda
+        update_batch_size = 5
+        update_half_life = 120
+        self.updater = clda.KFRML(update_batch_size, update_half_life)
+        self.updater.init(self.decoder)
 
     def call_decoder(self, neural_obs, target_state, **kwargs):
         '''
