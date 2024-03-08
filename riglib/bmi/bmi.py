@@ -1212,40 +1212,16 @@ class BMILoop(object):
             for x in self.extractor.feature_dtype: # Feature extractor returns multiple named fields
                 self.add_dtype(*x)
 
-    # def create_learner(self):
-    #     '''
-    #     The "learner" uses knowledge of the task goals to determine the "intended"
-    #     action of the BMI subject and pairs this intention estimation with actual observations.
-    #     '''
-    #     from . import clda
-    #     from . import feedback_controllers
-    #     self.learn_flag = False
-    #     # self.learner = clda.DumbLearner()
-    #     A = self.decoder.filt.A
-    #     B = self.decoder.filt.B
-    #     F = self.decoder.filt.F
-    #     fb_ctrl = feedback_controllers.LinearFeedbackController(A=A, B=B, F=F)
-    #     self.learner = clda.FeedbackControllerLearner(100, fb_ctrl)
-
-    # def create_updater(self):
-    #     '''
-    #     The "updater" uses the output batches of data from the learner and an update rule to
-    #     alter the decoder parameters to better match the intention estimates.
-    #     '''
-    #     # self.updater = None
-    #     from . import clda
-    #     self.updater = clda.KFRML(10, 10)
-
     def create_learner(self):
         '''
         The "learner" uses knowledge of the task goals to determine the "intended"
         action of the BMI subject and pairs this intention estimation with actual observations.
         '''
         from . import clda
-        # self.learn_flag = False
+        self.learn_flag = False
         # self.learner = clda.DumbLearner()
         learner_batch_size = 5 # Samples to update intended kinematics with
-        self.learner = clda.OFCLearner(learner_batch_size, self.decoder.filt.A, self.decoder.filt.B, self.decoder.filt.F)
+        self.learner = clda.OFCLearner(learner_batch_size, self.decoder.filt.A, self.decoder.filt.B, self.decoder.filt.F_dict)
 
     def create_updater(self):
         '''
@@ -1253,7 +1229,8 @@ class BMILoop(object):
         alter the decoder parameters to better match the intention estimates.
         '''
         from . import clda
-        update_batch_size = 2
+        # self.updater = None
+        update_batch_size = 5
         update_half_life = 120
         self.updater = clda.KFRML(update_batch_size, update_half_life)
         self.updater.init(self.decoder)
