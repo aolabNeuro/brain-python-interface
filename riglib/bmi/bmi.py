@@ -1253,7 +1253,7 @@ class BMILoop(object):
         alter the decoder parameters to better match the intention estimates.
         '''
         from . import clda
-        update_batch_size = 5
+        update_batch_size = 2
         update_half_life = 120
         self.updater = clda.KFRML(update_batch_size, update_half_life)
         self.updater.init(self.decoder)
