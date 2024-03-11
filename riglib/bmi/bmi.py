@@ -1096,7 +1096,7 @@ class BMILoop(object):
         Secondary init function. Finishes initializing the task after all the
         constructors have run and all the requried attributes have been declared
         for the task to operate.
-        '''
+        ''' 
         # Make sure the plant is up to date
         self.plant.set_endpoint_pos(np.array(self.starting_pos))
 
@@ -1220,6 +1220,15 @@ class BMILoop(object):
         from . import clda
         self.learn_flag = False
         # self.learner = clda.DumbLearner()
+        fmatrix = np.array(self.decoder.filt.B.T/np.max(self.decoder.filt.B))
+        self.decoder.filt.F_dict = {
+            'target': fmatrix,
+            'hold': np.zeros(fmatrix.shape),
+            'timeout_penalty': np.zeros(fmatrix.shape),
+            'wait': np.zeros(fmatrix.shape),
+        }
+
+        # print(self.decoder.filt.F_dict)
         learner_batch_size = 5 # Samples to update intended kinematics with
         self.learner = clda.OFCLearner(learner_batch_size, self.decoder.filt.A, self.decoder.filt.B, self.decoder.filt.F_dict)
 
