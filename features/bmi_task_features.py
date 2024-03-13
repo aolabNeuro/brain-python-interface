@@ -19,27 +19,25 @@ class RandomUnitDropout(traits.HasTraits):
 
     def init(self):
         super().init()
-        self.decoder_unit_mask = np.ones((len(self.decoder.units),), dtype='bool')
-        new_dtype = np.dtype(self.trial_dtype.descr + [('decoder_unit_mask', '?', self.decoder_unit_mask.shape)])
+        self.decoder_units_dropped = np.ones((len(self.decoder.units),), dtype='bool')
+        new_dtype = np.dtype(self.trial_dtype.descr + [('decoder_units_dropped', '?', self.decoder_units_dropped.shape)])
         self.trial_dtype = new_dtype
         if not hasattr(self.decoder, "unit_drop_prob"):
+            print("WARNING: RandomUnitDropout feature requires the decoder to have a unit_drop_prob attribute")
             self.decoder.unit_drop_prob = np.zeros((len(self.decoder.units),), dtype='float')
         
-        # Save a copy of the mFR and sdFR from the decoder
+        # Save a copy of the mFR from the decoder
         self.decoder_mFR = self.decoder.mFR.copy()
-        self.decoder_sdFR = self.decoder.sdFR.copy()
 
     def _start_wait(self):
         '''
         Override the decoder to drop random units. Keep a record of what's going on in the `trial` data.
         '''
-        self.decoder_unit_mask = np.random.rand(len(self.decoder.units)) < self.decoder.unit_drop_prob
-        mFR_curr = self.decoder_mFR.copy()
-        sdFR_curr = self.decoder_sdFR.copy()
-        mFR_curr[self.decoder_unit_mask] = 0
-        sdFR_curr[self.decoder_unit_mask] = 0
-        self.decoder.init_zscore(self, mFR_curr, sdFR_curr)
-        self.trial_record['decoder_unit_mask'] = self.decoder_unit_mask
+        self.decoder_units_dropped = np.random.rand(len(self.decoder.units)) < self.decoder.unit_drop_prob
+        mFR_drop = self.decoder_mFR.copy()
+        mFR_drop[self.decoder_units_dropped] = 0
+        self.decoder.init_zscore(self, mFR_drop, self.decoder.sdFR)
+        self.trial_record['decoder_units_dropped'] = self.decoder_units_dropped
         super()._start_wait()
 
 
