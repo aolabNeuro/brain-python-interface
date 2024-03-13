@@ -8,7 +8,7 @@ from scipy.spatial.transform import Rotation as R
 from riglib.experiment import traits
 
 from .target_graphics import *
-from .target_capture_task import ScreenTargetCapture, ScreenReachAngle, SequenceCapture
+from .target_capture_task import ScreenTargetCapture, ScreenReachAngle, SequenceCapture, HandConstrainedEyeCapture, ScreenTargetCapture_Saccade
 from .target_tracking_task import ScreenTargetTracking
 from riglib.stereo_opengl.window import WindowDispl2D
 
@@ -252,6 +252,19 @@ class TrackingTask(ManualControlMixin, ScreenTargetTracking):
 
 class SequenceTask(ManualControlMixin, SequenceCapture):
     '''
-    Track moving target task
+    Sequence task. Subjects need to capture 3 targets. The last target appears while reaching to the 2st target.
     '''
     pass
+
+class HandConstrainedSaccadeTask(ManualControlMixin, HandConstrainedEyeCapture):
+    '''
+    Saccade task while holding different targets by hand
+    '''
+    pass
+
+class SaccadeTask(ManualControlMixin, ScreenTargetCapture_Saccade):
+    '''
+    Center out saccade task. The controller for the cursor is eye positions. The target color changes when subjects fixate the target.
+    '''
+    pass
+

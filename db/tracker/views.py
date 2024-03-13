@@ -13,10 +13,12 @@ from django.http import HttpResponse
 
 from . import exp_tracker
 
-def main(request):
-    return render(request, "main.html", dict())
+from config.rig_defaults import rig_settings
 
-def _list_exp_history(dbname='default', subject=None, task=None, max_entries=None, show_hidden=False):
+def main(request):
+    return render(request, "main.html", dict(test_db=os.environ.get('BMI3D_TEST_DATABASE')))
+
+def _list_exp_history(dbname='default', subject=None, task=None, max_entries=None, show_all_rigs=False, show_hidden=False):
     from . import models
     # from .models import TaskEntry, Task, Subject, Feature, Generator
     td = datetime.timedelta(days=60)
@@ -24,6 +26,8 @@ def _list_exp_history(dbname='default', subject=None, task=None, max_entries=Non
     filter_kwargs = {}
     if not show_hidden:
         filter_kwargs['visible'] = True
+    if not show_all_rigs:
+        filter_kwargs['rig_name'] = rig_settings['name']
     if not (subject is None) and isinstance(subject, str):
         filter_kwargs['subject__name'] = subject
     if not (task is None) and isinstance(task, str):
@@ -76,6 +80,8 @@ def _list_exp_history(dbname='default', subject=None, task=None, max_entries=Non
         n_entries=len(entries),
         show_hidden=show_hidden,
         n_hidden=len([e for e in entries if e.visible==False]),
+        show_all_rigs=show_all_rigs,
+        test_db=os.environ.get('BMI3D_TEST_DATABASE')
     )
 
     try:
@@ -107,6 +113,7 @@ def list_exp_history(request, **kwargs):
     from .models import TaskEntry, Task, Subject, Feature, Generator
 
     kwargs['show_hidden'] = request.GET.get('show_hidden') != None
+    kwargs['show_all_rigs'] = request.GET.get('show_all_rigs') != None
 
     fields = _list_exp_history(**kwargs)
     fields['hostname'] = request.get_host()
@@ -132,7 +139,10 @@ def setup_subjects(request):
     subjects = models.Subject.objects.all()
     experimenters = models.Experimenter.objects.all()
 
-    return render(request, "setup_subjects.html", dict(subjects=subjects, experimenters=experimenters))
+    return render(request, "setup_subjects.html", 
+                  dict(subjects=subjects, 
+                       experimenters=experimenters,
+                       test_db=os.environ.get('BMI3D_TEST_DATABASE')))
 
 def setup_tasks(request):
     """view for experimenter to add new tasks"""
@@ -141,7 +151,8 @@ def setup_tasks(request):
 
     tasks = models.Task.objects.all()
 
-    return render(request, "setup_tasks.html", dict(tasks=tasks))
+    return render(request, "setup_tasks.html", 
+                  dict(tasks=tasks, test_db=os.environ.get('BMI3D_TEST_DATABASE')))
 
 def setup_features(request):
     """view for experimenter to add new features"""
@@ -157,7 +168,8 @@ def setup_features(request):
     return render(request, "setup_features.html",
         dict(active_features=features,
         active_feature_names=[feature.name for feature in features],
-        built_in_feature_names=built_in_feature_names))        
+        built_in_feature_names=built_in_feature_names,
+        test_db=os.environ.get('BMI3D_TEST_DATABASE')))        
 
 def setup_parameters(request):
     """view for experimenter to add new global system parameters"""
@@ -175,18 +187,18 @@ def setup_parameters(request):
         path = models.KeyValueStore.get('data_path', '--', dbname=db)
         database_objs.append({"name":db, "path":path})
 
-    rig_name = models.KeyValueStore.get("rig_name", "")
     recording_sys = models.KeyValueStore.get("recording_sys")
     recording_sys_options = ['None', 'tdt', 'blackrock', 'plexon', 'ecube'] # TODO make this dynamic
 
     return render(request, "setup_parameters.html",
-        dict(rig_name=rig_name, systems=systems, databases=database_objs, 
+        dict(systems=systems, databases=database_objs, 
             recording_sys=recording_sys,
-            recording_sys_options=recording_sys_options))
+            recording_sys_options=recording_sys_options,
+            test_db=os.environ.get('BMI3D_TEST_DATABASE')))
 
 def setup(request):
     """Highest level "Setup" view"""
-    return render(request, "setup_base.html")
+    return render(request, "setup_base.html", dict(test_db=os.environ.get('BMI3D_TEST_DATABASE')))
 
 def _color_entries(entries):
     from .models import TaskEntry, Task, Subject, Feature, Generator

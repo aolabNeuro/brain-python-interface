@@ -6,6 +6,7 @@ import types
 import numpy as np
 import pygame
 from riglib import gpio
+from config.rig_defaults import force_sensor_address
 
 ###### CONSTANTS
 sec_per_min = 60
@@ -205,7 +206,7 @@ class Eye(object):
         self.pos[0] = start_pos[0]
         self.pos[1] = start_pos[1]
         self.move_step = 1 # cm, before scaling
-        self.calibration = np.array([2,0.2]) # TODO load calibration data
+        self.calibration = np.array([2,2]) # TODO load calibration data
 
     def get(self):
         for event in pygame.event.get():
@@ -295,7 +296,7 @@ class ForceControl():
     def init(self, *args, **kwargs):
         if hasattr(super(), 'init'):
             super().init(*args, **kwargs)
-        self.joystick = gpio.ArduinoGPIO('/dev/forcesensor', enable_analog=True)
+        self.joystick = gpio.ArduinoGPIO(force_sensor_address, enable_analog=True)
         def get(self):
             return self.analog_read(0)
         self.joystick.get = types.MethodType(get, self.joystick)

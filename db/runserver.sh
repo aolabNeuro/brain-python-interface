@@ -2,11 +2,9 @@
 
 # Set display
 HOST=`hostname -s`
-if [ "$HOST" = "pagaiisland2" ]; then
+if [ "$HOST" = "pagaiisland2" ] || [ "$HOST" = "siberut-bmi" ]; then
     export DISPLAY=':0.1'
-elif [ "$HOST" = "peco" ]; then
-    export DISPLAY=$(grep nameserver /etc/resolv.conf | awk '{print $2}'):0.0
-    export LIBGL_ALWAYS_INDIRECT=0
+    echo "Moving display to :0.1"
 elif [ "$HOST" = "pagaiisland-surface" ]; then
     export DISPLAY=localhost:0
     export LIBGL_ALWAYS_INDIRECT=0
@@ -24,13 +22,19 @@ DB=$(dirname "$FILE")
 BMI3D=$(dirname "$DB")
 cd $DB
 
+# Check inputs
+LOG=false
+TEST=false
+[[ "$@" =~ '-log' ]] && LOG=true
+[[ "$@" =~ '-test' ]] && TEST=true
+
 # Start logging
-if [ -z "$1" ] # no arguments
+if [ "$LOG" == "false" ]
 then 
     echo "Turning on logging..."
     # Make the log directory if it doesn't already exist
     mkdir -p $BMI3D/log
-    /bin/bash ./runserver.sh -log | tee -a $BMI3D/log/runserver_log
+    /bin/bash ./runserver.sh -log "$@" | tee -a $BMI3D/log/runserver_log
     exit 0
 fi
 
@@ -93,7 +97,19 @@ git --git-dir=$BMI3D/.git --work-tree=$BMI3D status >> $BMI3D/log/runserver_log
 # Activate the relevant environment
 if  test -f "$BMI3D/env/bin/activate"; then 
     source $BMI3D/env/bin/activate
+else
+    source ~/miniconda3/etc/profile.d/conda.sh
+    eval "$(conda shell.bash hook)"
+    conda activate bmi3d
 fi
+
+# Set the database to test if necessary
+if [ "$TEST" == "true" ]
+then 
+    echo "Using test database"
+    export BMI3D_TEST_DATABASE=true
+fi
+
 
 trap "exit" INT TERM ERR
 trap "kill 0" EXIT
@@ -101,14 +117,14 @@ trap "kill 0" EXIT
 # Start python processes
 cd $BMI3D
 python manage.py runserver 0.0.0.0:8000 --noreload &
-if [ "$HOST" = "pagaiisland2" ]; then
-    celery -A db.tracker worker -l INFO &
-fi
+# if [ "$HOST" = "pagaiisland2" ] || [ "$HOST" = "siberut-bmi" ]; then
+#     celery -A db.tracker worker -l INFO &
+# fi
 # celery flower -A db.tracker --address=0.0.0.0 --port=5555 & # for monitoring
 
 # Start servernode-control
-if [ "$HOST" = "pagaiisland2" ]; then
-    gnome-terminal -- ssh 10.155.207.19 sh ~/start-servernode.sh
+if [ "$HOST" = "pagaiisland2" ] || [ "$HOST" = "siberut-bmi" ]; then
+    gnome-terminal -- ssh pagaiisland@10.155.207.19 sh ~/start-servernode.sh
     sleep 1
     gnome-terminal -- $BMI3D/riglib/ecube/servernode-control
 fi

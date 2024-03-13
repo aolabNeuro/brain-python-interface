@@ -1,8 +1,9 @@
 import serial
-from .gpio import CustomBoard
+from ..gpio import CustomBoard
 import time
 import numpy as np
-from . import singleton
+from .. import singleton
+from .optical_switch import LFiberOpticalSwitch
 
 # condigPacket is 4 bytes configuration command and contains the laser information
 # configPacket[0] : Channel (red, green, blue, white) & Mode (off, continuous, sin, inverted sin, square waveform)
@@ -92,6 +93,22 @@ class QwalorLink(singleton.Singleton):
         self.link.flush()
         time.sleep(0.005)
 
+
+class OpticalSwitchLink(singleton.Singleton):
+    '''
+    Helper singleton that acts as the serial link to the optical switch.
+    '''
+
+    __instance = None
+
+    def __init__(self, switch_port='/dev/lfiberswitch'):
+        super().__init__()
+        self.link = LFiberOpticalSwitch(port=switch_port)
+
+    def set_channel(self, channel):
+        self.link.set_channel(channel)
+
+
 class QwalorLaserSerial:
     '''
     Implentation of the quad-wavelength laser modulator. By default, the laser starts in
@@ -108,7 +125,7 @@ class QwalorLaserSerial:
         Hoping to change this in the future to use a raspberry pi or similar connected to the network to relay the
         config packets to the laser. That way we can have multiple computers talking to the laser at once.
         '''
-        if arduino_port == None:
+        if arduino_port is None:
             arduino_port = f"/dev/laser_ch{laser_channel}"
         self.trigger_pin = arduino_pin
         self.channel = laser_channel
@@ -132,12 +149,16 @@ class QwalorLaserSerial:
         self.gain = gain
         self._set_config()
 
+    def set_active(self):
+        pass
+
     def write_many(self, mask, data):
         '''
         Somewhat strange, but the way the lasers are implemented in othertasks.py requires they implement
         a `write_many` method, which should write the given data to the given masked outputs. In our case,
         this will be a single channel so we can safely ignore the mask and just turn off and on the laser.
         '''
+        self.set_active()
         if data:
             self.on()
         else:
@@ -150,9 +171,23 @@ class QwalorLaserSerial:
         self.board.digital[self.trigger_pin].write(0)
 
     def __del__(self):
-        if hasattr(self, 'ser'):
-            self.ser.close()
         if hasattr(self, 'board'):
             self.board.exit()
 
+class QwalorLaserSwitched(QwalorLaserSerial):
+    '''
+    Implentation of the quad-wavelength laser modulator routed through an LFiber optical switch.
+    '''
 
+    def __init__(self, laser_channel, switch_channel, arduino_port=None, arduino_pin=12):
+        '''
+        Hoping to change this in the future to use a raspberry pi or similar connected to the network to relay the
+        config packets to the laser. That way we can have multiple computers talking to the laser at once.
+        '''
+        super().__init__(laser_channel, arduino_port, arduino_pin)
+        OpticalSwitchLink.get_instance() # make sure the switch is initialized
+        self.switch_channel = switch_channel
+
+    def set_active(self):
+        link = OpticalSwitchLink.get_instance()
+        link.set_channel(self.switch_channel)
