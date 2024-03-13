@@ -512,6 +512,9 @@ class Decoder(object):
         self.bminum = int(self.binlen/(1/call_rate))
         self.spike_counts = np.zeros([len(units), 1])
 
+        # For the unit drop feature - set some/all units to nonzero probability
+        self.unit_drop_prob = np.zeros((len(self.units),), dtype='float')
+
         self.set_call_rate(call_rate)
 
         self._pickle_init()
