@@ -11,9 +11,10 @@ sec_per_min = 60
 ########################################################################################################
 # Decoder/BMISystem add-ons
 ########################################################################################################
-class UnitDropout(traits.HasTraits):
+class RandomUnitDropout(traits.HasTraits):
     '''
-    Randomly removes units from the decoder. Compatible with lindecoder.py only.
+    Randomly removes units from the decoder. Requires the decoder have a `unit_drop_prob` attribute
+    describing the probability that each unit will be dropped on a given trial.
     '''
 
     def init(self):
@@ -21,16 +22,23 @@ class UnitDropout(traits.HasTraits):
         self.decoder_unit_mask = np.ones((len(self.decoder.units),), dtype='bool')
         new_dtype = np.dtype(self.trial_dtype.descr + [('decoder_unit_mask', '?', self.decoder_unit_mask.shape)])
         self.trial_dtype = new_dtype
-        if not hasattr(self.decoder.filt, "update_mask"):
-            raise ValueError(f"FeatureDropout feature not supported by decoder {repr(self.decoder)}")
+        if not hasattr(self.decoder, "unit_drop_prob"):
+            self.decoder.unit_drop_prob = np.zeros((len(self.decoder.units),), dtype='float')
+        
+        # Save a copy of the mFR and sdFR from the decoder
+        self.decoder_mFR = self.decoder.mFR.copy()
+        self.decoder_sdFR = self.decoder.sdFR.copy()
 
     def _start_wait(self):
         '''
-        Override the decoder to drop a random unit. Keep a record of what's going on in the `trial` data.
+        Override the decoder to drop random units. Keep a record of what's going on in the `trial` data.
         '''
-        self.decoder_unit_mask[:] = True
-        self.decoder_unit_mask[np.random.choice(len(self.decoder_unit_mask), 1)] = False
-        self.decoder.filt.update_mask(self.decoder_unit_mask)
+        self.decoder_unit_mask = np.random.rand(len(self.decoder.units)) < self.decoder.unit_drop_prob
+        mFR_curr = self.decoder_mFR.copy()
+        sdFR_curr = self.decoder_sdFR.copy()
+        mFR_curr[self.decoder_unit_mask] = 0
+        sdFR_curr[self.decoder_unit_mask] = 0
+        self.decoder.init_zscore(self, mFR_curr, sdFR_curr)
         self.trial_record['decoder_unit_mask'] = self.decoder_unit_mask
         super()._start_wait()
 

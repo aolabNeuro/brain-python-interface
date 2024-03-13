@@ -15,7 +15,7 @@ from .optitrack_features import Optitrack
 from .plexon_features import PlexonBMI, RelayPlexon, RelayPlexByte
 from .hdf_features import SaveHDF
 from .video_recording_features import SingleChannelVideo, E3Video
-from .bmi_task_features import NormFiringRates
+from .bmi_task_features import NormFiringRates, RandomUnitDropout
 from .arduino_features import PlexonSerialDIORowByte
 from .blackrock_features import BlackrockBMI
 from .blackrock_features import RelayBlackrockByte
@@ -78,6 +78,7 @@ built_in_features = dict(
     eye_calibration=EyeCalibration, 
     force_sensor=ForceControl,
     show_fixation_progress=Progressbar_fixation,
+    random_unit_dropout=RandomUnitDropout,
 )
 
 # >>> features.built_in_features['autostart'].__module__
