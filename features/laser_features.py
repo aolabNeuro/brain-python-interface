@@ -107,7 +107,7 @@ class SwitchedQwalorLaser(QwalorLaser):
             traceback.print_exc()
             self.qwalor_laser_status = 'Couldn\'t connect to laser modulator, make it is turned on!'
             
-        super().init(*args, **kwargs)
+        super(QwalorLaser, self).init(*args, **kwargs)
 
 
 class MultiQwalorLaser(traits.HasTraits):
