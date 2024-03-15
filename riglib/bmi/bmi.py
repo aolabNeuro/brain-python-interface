@@ -1075,6 +1075,7 @@ class BMISystem(object):
                 self.decoder.update_params(new_params, **self.updater.update_kwargs)
                 new_params['intended_kin'] = batch_data['intended_kin']
                 new_params['spike_counts_batch'] = batch_data['spike_counts']
+                new_params['target_position'] = target_state_k
 
                 self.learner.enable()
                 update_flag = True
@@ -1230,7 +1231,7 @@ class BMILoop(object):
 
         # print(self.decoder.filt.F_dict)
         learner_batch_size = 5 # Samples to update intended kinematics with
-        self.learner = clda.OFCLearner(learner_batch_size, self.decoder.filt.A, self.decoder.filt.B, self.decoder.filt.F_dict)
+        self.learner = clda.OFCLearnerRotateIntendedVelocity(learner_batch_size, self.decoder.filt.A, self.decoder.filt.B, self.decoder.filt.F_dict)
 
     def create_updater(self):
         '''
@@ -1352,7 +1353,7 @@ class BMILoop(object):
 
     def _cycle(self):
         self.move_plant()
-
+        # print(self.decoder.filt.C)
         # save loop time to HDF file
         self.task_data['loop_time'] = self.iter_time()
         super(BMILoop, self)._cycle()

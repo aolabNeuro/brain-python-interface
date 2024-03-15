@@ -188,7 +188,6 @@ class SimpleEndpointAssisterLFC(feedback_controllers.MultiModalLFC):
         F_dict = dict(hold=F_hold, target=F_target)
         super(SimpleEndpointAssisterLFC, self).__init__(B=B, F_dict=F_dict)
 
-
 #################
 ##### Tasks #####
 #################
@@ -197,7 +196,6 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
     Target capture task with cursor position controlled by BMI output.
     Cursor movement can be assisted toward target by setting assist_level > 0.
     '''
-
     reset = traits.Int(0, desc='reset the decoder state to the starting configuration. 1 for always, 2 for only on timeout')
     assist_speed = traits.Float(2., desc="speed of assister in cm/s")
     assist_noise = traits.Float(0., desc="noise added to cursor speed in cm/s")
@@ -238,7 +236,7 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
         else:
             raise NotImplementedError("Cannot assist for this type of statespace: %r" % self.decoder.ssm)
 
-        print(self.assister)
+        print('Assister: ', self.assister)
 
     def create_goal_calculator(self):
         if isinstance(self.decoder.ssm, StateSpaceEndptVel2D):

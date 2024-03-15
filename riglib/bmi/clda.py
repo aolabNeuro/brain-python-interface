@@ -321,6 +321,56 @@ class OFCLearner(Learner):
         except KeyError:
             return None
 
+class OFCLearnerRotateIntendedVelocity(OFCLearner):
+    # Only intended for 3D cursor control with this state vector: [Px, Py, Pz, Vx, Vy, Vz, 1]
+    def calc_int_kin(self, current_state, target_state, decoder_output, task_state, state_order=None):
+        '''
+        Calculate intended kinematics as 
+            x_t^{int} = A*x_t + B*F(x^* - x_t)
+
+        Parameters
+        ----------
+        [same FeedbackControllerLearner.calc_int_kin]
+        current_state : np.mat of shape (N, 1)
+            State estimate output from the decoder.
+        target_state : np.mat of shape (N, 1)
+            For the current time, this is the optimal state for the Decoder as specified by the task
+        decoder_output : np.mat of shape (N, 1)
+            State estimate output from the decoder, after the current observations (may be one step removed from 'current_state')
+        task_state : string
+            Name of the task state; some learners (e.g., the cursorGoal learner) have different intention estimates depending on the phase of the task/trial
+        state_order : np.ndarray of shape (N,), optional
+            Order of each state in the decoder; see riglib.bmi.state_space_models.State
+
+        Returns
+        -------
+        np.mat of shape (N, 1)
+            Estimate of intended next state for BMI
+        '''
+        try:        
+            current_position = decoder_output[:3] # assumes the first half of states are position (besides offset)
+            target_position = target_state[:3]
+            target_velocity_norm = (target_position - current_position)/np.linalg.norm((target_position - current_position)) # Unit velocity vector towards target
+
+            target_state = np.ones(7)
+            target_state[:3] = current_position # Set target state position to be the same as the current state position
+            target_state[3:6] = target_velocity_norm * np.linalg.norm(decoder_output[3:6])
+
+
+            current_state = np.mat(current_state).reshape(-1,1)
+            target_state = np.mat(target_state).reshape(-1,1)
+            F = self.F_dict[task_state]
+            A = self.A
+            B = self.B
+
+            print(np.round(decoder_output,3), np.round(target_position,3), np.round(target_state,3))
+            print('\n')
+
+            return A*current_state + B*F*(target_state - current_state)
+        except KeyError:
+            return None
+
+
 class RegexKeyDict(dict):
     '''
     Dictionary where key matching applies regular expressions in addition to exact matches
