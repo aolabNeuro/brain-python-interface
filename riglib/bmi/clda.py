@@ -82,7 +82,7 @@ class Learner(object):
         self.batch_size = batch_size
         self.passed_done_state = False
         self.enabled = True
-        self.input_state_index = -1
+        self.input_state_index = 0
         self.reset()
 
     def disable(self):
@@ -348,13 +348,13 @@ class OFCLearnerRotateIntendedVelocity(OFCLearner):
             Estimate of intended next state for BMI
         '''
         try:        
-            current_position = decoder_output[:3] # assumes the first half of states are position (besides offset)
+            current_position = current_state[:3] # assumes the first half of states are position (besides offset)
             target_position = target_state[:3]
             target_velocity_norm = (target_position - current_position)/np.linalg.norm((target_position - current_position)) # Unit velocity vector towards target
 
             target_state = np.ones(7)
             target_state[:3] = current_position # Set target state position to be the same as the current state position
-            target_state[3:6] = target_velocity_norm * np.linalg.norm(decoder_output[3:6])
+            target_state[3:6] = target_velocity_norm * np.linalg.norm(current_state[3:6])
 
 
             current_state = np.mat(current_state).reshape(-1,1)
@@ -362,9 +362,6 @@ class OFCLearnerRotateIntendedVelocity(OFCLearner):
             F = self.F_dict[task_state]
             A = self.A
             B = self.B
-
-            print(np.round(decoder_output,3), np.round(target_position,3), np.round(target_state,3))
-            print('\n')
 
             return A*current_state + B*F*(target_state - current_state)
         except KeyError:

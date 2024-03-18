@@ -1230,7 +1230,7 @@ class BMILoop(object):
         }
 
         # print(self.decoder.filt.F_dict)
-        learner_batch_size = 5 # Samples to update intended kinematics with
+        learner_batch_size = 1 # Samples to update intended kinematics with
         self.learner = clda.OFCLearnerRotateIntendedVelocity(learner_batch_size, self.decoder.filt.A, self.decoder.filt.B, self.decoder.filt.F_dict)
 
     def create_updater(self):
@@ -1240,8 +1240,8 @@ class BMILoop(object):
         '''
         from . import clda
         # self.updater = None
-        update_batch_size = 5
-        update_half_life = 120
+        update_batch_size = 1
+        update_half_life = 10
         self.updater = clda.KFRML(update_batch_size, update_half_life)
         self.updater.init(self.decoder)
 
