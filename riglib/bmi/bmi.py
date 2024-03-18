@@ -1075,6 +1075,7 @@ class BMISystem(object):
                 self.decoder.update_params(new_params, **self.updater.update_kwargs)
                 new_params['intended_kin'] = batch_data['intended_kin']
                 new_params['spike_counts_batch'] = batch_data['spike_counts']
+                new_params['target_position'] = target_state_k
 
                 self.learner.enable()
                 update_flag = True
@@ -1096,7 +1097,7 @@ class BMILoop(object):
         Secondary init function. Finishes initializing the task after all the
         constructors have run and all the requried attributes have been declared
         for the task to operate.
-        '''
+        ''' 
         # Make sure the plant is up to date
         self.plant.set_endpoint_pos(np.array(self.starting_pos))
 
@@ -1212,30 +1213,6 @@ class BMILoop(object):
             for x in self.extractor.feature_dtype: # Feature extractor returns multiple named fields
                 self.add_dtype(*x)
 
-    # def create_learner(self):
-    #     '''
-    #     The "learner" uses knowledge of the task goals to determine the "intended"
-    #     action of the BMI subject and pairs this intention estimation with actual observations.
-    #     '''
-    #     from . import clda
-    #     from . import feedback_controllers
-    #     self.learn_flag = False
-    #     # self.learner = clda.DumbLearner()
-    #     A = self.decoder.filt.A
-    #     B = self.decoder.filt.B
-    #     F = self.decoder.filt.F
-    #     fb_ctrl = feedback_controllers.LinearFeedbackController(A=A, B=B, F=F)
-    #     self.learner = clda.FeedbackControllerLearner(100, fb_ctrl)
-
-    # def create_updater(self):
-    #     '''
-    #     The "updater" uses the output batches of data from the learner and an update rule to
-    #     alter the decoder parameters to better match the intention estimates.
-    #     '''
-    #     # self.updater = None
-    #     from . import clda
-    #     self.updater = clda.KFRML(10, 10)
-
     def create_learner(self):
         '''
         The "learner" uses knowledge of the task goals to determine the "intended"
@@ -1245,11 +1222,13 @@ class BMILoop(object):
         self.learn_flag = False
         self.learner = clda.DumbLearner()
 
+
     def create_updater(self):
         '''
         The "updater" uses the output batches of data from the learner and an update rule to
         alter the decoder parameters to better match the intention estimates.
         '''
+        from . import clda
         self.updater = None
 
     def call_decoder(self, neural_obs, target_state, **kwargs):
@@ -1360,7 +1339,7 @@ class BMILoop(object):
 
     def _cycle(self):
         self.move_plant()
-
+        # print(self.decoder.filt.C)
         # save loop time to HDF file
         self.task_data['loop_time'] = self.iter_time()
         super(BMILoop, self)._cycle()

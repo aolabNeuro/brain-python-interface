@@ -523,7 +523,7 @@ class PCAKalmanFilter(KalmanFilter):
         data = super(PCAKalmanFilter, self).__getstate__()
         data['M'] = self.M
         data['pca_offset'] = self.pca_offset
-        return data
+        return data_pickle_
 
     def __setstate__(self, state):
         '''
