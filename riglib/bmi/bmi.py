@@ -1220,18 +1220,8 @@ class BMILoop(object):
         '''
         from . import clda
         self.learn_flag = False
-        # self.learner = clda.DumbLearner()
-        fmatrix = np.array(self.decoder.filt.B.T/np.max(self.decoder.filt.B))
-        self.decoder.filt.F_dict = {
-            'target': fmatrix,
-            'hold': np.zeros(fmatrix.shape),
-            'timeout_penalty': np.zeros(fmatrix.shape),
-            'wait': np.zeros(fmatrix.shape),
-        }
+        self.learner = clda.DumbLearner()
 
-        # print(self.decoder.filt.F_dict)
-        learner_batch_size = 1 # Samples to update intended kinematics with
-        self.learner = clda.OFCLearnerRotateIntendedVelocity(learner_batch_size, self.decoder.filt.A, self.decoder.filt.B, self.decoder.filt.F_dict)
 
     def create_updater(self):
         '''
@@ -1239,11 +1229,7 @@ class BMILoop(object):
         alter the decoder parameters to better match the intention estimates.
         '''
         from . import clda
-        # self.updater = None
-        update_batch_size = 1
-        update_half_life = 10
-        self.updater = clda.KFRML(update_batch_size, update_half_life)
-        self.updater.init(self.decoder)
+        self.updater = None
 
     def call_decoder(self, neural_obs, target_state, **kwargs):
         '''

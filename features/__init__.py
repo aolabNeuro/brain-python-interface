@@ -22,6 +22,7 @@ from .blackrock_features import RelayBlackrockByte
 from .ecube_features import EcubeFileBMI, EcubeBMI, RecordECube
 from .sync_features import ArduinoSync, CursorAnalogOut, ScreenSync
 from .neuropixel_features import RecordNeuropixels
+from .clda_features import CLDA_KFRML_IntendedVelocity
 
 built_in_features = dict(
     keyboard=KeyboardControl,
@@ -77,6 +78,7 @@ built_in_features = dict(
     eye_constrained=EyeConstrained,
     eye_calibration=EyeCalibration, 
     force_sensor=ForceControl,
+    clda_kfrml=CLDA_KFRML_IntendedVelocity
 )
 
 # >>> features.built_in_features['autostart'].__module__
