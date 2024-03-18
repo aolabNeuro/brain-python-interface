@@ -79,9 +79,7 @@ class BMIReconstruction(BMILoop, Experiment):
 
         self.idx = 0
         gen = sim_target_seq_generator_multi(8, 1000)
-
         super(BMIReconstruction, self).__init__(gen, *args, **kwargs)
-
         self.hdf = SimHDF()
         self.learn_flag = True
 
