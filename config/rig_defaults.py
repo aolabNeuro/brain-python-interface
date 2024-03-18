@@ -33,6 +33,8 @@ sync_events = dict(
     PAUSE_START             = 0x80,
     PAUSE_END               = 0x81,
     FIXATION                = 0x90,
+    EYE_TARGET_ON           = 0xa0,
+    EYE_TARGET_OFF          = 0xb0,
     TIME_ZERO               = 0xee,
     TRIAL_END               = 0xef,
     PAUSE                   = 0xfe,
@@ -67,7 +69,7 @@ nidaq_sync_params.update(dict(
 rig1_sync_params_arduino = copy.copy(nidaq_sync_params)
 rig1_sync_params_arduino.update(dict(
     sync_protocol = 'rig1_arduino',
-    sync_protocol_version = 15,
+    sync_protocol_version = 16,
     event_sync_mask = 0xfffffc,
     event_sync_data_shift = 2,
     event_sync_dch = range(31,39),
