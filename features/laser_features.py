@@ -99,7 +99,7 @@ class SwitchedQwalorLaser(QwalorLaser):
                     continue
 
                 # Add the laser to the list of available lasers
-                laser = QwalorLaserSwitched(laser_channel=self.qwalor_channel, switch_channel=ch)
+                laser = QwalorLaserSwitched(laser_channel=self.qwalor_channel, switch_channel=ch-1) # 0-indexed in the switch
                 laser.port = laser.trigger_pin
                 laser.name = f'qwalor_laser_switch_ch{ch}'
                 self.lasers.append(laser)
