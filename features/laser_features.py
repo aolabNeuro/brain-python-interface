@@ -86,6 +86,8 @@ class SwitchedQwalorLaser(QwalorLaser):
     qwalor_switch_rdy_dch = traits.Int(60, desc="Digital channel (0-index) recording the READY signal from the optical switch")
     qwalor_switch_data_dch = traits.Array(value=[56, 57, 58, 59], desc="Digital channels (0-index) recording the DATA signals from the optical switch")
 
+    hidden_traits = ['qwalor_switch_rdy_dch', 'qwalor_switch_data_dch']
+
     def init(self, *args, **kwargs):
 
         # Attempt to open the laser connection, but fail gracefully if it is unavailable
