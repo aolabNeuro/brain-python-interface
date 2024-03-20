@@ -26,6 +26,7 @@ class LFiberOpticalSwitch:
         return self._send_and_receive(17)
 
     def set_channel(self, idx):
+        '''Set the 0-indexed channel by idx'''
         return self._send_and_receive(idx)
     
     def exit(self):
