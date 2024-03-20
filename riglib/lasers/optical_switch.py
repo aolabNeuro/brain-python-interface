@@ -13,7 +13,6 @@ class LFiberOpticalSwitch:
         self.channels = channels
             
     def _send_and_receive(self, int):
-        print(bytearray([int]))
         self.conn.write(bytearray([int]))
         ret = list(self.conn.read())
         if len(ret) == 0:
