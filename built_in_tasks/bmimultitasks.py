@@ -303,8 +303,13 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
         # Optionally save a new decoder zscored from this task
         if (not self.save_zscore) or (self.saveid is None):
             return
-        
+
         if not (np.all(self.decoder.mFR == 0) and np.all(self.decoder.sdFR) == 1):
+            filename = self.decoder.save()
+
+            from db.tracker import dbq
+            suffix = f"zscored_online_in_{self.saveid}"
+            dbq.save_bmi(suffix, self.saveid, filename)
             return
 
         # This is linear mapping specific - needs updating
