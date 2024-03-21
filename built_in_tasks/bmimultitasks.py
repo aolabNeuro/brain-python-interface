@@ -308,7 +308,7 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
             filename = self.decoder.save()
 
             from db.tracker import dbq
-            suffix = f"zscored_online_in_{self.saveid}"
+            suffix = f"saved_from_{self.saveid}"
             dbq.save_bmi(suffix, self.saveid, filename)
             return
 
