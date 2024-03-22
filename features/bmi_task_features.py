@@ -4,6 +4,7 @@ BMI task features
 import time
 import numpy as np
 from riglib.experiment import traits, experiment
+from riglib.bmi import clda
 
 ###### CONSTANTS
 sec_per_min = 60
@@ -39,6 +40,13 @@ class RandomUnitDropout(traits.HasTraits):
         self.decoder.init_zscore(self, mFR_drop, self.decoder.sdFR)
         self.trial_record['decoder_units_dropped'] = self.decoder_units_dropped
         super()._start_wait()
+
+    def create_learner(self):
+        '''Always be ready to implement neuron dropout'''        
+        self.learner = clda.EagerLearner()
+
+    def create_decoder(self):
+        self.updater = clda.UnitDropout(self.decoder_units_dropped)
 
 
 class NormFiringRates(traits.HasTraits):

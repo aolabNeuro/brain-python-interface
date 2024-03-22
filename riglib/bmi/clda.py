@@ -210,6 +210,14 @@ class DumbLearner(Learner):
         '''DumbLearner never has any 'batch' data to retrieve'''
         raise NotImplementedError
 
+class EagerLearner(DumbLearner):
+    '''
+    Eager learner is always ready to learn but never learns anything. Used to make updates to the decoder that are determined externally.
+    '''
+    def is_ready(self):
+        '''Eager learner is always ready to change'''
+        return True
+
 class FeedbackControllerLearner(Learner):
     '''
     An intention estimator where the subject is assumed to operate like a state feedback controller
@@ -1017,6 +1025,11 @@ class PPFRML(Updater):
                 self.S[k] = np.array(rho*S + (1-rho)*(y_m*x_m)).ravel()
 
         return {'filt.C': self.C_est}
+
+class UnitDropout(Updater):
+    def calc(self):
+        pass
+
 
 
 ###############################

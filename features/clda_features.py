@@ -12,6 +12,7 @@ class CLDA_KFRML_IntendedVelocity(traits.HasTraits):
     clda_update_batch_time = traits.Float(60, desc="How frequently to update weights [s]")
     clda_update_half_life = traits.Float(120, desc="Half-life for exponential decay [s] to combine with previous weights.") #[s]
     clda_learner_batch_time = traits.Float(60, desc="How much data to update the learner with [s]") # Samples to update intended kinematics with
+    
     def create_learner(self):
         '''
         The "learner" uses knowledge of the task goals to determine the "intended"

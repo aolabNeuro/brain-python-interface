@@ -303,7 +303,7 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
         # Optionally save a new decoder zscored from this task
         if (not self.save_zscore) or (self.saveid is None):
             return
-        
+
         if not (np.all(self.decoder.mFR == 0) and np.all(self.decoder.sdFR) == 1):
             return
 
