@@ -82,7 +82,11 @@ class SwitchedQwalorLaser(QwalorLaser):
 
     n_channels = 16 # number of channels on the optical switch
     stimulation_site = traits.Array(value=[-1]*n_channels, 
-                                    desc="Where was the laser stimulation at each connected channel. -1 means the channel is not connected.")
+                                    desc="Where was the laser stimulation at each connected channel. -1 means the channel is not connected. 0 means consult the channel mapping file")
+    qwalor_switch_rdy_dch = traits.Int(60, desc="Digital channel (0-index) recording the READY signal from the optical switch")
+    qwalor_switch_data_dch = traits.Array(value=[56, 57, 58, 59], desc="Digital channels (0-index) recording the DATA signals from the optical switch")
+
+    hidden_traits = ['qwalor_switch_rdy_dch', 'qwalor_switch_data_dch']
 
     def init(self, *args, **kwargs):
 
@@ -95,7 +99,7 @@ class SwitchedQwalorLaser(QwalorLaser):
                     continue
 
                 # Add the laser to the list of available lasers
-                laser = QwalorLaserSwitched(laser_channel=self.qwalor_channel, switch_channel=ch)
+                laser = QwalorLaserSwitched(laser_channel=self.qwalor_channel, switch_channel=ch-1) # 0-indexed in the switch
                 laser.port = laser.trigger_pin
                 laser.name = f'qwalor_laser_switch_ch{ch}'
                 self.lasers.append(laser)
