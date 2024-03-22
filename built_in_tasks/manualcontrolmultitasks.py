@@ -8,7 +8,7 @@ from scipy.spatial.transform import Rotation as R
 from riglib.experiment import traits
 
 from .target_graphics import *
-from .target_capture_task import ScreenTargetCapture, ScreenReachAngle, SequenceCapture, HandConstrainedEyeCapture, ScreenTargetCapture_Saccade
+from .target_capture_task import ScreenTargetCapture, ScreenReachAngle, SequenceCapture, HandConstrainedEyeCapture, EyeConstrainedHandCapture, ScreenTargetCapture_Saccade
 from .target_tracking_task import ScreenTargetTracking
 from riglib.stereo_opengl.window import WindowDispl2D
 
@@ -259,6 +259,12 @@ class SequenceTask(ManualControlMixin, SequenceCapture):
 class HandConstrainedSaccadeTask(ManualControlMixin, HandConstrainedEyeCapture):
     '''
     Saccade task while holding different targets by hand
+    '''
+    pass
+
+class EyeConstrainedReachingTask(ManualControlMixin, EyeConstrainedHandCapture):
+    '''
+    Reaching task while fixating different targets by eyes
     '''
     pass
 
