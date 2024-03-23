@@ -9,9 +9,10 @@ import os
 
 
 class CLDA_KFRML_IntendedVelocity(traits.HasTraits):
-    clda_update_batch_time = traits.Float(60, desc="How frequently to update weights [s]")
-    clda_update_half_life = traits.Float(120, desc="Half-life for exponential decay [s] to combine with previous weights.") #[s]
-    clda_learner_batch_time = traits.Float(60, desc="How much data to update the learner with [s]") # Samples to update intended kinematics with
+    clda_batch_time = traits.Float(1, desc="How frequently to update weights [s]")
+    clda_update_half_life = traits.Float(60, desc="Half-life for exponential decay [s] to combine with previous weights.") #[s]
+    # clda_update_batch_time = traits.Float(60, desc="How frequently to update weights [s]")
+    # clda_learner_batch_time = traits.Float(60, desc="How much data to update the learner with [s]") # Samples to update intended kinematics with
     def create_learner(self):
         '''
         The "learner" uses knowledge of the task goals to determine the "intended"
@@ -31,7 +32,7 @@ class CLDA_KFRML_IntendedVelocity(traits.HasTraits):
             'reward': np.zeros(fmatrix.shape),
         }
 
-        learner_batch_size = int(self.clda_learner_batch_time/self.decoder.binlen)
+        learner_batch_size = int(self.clda_batch_time/self.decoder.binlen)
         self.learner = clda.OFCLearnerRotateIntendedVelocity(learner_batch_size, self.decoder.filt.A, self.decoder.filt.B, self.decoder.filt.F_dict)
 
     def create_updater(self):
@@ -39,6 +40,5 @@ class CLDA_KFRML_IntendedVelocity(traits.HasTraits):
         The "updater" uses the output batches of data from the learner and an update rule to
         alter the decoder parameters to better match the intention estimates.
         '''
-        update_batch_size = int(self.clda_update_batch_time/self.decoder.binlen)
-        self.updater = clda.KFRML(update_batch_size, self.clda_update_half_life)
+        self.updater = clda.KFRML(self.clda_batch_time, self.clda_update_half_life)
         self.updater.init(self.decoder)
