@@ -1496,6 +1496,7 @@ class EyeConstrainedHandCapture(ScreenTargetCapture):
 
     def _start_target(self):
         if self.num_fixation_state == 0:
+            self.targets_eye[0].sphere.color = target_colors[self.eye_target_color]
             self.target_index += 1 # target index shouldn't be incremented after fixation break loop
 
             # Show target if it is hidden (this is the first target, or previous state was a penalty)
@@ -1506,6 +1507,8 @@ class EyeConstrainedHandCapture(ScreenTargetCapture):
                 self.sync_event('EYE_TARGET_ON', self.gen_indices[-1])
                 
         else:
+            if self.target_index == 0:
+                self.targets_eye[0].sphere.color = target_colors[self.eye_target_color]
             target = self.targets[self.target_index % 2]
             target.hide() # hide hand target
             self.sync_event('TARGET_OFF', self.gen_indices[self.target_index % 2])
