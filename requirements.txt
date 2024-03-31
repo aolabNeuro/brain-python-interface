@@ -34,3 +34,4 @@ tasks==2.5.0
 tornado==6.1
 traits==6.1.0
 urllib3==1.26.13
+hidapi
