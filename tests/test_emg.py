@@ -10,9 +10,13 @@ import re
 
 import unittest
 
+from riglib import source
+from riglib.spikerbox.usb_comms import SpikerBox
+from riglib.spikerbox import LFP
 
 class EMGTests(unittest.TestCase):
 
+    @unittest.skip("")
     def test_connect(self):
         
         h = hid.device()
@@ -102,13 +106,32 @@ class EMGTests(unittest.TestCase):
         print("Closing the device")
         h.close()
 
-    # def test_source(self):
-    #     f = ForceSensorControl()
-    #     f.init()
-    #     t0 = time.time()
-    #     while time.time() - t0 < 5:
-    #         print(f.force_sensor.get())
-    #         time.sleep(0.1)
+    @unittest.skip("")
+    def test_source(self):
+        b = SpikerBox()
+        b.start()
+        t0 = time.time()
+        while time.time() - t0 < 0.1:
+            print(b.get_next_ch(), end="")
+
+        b.stop()
+        print('stop')
+        time.sleep(0.5)
+
+        while time.time() - t0 < 0.1:
+            print(b.get_next_ch(), end="")
+        print('done')
+
+    def test_datasource(self):
+        channels = [1, 2]
+        ds = source.MultiChanDataSource(LFP, channels=channels)
+        ds.start()
+        time.sleep(1)
+        data = ds.get_new(channels)
+        ds.stop()
+
+        print(data[0].shape)
+        print(data[1].shape)
 
 
 if __name__ == '__main__':

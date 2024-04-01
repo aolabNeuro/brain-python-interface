@@ -65,3 +65,13 @@ class CorticalBMI(CorticalData, traits.HasTraits):
         '''
         self.cortical_channels = [int(ch) for ch in self.decoder.units[:,0]]
         super(CorticalBMI, self).init()
+
+class SpikerBoxBMI(CorticalBMI):
+
+    send_data_to_sink_manager = True
+
+    @property
+    def sys_module(self):
+        from riglib import spikerbox
+        return spikerbox
+

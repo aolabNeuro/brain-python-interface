@@ -23,6 +23,7 @@ from .ecube_features import EcubeFileBMI, EcubeBMI, RecordECube
 from .sync_features import ArduinoSync, CursorAnalogOut, ScreenSync
 from .neuropixel_features import RecordNeuropixels
 from .clda_features import CLDA_KFRML_IntendedVelocity
+from .neural_sys_features import SpikerBoxBMI
 
 built_in_features = dict(
     keyboard=KeyboardControl,
@@ -54,6 +55,7 @@ built_in_features = dict(
     single_video=SingleChannelVideo,
     exp_display=WindowWithExperimenterDisplay,
     relay_arduino=PlexonSerialDIORowByte,
+    spikerbox_bmi=SpikerBoxBMI,
     plexonbmi=PlexonBMI,
     relay_plexon=RelayPlexon,
     relay_plexbyte=RelayPlexByte,

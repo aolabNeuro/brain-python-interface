@@ -12,74 +12,94 @@ class SpikerBox:
 
         # write version query data to the device
         self.send_cmd("?:;")
-        
+        self.fw_ver, self.hw_type, self.hw_ver = self.parse_response("FWV", "HWT", "HWV")
+        print("Firmware version:", self.fw_ver)
+        print("Hardware type:", self.hw_type)
+        print("Hardware version:", self.hw_ver)
+
         # Ask for max samplerate and channels
         self.send_cmd("max:;")
+        samplerate, n_channels = self.parse_response("MSF", "MNC")
+        self.samplerate = float(samplerate)
+        self.n_channels = int(n_channels)
+        print("Samplerate:", self.samplerate, "hz")
+        print("Number of channels:", self.n_channels)
 
-        self.next_ch1 = 0
-        self.next_ch2 = 0
-        self.frame_counter = 0
+        # Some attributes to keep track of the continuous data
+        self.data = None
+        self.idx = 0
+        self.ch = 1
 
     def start(self):
-        return self.send_cmd("start:;")
+        self.send_cmd("start:;")
 
     def stop(self):
-        return self.send_cmd("start:;")
+        self.send_cmd("h:;")
 
     def send_cmd(self, cmd):
         '''
         Command packet is always 64 bytes long; starts with 0x3f and 0x3e, then command null padded
-        Response always 64 bytes long; 1st byte constant (ignored), 2nd byte payload length, then 
-            the data, which is escaped with 
-            start signal: \xff\xff\x01\x01\x80\xff and 
-            stop signal: \xff\xff\x01\x01\x81\xff
-            in the case of a command
         '''
         data = [0x3f, 0x3e] + list(bytearray(cmd.ljust(62, "\0").encode("utf-8")))
         self.h.write(data)
 
-        d = self.h.read(64, 1000)
+    def parse_response(self, *keys):
+        '''
+        Response always 64 bytes long; 1st byte constant (ignored), 2nd byte payload length, then 
+            the data, which is escaped with 
+            start signal: \xff\xff\x01\x01\x80\xff and 
+            stop signal: \xff\xff\x01\x01\x81\xff
+        '''
+        d = self.h.read(64, 10) # 10 ms timeout
         if d:
             length = d[1]
-            print(bytes(d[2:length]))
             payload = re.search(b'\xff\xff\x01\x01\x80\xff(.*?)\xff\xff\x01\x01\x81\xff', bytes(d[2:length])).group(1)
-            return payload.decode('utf-8')
+            msg = payload.decode('utf-8')
+            response = []
+            for key in keys:
+                response.append(re.search(f'{key}:(.*?);', msg).group(1))
+            return tuple(response)
         else:
             return None
 
-    def read_data(self):
+    def get_next_ch(self):
         '''
         Data packets always 64 bytes long; 1st byte constant (ignored), 2nd byte payload length, then 
-        Data is always 2 channels of 10 bits each encoded in frames of 4 bytes.
+        Data is always 2 channels of 10 bits each encoded in frames of 4 bytes with data in the first 
+            7 bits of each byte.
         '''
-        data_ch1 = []
-        data_ch2 = []
-        for _ in range(2):
-            d = self.h.read(64, 1000)
-            for i in d[2:]:
-                if i >> 7:
-                    frame_counter = 0 # start of frame
-                    data_ch1.append(next_ch1)
-                    data_ch2.append(next_ch2)
-                    next_ch1 = 0
-                    next_ch2 = 0
-                else:
-                    frame_counter += 1 # continuation
+        MSB = 0
+        LSB = 0
+        frame_counter = 0
+        while frame_counter < 2:
 
-                if frame_counter == 0:
-                    next_ch1 = i & 0x7
-                    print('ch1:', next_ch1, end=" ")
-                elif frame_counter == 1:
-                    next_ch1 = (next_ch1 << 7) | (i & 0x7f)
-                    print(i & 0x7f, end=" ")
-                elif frame_counter == 2:
-                    next_ch2 = i & 0x7
-                    print('ch2:', next_ch1, end=" ")
-                elif frame_counter == 3:
-                    next_ch2 = (next_ch2 << 7) | (i & 0x7f)
-                    print(i & 0x7f)
-                elif frame_counter > 3:
+            if self.data is None or self.idx >= len(self.data):
+                d = self.h.read(64, 10) # 10 ms timeout
+                if d is None or len(d) == 0:
+                    return (self.ch, [0]) # no data to read
+                self.data = d[2:]
+                self.idx = 0
+
+            i = self.data[self.idx]
+            if frame_counter == 0:
+                if self.ch == 1 and not i > 127: # frame error
+                    frame_counter += 1
                     break
+                MSB  = i & 0x7F
+
+            elif frame_counter == 1:
+                if i > 127: # frame error
+                    frame_counter = 0
+                    break # continue as if we have new frame
+                
+                LSB = i & 0x7F
+            
+            self.idx += 1
+            frame_counter += 1
+
+        out = (self.ch, [LSB | MSB<<7])
+        self.ch = (self.ch % self.n_channels) + 1
+        return out
         
     def close(self):
         self.h.close()
