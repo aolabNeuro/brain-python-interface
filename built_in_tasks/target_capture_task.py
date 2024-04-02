@@ -1685,6 +1685,91 @@ class EyeConstrainedHandCapture(ScreenTargetCapture):
 
             yield indices, targs
 
+class ScreenTargetCapture_EyeandHand(EyeConstrainedHandCapture):
+
+    status = dict(
+        wait = dict(start_trial="target"),
+        target = dict(timeout="timeout_penalty",gaze_target="fixation",enter_target="hold"),
+        fixation = dict(fixation_break="fixation_penalty", enter_target="hold_fixation"),
+        hold = dict(leave_target="hold_penalty",gaze_target="hold_fixation"),
+        hold_fixation = dict(leave_target="hold_penalty", hold_complete="targ_transition", fixation_break="fixation_penalty"),
+        targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target"),
+        timeout_penalty = dict(timeout_penalty_end="targ_transition", end_state=True),
+        hold_penalty = dict(hold_penalty_end="targ_transition", end_state=True),
+        delay_penalty = dict(delay_penalty_end="targ_transition", end_state=True),
+        fixation_penalty = dict(fixation_penalty_end="targ_transition",end_state=True),
+        reward = dict(reward_end="wait", stoppable=False, end_state=True)
+    )
+
+    sequence_generators = ['sac_hand_random']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Instantiate the targets
+        instantiate_targets = kwargs.pop('instantiate_targets', True)
+        if instantiate_targets:
+
+            # Target 1 and 2 are for hand. Target 3 is for fixation
+            target1 = VirtualCircularTarget(target_radius=self.target_radius, target_color=target_colors[self.target_color])
+            target2 = VirtualCircularTarget(target_radius=self.fixation_radius, target_color=target_colors[self.eye_target_color])
+
+            self.targets = [target1]
+            self.targets_eye = [target2]
+
+    def _start_wait(self):
+        # Call parent method to draw the next target capture sequence from the generator
+        super()._start_wait()
+
+        # number of targets to be acquired in this trial
+        self.chain_length = len(self.targs)/2
+
+    def _start_target(self):
+        self.target_index += 1
+        self.targets_eye[0].sphere.color = target_colors[self.eye_target_color]
+
+        # Show both eye and hand targets
+        target_eye = self.targets_eye[0]
+        target_eye.move_to_position(self.targs[-1])
+        target_eye.show()
+        self.sync_event('EYE_TARGET_ON', self.gen_indices[-1])
+
+        target = self.targets[0]
+        target.move_to_position(self.targs[0])
+        target.show()
+        self.sync_event('TARGET_ON', self.gen_indices[0])
+
+        print(self.target_index)
+
+    def _start_fixation(self):
+        self.targets_eye[0].sphere.color = target_colors[self.fixation_target_color] # change target color in fixation state
+
+    def _start_hold_fixation(self):
+        self.targets_eye[0].sphere.color = target_colors[self.fixation_target_color] # change target color in hold and fixation state
+
+    @staticmethod
+    def sac_hand_random(nblocks=800, radius=6, origin=(0,0,0),seed=0):
+        '''
+        Pairs of hand targets and eye targets
+
+        Returns
+        -------
+        [nblocks*ntargets x 1] array of tuples containing trial indices and [3 x 3] target coordinates
+        '''
+
+        for _ in range(nblocks):
+
+            for idx in range(100):
+                targs = radius*np.random.uniform(low=-1,high=1,size=(2,3))
+                targs[:,1] = 0
+                dist = np.sqrt(np.sum((targs[0,:]-targs[1,:])**2))
+                if dist > 3.5: # To prevent overlapping of both targets. This should be dependent on target size.
+                    break            
+
+            indices = np.zeros([2,1])
+
+            yield indices, targs
+
 class ScreenTargetCapture_Saccade(ScreenTargetCapture):
     '''
     Center-out saccade task. The controller for the cursor position is eye position.
