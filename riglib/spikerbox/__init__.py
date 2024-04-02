@@ -20,7 +20,6 @@ class LFP(DataSourceSystem):
 
     def stop(self):
         self.b.stop()
-        time.sleep(0.5)
         self.b.close()
     
     def get(self):

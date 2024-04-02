@@ -68,7 +68,7 @@ class CorticalBMI(CorticalData, traits.HasTraits):
 
 class SpikerBoxBMI(CorticalBMI):
 
-    send_data_to_sink_manager = True
+    # send_data_to_sink_manager = True
 
     @property
     def sys_module(self):

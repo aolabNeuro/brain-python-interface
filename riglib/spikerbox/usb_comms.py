@@ -1,12 +1,13 @@
 import numpy as np
 import hid
 import re
-
+import time
 
 class SpikerBox:
 
-    def __init__(self):
-        
+    def __init__(self, timeout=0.015):
+
+        self.timeout = int(timeout*1000) # convert s to ms
         self.h = hid.device()
         self.h.open(0x2e73, 0x0001)  # Muscle SpikerBox Pro VendorID/ProductID
 
@@ -35,6 +36,11 @@ class SpikerBox:
 
     def stop(self):
         self.send_cmd("h:;")
+        
+        # Get some packets until there is no data
+        while len(self.h.read(64, self.timeout)) > 0:
+            time.sleep(float(self.timeout)/1000)
+
 
     def send_cmd(self, cmd):
         '''
@@ -50,17 +56,18 @@ class SpikerBox:
             start signal: \xff\xff\x01\x01\x80\xff and 
             stop signal: \xff\xff\x01\x01\x81\xff
         '''
-        d = self.h.read(64, 10) # 10 ms timeout
+        d = self.h.read(64, self.timeout)
         if d:
             length = d[1]
-            payload = re.search(b'\xff\xff\x01\x01\x80\xff(.*?)\xff\xff\x01\x01\x81\xff', bytes(d[2:length])).group(1)
+            data = d[2:length]
+            payload = re.search(b'\xff\xff\x01\x01\x80\xff(.*?)\xff\xff\x01\x01\x81\xff', bytes(data)).group(1)
             msg = payload.decode('utf-8')
             response = []
             for key in keys:
                 response.append(re.search(f'{key}:(.*?);', msg).group(1))
             return tuple(response)
         else:
-            return None
+            return (None for _ in keys)
 
     def get_next_ch(self):
         '''
@@ -74,7 +81,7 @@ class SpikerBox:
         while frame_counter < 2:
 
             if self.data is None or self.idx >= len(self.data):
-                d = self.h.read(64, 10) # 10 ms timeout
+                d = self.h.read(64, self.timeout)
                 if d is None or len(d) == 0:
                     return (self.ch, [0]) # no data to read
                 self.data = d[2:]
