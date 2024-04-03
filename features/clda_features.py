@@ -43,3 +43,15 @@ class CLDA_KFRML_IntendedVelocity(traits.HasTraits):
         update_batch_size = int(self.clda_update_batch_time/self.decoder.binlen)
         self.updater = clda.KFRML(update_batch_size, self.clda_update_half_life)
         self.updater.init(self.decoder)
+
+
+# class UnitDropout(traits.HasTraits):
+#     units_to_drop = traits.Float([], desc="Which units should have a chance to be dropped")
+#     unit_drop_prob = traits.Float(0, desc="Probability of dropping each unit on a given trial")
+#     targets_to_drop_units = traits.Float(None, desc="Which targets should unit dropping be applied on")
+
+#     def create_learner(self):
+#         self.learner  = clda.TargetSpecificLearner(self.targets_to_drop_units)
+
+#     def create_updater(self):
+#         self.updater = clda.UnitDropout(self.units_to_drop, self.unit_drop_prob)
