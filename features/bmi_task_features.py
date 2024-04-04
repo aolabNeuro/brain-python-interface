@@ -36,13 +36,20 @@ class RandomUnitDropout(traits.HasTraits):
         self.decoder_orig = self.decoder.copy()
 
     def _start_wait(self):
-        super()._start_wait()
 
         # Decide which units to drop in this trial but don't actually drop them yet
-        if np.random.rand() < self.unit_drop_prob:
-            self.unit_drop_group_idx = (self.unit_drop_group_idx + 1) % len(self.unit_drop_groups)
+        if (self.gen_indices[self.target_index] == self.unit_drop_targets[self.unit_drop_group_idx] and 
+            np.random.rand() < self.unit_drop_prob):
             self.decoder_units_dropped = np.isin(range(len(self.decoder.units)), self.unit_drop_groups[self.unit_drop_group_idx])
-            self.trial_record['decoder_units_dropped'] = self.decoder_units_dropped
+
+            # Update the group for next trial
+            self.unit_drop_group_idx = (self.unit_drop_group_idx + 1) % len(self.unit_drop_groups)
+        else:
+            self.decoder_units_dropped = np.zeros((len(self.decoder.units),), dtype='bool')
+        
+        # Update the trial record
+        self.trial_record['decoder_units_dropped'] = self.decoder_units_dropped
+        super()._start_wait()
 
     def _start_targ_transition(self):
         '''

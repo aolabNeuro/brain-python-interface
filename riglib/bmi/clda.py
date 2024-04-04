@@ -85,7 +85,6 @@ class Learner(object):
         self.input_state_index = 0
         self.reset()
 
-
     def disable(self):
         '''Set a flag to disable forming intention estimates from new incoming data'''
         self.enabled = False
@@ -210,7 +209,6 @@ class DumbLearner(Learner):
     def get_batch(self):
         '''DumbLearner never has any 'batch' data to retrieve'''
         raise NotImplementedError
-
 
 class FeedbackControllerLearner(Learner):
     '''
@@ -1034,7 +1032,7 @@ class KFSmoothbatch(Updater):
     def __init__(self, batch_time, half_life):
         '''
         Constructor for KFSmoothbatch
-F
+
         Parameters
         ----------
         batch_time : float
