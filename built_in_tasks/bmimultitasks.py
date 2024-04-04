@@ -305,6 +305,11 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
             return
 
         if not (np.all(self.decoder.mFR == 0) and np.all(self.decoder.sdFR) == 1):
+            filename = self.decoder.save()
+
+            from db.tracker import dbq
+            suffix = f"saved_from_{self.saveid}"
+            dbq.save_bmi(suffix, self.saveid, filename)
             return
 
         # This is linear mapping specific - needs updating

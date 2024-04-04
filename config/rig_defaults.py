@@ -105,7 +105,7 @@ if hostname == 'pagaiisland2':
     arduino_sync_params = rig1_sync_params_arduino
 elif hostname == 'siberut-bmi':
     optitrack_address = '10.155.204.10'
-    optitrack_save_path = "C:/Users/aolab/Documents",
+    optitrack_save_path = "C:/Users/aolab/Documents"
     optitrack_sync_dch = 53 # 0-index
     screen_dist = 28
     screen_half_height = 10.25

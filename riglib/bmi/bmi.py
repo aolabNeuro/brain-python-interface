@@ -1475,6 +1475,11 @@ class BMILoop(object):
                 decoder_name = self.decoder_sequence + now.strftime('%m%d%H%M')
 
                 # Pickle the decoder
+                # filename = self.decoder.save()
+
+                # from db.tracker import dbq
+                # suffix = f"saved_from_{self.saveid}"
+                # dbq.save_bmi(suffix, self.saveid, filename)
                 decoder_tempfilename = self.decoder.save()
 
                 # Link the pickled decoder file to the associated task entry in the database

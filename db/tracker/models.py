@@ -1118,20 +1118,27 @@ class TaskEntry(models.Model):
             files[df.system.name] = os.path.join(df.system.path, os.path.basename(df.path))
         return files
 
-    def make_hdf_self_contained(self, dbname=None):
+    def make_hdf_self_contained(self, data_dir=None, dbname=None):
         '''
         If the entry has an hdf file associated with it, dump the entry metadata into it
         '''
         try:
             df = DataFile.objects.using(dbname).get(entry__id=self.id, system__name="hdf")
-            h5file = df.get_path()
         except:
             print("No HDF file to make self contained")
             return False
 
         import h5py
-        hdf = h5py.File(h5file, mode='a')
-        print("Adding database metadata to hdf file:")
+        if data_dir is None:
+            h5file = df.get_path()
+        else:
+            h5file = os.path.join(data_dir, df.system.name, os.path.basename(df.path))
+        try:
+            hdf = h5py.File(h5file, mode='a')
+        except:
+            print("Cannot open HDF file")
+            return False
+        print("Updating hdf file with metadata for task entry %d" % self.id)
         print(h5file)
 
         # Add any task metadata
