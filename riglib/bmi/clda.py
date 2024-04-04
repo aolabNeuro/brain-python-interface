@@ -211,20 +211,6 @@ class DumbLearner(Learner):
         '''DumbLearner never has any 'batch' data to retrieve'''
         raise NotImplementedError
 
-# class TargetSpecificLearner(Learner):
-#     '''
-#     Ready to learn only to specific targets
-#     '''
-#     def __init__(self, update_target_idx):
-#         self.update_target_idx = update_target_idx
-
-
-#     def is_ready(self):
-#         ''''''
-#         _is_ready = self.gen in self.update_target_idx
-
-
-#         return _is_ready
 
 class FeedbackControllerLearner(Learner):
     '''
@@ -1034,32 +1020,6 @@ class PPFRML(Updater):
 
         return {'filt.C': self.C_est}
 
-# class UnitDropout(Updater):
-#     def __init__(self, units_dropped=None, unit_drop_prob=0): 
-#         self.units_dropped = units_dropped
-#         self.unit_drop_prob = unit_drop_prob
-
-#     def calc(self, units_dropped=None, unit_drop_prob=0):
-#         '''
-#         Args:
-#             units_dropped (): If none, randomly drop any unit with the max(||C||_2). Else specific arry input
-#             unit_drop_prob (float): Probability of dropping any given unit
-#             targets (): If none, apply on any target, else only on trials to specific target(s)
-#         '''
-        
-#         # C_new = self.S * R_inv
-#         # C = copy.deepcopy(decoder.filt.C)
-#         # C[np.ix_(self.adapting_inds, self.state_adapting_inds)] = C_new[np.ix_(self.adapting_inds, self.state_adapting_inds)]
-        
-#         # Q = (1./self.ESS) * (self.T - self.S*C.T)
-#         # if hasattr(self, 'stable_inds_mesh'):
-#         #     if len(self.stable_inds) > 0:
-#         #         print('stable inds mesh: ', self.stable_inds, self.stable_inds_mesh)
-#         #         Q_old = decoder.filt.Q[self.stable_inds_mesh].copy()
-#         #         Q[self.stable_inds_mesh] = Q_old
-#         pass
-
-
 
 ###############################
 ##### Deprecated updaters #####
@@ -1074,7 +1034,7 @@ class KFSmoothbatch(Updater):
     def __init__(self, batch_time, half_life):
         '''
         Constructor for KFSmoothbatch
-
+F
         Parameters
         ----------
         batch_time : float
