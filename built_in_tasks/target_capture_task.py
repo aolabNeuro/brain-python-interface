@@ -1741,8 +1741,6 @@ class ScreenTargetCapture_EyeandHand(EyeConstrainedHandCapture):
         target.show()
         self.sync_event('TARGET_ON', self.gen_indices[0])
 
-        print(self.target_index)
-
     def _start_fixation(self):
         self.targets_eye[0].sphere.color = target_colors[self.fixation_target_color] # change target color in fixation state
 
