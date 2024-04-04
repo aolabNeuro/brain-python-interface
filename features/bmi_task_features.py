@@ -14,40 +14,58 @@ sec_per_min = 60
 ########################################################################################################
 class RandomUnitDropout(traits.HasTraits):
     '''
-    Randomly removes units from the decoder. Requires the decoder have a `unit_drop_prob` attribute
-    describing the probability that each unit will be dropped on a given trial.
+    Randomly removes units from the decoder. Does not work with CLDA turned on. Units are removed at the
+    end of the delay period on each trial and replaced when the trial ends (either in reward or penalty).
+    The same units will be dropped on repeated trials. The units to drop are specified in the 
+    `unit_drop_groups` attribute by a list of lists of unit indices. The `unit_drop_targets` attribute
+    specifies the target indices on which to drop each group of units.
     '''
+
+    unit_drop_prob = traits.Float(0, desc="Probability of dropping a group of units from the decoder")
+    unit_drop_groups = traits.Array(value=[[0, 1], [2]], desc="Groups of unit indices to drop from the decoder one at a time")
+    unit_drop_targets = traits.Array(value=[1, 2], desc="Target indices on which to drop groups of units from the decoder")
 
     def init(self):
         super().init()
         self.decoder_units_dropped = np.ones((len(self.decoder.units),), dtype='bool')
         new_dtype = np.dtype(self.trial_dtype.descr + [('decoder_units_dropped', '?', self.decoder_units_dropped.shape)])
         self.trial_dtype = new_dtype
-        if not hasattr(self.decoder, "unit_drop_prob"):
-            print("WARNING: RandomUnitDropout feature requires the decoder to have a unit_drop_prob attribute")
-            self.decoder.unit_drop_prob = np.zeros((len(self.decoder.units),), dtype='float')
-        
-        # Save a copy of the mFR from the decoder
-        self.decoder_mFR = self.decoder.mFR.copy()
+        self.unit_drop_group_idx = 0
+
+        # Save a copy of the decoder
+        self.decoder_orig = self.decoder.copy()
 
     def _start_wait(self):
+        super()._start_wait()
+
+        # Decide which units to drop in this trial but don't actually drop them yet
+        if np.random.rand() < self.unit_drop_prob:
+            self.unit_drop_group_idx = (self.unit_drop_group_idx + 1) % len(self.unit_drop_groups)
+            self.decoder_units_dropped = np.isin(range(len(self.decoder.units)), self.unit_drop_groups[self.unit_drop_group_idx])
+            self.trial_record['decoder_units_dropped'] = self.decoder_units_dropped
+
+    def _start_targ_transition(self):
         '''
         Override the decoder to drop random units. Keep a record of what's going on in the `trial` data.
         '''
-        self.decoder_units_dropped = np.random.rand(len(self.decoder.units)) < self.decoder.unit_drop_prob
-        mFR_drop = self.decoder_mFR.copy()
-        mFR_drop[self.decoder_units_dropped] = 0
-        self.decoder.init_zscore(self, mFR_drop, self.decoder.sdFR)
-        self.trial_record['decoder_units_dropped'] = self.decoder_units_dropped
-        super()._start_wait()
+        super()._start_targ_transition()
+        if self.target_index + 1 < self.chain_length and np.any(self.decoder_units_dropped):
+            if hasattr(self.decoder.filt, 'C'):
+                self.decoder.filt.C[self.decoder_units_dropped, :] = 0
+            elif hasattr(self.decoder.filt, 'unit_to_state'):
+                self.decoder.filt.unit_to_state[:, self.decoder_units_dropped] = 0
 
-    def create_learner(self):
-        '''Always be ready to implement neuron dropout'''        
-        self.learner = clda.EagerLearner()
+    def _reset_decoder(self):
+        self.decoder = self.decoder_orig.copy()
 
-    def create_decoder(self):
-        self.updater = clda.UnitDropout(self.decoder_units_dropped)
+    def _increment_tries(self):
+        super()._increment_tries()
+        self._reset_decoder()
 
+    def _start_reward(self):
+        super()._start_reward()
+        self._reset_decoder()
+    
 
 class NormFiringRates(traits.HasTraits):
     ''' Docstring '''
