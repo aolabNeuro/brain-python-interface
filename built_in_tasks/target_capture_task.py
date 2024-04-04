@@ -1701,6 +1701,8 @@ class ScreenTargetCapture_EyeandHand(EyeConstrainedHandCapture):
         reward = dict(reward_end="wait", stoppable=False, end_state=True)
     )
 
+    auto_hand_target = traits.Bool(False, desc="Hand target is automatically acquired")
+
     sequence_generators = ['sac_hand_random']
 
     def __init__(self, *args, **kwargs):
@@ -1732,7 +1734,7 @@ class ScreenTargetCapture_EyeandHand(EyeConstrainedHandCapture):
         target_eye = self.targets_eye[0]
         target_eye.move_to_position(self.targs[-1])
         target_eye.show()
-        self.sync_event('EYE_TARGET_ON', self.gen_indices[-1])
+        #self.sync_event('EYE_TARGET_ON', self.gen_indices[-1]) # because 2 targers appear at the same time
 
         target = self.targets[0]
         target.move_to_position(self.targs[0])
@@ -1747,6 +1749,29 @@ class ScreenTargetCapture_EyeandHand(EyeConstrainedHandCapture):
     def _start_hold_fixation(self):
         self.targets_eye[0].sphere.color = target_colors[self.fixation_target_color] # change target color in hold and fixation state
 
+    def _test_enter_target(self, ts):
+        '''
+        return true if the distance between center of cursor and target is smaller than the cursor radius
+        '''
+
+        if self.auto_hand_target:
+            return self.auto_hand_target
+        else:
+            cursor_pos = self.plant.get_endpoint_pos()
+            d = np.linalg.norm(cursor_pos - self.targs[self.target_index%2]) # hand must be within the initial target
+            return d <= (self.target_radius - self.cursor_radius) or self.pause
+    
+    def _test_leave_target(self, ts):
+        '''
+        return true if cursor moves outside the exit radius
+        '''
+        if self.auto_hand_target:
+            return 0
+        else:
+            cursor_pos = self.plant.get_endpoint_pos()
+            d = np.linalg.norm(cursor_pos - self.targs[self.target_index%2]) # hand must be within the initial target
+            return d > (self.target_radius - self.cursor_radius) or self.pause    
+    
     @staticmethod
     def sac_hand_random(nblocks=800, radius=6, origin=(0,0,0),seed=0):
         '''
