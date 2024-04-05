@@ -20,9 +20,9 @@ class RewardSystem(traits.HasTraits):
     '''
     trials_per_reward = traits.Float(1, desc='Number of successful trials before solenoid is opened')
 
-    def __init__(self, *args, **kwargs):
+    def init(self):
+        super().init()
         from riglib import reward
-        super().__init__(*args, **kwargs)
         self.reward = reward.open()
         self.reportstats['Reward #'] = 0
 
@@ -64,9 +64,9 @@ class PelletReward(RewardSystem):
     '''
     pellets_per_reward = traits.Int(1, desc='The number of pellets to dispense per reward.')      
 
-    def __init__(self, *args, **kwargs):
+    def init(self):
+        super().init()
         from riglib.tablet_reward import RemoteReward
-        super(RewardSystem, self).__init__(*args, **kwargs)
         self.reward = RemoteReward()
         self.reportstats['Reward #'] = 0
 
@@ -99,8 +99,8 @@ class RewardAudio(traits.HasTraits):
     files = [f for f in os.listdir(audio_path) if '.wav' in f]
     reward_sound = traits.OptionsList(files, desc="File in riglib/audio to play on each reward")
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def init(self):
+        super().init()
         self.reward_player = AudioPlayer(self.reward_sound)
 
     def _start_reward(self):
@@ -116,8 +116,8 @@ class PenaltyAudio(traits.HasTraits):
     files = list(reversed([f for f in os.listdir(audio_path) if '.wav' in f]))
     penalty_sound = traits.OptionsList(files, desc="File in riglib/audio to play on each penalty")
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def init(self):
+        super().init()
         self.penalty_player = AudioPlayer(self.penalty_sound)
 
     def _start_hold_penalty(self):
@@ -151,8 +151,8 @@ class PenaltyAudioMulti(traits.HasTraits):
     reach_penalty_sound = "incorrect.wav"
     tracking_out_penalty_sound = "buzzer.wav"
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def init(self):
+        super().init()
         self.hold_penalty_player = AudioPlayer(self.hold_penalty_sound)
         self.delay_penalty_player = AudioPlayer(self.delay_penalty_sound)
         self.timeout_penalty_player = AudioPlayer(self.timeout_penalty_sound)

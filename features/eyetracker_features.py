@@ -26,13 +26,11 @@ class ArduinoEye(traits.HasTraits):
 
     def __init__(self, *args, **kwargs):
         # Maybe load previous recording and do calibration here
-        print('hello')
         super().__init__(*args, **kwargs)
-        self.eyedata = ArduinoEyeInput() #np.array(self.starting_pos[::2]), self.calibration)
 
     def init(self, *args, **kwargs):
-        print('hello init')
         super().init(*args, **kwargs)
+        self.eyedata = ArduinoEyeInput() #np.array(self.starting_pos[::2]), self.calibration)
 
 class ArduinoEyeInput():
     '''
@@ -305,56 +303,8 @@ class EyeCalibration(traits.HasTraits):
     eye_target_calibration = traits.Bool(False, desc="Whether to regress eye positions against target positions")
 
     def __init__(self, *args, **kwargs): #, start_pos, calibration):
-        super(EyeCalibration,self).__init__(*args, **kwargs)
-        
-        # proc_exp # preprocess cursor data only
-        taskid = self.taskid_for_eye_calibration
-        hdf_dir = '/storage/hdf'
-        hdf_file = glob.glob(os.path.join(hdf_dir, f'*{taskid}*'))[0]
-        ecube_file = glob.glob(f'/media/NeuroAcq/*{taskid}*')[0]
-        files = {}
-        files['hdf'] = hdf_file
-        files['ecube'] = ecube_file
-        print(files)
-
-        if not self.keyboard_control:
-            bmi3d_data, bmi3d_metadata = aopy.preproc.proc_exp(hdf_dir, files, 'hoge', 'hoge', overwrite=True, save_res=False)
-
-            # load raw eye data
-            # raw_eye_data, raw_eye_metadata = aopy.preproc.parse_oculomatic(hdf_dir, files, debug=False)
-            eye_interp = aopy.data.get_interp_kinematics(bmi3d_data,bmi3d_metadata,datatype='eye',samplerate=bmi3d_metadata['cursor_interp_samplerate'])
-
-            # calculate coefficients to calibrate eye data
-            events = bmi3d_data['events']
-
-            if not self.eye_target_calibration:
-                self.eye_coeff,_,_,_ = aopy.preproc.calc_eye_calibration\
-                    (bmi3d_data['cursor_interp'],bmi3d_metadata['cursor_interp_samplerate'],\
-                    eye_interp[:,:4], bmi3d_metadata['cursor_interp_samplerate'],events['timestamp'], events['code'],return_datapoints=True)
-
-            else:
-                def get_target_locations(data, target_indices):
-
-                    try:
-                        trials = data['trials']
-                    except:
-                        trials = data['bmi3d_trials']
-                    locations = np.nan*np.zeros((len(target_indices), 3))
-                    for i in range(len(target_indices)):
-                        trial_idx = np.where(trials['index'] == target_indices[i])[0]
-                        if len(trial_idx) > 0:
-                            locations[i,:] = trials['target'][trial_idx[0]][[0,2,1]] # use x,y,z format
-                        else:
-                            raise ValueError(f"Target index {target_indices[i]} not found")
-                    return np.round(locations,4)
-
-                target_pos = get_target_locations(bmi3d_data, [1,2,3,4,5,6,7,8])
-                
-                self.eye_coeff, _ = aopy.preproc.calc_eye_target_calibration(eye_interp[:,:4], \
-                    bmi3d_metadata['cursor_interp_samplerate'], events['timestamp'], events['code'], target_pos)
-            
-            print("Calibration complete:", self.eye_coeff)
-
+        super().__init__(*args, **kwargs)
+    
         # Set up eye cursor
         self.eye_cursor = VirtualCircularTarget(target_radius=.5, target_color=(0., 1., 0., 0.75))
         self.target_location = np.array(self.starting_pos).copy()
@@ -365,6 +315,57 @@ class EyeCalibration(traits.HasTraits):
     def init(self):
         self.add_dtype('calibrated_eye', 'f8', (2,))
         super().init()
+
+        if self.keyboard_control:
+            return
+
+        # proc_exp # preprocess cursor data only
+        taskid = self.taskid_for_eye_calibration
+        hdf_dir = '/storage/hdf'
+        hdf_file = glob.glob(os.path.join(hdf_dir, f'*{taskid}*'))[0]
+        ecube_file = glob.glob(f'/media/NeuroAcq/*{taskid}*')[0]
+        files = {}
+        files['hdf'] = hdf_file
+        files['ecube'] = ecube_file
+        print(files)
+        
+        bmi3d_data, bmi3d_metadata = aopy.preproc.proc_exp(hdf_dir, files, 'hoge', 'hoge', overwrite=True, save_res=False)
+
+        # load raw eye data
+        # raw_eye_data, raw_eye_metadata = aopy.preproc.parse_oculomatic(hdf_dir, files, debug=False)
+        eye_interp = aopy.data.get_interp_kinematics(bmi3d_data,bmi3d_metadata,datatype='eye',samplerate=bmi3d_metadata['cursor_interp_samplerate'])
+
+        # calculate coefficients to calibrate eye data
+        events = bmi3d_data['events']
+
+        if not self.eye_target_calibration:
+            self.eye_coeff,_,_,_ = aopy.preproc.calc_eye_calibration\
+                (bmi3d_data['cursor_interp'],bmi3d_metadata['cursor_interp_samplerate'],\
+                eye_interp[:,:4], bmi3d_metadata['cursor_interp_samplerate'],events['timestamp'], events['code'],return_datapoints=True)
+
+        else:
+            def get_target_locations(data, target_indices):
+
+                try:
+                    trials = data['trials']
+                except:
+                    trials = data['bmi3d_trials']
+                locations = np.nan*np.zeros((len(target_indices), 3))
+                for i in range(len(target_indices)):
+                    trial_idx = np.where(trials['index'] == target_indices[i])[0]
+                    if len(trial_idx) > 0:
+                        locations[i,:] = trials['target'][trial_idx[0]][[0,2,1]] # use x,y,z format
+                    else:
+                        raise ValueError(f"Target index {target_indices[i]} not found")
+                return np.round(locations,4)
+
+            target_pos = get_target_locations(bmi3d_data, [1,2,3,4,5,6,7,8])
+            
+            self.eye_coeff, _ = aopy.preproc.calc_eye_target_calibration(eye_interp[:,:4], \
+                bmi3d_metadata['cursor_interp_samplerate'], events['timestamp'], events['code'], target_pos)
+        
+        print("Calibration complete:", self.eye_coeff)
+
 
     #### STATE FUNCTIONS ####
     def _start_wait(self):

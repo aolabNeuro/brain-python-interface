@@ -131,8 +131,11 @@ class NIDAQSync(HDFSync):
     def __init__(self, *args, **kwargs):
         super(HDFSync, self).__init__(*args, **kwargs)
         self.sync_params = nidaq_sync_params
-        self.sync_gpio = NIGPIO()
         self.sync_every_cycle = True
+
+    def init(self):
+        super().init()
+        self.sync_gpio = NIGPIO()
         print("NIDAQ sync active")
 
     def sync_code(self, code, delay=0.):
@@ -166,9 +169,12 @@ class ArduinoSync(NIDAQSync):
     def __init__(self, *args, **kwargs):
         super(HDFSync, self).__init__(*args, **kwargs)
         self.sync_params = arduino_sync_params
-        self.sync_gpio = TeensyGPIO(self.sync_gpio_port)
         self.sync_every_cycle = True
 
+    def init(self):
+        super(HDFSync, self).init()
+        self.sync_gpio = TeensyGPIO(self.sync_gpio_port)
+        print("Arduino sync active")
 
 class ScreenSync(traits.HasTraits):
     '''Adds a square in one corner that switches color with every flip.'''
