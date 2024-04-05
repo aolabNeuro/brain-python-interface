@@ -22,8 +22,8 @@ class RandomUnitDropout(traits.HasTraits):
     '''
 
     unit_drop_prob = traits.Float(0, desc="Probability of dropping a group of units from the decoder")
-    unit_drop_groups = traits.Array(value=[[1, 256]], desc="Groups of channels to drop from the decoder one at a time")
-    unit_drop_targets = traits.Array(value=[1], desc="Target indices on which to drop groups of units from the decoder")
+    unit_drop_groups = traits.List(value=[], desc="Groups of channels to drop from the decoder one at a time")
+    unit_drop_targets = traits.List(value=[], desc="Target indices on which to drop groups of units from the decoder")
 
     def init(self):
         self.decoder_units_dropped = np.ones((len(self.decoder.units),), dtype='bool')
