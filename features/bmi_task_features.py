@@ -4,7 +4,7 @@ BMI task features
 import time
 import numpy as np
 from riglib.experiment import traits, experiment
-from riglib.bmi import clda
+import copy
 
 ###### CONSTANTS
 sec_per_min = 60
@@ -14,31 +14,33 @@ sec_per_min = 60
 ########################################################################################################
 class RandomUnitDropout(traits.HasTraits):
     '''
-    Randomly removes units from the decoder. Does not work with CLDA turned on. Units are removed at the
-    end of the delay period on each trial and replaced when the trial ends (either in reward or penalty).
-    The same units will be dropped on repeated trials. The units to drop are specified in the 
-    `unit_drop_groups` attribute by a list of lists of unit indices. The `unit_drop_targets` attribute
-    specifies the target indices on which to drop each group of units.
+    Randomly removes units from the decoder. Units are removed at the end of the delay period on each 
+    trial and replaced when the trial ends (either in reward or penalty).The same units will be dropped 
+    on repeated trials. The units to drop are specified in the `unit_drop_groups` attribute by a list of 
+    lists of unit indices. The `unit_drop_targets` attribute specifies the target indices on which to 
+    drop each group of units. Does not work with CLDA turned on. 
     '''
 
     unit_drop_prob = traits.Float(0, desc="Probability of dropping a group of units from the decoder")
-    unit_drop_groups = traits.Array(value=[[1, 256], [2]], desc="Groups of channels to drop from the decoder one at a time")
-    unit_drop_targets = traits.Array(value=[1, [7, 8]], desc="Target indices on which to drop groups of units from the decoder")
+    unit_drop_groups = traits.Array(value=[[1, 256]], desc="Groups of channels to drop from the decoder one at a time")
+    unit_drop_targets = traits.Array(value=[1], desc="Target indices on which to drop groups of units from the decoder")
 
     def init(self):
-        super().init()
         self.decoder_units_dropped = np.ones((len(self.decoder.units),), dtype='bool')
-        new_dtype = np.dtype(self.trial_dtype.descr + [('decoder_units_dropped', '?', self.decoder_units_dropped.shape)])
-        self.trial_dtype = new_dtype
+        self.add_dtype('decoder_units_dropped', '?', self.decoder_units_dropped.shape)
         self.unit_drop_group_idx = 0
+        super().init()
 
         # Save a copy of the decoder
-        self.decoder_orig = self.decoder.copy()
+        self.decoder_orig = copy.deepcopy(self.decoder)
+        self.reportstats['Units dropped'] = '' # Runtime stat displayed on the UI
+
 
     def _start_wait(self):
-
+        super()._start_wait()
+        
         # Decide which units to drop in this trial but don't actually drop them yet
-        if (self.gen_indices[self.target_index] in self.unit_drop_targets[self.unit_drop_group_idx] and 
+        if (self.gen_indices[self.target_index] in np.array(self.unit_drop_targets[self.unit_drop_group_idx]) and 
             np.random.rand() < self.unit_drop_prob):
             self.decoder_units_dropped = np.isin(self.decoder.channels, self.unit_drop_groups[self.unit_drop_group_idx])
 
@@ -47,31 +49,38 @@ class RandomUnitDropout(traits.HasTraits):
         else:
             self.decoder_units_dropped = np.zeros((len(self.decoder.units),), dtype='bool')
         
-        # Update the trial record
-        self.trial_record['decoder_units_dropped'] = self.decoder_units_dropped
-        super()._start_wait()
-
     def _start_targ_transition(self):
         '''
         Override the decoder to drop random units. Keep a record of what's going on in the `trial` data.
         '''
         super()._start_targ_transition()
-        if self.target_index + 1 < self.chain_length and np.any(self.decoder_units_dropped):
+        if self.target_index == -1:
+
+            # Came from a penalty state
+            pass
+        elif self.target_index + 1 < self.chain_length and np.any(self.decoder_units_dropped):
             if hasattr(self.decoder.filt, 'C'):
                 self.decoder.filt.C[self.decoder_units_dropped, :] = 0
             elif hasattr(self.decoder.filt, 'unit_to_state'):
                 self.decoder.filt.unit_to_state[:, self.decoder_units_dropped] = 0
+            self.task_data['decoder_units_dropped'] = self.decoder_units_dropped
+            self.reportstats['Units dropped'] = str(self.decoder.channels[self.decoder_units_dropped])
 
-    def _reset_decoder(self):
-        self.decoder = self.decoder_orig.copy()
+    def _reset_decoder_units(self):
+        if hasattr(self.decoder.filt, 'C'):
+            self.decoder.filt.C = self.decoder_orig.filt.C
+        elif hasattr(self.decoder.filt, 'unit_to_state'):
+            self.decoder.filt.unit_to_state = self.decoder_orig.filt.unit_to_state
+        self.task_data['decoder_units_dropped'] = np.zeros((len(self.decoder.units),), dtype='bool')
+        self.reportstats['Units dropped'] = '[]'
 
     def _increment_tries(self):
         super()._increment_tries()
-        self._reset_decoder()
+        self._reset_decoder_units()
 
     def _start_reward(self):
         super()._start_reward()
-        self._reset_decoder()
+        self._reset_decoder_units()
     
 
 class NormFiringRates(traits.HasTraits):
