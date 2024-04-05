@@ -1,6 +1,7 @@
 '''
 BMI task features
 '''
+import ast
 import time
 import numpy as np
 from riglib.experiment import traits, experiment
@@ -22,8 +23,8 @@ class RandomUnitDropout(traits.HasTraits):
     '''
 
     unit_drop_prob = traits.Float(0, desc="Probability of dropping a group of units from the decoder")
-    unit_drop_groups = traits.List(value=[], desc="Groups of channels to drop from the decoder one at a time")
-    unit_drop_targets = traits.List(value=[], desc="Target indices on which to drop groups of units from the decoder")
+    unit_drop_groups = traits.Array(value=[[1],[2],[3],[4]], desc="Groups of channels to drop from the decoder one at a time")
+    unit_drop_targets = traits.Array(value=[[1,2], [3,4], [5,6], [7,8]], desc="Target indices on which to drop groups of units from the decoder")
 
     def init(self):
         self.decoder_units_dropped = np.ones((len(self.decoder.units),), dtype='bool')
@@ -35,6 +36,15 @@ class RandomUnitDropout(traits.HasTraits):
         self.decoder_orig = copy.deepcopy(self.decoder)
         self.reportstats['Units dropped'] = '' # Runtime stat displayed on the UI
 
+        print('--------------------\nUnit dropping settings:')
+        if len(self.unit_drop_groups) == len(self.unit_drop_targets):
+            for i in range(len(self.unit_drop_groups)):
+                print(f'group {i} channels: {self.unit_drop_groups[i]}, targets: {self.unit_drop_targets[i]}')
+        else:
+            print('Unit dropping settings invalid! Please reformat into groups [[ch1, ch2], ...] and targets [[t1, t2, ...], ...]')
+            print('Current groups:', self.unit_drop_groups)
+            print('Current targets:', self.unit_drop_targets)
+        print('--------------------')
 
     def _start_wait(self):
         super()._start_wait()
