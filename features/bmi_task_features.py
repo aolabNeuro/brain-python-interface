@@ -22,8 +22,8 @@ class RandomUnitDropout(traits.HasTraits):
     '''
 
     unit_drop_prob = traits.Float(0, desc="Probability of dropping a group of units from the decoder")
-    unit_drop_groups = traits.Array(value=[[0, 1], [2]], desc="Groups of unit indices to drop from the decoder one at a time")
-    unit_drop_targets = traits.Array(value=[1, 2], desc="Target indices on which to drop groups of units from the decoder")
+    unit_drop_groups = traits.Array(value=[[1, 256], [2]], desc="Groups of channels to drop from the decoder one at a time")
+    unit_drop_targets = traits.Array(value=[1, [7, 8]], desc="Target indices on which to drop groups of units from the decoder")
 
     def init(self):
         super().init()
@@ -38,9 +38,9 @@ class RandomUnitDropout(traits.HasTraits):
     def _start_wait(self):
 
         # Decide which units to drop in this trial but don't actually drop them yet
-        if (self.gen_indices[self.target_index] == self.unit_drop_targets[self.unit_drop_group_idx] and 
+        if (self.gen_indices[self.target_index] in self.unit_drop_targets[self.unit_drop_group_idx] and 
             np.random.rand() < self.unit_drop_prob):
-            self.decoder_units_dropped = np.isin(range(len(self.decoder.units)), self.unit_drop_groups[self.unit_drop_group_idx])
+            self.decoder_units_dropped = np.isin(self.decoder.channels, self.unit_drop_groups[self.unit_drop_group_idx])
 
             # Update the group for next trial
             self.unit_drop_group_idx = (self.unit_drop_group_idx + 1) % len(self.unit_drop_groups)
