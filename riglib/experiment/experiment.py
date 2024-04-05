@@ -186,12 +186,7 @@ class Experiment(ThreadedFSM, traits.HasTraits, metaclass=ExperimentMeta):
 
         self.pause = False
 
-
-        ## Figure out which traits to not save to the HDF file
-        ## Large/complex python objects cannot be saved as HDF file attributes
-        ctraits = self.class_traits()
-        self.object_trait_names = [ctr for ctr in list(ctraits.keys()) if ctraits[ctr].trait_type.__class__.__name__ in ['Instance', 'InstanceFromDB', 'DataFile']]
-
+        self.object_trait_names = self.class_object_traits()
         if self.verbose: print("finished executing Experiment.__init__")
 
     def init(self):
@@ -284,6 +279,14 @@ class Experiment(ThreadedFSM, traits.HasTraits, metaclass=ExperimentMeta):
         traits = cls.class_trait_names(type=not_event, editable=not_false)
         editable_traits = [x for x in traits if x not in cls.exclude_parent_traits]
         return editable_traits
+    
+    @classmethod
+    def class_object_traits(cls):
+        ## Figure out which traits to not save to the HDF file
+        ## Large/complex python objects cannot be saved as HDF file attributes
+        ctraits = cls.class_traits()
+        return [ctr for ctr in list(ctraits.keys()) if ctraits[ctr].trait_type.__class__.__name__ in ['Instance', 'InstanceFromDB', 'DataFile']]
+
 
     @classmethod
     def get_trait_info(cls, trait_name, ctraits=None):

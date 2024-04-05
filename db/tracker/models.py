@@ -16,6 +16,7 @@ import subprocess
 import traceback
 import imp
 import tables
+import h5py
 import tempfile
 import shutil
 from collections import OrderedDict
@@ -1128,20 +1129,25 @@ class TaskEntry(models.Model):
             print("No HDF file to make self contained")
             return False
 
-        import h5py
+        # Open the hdf file
         if data_dir is None:
             h5file = df.get_path()
         else:
             h5file = os.path.join(data_dir, df.system.name, os.path.basename(df.path))
         try:
-            hdf = h5py.File(h5file, mode='a')
+            # Create an empty task database if there isn't one already (may be empty if there was no task data)
+            hdf = tables.open_file(h5file, mode='a')
+            if not hasattr(hdf.root, "task"):
+                hdf.create_table("/", "task", [('time', 'u8')])
+            hdf.close()
+            hdf = h5py.File(h5file, mode='a') # switch to h5py because tables doesn't let you add root attributes
         except:
-            print("Cannot open HDF file")
+            print(f"Cannot open HDF file at {h5file}")
             return False
         print("Updating hdf file with metadata for task entry %d" % self.id)
         print(h5file)
 
-        # Add any task metadata
+        # Add experiment metadata to the root attributes
         hdf['/'].attrs["task_name"] = self.task.name
         hdf['/'].attrs["features"] = [f.name for f in self.feats.all()]
         hdf['/'].attrs["rig_name"] = self.rig_name
@@ -1160,15 +1166,26 @@ class TaskEntry(models.Model):
         hdf['/'].attrs["notes"] = self.notes
         hdf['/'].attrs["sw_version"] = self.sw_version
 
+        # Update task metadata in the task attributes
+        exp = self.get()
+        traits = exp.class_editable_traits()
+        for trait in traits:
+            if (trait not in exp.class_object_traits()): # don't save traits which are complicated python objects to the HDF file
+                hdf['/task'].attrs[trait] = getattr(exp, trait)
+
         # Link any data files
         data_files = []
         for df in DataFile.objects.using(dbname).filter(entry__id=self.id):
             data_files.append(df.get_path())
         hdf['/'].attrs["data_files"] = data_files
-        hdf.close()
-
+            
         # TODO save decoder parameters to hdf file, if applicable
-
+        if 'decoder' in traits:
+            hdf['/'].attrs['decoder'] = exp.decoder.name
+            hdf['/'].attrs['decoder_id'] = exp.decoder.id
+            hdf['/'].attrs['decoder_parent_id'] = exp.decoder.parent_id
+        
+        hdf.close()
         return True
 
 class Calibration(models.Model):
