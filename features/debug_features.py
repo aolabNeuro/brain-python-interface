@@ -1,7 +1,7 @@
 import cProfile
 import pstats
-import traits
 import socket
+from riglib.experiment import traits
 
 class Profiler():
     
@@ -18,27 +18,27 @@ class OnlineAnalysis(traits.HasTraits):
 
     online_analysis_ip = traits.String("localhost", desc="IP address of the machine running the online analysis")
     online_analysis_port = traits.Int(5000, desc="Port number for the online analysis server")
-
-    def __init__(self, *args, **kwargs):
-        self.online_analysis_sock = socket.socket(
-            socket.AF_INET, # Internet
-            socket.SOCK_DGRAM) # UDP
         
     def _send_online_analysis_msg(self, key, value):
         '''
         Helper function to send messages to the online analysis server
         '''
-        self.online_analysis_sock.sendto(f'{key}:{value};', (self.online_analysis_ip, self.online_analysis_port))
+        self.online_analysis_sock.sendto(f'{key}:{value}'.encode('utf-8'), (self.online_analysis_ip, self.online_analysis_port))
 
     def init(self):
         '''
         Send basic experiment info to the online analysis server
         '''
         super().init()
+        self.online_analysis_sock = socket.socket(
+            socket.AF_INET, # Internet
+            socket.SOCK_DGRAM) # UDP
         self._send_online_analysis_msg('experiment_name', self.__class__.__name__)
-        self._send_online_analysis_msg('subject', self.subject)
-        self._send_online_analysis_msg('save_id', self.save_id)
-        for key, value in self.get_trait_values:
+        if hasattr(self, 'saveid'):
+            self._send_online_analysis_msg('te_id', self.saveid)
+        else:
+            self._send_online_analysis_msg('te_id', 'None')
+        for key, value in self.get_trait_values().items():
             self._send_online_analysis_msg(key, value)
         self._send_online_analysis_msg('init', 'None')
 
