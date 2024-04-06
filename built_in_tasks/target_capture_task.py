@@ -1780,6 +1780,7 @@ class ScreenTargetCapture_EyeandHand(EyeConstrainedHandCapture):
         [nblocks*ntargets x 1] array of tuples containing trial indices and [3 x 3] target coordinates
         '''
 
+        np.random.seed(seed)
         for _ in range(nblocks):
 
             for idx in range(100):
