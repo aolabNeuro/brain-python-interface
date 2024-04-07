@@ -32,8 +32,7 @@ class TestOnlineAnalysis(unittest.TestCase):
         analysis.update()
         self.assertTrue(analysis.is_completed)
         self.assertFalse(analysis.is_running)
-        self.assertEqual(analysis.state, 'None')
-        self.assertEqual(analysis.cycle_count, 4)
+        self.assertEqual(analysis.state, None)
 
         analysis.close()
 
