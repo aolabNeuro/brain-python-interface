@@ -389,6 +389,116 @@ class LFP_Plus_Trigger_File(DataSourceSystem):
                 data_block = np.zeros((int(728/25),len(self.channels)))
             self.gen = multi_chan_generator(data_block, self.channels, downsample=25)
             return next(self.gen)
+        
+def map_channels_for_multisource(headstage_channels=[], analog_channels=[], digital_channels=[]):
+    '''
+    Utility to convert the channel numbers to the format used by the MultiSource class
+
+    Args:
+        headstage_channels (list): list of 1-indexed headstage channels
+        analog_channels (list): list of 1-indexed analog channels
+        digital_channels (list): list of 1-indexed digital channels
+
+    Returns:
+        np.array: channel numbers in the format used by the MultiSource class
+    '''
+    return np.concatenate((analog_channels, digital_channels+32, headstage_channels+96))
+
+class MultiSource(DataSourceSystem):
+    '''
+    Adds Analog, Digital and Broadband channels. Compatible with riglib.source.MultiChanDataSource.
+    Because of the way the system is set up, Analog channels map from 1-32, Digital channels 
+    from 33-96, and Broadband channels from 97- onwards. Use the mapping utility to convert channels.
+    Not tested for use with BMI, as the latency is likely higher than streaming only broadband data.
+    '''
+    # Required by DataSourceSystem: update_freq and dtype (see make() below)
+    update_freq = 25000.
+    dtype = np.dtype('uint16')
+
+    def __init__(self, headstage=7, channels=[]):
+        '''
+        Inputs:
+            headstages int: headstage number (1-indexed)
+            channels [int array]: channel list (1-indexed) where channels 1-32 are analog, 
+                33-96 are digital, and 97- are broadband channels
+        '''
+        # Initialize the servernode-control connection
+        self.conn = eCubeStream(debug=False)
+        channels = np.array(channels)
+        self.analog_channels = channels[channels <= 32]
+        self.digital_channels = channels[(channels > 32) & (channels <= 96)] - 32
+        self.headstage = headstage
+        self.headstage_channels = channels[channels > 96] - 96
+
+        # Remove all existing sources
+        subscribed = self.conn.listadded()
+        if len(subscribed[0]) > 0:
+            self.conn.remove(('Headstages', self.headstage))
+        if len(subscribed[1]) > 0:
+            self.conn.remove(('AnalogPanel',))
+        if len(subscribed[2]) > 0:
+            self.conn.remove(('DigitalPanel',))
+
+        # Add the requested headstage channels if they are available
+        available = self.conn.listavailable()[0][self.headstage-1] # (headstages, analog, digital); ch are 1-indexed
+        for ch in self.headstage_channels:
+            if ch > available:
+                raise RuntimeError('requested channel {} is not available ({} connected)'.format(
+                    ch, available))
+            self.conn.add(('Headstages', self.headstage, (ch, ch)))
+
+        # Add the analog panel channels
+        available = self.conn.listavailable()[1]
+        for ch in self.digital_channels:
+            if ch > available:
+                raise RuntimeError('requested channel {} is not available ({} connected)'.format(
+                    ch, available))
+            self.conn.add(('AnalogPanel', (ch, ch)))
+
+        # Add the digital panel channels
+        available = self.conn.listavailable()[2]
+        for ch in self.digital_channels:
+            if ch > available:
+                raise RuntimeError('requested channel {} is not available ({} connected)'.format(
+                    ch, available))
+            self.conn.add(('DigitalPanelAsChans', (ch, ch)))
+
+        subscribed = self.conn.listadded() # in debug mode this prints out the added channels
+
+    def start(self):
+        print("Starting ecube streaming datasource...")
+        self.conn.start()
+
+        # Start with an empty generator
+        self.gen = iter(())
+    
+    def stop(self):
+
+        # Stop streaming
+        if not self.conn.stop():
+            del self.conn # try to force the streaming to end by deleting the ecube connection object
+            self.conn = eCubeStream(debug=True)
+
+        # Remove the added sources
+        self.conn.remove(('Headstages', self.headstage))
+        self.conn.remove(('AnalogPanel',))
+        self.conn.remove(('DigitalPanelAsChans',))
+        
+    def get(self):
+        '''
+        Retrieve a packet from the server
+        '''
+        try:
+            return next(self.gen)
+        except StopIteration:
+            data_block = self.conn.get() # in the form of (time_stamp, data_source, data_content)
+            if data_block[1] == "AnalogPanel":
+                self.gen = multi_chan_generator(data_block[2], self.analog_channels)
+            elif data_block[1] == "DigitalPanelAsChans":
+                self.gen = multi_chan_generator(data_block[2], self.digital_channels+32)
+            elif data_block[1] == "Headstages":
+                self.gen = multi_chan_generator(data_block[2], self.headstage_channels+96)
+            return next(self.gen)
     
 class LFP_Blanking(LFP_Plus_Trigger):
     '''
