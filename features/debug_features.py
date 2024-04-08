@@ -42,16 +42,16 @@ class OnlineAnalysis(traits.HasTraits):
         self.online_analysis_sock = socket.socket(
             socket.AF_INET, # Internet
             socket.SOCK_DGRAM) # UDP
-        self._send_online_analysis_msg('experiment_name', self.__class__.__name__)
+        self._send_online_analysis_msg('param', 'experiment_name', self.__class__.__name__)
         if hasattr(self, 'saveid'):
             self._send_online_analysis_msg('te_id', self.saveid)
         else:
             self._send_online_analysis_msg('te_id', 'None')
         for key, value in self.get_trait_values().items():
-            self._send_online_analysis_msg(key, value)
+            self._send_online_analysis_msg('param', key, value)
         if hasattr(self, 'sync_params'):
             for key, value in self.sync_params.items():
-                self._send_online_analysis_msg(key, value)
+                self._send_online_analysis_msg('param', key, value)
         self._send_online_analysis_msg('init', 'None')
 
     def _start_wait(self):
@@ -66,6 +66,7 @@ class OnlineAnalysis(traits.HasTraits):
         Send cursor and eye position data to the online analysis server
         '''
         super()._cycle()
+        self._send_online_analysis_msg('cycle_count', self.cycle_count)
         if hasattr(self, 'plant'):
             self._send_online_analysis_msg('cursor', self.plant.get_endpoint_pos())
         if hasattr(self, 'eye_pos'):

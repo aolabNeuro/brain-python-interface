@@ -1,22 +1,18 @@
-'''
-Functions to analyze data in real-time. 
-Useful for debugging and monitoring the system on a separate machine connected over the network.
-'''
-
+import time
 import json
 import socket
 import select
-from threading import Thread, Event
-from queue import Queue
+from multiprocessing import Process, Event, Queue
+from queue import Empty
 import numpy as np
 import matplotlib.pyplot as plt
 import aopy
 from riglib.ecube import MultiSource, map_channels_for_multisource
 from riglib.source import MultiChanDataSource
 
-class OnlineDataWorker(Thread):
+class OnlineDataWorker(Process):
     '''
-    Worker thread to receive data from BMI3D.
+    Worker process to receive data from BMI3D.
     '''
 
     def __init__(self, socket, result_queue):
@@ -26,7 +22,7 @@ class OnlineDataWorker(Thread):
         self.sock = socket
         self._stop_event = Event()
         self.result_queue = result_queue
-        Thread.__init__(self)
+        super().__init__()
 
     def run(self):
         while not self._stop_event.is_set():
@@ -35,109 +31,30 @@ class OnlineDataWorker(Thread):
                 data = self.sock.recv(4096)
                 key, value = data.decode('utf-8').split(':')
                 self.result_queue.put((key, [json.loads(v) for v in value.split('#')]))
+                print(key, value)
 
     def stop(self):
         self._stop_event.set()
 
-
-class OnlineDataServer:
+class AnalysisWorker(Process):
     '''
-    Interface for ingesting and accumulating BMI3D data in real-time.
+    Plots eye, cursor, and target data from experiments that have them. Performs automatic
+    calibration of eye data to target locations when the cursor enters the target.
     '''
 
-    def __init__(self, host_ip, port=5000):
-        '''
-        Initialize the server on the specified IP address and port number.
-
-        Args:
-            host_ip (str): IP address of the machine running the online analysis
-            port (int): Port number for the online analysis server
-        '''
-        self.sock = socket.socket(
-            socket.AF_INET, # Internet
-              socket.SOCK_DGRAM) # UDP 
-        self.sock.bind((host_ip, port))
-        self.sock.setblocking(0)
-        self.reset()
-
-    def reset(self):
-        self.result_queue = Queue()
-        self.worker = OnlineDataWorker(self.sock, self.result_queue)
-        self.worker.start()
-        self.is_running = False
-        self.is_completed = False
-        self.task_params = {}
-        self.cycle_count = 0
-        self.state = None
+    def __init__(self, task_params, queue):
+        self.task_params = task_params
+        self._stop_event = Event()
+        self.queue = queue
         self.sync_events = []
         self.cursor_pos = np.zeros(2)
         self.eye_pos = np.zeros(2)
         self.target_pos = {}
-
-    def init(self):
-        '''
-        Code that runs once the experiment is initialized but before it starts
-        '''
-        pass
-
-    def update_sync_events(self):
-        '''
-        Code that runs when a sync event is detected
-        '''
-        pass
-
-    def _stop(self):
-        if self.worker.is_alive():
-            self.worker.stop()
-            self.worker.join()
-        
-    def update(self):
-        '''
-        Get the latest data from the online server
-        '''
-        while not self.result_queue.empty():
-            key, values = self.result_queue.get()
-            print(key, values)
-            if key == 'state':
-                self.state = values[0]
-                if values[0] is None:
-                    print('Experiment finished')
-                    self._stop()
-                    self.is_running = False
-                    self.is_completed = True
-            elif key == 'sync_event':
-                event_name, event_data = values
-                self.sync_events.append((event_name, int(event_data)))
-                self.update_sync_events()
-            elif key == 'cursor':
-                self.cursor_pos = np.array(values[0])[0,2]
-            elif key == 'eye_pos':
-                self.eye_pos = np.array(values[0])[:2]
-            elif key == 'target_location':
-                target_idx, target_location = values
-                self.target_pos[int(target_idx)] = target_location[0,2]
-            elif key == 'init':
-                self.is_running = True
-                self.init()
-            else:
-                # Any other incoming data is a parameter update
-                self.task_params[key] = values[0]
-    
-    def close(self):
-        self._stop()
-        self.sock.close()
-
-class OnlineEyeCursorTarget(OnlineDataServer):
-    '''
-    Buffers eye, cursor, and target data from experiments that have them. Performs automatic
-    calibration of eye data to target locations when the cursor enters the target.
-    '''
-    def reset(self):
-        super().reset()
         self.sync_events_checked = 0
         self.eye_coeff = np.zeros((2, 2))
         self.calibration_data = []
-
+        super().__init__()
+   
     def update_sync_events(self):
         '''
         Look at the sync events to determine which target is active
@@ -165,39 +82,201 @@ class OnlineEyeCursorTarget(OnlineDataServer):
             target_data = np.array(target_data)
             self.eye_coeff = np.linalg.lstsq(eye_data, target_data, rcond=None)[0]
         
-    def get_cursor(self):
-        self.update()
-        return self.cursor_pos
+    def get_current_pos(self):
+        '''
+        Get the current cursor, eye, and target positions
 
-    def get_eye(self):
-        self.update()
+        Returns:
+            cursor_pos ((2,) tuple): Current cursor position
+            eye_pos ((2,) tuple): Current eye position
+            targets (list): List of active targets in (position, radius, color) format
+        '''
         self.update_eye_calibration()
         calibrated_eye_pos = np.dot(self.eye_pos, self.eye_coeff)
-        return calibrated_eye_pos
-    
-    def get_targets(self):
-        self.update()
+
         try:
             radius = self.task_params['target_radius']
             color = self.task_params['target_color']
-            return [(self.target_pos[k], radius, color) for k, v in self.targets.items() if v]
+            targets = [(self.target_pos[k], radius, color) for k, v in self.targets.items() if v]
         except:
-            return []
+            targets = []
 
-class OnlineECoG244ERP(OnlineDataServer):
+        return self.cursor_pos, calibrated_eye_pos, targets
+
+    def init(self):
+        # Initialize figure
+        # self.fig = plt.figure(figsize=(16,10))
+        # plt.show()
+
+        # self.ax = self.fig.add_subplot(221)
+        # self.text = self.ax.text(0.5, 0.5, '', ha='center', va='center', fontsize=12)
+        # self.text.set_text('Waiting for data...')
+        # self.fig.canvas.draw()
+        pass
+
+    def update(self):
+        try:
+            key, values = self.queue.get(timeout=0.1)
+        except Empty:
+            return
+        if key == 'cycle_count':
+            #  self.text.set_text(values[0])
+            pass
+        if key == 'sync_event':
+            event_name, event_data = values
+            self.sync_events.append((event_name, int(event_data)))
+            self.update_sync_events()
+        elif key == 'cursor':
+            self.cursor_pos = np.array(values[0])[0,2]
+        elif key == 'eye_pos':
+            self.eye_pos = np.array(values[0])[:2]
+        elif key == 'target_location':
+            target_idx, target_location = values
+            self.target_pos[int(target_idx)] = target_location[0,2]
+
+    def run(self):
+        print('Starting analysis worker:', self.__class__.__name__)
+        self.init()
+        while not self._stop_event.is_set():
+            self.update()
+
+    def stop(self):
+        self._stop_event.set()
+
+class ERPAnalysisWorker(AnalysisWorker):
     '''
-    Buffers ERP data from experiments with a ECoG244 array. Automatically calculates 
+    Plots ERP data from experiments with a ECoG244 array. Automatically calculates 
     ERPs for flash, movement, or laser events depending on the task.
     '''
-    def reset(self):
-        super().reset()
+
+    bufferlen = 5 # seconds of data to keep in the buffer
 
     def init(self):
         self.elec_pos, self.acq_ch, _ = aopy.data.load_chmap('ECoG244')
-        channels = map_channels_for_multisource(headstage_channels=self.acq_ch)
-        self.ds = MultiChanDataSource(MultiSource, channels=channels, bufferlen=bufferlen)
+        if hasattr(self.task_params, 'qwalor_trigger_dch'):
+            self.trigger_ch = self.task_params['qwalor_trigger_dch']
+            self.channels = map_channels_for_multisource(headstage_channels=self.acq_ch, digital_channels=[self.trigger_ch])
+        self.ds = MultiChanDataSource(MultiSource, channels=self.channels, bufferlen=self.bufferlen)
         self.ds.start()
 
-        
     def get_erp(self, channels):
         data = self.ds.get_new(channels)
+
+
+class OnlineDataServer(Process):
+    '''
+    Interface for accumulating and analyzing BMI3D data in real-time.
+    '''
+
+    def __init__(self, host_ip, port=5000):
+        '''
+        Initialize the server on the specified IP address and port number.
+
+        Args:
+            host_ip (str): IP address of the machine running the online analysis
+            port (int): Port number for the online analysis server
+        '''
+
+        # Initialize socket
+        self.sock = socket.socket(
+            socket.AF_INET, # Internet
+              socket.SOCK_DGRAM) # UDP 
+        self.sock.bind((host_ip, port))
+        self.sock.setblocking(0)
+                
+        # Initialize workers
+        self.data_worker = None
+        self.analysis_workers = []
+
+        # Initialize the server
+        self._stop_event = Event()
+        self.reset()
+        self.is_completed = False
+        super().__init__()
+
+    def reset(self):
+        # Stop all the workers
+        for worker, queue in self.analysis_workers:
+            if worker.is_alive():
+                worker.stop()
+                worker.join()
+        if self.data_worker and self.data_worker.is_alive():
+            self.data_worker.stop()
+            self.data_worker.join()
+
+        # Start new workers
+        self.result_queue = Queue()
+        self.data_worker = OnlineDataWorker(self.sock, self.result_queue)
+        self.data_worker.start()
+        self.analysis_workers = []
+        self.is_running = False
+        self.is_completed = True
+        self.task_params = {}
+        self.state = None
+
+    def init(self):
+        '''
+        Once the experiment is initialized but before it starts, we spin up the analysis processes
+        based on what kind of experiment is running.
+        '''
+        # Always start with the basic analysis worker
+        # queue = Queue()
+        # self.analysis_workers.append((AnalysisWorker(self.task_params, queue), queue))
+
+        # # Is there an ECoG array?
+        # if hasattr(self.task_params, 'record_headstage') and self.task_params['record_headstage']:
+        #     queue = Queue()
+        #     self.analysis_workers.append((ERPAnalysisWorker(self.task_params, queue), queue))
+
+        # Start all the workers
+        for worker, queue in self.analysis_workers:
+            worker.start()
+        
+    def update(self):
+        '''
+        Get the latest data from the online server
+        '''
+        try:
+            key, values = self.result_queue.get(timeout=0.1)
+        except Empty:
+            time.sleep(0.1)
+            return False
+        print(key, values)
+        if key == 'state':
+            self.state = values[0]
+            if values[0] is None:
+                print('Experiment finished')
+                self.reset()
+                self.is_running = False
+                self.is_completed = True
+            elif not self.is_running: # check in case we missed the init message
+                self.is_running = True
+                self.init()
+            for worker, queue in self.analysis_workers:
+                queue.put((key, values))
+        elif key == 'init':
+            self.is_running = True
+            self.init()
+        elif key == 'param':
+            name, value = values
+            self.task_params[name] = value
+        else:
+            # Send everything else back onto the queues for the analysis workers
+            for worker, queue in self.analysis_workers:
+                queue.put((key, values))
+        return True
+
+    def run(self):
+        '''
+        Main loop to run the server
+        '''
+        while True:
+            self.update()
+            if self._stop_event.is_set():
+                break
+
+        self._stop()
+        self.sock.close()
+
+    def stop(self):
+        self._stop_event.set()
