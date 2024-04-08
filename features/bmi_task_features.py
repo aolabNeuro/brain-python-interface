@@ -23,12 +23,24 @@ class RandomUnitDropout(traits.HasTraits):
     '''
 
     unit_drop_prob = traits.Float(0, desc="Probability of dropping a group of units from the decoder")
-    unit_drop_groups = traits.Array(value=[[1],[2],[3],[4]], desc="Groups of channels to drop from the decoder one at a time")
-    unit_drop_targets = traits.Array(value=[[1,2], [3,4], [5,6], [7,8]], desc="Target indices on which to drop groups of units from the decoder")
+    unit_drop_group1_channels = traits.List(value=[], desc="Channels to drop from the decoder one at a time")
+    unit_drop_group1_targets = traits.List(value=[], desc="Target indices on which to drop groups of units from the decoder")
+    unit_drop_group2_channels = traits.List(value=[], desc="Channels to drop from the decoder one at a time")
+    unit_drop_group2_targets = traits.List(value=[], desc="Target indices on which to drop groups of units from the decoder")
+    unit_drop_group3_channels = traits.List(value=[], desc="Channels to drop from the decoder one at a time")
+    unit_drop_group3_targets = traits.List(value=[], desc="Target indices on which to drop groups of units from the decoder")
+    unit_drop_group4_channels = traits.List(value=[], desc="Channels to drop from the decoder one at a time")
+    unit_drop_group4_targets = traits.List(value=[], desc="Target indices on which to drop groups of units from the decoder")
 
     def init(self):
         self.decoder_units_dropped = np.ones((len(self.decoder.units),), dtype='bool')
         self.add_dtype('decoder_units_dropped', '?', self.decoder_units_dropped.shape)
+        self.unit_drop_groups = [self.unit_drop_group1_channels, self.unit_drop_group2_channels,
+                                 self.unit_drop_group3_channels, self.unit_drop_group4_channels]
+        self.unit_drop_groups = np.array([g for g in self.unit_drop_groups if not g == ['']])
+        self.unit_drop_targets = [self.unit_drop_group1_targets, self.unit_drop_group2_targets,
+                                 self.unit_drop_group3_targets, self.unit_drop_group4_targets]
+        self.unit_drop_targets = np.array([t for t in self.unit_drop_targets if not t == ['']])
         self.unit_drop_group_idx = 0
         super().init()
 
