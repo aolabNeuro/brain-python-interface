@@ -48,16 +48,75 @@ class AnalysisWorker(mp.Process):
         self._stop_event = mp.Event()
         self.data_queue = data_queue
         self.figsize = figsize
-        self.cycle_count = 0
-        self.sync_events = []
-        self.cursor_pos = np.zeros(2)
-        self.eye_pos = np.zeros(2)
-        self.target_pos = {}
-        self.targets = {}
-        self.sync_events_checked = 0
-        self.eye_coeff = np.zeros((2, 2))
-        self.calibration_data = []
         super().__init__()
+
+    def init(self):
+        '''
+        Initialize the worker. 
+        '''
+        self.cycle_count = 0
+
+    def handle_data(self, key, values):
+        '''
+        Do something with incoming data. By default just keeps track of the time
+        '''
+        if key == 'cycle_count':
+            self.cycle_count = values[0]        
+
+    def draw(self):
+        '''
+        Update the figure.
+        '''
+        self.time_text.set_text(f"t={int(self.cycle_count/self.task_params['fps'])}s")
+
+    def cleanup(self):
+        '''
+        Cleanup tasks after the experiment ends, e.g. saving the figure.
+        '''
+        pass
+
+    def update(self):
+        while True:
+            try:
+                key, values = self.data_queue.get(timeout=0.) # continue if no data
+                self.handle_data(key, values)
+            except queue.Empty:
+                break
+
+    def run(self):
+        print('Starting analysis worker:', self.__class__.__name__)
+        
+        # Initialize figure
+        self.fig = plt.figure(figsize=self.figsize)
+        self.ax = self.fig.add_subplot(111)
+        self.ax.text(0., 1.05, f"{self.task_params['experiment_name']} ({self.task_params['te_id']}) - {self.__class__.__name__}",
+                     ha='left', va='center', fontsize=12, transform=self.ax.transAxes)
+        self.time_text = self.ax.text(1., 1.05, '', ha='right', va='center', fontsize=12, transform=self.ax.transAxes)
+        self.time_text.set_text('Waiting for data...')
+        self.init()
+                
+        # Pop up the figure
+        plt.show(block=False)
+        plt.pause(0.1)
+
+        while not self._stop_event.is_set():
+            self.update()
+            self.draw()
+            self.time_text.set_text(f"t={int(self.cycle_count/self.task_params['fps'])}s")
+            plt.pause(0.016) # 60 Hz ish
+
+        self.cleanup()
+        plt.close(self.fig)
+
+    def stop(self):
+        self._stop_event.set()
+
+
+class BehaviorAnalysisWorker(AnalysisWorker):
+    '''
+    Plots eye, cursor, and target data from experiments that have them. Performs automatic
+    calibration of eye data to target locations when the cursor enters the target.
+    '''
    
     def update_sync_events(self):
         '''
@@ -113,37 +172,27 @@ class AnalysisWorker(mp.Process):
         return self.cursor_pos, calibrated_eye_pos, targets
 
     def init(self):
-        # Initialize figure
-        self.fig = plt.figure(figsize=self.figsize)
+        super().init()
+        self.sync_events = []
+        self.cursor_pos = np.zeros(2)
+        self.eye_pos = np.zeros(2)
+        self.target_pos = {}
+        self.targets = {}
+        self.sync_events_checked = 0
+        self.eye_coeff = np.zeros((2, 2))
+        self.calibration_data = []
 
-        # Add axis
-        self.ax = self.fig.add_subplot(111)
         bounds = self.task_params.get('cursor_bounds', (-10,10,0,0,-10,10))
         self.ax.set_xlim(bounds[0], bounds[1])
         self.ax.set_ylim(bounds[-2], bounds[-1])
         self.ax.set_aspect('equal')
 
-        # Labels
-        self.exp_text = self.ax.text(0., 1.05, f"{self.task_params['experiment_name']} ({self.task_params['te_id']})",
-                                     ha='left', va='center', fontsize=12, transform=self.ax.transAxes)
-        self.time_text = self.ax.text(1., 1.05, '', ha='right', va='center', fontsize=12, transform=self.ax.transAxes)
-        self.time_text.set_text('Waiting for data...')
-
         # Circles
         self.circles = PatchCollection([])
         self.ax.add_collection(self.circles)
 
-        # Pop up the figure
-        plt.show(block=False)
-        plt.pause(0.1)
-
-    def update(self):
-        try:
-            key, values = self.data_queue.get(timeout=0.) # continue if no data
-        except queue.Empty:
-            return False
-        if key == 'cycle_count':
-            self.cycle_count = values[0]
+    def handle_data(self, key, values):
+        super().handle_data(key, values)
         if key == 'sync_event':
             event_name, event_data = values
             self.sync_events.append((event_name, int(event_data)))
@@ -155,13 +204,12 @@ class AnalysisWorker(mp.Process):
         elif key == 'target_location':
             target_idx, target_location = values
             self.target_pos[int(target_idx)] = np.array(target_location)[[0,2]]
-        return True
 
     def draw(self):
         '''
         Update the figure
         '''
-        self.time_text.set_text(f"t={int(self.cycle_count/self.task_params['fps'])}s")
+        super().draw()
         cursor_pos, eye_pos, targets = self.get_current_pos()
         cursor_radius = self.task_params.get('cursor_radius', 0.25)
         patches = [
@@ -172,20 +220,12 @@ class AnalysisWorker(mp.Process):
         colors = ['b', 'g'] + [c for _, _, c in targets]
         self.circles.set_facecolor(colors)
         self.circles.set_alpha(0.5)
-        plt.pause(0.016) # 60 Hz ish
 
-    def run(self):
-        print('Starting analysis worker:', self.__class__.__name__)
-        self.init()
-        while not self._stop_event.is_set():
-            while self.update():
-                pass # process as fast as possible
-            self.draw() # Draw when no updates are happening
+    def save(self):
 
-        plt.close(self.fig) # add saving feature here
+        # TO-DO: implement save
+        pass
 
-    def stop(self):
-        self._stop_event.set()
 
 class ERPAnalysisWorker(AnalysisWorker):
     '''
@@ -267,10 +307,10 @@ class OnlineDataServer(threading.Thread):
         Once the experiment is initialized but before it starts, we spin up the analysis processes
         based on what kind of experiment is running.
         '''
-        # Always start with the basic analysis worker
+        # Always start with the behavior analysis worker
         print('init in state', self.state)
         data_queue = mp.Queue()
-        self.analysis_workers.append((AnalysisWorker(self.task_params, data_queue), data_queue))
+        self.analysis_workers.append((BehaviorAnalysisWorker(self.task_params, data_queue), data_queue))
 
         # # Is there an ECoG array?
         # if hasattr(self.task_params, 'record_headstage') and self.task_params['record_headstage']:
