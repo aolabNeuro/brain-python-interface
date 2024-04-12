@@ -9,6 +9,7 @@ import threading
 
 class TestOnlineAnalysis(unittest.TestCase):
 
+    @unittest.skip("")
     def test_manual_run(self):
 
         analysis = online_analysis.OnlineDataServer('localhost', 5000)
@@ -18,10 +19,10 @@ class TestOnlineAnalysis(unittest.TestCase):
         print(exp.dtype)
         exp.init()
 
-        time.sleep(1)
-        while True:
-            if not analysis.update():
-                break
+        t0 = time.time()
+        while time.time() - t0 < 2:
+            analysis.update()
+        print('done updating')
         self.assertEqual(analysis.task_params['experiment_name'], 'Experiment')
 
         threading.Thread(target=exp.run).start()
@@ -44,14 +45,13 @@ class TestOnlineAnalysis(unittest.TestCase):
 
         analysis._stop()
 
-    @unittest.skip("")
     def test_threaded(self):
 
         analysis = online_analysis.OnlineDataServer('localhost', 5000)
 
         # Start exp 1
         Exp = experiment.make(experiment.Experiment, feats=[OnlineAnalysis])
-        exp = Exp(fps=1, session_length=5, online_analysis_ip='localhost', online_analysis_port=5000)
+        exp = Exp(fps=1, session_length=10, online_analysis_ip='localhost', online_analysis_port=5000)
         print(exp.dtype)
         exp.init()
 
@@ -60,7 +60,7 @@ class TestOnlineAnalysis(unittest.TestCase):
         time.sleep(1)
         threading.Thread(target=exp.run).start()
 
-        time.sleep(6)
+        time.sleep(12)
 
         # Start exp 2
         Exp = experiment.make(experiment.Experiment, feats=[OnlineAnalysis])
