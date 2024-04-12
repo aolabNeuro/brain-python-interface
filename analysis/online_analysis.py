@@ -7,6 +7,7 @@ import threading
 import queue
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.collections import PatchCollection
 import aopy
 from riglib.ecube import MultiSource, map_channels_for_multisource
 from riglib.source import MultiChanDataSource
@@ -47,10 +48,12 @@ class AnalysisWorker(mp.Process):
         self._stop_event = mp.Event()
         self.data_queue = data_queue
         self.figsize = figsize
+        self.cycle_count = 0
         self.sync_events = []
         self.cursor_pos = np.zeros(2)
         self.eye_pos = np.zeros(2)
         self.target_pos = {}
+        self.targets = {}
         self.sync_events_checked = 0
         self.eye_coeff = np.zeros((2, 2))
         self.calibration_data = []
@@ -63,11 +66,16 @@ class AnalysisWorker(mp.Process):
         while self.sync_events_checked < len(self.sync_events):
             event_name, event_data = self.sync_events[self.sync_events_checked]
             if event_name == 'TARGET_ON':
-                self.targets[event_data] = True
+                self.targets[event_data] = 1
             elif event_name == 'TARGET_OFF':
-                self.targets[event_data] = False
-            elif event_name == 'TRIAL_END':
-                self.targets = {} # Clear targets at the end of the trial
+                self.targets[event_data] = 0
+            elif event_name in ['PAUSE', 'TRIAL_END', 'HOLD_PENALTY', 'DELAY_PENALTY', 'TIMEOUT_PENALTY']:
+                # Clear targets at the end of the trial
+                self.targets = {}
+            elif event_name == 'REWARD':
+                # Set all active targets to reward
+                for target_idx in self.targets.keys():
+                    self.targets[target_idx] = 2 if self.targets[target_idx] else 0
             elif event_name == 'CURSOR_ENTER_TARGET' and event_data > 0:
                 self.calibration_data.append((self.eye_pos, self.target_pos[event_data]))
 
@@ -98,7 +106,7 @@ class AnalysisWorker(mp.Process):
         try:
             radius = self.task_params['target_radius']
             color = self.task_params['target_color']
-            targets = [(self.target_pos[k], radius, color) for k, v in self.targets.items() if v]
+            targets = [(self.target_pos[k], radius, color if v == 1 else 'green') for k, v in self.targets.items() if v]
         except:
             targets = []
 
@@ -107,40 +115,74 @@ class AnalysisWorker(mp.Process):
     def init(self):
         # Initialize figure
         self.fig = plt.figure(figsize=self.figsize)
-        plt.show(block=False)
 
-        self.ax = self.fig.add_subplot(221)
-        self.text = self.ax.text(0.5, 0.5, '', ha='center', va='center', fontsize=12)
-        self.text.set_text('Waiting for data...')
-        self.fig.canvas.draw()
+        # Add axis
+        self.ax = self.fig.add_subplot(111)
+        bounds = self.task_params.get('cursor_bounds', (-10,10,0,0,-10,10))
+        self.ax.set_xlim(bounds[0], bounds[1])
+        self.ax.set_ylim(bounds[-2], bounds[-1])
+        self.ax.set_aspect('equal')
+
+        # Labels
+        self.exp_text = self.ax.text(0., 1.05, f"{self.task_params['experiment_name']} ({self.task_params['te_id']})",
+                                     ha='left', va='center', fontsize=12, transform=self.ax.transAxes)
+        self.time_text = self.ax.text(1., 1.05, '', ha='right', va='center', fontsize=12, transform=self.ax.transAxes)
+        self.time_text.set_text('Waiting for data...')
+
+        # Circles
+        self.circles = PatchCollection([])
+        self.ax.add_collection(self.circles)
+
+        # Pop up the figure
+        plt.show(block=False)
+        plt.pause(0.1)
 
     def update(self):
         try:
-            key, values = self.data_queue.get(timeout=0.1)
+            key, values = self.data_queue.get(timeout=0.) # continue if no data
         except queue.Empty:
-            return
+            return False
         if key == 'cycle_count':
-            self.text.set_text(values[0])
+            self.cycle_count = values[0]
         if key == 'sync_event':
             event_name, event_data = values
             self.sync_events.append((event_name, int(event_data)))
             self.update_sync_events()
         elif key == 'cursor':
-            self.cursor_pos = np.array(values[0])[0,2]
+            self.cursor_pos = np.array(values[0])[[0,2]]
         elif key == 'eye_pos':
             self.eye_pos = np.array(values[0])[:2]
         elif key == 'target_location':
             target_idx, target_location = values
-            self.target_pos[int(target_idx)] = target_location[0,2]
+            self.target_pos[int(target_idx)] = np.array(target_location)[[0,2]]
+        return True
+
+    def draw(self):
+        '''
+        Update the figure
+        '''
+        self.time_text.set_text(f"t={int(self.cycle_count/self.task_params['fps'])}s")
+        cursor_pos, eye_pos, targets = self.get_current_pos()
+        cursor_radius = self.task_params.get('cursor_radius', 0.25)
+        patches = [
+            plt.Circle(cursor_pos, cursor_radius), 
+            plt.Circle(eye_pos, cursor_radius)
+        ] + [plt.Circle(pos, radius) for pos, radius, _ in targets]
+        self.circles.set_paths(patches)
+        colors = ['b', 'g'] + [c for _, _, c in targets]
+        self.circles.set_facecolor(colors)
+        self.circles.set_alpha(0.5)
+        plt.pause(0.016) # 60 Hz ish
 
     def run(self):
         print('Starting analysis worker:', self.__class__.__name__)
         self.init()
         while not self._stop_event.is_set():
-            self.update()
-            plt.pause(0.1)
+            while self.update():
+                pass # process as fast as possible
+            self.draw() # Draw when no updates are happening
 
-        plt.close(self.fig) # add saving feature here instead of just closing the figure
+        plt.close(self.fig) # add saving feature here
 
     def stop(self):
         self._stop_event.set()

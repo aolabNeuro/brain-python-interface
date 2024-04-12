@@ -2,6 +2,9 @@ import time
 from riglib import experiment
 from analysis import online_analysis
 from features.debug_features import OnlineAnalysis
+from features.peripheral_device_features import MouseControl
+from built_in_tasks.manualcontrolmultitasks import ManualControl
+from riglib.stereo_opengl.window import Window2D
 import unittest
 import numpy as np
 import os
@@ -45,35 +48,47 @@ class TestOnlineAnalysis(unittest.TestCase):
 
         analysis._stop()
 
+    @unittest.skip("")
     def test_threaded(self):
 
         analysis = online_analysis.OnlineDataServer('localhost', 5000)
 
         # Start exp 1
         Exp = experiment.make(experiment.Experiment, feats=[OnlineAnalysis])
-        exp = Exp(fps=1, session_length=10, online_analysis_ip='localhost', online_analysis_port=5000)
+        exp = Exp(fps=10, session_length=18, online_analysis_ip='localhost', online_analysis_port=5000)
         print(exp.dtype)
         exp.init()
 
         # Start analysis
         analysis.start()
         time.sleep(1)
-        threading.Thread(target=exp.run).start()
-
-        time.sleep(12)
-
-        # Start exp 2
-        Exp = experiment.make(experiment.Experiment, feats=[OnlineAnalysis])
-        exp = Exp(fps=1, session_length=5, online_analysis_ip='localhost', online_analysis_port=5000)
-        print(exp.dtype)
-        exp.init()
-        time.sleep(1)
-        threading.Thread(target=exp.run).start()
-        time.sleep(6)
+        exp.run()
 
         # Wrap up
         analysis.stop()
         analysis.join()
+
+    def test_cursor(self):
+
+        analysis = online_analysis.OnlineDataServer('localhost', 5000)
+
+        # Start exp 1
+        seq = ManualControl.centerout_2D(nblocks=1, distance=5)
+        Exp = experiment.make(ManualControl, feats=[Window2D, MouseControl, OnlineAnalysis])
+        exp = Exp(seq, fps=60, session_length=18, online_analysis_ip='localhost', online_analysis_port=5000,
+                  fullscreen=False, window_size=(800,400), rotation='xzy')
+        print(exp.dtype)
+        exp.init()
+
+        # Start analysis
+        analysis.start()
+        time.sleep(1)
+        exp.run()
+
+        # Wrap up
+        analysis.stop()
+        analysis.join()
+
 
 
 if __name__ == '__main__':

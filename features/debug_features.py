@@ -2,6 +2,7 @@ import cProfile
 import pstats
 import socket
 from riglib.experiment import traits
+import numpy as np
 import json
 
 class Profiler():
@@ -31,7 +32,15 @@ class OnlineAnalysis(traits.HasTraits):
         '''
         Helper function to send messages to the online analysis server
         '''
-        payload = '#'.join([json.dumps(v) for v in values])
+        strings = []
+        for v in values:
+            if isinstance(v, np.ndarray) and v.size > 1:
+                strings.append(json.dumps(v.tolist()))
+            elif isinstance(v, np.ndarray):
+                strings.append(json.dumps(v[0]))
+            else:
+                strings.append(json.dumps(v))
+        payload = '#'.join(strings)
         self.online_analysis_sock.sendto(f'{key}:{payload}'.encode('utf-8'), (self.online_analysis_ip, self.online_analysis_port))
 
     def init(self):
@@ -44,9 +53,9 @@ class OnlineAnalysis(traits.HasTraits):
             socket.SOCK_DGRAM) # UDP
         self._send_online_analysis_msg('param', 'experiment_name', self.__class__.__name__)
         if hasattr(self, 'saveid'):
-            self._send_online_analysis_msg('te_id', self.saveid)
+            self._send_online_analysis_msg('param', 'te_id', self.saveid)
         else:
-            self._send_online_analysis_msg('te_id', 'None')
+            self._send_online_analysis_msg('param', 'te_id', 'None')
         for key, value in self.get_trait_values().items():
             self._send_online_analysis_msg('param', key, value)
         if hasattr(self, 'sync_params'):
@@ -79,7 +88,7 @@ class OnlineAnalysis(traits.HasTraits):
         self._send_online_analysis_msg('state', condition)
         super().set_state(condition, **kwargs)
 
-    def sync_event(self, event_name, event_data=None, immediate=False):
+    def sync_event(self, event_name, event_data=0, immediate=False):
         '''
         Send sync events to the online analysis server
         '''
