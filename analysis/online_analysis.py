@@ -43,11 +43,12 @@ class AnalysisWorker(mp.Process):
     calibration of eye data to target locations when the cursor enters the target.
     '''
 
-    def __init__(self, task_params, data_queue, figsize=(8,10)):
+    def __init__(self, task_params, data_queue, figsize=(8,10), update_rate=60):
         self.task_params = task_params
         self._stop_event = mp.Event()
         self.data_queue = data_queue
         self.figsize = figsize
+        self.update_rate = update_rate
         super().__init__()
 
     def init(self):
@@ -103,7 +104,7 @@ class AnalysisWorker(mp.Process):
             self.update()
             self.draw()
             self.time_text.set_text(f"t={int(self.cycle_count/self.task_params['fps'])}s")
-            plt.pause(0.016) # 60 Hz ish
+            plt.pause(1./self.update_rate) # 60 Hz ish
 
         self.cleanup()
         plt.close(self.fig)
@@ -118,28 +119,6 @@ class BehaviorAnalysisWorker(AnalysisWorker):
     calibration of eye data to target locations when the cursor enters the target.
     '''
    
-    def update_sync_events(self):
-        '''
-        Look at the sync events to determine which target is active
-        '''
-        while self.sync_events_checked < len(self.sync_events):
-            event_name, event_data = self.sync_events[self.sync_events_checked]
-            if event_name == 'TARGET_ON':
-                self.targets[event_data] = 1
-            elif event_name == 'TARGET_OFF':
-                self.targets[event_data] = 0
-            elif event_name in ['PAUSE', 'TRIAL_END', 'HOLD_PENALTY', 'DELAY_PENALTY', 'TIMEOUT_PENALTY']:
-                # Clear targets at the end of the trial
-                self.targets = {}
-            elif event_name == 'REWARD':
-                # Set all active targets to reward
-                for target_idx in self.targets.keys():
-                    self.targets[target_idx] = 2 if self.targets[target_idx] else 0
-            elif event_name == 'CURSOR_ENTER_TARGET' and event_data > 0:
-                self.calibration_data.append((self.eye_pos, self.target_pos[event_data]))
-
-            self.sync_events_checked += 1
-
     def update_eye_calibration(self):
         '''
         Update the eye calibration coefficients using the collected data
@@ -159,7 +138,6 @@ class BehaviorAnalysisWorker(AnalysisWorker):
             eye_pos ((2,) tuple): Current eye position
             targets (list): List of active targets in (position, radius, color) format
         '''
-        self.update_eye_calibration()
         calibrated_eye_pos = np.dot(self.eye_pos, self.eye_coeff)
 
         try:
@@ -173,12 +151,10 @@ class BehaviorAnalysisWorker(AnalysisWorker):
 
     def init(self):
         super().init()
-        self.sync_events = []
         self.cursor_pos = np.zeros(2)
         self.eye_pos = np.zeros(2)
         self.target_pos = {}
         self.targets = {}
-        self.sync_events_checked = 0
         self.eye_coeff = np.zeros((2, 2))
         self.calibration_data = []
 
@@ -195,8 +171,20 @@ class BehaviorAnalysisWorker(AnalysisWorker):
         super().handle_data(key, values)
         if key == 'sync_event':
             event_name, event_data = values
-            self.sync_events.append((event_name, int(event_data)))
-            self.update_sync_events()
+            if event_name == 'TARGET_ON':
+                self.targets[event_data] = 1
+            elif event_name == 'TARGET_OFF':
+                self.targets[event_data] = 0
+            elif event_name in ['PAUSE', 'TRIAL_END', 'HOLD_PENALTY', 'DELAY_PENALTY', 'TIMEOUT_PENALTY']:
+                # Clear targets at the end of the trial
+                self.targets = {}
+            elif event_name == 'REWARD':
+                # Set all active targets to reward
+                for target_idx in self.targets.keys():
+                    self.targets[target_idx] = 2 if self.targets[target_idx] else 0
+            elif event_name == 'CURSOR_ENTER_TARGET' and event_data > 0:
+                self.calibration_data.append((self.eye_pos, self.target_pos[event_data]))
+                self.update_eye_calibration()
         elif key == 'cursor':
             self.cursor_pos = np.array(values[0])[[0,2]]
         elif key == 'eye_pos':
@@ -221,7 +209,7 @@ class BehaviorAnalysisWorker(AnalysisWorker):
         self.circles.set_facecolor(colors)
         self.circles.set_alpha(0.5)
 
-    def save(self):
+    def cleanup(self):
 
         # TO-DO: implement save
         pass
@@ -229,23 +217,119 @@ class BehaviorAnalysisWorker(AnalysisWorker):
 
 class ERPAnalysisWorker(AnalysisWorker):
     '''
-    Plots ERP data from experiments with a ECoG244 array. Automatically calculates 
+    Plots ERP data from experiments with an ECoG244 array. Automatically calculates 
     ERPs for flash, movement, or laser events depending on the task.
     '''
 
     bufferlen = 5 # seconds of data to keep in the buffer
 
+    def __init__(self, task_params, data_queue, figsize=(8,10), update_rate=1, time_before=0.02, time_after=0.02):
+        super().__init__(task_params, data_queue, figsize=figsize, update_rate=update_rate)
+        self.time_before = time_before
+        self.time_after = time_after
+
     def init(self):
+        super().init()
+
+        # Initialize the data source
         self.elec_pos, self.acq_ch, _ = aopy.data.load_chmap('ECoG244')
+        self.clock_dch = self.task_params['screen_sync_dch']
+        self.clock_elapsed = 0
+        self.clock_times = np.array([])
+        self.trigger_dch = None
+        self.trigger_events = []
+        self.trigger_times = np.array([])
+        self.lfp_downsample = 25
+
         if hasattr(self.task_params, 'qwalor_trigger_dch'):
-            self.trigger_ch = self.task_params['qwalor_trigger_dch']
-            self.channels = map_channels_for_multisource(headstage_channels=self.acq_ch, digital_channels=[self.trigger_ch])
-        self.ds = MultiChanDataSource(MultiSource, channels=self.channels, bufferlen=self.bufferlen)
+            self.trigger_dch = self.task_params['qwalor_trigger_dch']
+            channels = map_channels_for_multisource(headstage_channels=self.acq_ch, 
+                                                         digital_channels=[self.clock_dch, self.trigger_dch])
+        else:
+            self.trigger_events.append('TARGET_ON') # For flash
+            channels = map_channels_for_multisource(headstage_channels=self.acq_ch, digital_channels=[self.clock_dch])
+        self.ds = MultiChanDataSource(MultiSource, channels=channels, bufferlen=self.bufferlen)
         self.ds.start()
+        print('datasource started')
 
-    def get_erp(self, channels):
-        data = self.ds.get_new(channels)
+        # Initialize the ERP data
+        self.erp = np.zeros((len(self.elec_pos), 
+                             int((self.time_before + self.time_after) * self.ds.source.update_freq/self.lfp_downsample), 
+                             0), dtype=self.ds.source.dtype)
+        
+        # Initialize the figure
+        self.clim = (-100, 100)
+        self.erp_im = aopy.visualization.plot_spatial_map(np.zeros(16,16), self.elec_pos[:,0], self.elec_pos[:,1], 
+                                                 cmap='bwr', ax=self.ax)
+        self.erp_im.set_clim(self.clim)
+        self.erp_text = self.ax.text(1., 1.5, '', ha='center', va='center', fontsize=12, transform=self.ax.transAxes)
 
+    def update(self):
+        super().update()
+
+        # Keep track of clock cycles
+        clock_data = self.ds.get_new(map_channels_for_multisource(digital_channels=[self.clock_dch]))
+        timestamps, edges = aopy.utils.detect_edges(clock_data, self.ds.source.update_freq, rising=True, falling=False)   
+        self.clock_times = np.concatenate((self.clock_times, timestamps + self.clock_elapsed))
+        clock_elapsed_prev = self.clock_elapsed
+        clock_elapsed_new = self.clock_elapsed + len(clock_data) / self.ds.source.update_freq
+
+        # Check the trigger if it exists
+        if self.trigger_dch:
+            trigger_data = self.ds.get_new(map_channels_for_multisource(digital_channels=[self.trigger_dch]))
+            timestamps, edges = aopy.utils.detect_edges(trigger_data, self.ds.source.update_freq, rising=True, falling=False)   
+            self.trigger_times = np.concatenate((self.trigger_times, timestamps + clock_elapsed_prev))
+        
+        # Append new ERPs from trigger events
+        lfp = self.ds.get_new(map_channels_for_multisource(headstage_channels=self.acq_ch))[::self.lfp_downsample, :]
+        fs = self.ds.source.update_freq / self.lfp_downsample
+        ignored_trigger_cycles = []
+        while self.trigger_cycles:
+            cycle = self.trigger_cycles.pop()
+            if cycle > len(self.clock_times):
+                ignored_trigger_cycles.append(cycle)
+                continue
+            time = self.clock_times[cycle]
+            if time + self.time_after > clock_elapsed_new:
+                ignored_trigger_cycles.append(cycle)
+                continue
+            erp = aopy.analysis.calc_erp(lfp, [time - clock_elapsed_prev], self.time_before, self.time_after, fs)
+            self.erp = np.concatenate((self.erp, erp), axis=2)
+        self.trigger_cycles = ignored_trigger_cycles
+
+        # Check for new digital triggers
+        ignored_trigger_times = []
+        while self.trigger_times:
+            time = self.trigger_times.pop()
+            if time + self.time_after > clock_elapsed_new:
+                ignored_trigger_times.append(time)
+                continue
+            erp = aopy.analysis.calc_erp(lfp, [time - clock_elapsed_prev], self.time_before, self.time_after, fs)
+            self.erp = np.concatenate((self.erp, erp), axis=2)
+        self.trigger_times = ignored_trigger_times
+
+        # Update the total elapsed time
+        self.clock_elapsed = clock_elapsed_new
+
+    def handle_data(self, key, values):
+        super().handle_data(key, values)
+        if key == 'sync_event':
+            event_name, event_data = values
+            if event_name in self.trigger_events:
+                self.trigger_cycles.append(self.cycle_count)
+
+    def draw(self):
+        super().draw()
+        self.erp_text.set_text(f"{len(self.erp)}")
+        mean_erp = np.mean(self.erp, axis=2)*1.907348633e-7*1e6 # convert to uV
+        data_map = aopy.visualization.get_data_map(mean_erp, self.elec_pos[:,0], self.elec_pos[:,1])
+        self.erp_im.set_data(data_map)
+
+    def cleanup(self):
+        '''
+        Cleanup tasks after the experiment ends, e.g. saving the figure.
+        '''
+        pass
 
 class OnlineDataServer(threading.Thread):
     '''
@@ -312,10 +396,10 @@ class OnlineDataServer(threading.Thread):
         data_queue = mp.Queue()
         self.analysis_workers.append((BehaviorAnalysisWorker(self.task_params, data_queue), data_queue))
 
-        # # Is there an ECoG array?
-        # if hasattr(self.task_params, 'record_headstage') and self.task_params['record_headstage']:
-        #     queue = Queue()
-        #     self.analysis_workers.append((ERPAnalysisWorker(self.task_params, queue), queue))
+        # Is there an ECoG array?
+        if hasattr(self.task_params, 'record_headstage') and self.task_params['record_headstage']:
+            data_queue = mp.Queue()
+            self.analysis_workers.append((ERPAnalysisWorker(self.task_params, data_queue), data_queue))
 
         # Start all the workers
         for worker, _ in self.analysis_workers:
