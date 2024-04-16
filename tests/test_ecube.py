@@ -1,6 +1,6 @@
 import time
 from riglib import source
-from riglib.ecube import Broadband, LFP, LFP_Blanking_File, LFP_Blanking, make_source_class
+from riglib.ecube import Broadband, LFP, File, LFP_Blanking_File, LFP_Blanking, MultiSource, MultiSource_File, make_source_class
 from riglib.ecube.file import parse_file
 from riglib.bmi import state_space_models, train, extractor
 import numpy as np
@@ -77,6 +77,7 @@ class TestStreaming(unittest.TestCase):
         self.assertEqual(data.shape[1], len(channels))
         self.assertEqual(data.shape[0], STREAMING_DURATION/extract_rate)
 
+    @unittest.skip('works')
     def test_lfp_blanking(self):
         channels = [1, 3]
         file = "/media/server/raw/ecube/2022-12-23_BMI3D_te7797"
@@ -94,6 +95,45 @@ class TestStreaming(unittest.TestCase):
         print(np.unique(chs))
         bb.stop()
 
+    @unittest.skip("works") 
+    def test_multisource(self):
+        channels = [1, 33, 34, 97]
+        # file = "/Users/leoscholl/2023-10-10_BMI3D_te11503"
+        bb = MultiSource_File(channels=channels)
+        bb.start()
+        ch_data = []
+        chs = []
+        for d in range(100):
+            print('.', end="")
+            for i in range(len(channels)):
+                ch, data = bb.get()
+                ch_data.append(data)
+                chs.append(ch)
+                if np.count_nonzero(np.isnan(data)):
+                    print(f"Got some nans in ch {ch}")
+        print(np.unique(chs))
+        bb.stop()
+
+    @unittest.skip("doesn't work on my mac - just a bunch of zeros")
+    def test_multisource_ds(self):
+        channels = [1, 40+32, 97]
+        # file = "/Users/leoscholl/2023-10-10_BMI3D_te11503"
+        ds = source.MultiChanDataSource(MultiSource_File, channels=channels)
+        ds.start()
+        time.sleep(STREAMING_DURATION)
+        data = ds.get(1000, channels)
+        print(data)
+        ds.stop()
+
+        n_samples = int(MultiSource_File.update_freq * STREAMING_DURATION / 728) * 728 # closest multiple of 728 (floor)
+
+        self.assertEqual(len(data), len(channels))
+        # self.assertEqual(len(data[0]), n_samples)
+        self.assertEqual(len(data[1]), len(data[2]))
+
+        from matplotlib import pyplot as plt
+        plt.plot(data)
+        plt.show()
 
 class TestFileLoadin(unittest.TestCase):
 

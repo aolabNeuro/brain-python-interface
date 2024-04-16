@@ -9,7 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.collections import PatchCollection
 import aopy
-from riglib.ecube import MultiSource, map_channels_for_multisource
+from riglib.ecube import MultiSource_File as MultiSource, map_channels_for_multisource
 from riglib.source import MultiChanDataSource
 
 class OnlineDataWorker(threading.Thread):
@@ -43,12 +43,13 @@ class AnalysisWorker(mp.Process):
     calibration of eye data to target locations when the cursor enters the target.
     '''
 
-    def __init__(self, task_params, data_queue, figsize=(8,10), update_rate=60):
+    def __init__(self, task_params, data_queue, figsize=(8,10), update_rate=60, fps=60):
         self.task_params = task_params
         self._stop_event = mp.Event()
         self.data_queue = data_queue
         self.figsize = figsize
         self.update_rate = update_rate
+        self.fps = fps
         super().__init__()
 
     def init(self):
@@ -100,11 +101,16 @@ class AnalysisWorker(mp.Process):
         plt.show(block=False)
         plt.pause(0.1)
 
+        t_update = time.perf_counter()
+        t_refresh = time.perf_counter()
         while not self._stop_event.is_set():
-            self.update()
+            if time.perf_counter() - t_update > 1./self.update_rate:
+                self.update()
+                t_update = time.perf_counter()
             self.draw()
             self.time_text.set_text(f"t={int(self.cycle_count/self.task_params['fps'])}s")
-            plt.pause(1./self.update_rate) # 60 Hz ish
+            plt.gcf().canvas.draw_idle()
+            plt.gcf().canvas.start_event_loop(1./self.fps) 
 
         self.cleanup()
         plt.close(self.fig)
@@ -233,12 +239,13 @@ class ERPAnalysisWorker(AnalysisWorker):
 
         # Initialize the data source
         self.elec_pos, self.acq_ch, _ = aopy.data.load_chmap('ECoG244')
-        self.clock_dch = self.task_params['screen_sync_dch']
+        self.clock_dch = self.task_params.get('screen_sync_dch', 40)
         self.clock_elapsed = 0
         self.clock_times = np.array([])
         self.trigger_dch = None
         self.trigger_events = []
-        self.trigger_times = np.array([])
+        self.trigger_cycles = []
+        self.trigger_times = []
         self.lfp_downsample = 25
 
         if hasattr(self.task_params, 'qwalor_trigger_dch'):
@@ -259,52 +266,63 @@ class ERPAnalysisWorker(AnalysisWorker):
         
         # Initialize the figure
         self.clim = (-100, 100)
-        self.erp_im = aopy.visualization.plot_spatial_map(np.zeros(16,16), self.elec_pos[:,0], self.elec_pos[:,1], 
+        self.erp_im = aopy.visualization.plot_spatial_map(np.zeros((16,16)), self.elec_pos[:,0], self.elec_pos[:,1], 
                                                  cmap='bwr', ax=self.ax)
         self.erp_im.set_clim(self.clim)
-        self.erp_text = self.ax.text(1., 1.5, '', ha='center', va='center', fontsize=12, transform=self.ax.transAxes)
+        self.erp_text = self.ax.text(0.75, 1.05, '.', ha='center', va='center', fontsize=12, transform=self.ax.transAxes)
 
     def update(self):
         super().update()
 
+        print('update')
+
         # Keep track of clock cycles
-        clock_data = self.ds.get_new(map_channels_for_multisource(digital_channels=[self.clock_dch]))
-        timestamps, edges = aopy.utils.detect_edges(clock_data, self.ds.source.update_freq, rising=True, falling=False)   
+        clock_data = self.ds.get_new(map_channels_for_multisource(digital_channels=[self.clock_dch]))[0]
+        if len(clock_data) == 0:
+            return # no new data
+        timestamps, edges = aopy.utils.detect_edges(clock_data, self.ds.source.update_freq, rising=True, falling=False)
         self.clock_times = np.concatenate((self.clock_times, timestamps + self.clock_elapsed))
         clock_elapsed_prev = self.clock_elapsed
         clock_elapsed_new = self.clock_elapsed + len(clock_data) / self.ds.source.update_freq
 
         # Check the trigger if it exists
         if self.trigger_dch:
-            trigger_data = self.ds.get_new(map_channels_for_multisource(digital_channels=[self.trigger_dch]))
+            trigger_data = self.ds.get_new(map_channels_for_multisource(digital_channels=[self.trigger_dch]))[0]
             timestamps, edges = aopy.utils.detect_edges(trigger_data, self.ds.source.update_freq, rising=True, falling=False)   
             self.trigger_times = np.concatenate((self.trigger_times, timestamps + clock_elapsed_prev))
         
         # Append new ERPs from trigger events
-        lfp = self.ds.get_new(map_channels_for_multisource(headstage_channels=self.acq_ch))[::self.lfp_downsample, :]
         fs = self.ds.source.update_freq / self.lfp_downsample
+        nt = 2 # seconds
+        npts = int(nt * fs)
+        lfp = self.ds.get(npts, map_channels_for_multisource(headstage_channels=self.acq_ch))
+        lfp = np.array(lfp)[:,::self.lfp_downsample].T # reshape and downsample (nt, nch)
         ignored_trigger_cycles = []
         while self.trigger_cycles:
+            print(len(self.trigger_cycles), 'cycles')
             cycle = self.trigger_cycles.pop()
             if cycle > len(self.clock_times):
+                print('ignore cycle', cycle, 'out of', len(self.clock_times))
                 ignored_trigger_cycles.append(cycle)
                 continue
             time = self.clock_times[cycle]
             if time + self.time_after > clock_elapsed_new:
+                print('ignore cycle', cycle, 'with time', time, 'out of', clock_elapsed_new)
                 ignored_trigger_cycles.append(cycle)
                 continue
-            erp = aopy.analysis.calc_erp(lfp, [time - clock_elapsed_prev], self.time_before, self.time_after, fs)
+            erp = aopy.analysis.calc_erp(lfp, [time - clock_elapsed_new + nt], self.time_before, self.time_after, fs)
             self.erp = np.concatenate((self.erp, erp), axis=2)
         self.trigger_cycles = ignored_trigger_cycles
 
         # Check for new digital triggers
         ignored_trigger_times = []
         while self.trigger_times:
+            print('times:', len(self.trigger_times))
             time = self.trigger_times.pop()
             if time + self.time_after > clock_elapsed_new:
                 ignored_trigger_times.append(time)
                 continue
-            erp = aopy.analysis.calc_erp(lfp, [time - clock_elapsed_prev], self.time_before, self.time_after, fs)
+            erp = aopy.analysis.calc_erp(lfp, [time - clock_elapsed_new + nt], self.time_before, self.time_after, fs)
             self.erp = np.concatenate((self.erp, erp), axis=2)
         self.trigger_times = ignored_trigger_times
 
@@ -320,16 +338,17 @@ class ERPAnalysisWorker(AnalysisWorker):
 
     def draw(self):
         super().draw()
-        self.erp_text.set_text(f"{len(self.erp)}")
-        mean_erp = np.mean(self.erp, axis=2)*1.907348633e-7*1e6 # convert to uV
-        data_map = aopy.visualization.get_data_map(mean_erp, self.elec_pos[:,0], self.elec_pos[:,1])
+        fs = self.ds.source.update_freq / self.lfp_downsample
+        max_erp = aopy.analysis.get_max_erp(self.erp, self.time_before, self.time_after, fs, trial_average=True)
+        data_map = aopy.visualization.get_data_map(max_erp*1.907348633e-7*1e6, self.elec_pos[:,0], self.elec_pos[:,1])
         self.erp_im.set_data(data_map)
+        self.erp_text.set_text(f"{self.erp.shape[2]} trials")
 
     def cleanup(self):
         '''
         Cleanup tasks after the experiment ends, e.g. saving the figure.
         '''
-        pass
+        self.ds.stop()
 
 class OnlineDataServer(threading.Thread):
     '''
@@ -397,9 +416,9 @@ class OnlineDataServer(threading.Thread):
         self.analysis_workers.append((BehaviorAnalysisWorker(self.task_params, data_queue), data_queue))
 
         # Is there an ECoG array?
-        if hasattr(self.task_params, 'record_headstage') and self.task_params['record_headstage']:
-            data_queue = mp.Queue()
-            self.analysis_workers.append((ERPAnalysisWorker(self.task_params, data_queue), data_queue))
+        # if hasattr(self.task_params, 'record_headstage') and self.task_params['record_headstage']:
+        data_queue = mp.Queue()
+        self.analysis_workers.append((ERPAnalysisWorker(self.task_params, data_queue), data_queue))
 
         # Start all the workers
         for worker, _ in self.analysis_workers:
