@@ -14,6 +14,7 @@ from config.rig_defaults import db as rig_defaults
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 CONFIG_DIR = os.path.join(os.path.expanduser("~"), '.config', 'bmi3d')
 HOSTNAME = socket.gethostname()
+DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 
 # Add databases
 def get_sqlite3_databases():

@@ -512,8 +512,8 @@ class MultiSource_File(DataSourceSystem):
     def __init__(self, channels, ecube_bmi_filename=None):
         
         if not ecube_bmi_filename:
-            ecube_bmi_filename = "/Users/leoscholl/2023-10-10_BMI3D_te11503"
-
+            # ecube_bmi_filename = "/media/moor-data/raw/ecube/2024-03-04_BMI3D_te14929" # laser
+            ecube_bmi_filename = "/media/moor-data/raw/ecube/2024-03-06_BMI3D_te15031" # mc
         # Open the file
         channels = np.array(channels)
         self.analog_channels = (channels[channels <= 32] - 1).astype('int')
@@ -525,6 +525,7 @@ class MultiSource_File(DataSourceSystem):
         self.digital_file = aopy.data.load_ecube_data_chunked(ecube_bmi_filename, "DigitalPanel", chunksize=self.chunksize)
         self.flag = "Headstages"
         self.gen = iter(())
+        self.t0 = time.perf_counter()
         
     def _next_gen(self, file, channels):
         try:
@@ -552,10 +553,9 @@ class MultiSource_File(DataSourceSystem):
                 try:
                     # Special consideration for digital panel to convert bits to channels
                     data_block = next(self.digital_file)
-                    # data_block = aopy.utils.convert_digital_to_channels(data_block)[:,self.digital_channels]
-                    data_block = -1*np.ones((int(self.chunksize),len(self.digital_channels)))
+                    data_block = aopy.utils.convert_digital_to_channels(data_block)[:,self.digital_channels]
                 except StopIteration:
-                    data_block = -1*np.ones((int(self.chunksize),len(self.digital_channels)))
+                    data_block = np.zeros((int(self.chunksize),len(self.digital_channels)))
                 self.gen = multi_chan_generator(data_block, self.digital_channels+33)
                 return next(self.gen)
             elif self.flag == "DigitalPanelAsChans":
@@ -563,7 +563,9 @@ class MultiSource_File(DataSourceSystem):
             
             if self.flag == "AnalogPanel" and len(self.analog_channels) > 0:
                 self.flag = "Headstages"
-                time.sleep(1./(25000/self.chunksize))
+                while time.perf_counter() - self.t0 < 1./(25000/self.chunksize):
+                    pass
+                self.t0 = time.perf_counter()
                 return self._next_gen(self.analog_file, self.analog_channels+1)
             elif self.flag == "AnalogPanel":
                 self.flag = "Headstages"

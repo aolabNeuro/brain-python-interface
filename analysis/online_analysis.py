@@ -5,11 +5,12 @@ import select
 import multiprocessing as mp
 import threading
 import queue
+import traceback
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.collections import PatchCollection
 import aopy
-from riglib.ecube import MultiSource_File as MultiSource, map_channels_for_multisource
+from riglib.ecube import MultiSource, map_channels_for_multisource
 from riglib.source import MultiChanDataSource
 
 class OnlineDataWorker(threading.Thread):
@@ -31,7 +32,7 @@ class OnlineDataWorker(threading.Thread):
             ready = select.select([self.sock], [], [], 0.1) # 100ms timeout to check _stop_event
             if ready[0]:
                 data = self.sock.recv(4096)
-                key, value = data.decode('utf-8').split(':')
+                key, value = data.decode('utf-8').split('%')
                 self.result_queue.put((key, [json.loads(v) for v in value.split('#')]))
 
     def stop(self):
@@ -134,10 +135,10 @@ class BehaviorAnalysisWorker(AnalysisWorker):
             eye_data = np.array(eye_data)
             cursor_data = np.array(cursor_data)
             slopes, intercepts, correlation_coeff = aopy.analysis.fit_linear_regression(eye_data, cursor_data)
-            if abs(correlation_coeff) > self.eye_coeff_corr:
-                self.eye_coeff_corr = abs(correlation_coeff)
+            if np.all(abs(correlation_coeff) > self.eye_coeff_corr):
+                self.eye_coeff_corr = np.min(abs(correlation_coeff))
                 self.eye_coeff = np.vstack((slopes, intercepts)).T
-
+            
     def get_current_pos(self):
         '''
         Get the current cursor, eye, and target positions
@@ -165,6 +166,7 @@ class BehaviorAnalysisWorker(AnalysisWorker):
         self.calibration_data = []
         self.calibration_flag = True
         self.eye_coeff = np.zeros((2, 2))
+        self.eye_coeff_corr = 0.5 # Don't accept anything lower than 0.5 by default
 
         bounds = self.task_params.get('cursor_bounds', (-10,10,0,0,-10,10))
         self.ax.set_xlim(bounds[0], bounds[1])
@@ -297,15 +299,12 @@ class ERPAnalysisWorker(AnalysisWorker):
         lfp = np.array(lfp)[:,::self.lfp_downsample].T # reshape and downsample (nt, nch)
         ignored_trigger_cycles = []
         while self.trigger_cycles:
-            print(len(self.trigger_cycles), 'cycles')
             cycle = self.trigger_cycles.pop()
             if cycle > len(self.clock_times):
-                print('ignore cycle', cycle, 'out of', len(self.clock_times))
                 ignored_trigger_cycles.append(cycle)
                 continue
             time = self.clock_times[cycle]
             if time + self.time_after > clock_elapsed_new:
-                print('ignore cycle', cycle, 'with time', time, 'out of', clock_elapsed_new)
                 ignored_trigger_cycles.append(cycle)
                 continue
             erp = aopy.analysis.calc_erp(lfp, [time - clock_elapsed_new + nt], self.time_before, self.time_after, fs)
@@ -315,7 +314,6 @@ class ERPAnalysisWorker(AnalysisWorker):
         # Check for new digital triggers
         ignored_trigger_times = []
         while self.trigger_times:
-            print('times:', len(self.trigger_times))
             time = self.trigger_times.pop()
             if time + self.time_after > clock_elapsed_new:
                 ignored_trigger_times.append(time)
@@ -416,9 +414,9 @@ class OnlineDataServer(threading.Thread):
         self.analysis_workers.append((BehaviorAnalysisWorker(self.task_params, data_queue), data_queue))
 
         # Is there an ECoG array?
-        # if hasattr(self.task_params, 'record_headstage') and self.task_params['record_headstage']:
-        data_queue = mp.Queue()
-        self.analysis_workers.append((ERPAnalysisWorker(self.task_params, data_queue), data_queue))
+        if hasattr(self.task_params, 'record_headstage') and self.task_params['record_headstage']:
+            data_queue = mp.Queue()
+            self.analysis_workers.append((ERPAnalysisWorker(self.task_params, data_queue), data_queue))
 
         # Start all the workers
         for worker, _ in self.analysis_workers:

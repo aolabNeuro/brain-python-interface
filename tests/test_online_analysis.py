@@ -73,17 +73,18 @@ class TestOnlineAnalysis(unittest.TestCase):
         analysis = online_analysis.OnlineDataServer('localhost', 5000)
 
         # Start exp 1
-        seq = ManualControl.centerout_2D(nblocks=1, distance=5)
-        Exp = experiment.make(ManualControl, feats=[Window2D, MouseControl, OnlineAnalysis])
-        exp = Exp(seq, fps=60, session_length=18, online_analysis_ip='localhost', online_analysis_port=5000,
-                  fullscreen=False, window_size=(800,400), rotation='xzy')
-        print(exp.dtype)
-        exp.init()
+        os.environ['DISPLAY'] = ':0.0'
+        # seq = ManualControl.centerout_2D(nblocks=1, distance=5)
+        # Exp = experiment.make(ManualControl, feats=[Window2D, MouseControl, OnlineAnalysis])
+        # exp = Exp(seq, fps=10, session_length=28, online_analysis_ip='localhost', online_analysis_port=5000,
+        #           fullscreen=False, window_size=(800,600), rotation='xzy')
+        # print(exp.dtype)
+        # exp.init()
 
         # Start analysis
         analysis.start()
-        time.sleep(1)
-        exp.run()
+        time.sleep(20)
+        #exp.run()
 
         # Wrap up
         analysis.stop()

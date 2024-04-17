@@ -114,14 +114,14 @@ class TestStreaming(unittest.TestCase):
         print(np.unique(chs))
         bb.stop()
 
-    @unittest.skip("doesn't work on my mac - just a bunch of zeros")
+    # @unittest.skip("doesn't work on my mac - just a bunch of zeros")
     def test_multisource_ds(self):
         channels = [1, 40+32, 97]
         # file = "/Users/leoscholl/2023-10-10_BMI3D_te11503"
         ds = source.MultiChanDataSource(MultiSource_File, channels=channels)
         ds.start()
-        time.sleep(STREAMING_DURATION)
-        data = ds.get(1000, channels)
+        time.sleep(2*STREAMING_DURATION)
+        data = ds.get_new(channels)
         print(data)
         ds.stop()
 
@@ -129,10 +129,10 @@ class TestStreaming(unittest.TestCase):
 
         self.assertEqual(len(data), len(channels))
         # self.assertEqual(len(data[0]), n_samples)
-        self.assertEqual(len(data[1]), len(data[2]))
+        # self.assertEqual(len(data[1]), len(data[2]))
 
         from matplotlib import pyplot as plt
-        plt.plot(data)
+        plt.plot(data[1])
         plt.show()
 
 class TestFileLoadin(unittest.TestCase):

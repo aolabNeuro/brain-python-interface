@@ -41,7 +41,7 @@ class OnlineAnalysis(traits.HasTraits):
             else:
                 strings.append(json.dumps(v))
         payload = '#'.join(strings)
-        self.online_analysis_sock.sendto(f'{key}:{payload}'.encode('utf-8'), (self.online_analysis_ip, self.online_analysis_port))
+        self.online_analysis_sock.sendto(f'{key}%{payload}'.encode('utf-8'), (self.online_analysis_ip, self.online_analysis_port))
 
     def init(self):
         '''
