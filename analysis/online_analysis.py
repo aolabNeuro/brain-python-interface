@@ -102,7 +102,6 @@ class AnalysisWorker(mp.Process):
         plt.pause(0.1)
 
         t_update = time.perf_counter()
-        t_refresh = time.perf_counter()
         while not self._stop_event.is_set():
             if time.perf_counter() - t_update > 1./self.update_rate:
                 self.update()
@@ -122,19 +121,23 @@ class AnalysisWorker(mp.Process):
 class BehaviorAnalysisWorker(AnalysisWorker):
     '''
     Plots eye, cursor, and target data from experiments that have them. Performs automatic
-    calibration of eye data to target locations when the cursor enters the target.
+    calibration of eye data to target locations when the cursor enters the target if no
+    calibration coefficients are available. 
     '''
    
     def update_eye_calibration(self):
         '''
         Update the eye calibration coefficients using the collected data
         '''
-        if len(self.calibration_data) > 0:
-            eye_data, target_data = zip(*self.calibration_data)
+        if self.calibration_flag and len(self.calibration_data) > 0:
+            eye_data, cursor_data = zip(*self.calibration_data)
             eye_data = np.array(eye_data)
-            target_data = np.array(target_data)
-            self.eye_coeff = np.linalg.lstsq(eye_data, target_data, rcond=None)[0]
-        
+            cursor_data = np.array(cursor_data)
+            slopes, intercepts, correlation_coeff = aopy.analysis.fit_linear_regression(eye_data, cursor_data)
+            if abs(correlation_coeff) > self.eye_coeff_corr:
+                self.eye_coeff_corr = abs(correlation_coeff)
+                self.eye_coeff = np.vstack((slopes, intercepts)).T
+
     def get_current_pos(self):
         '''
         Get the current cursor, eye, and target positions
@@ -144,15 +147,13 @@ class BehaviorAnalysisWorker(AnalysisWorker):
             eye_pos ((2,) tuple): Current eye position
             targets (list): List of active targets in (position, radius, color) format
         '''
-        calibrated_eye_pos = np.dot(self.eye_pos, self.eye_coeff)
-
+        calibrated_eye_pos = aopy.data.get_calibrated_eye_data(self.eye_pos, self.eye_coeff)
         try:
             radius = self.task_params['target_radius']
             color = self.task_params['target_color']
             targets = [(self.target_pos[k], radius, color if v == 1 else 'green') for k, v in self.targets.items() if v]
         except:
             targets = []
-
         return self.cursor_pos, calibrated_eye_pos, targets
 
     def init(self):
@@ -161,8 +162,9 @@ class BehaviorAnalysisWorker(AnalysisWorker):
         self.eye_pos = np.zeros(2)
         self.target_pos = {}
         self.targets = {}
-        self.eye_coeff = np.zeros((2, 2))
         self.calibration_data = []
+        self.calibration_flag = True
+        self.eye_coeff = np.zeros((2, 2))
 
         bounds = self.task_params.get('cursor_bounds', (-10,10,0,0,-10,10))
         self.ax.set_xlim(bounds[0], bounds[1])
@@ -189,7 +191,7 @@ class BehaviorAnalysisWorker(AnalysisWorker):
                 for target_idx in self.targets.keys():
                     self.targets[target_idx] = 2 if self.targets[target_idx] else 0
             elif event_name == 'CURSOR_ENTER_TARGET' and event_data > 0:
-                self.calibration_data.append((self.eye_pos, self.target_pos[event_data]))
+                self.calibration_data.append((self.eye_pos, self.cursor_pos))
                 self.update_eye_calibration()
         elif key == 'cursor':
             self.cursor_pos = np.array(values[0])[[0,2]]
@@ -200,9 +202,6 @@ class BehaviorAnalysisWorker(AnalysisWorker):
             self.target_pos[int(target_idx)] = np.array(target_location)[[0,2]]
 
     def draw(self):
-        '''
-        Update the figure
-        '''
         super().draw()
         cursor_pos, eye_pos, targets = self.get_current_pos()
         cursor_radius = self.task_params.get('cursor_radius', 0.25)
@@ -217,7 +216,7 @@ class BehaviorAnalysisWorker(AnalysisWorker):
 
     def cleanup(self):
 
-        # TO-DO: implement save
+        # TO-DO: implement saving calibration
         pass
 
 
@@ -226,7 +225,6 @@ class ERPAnalysisWorker(AnalysisWorker):
     Plots ERP data from experiments with an ECoG244 array. Automatically calculates 
     ERPs for flash, movement, or laser events depending on the task.
     '''
-
     bufferlen = 5 # seconds of data to keep in the buffer
 
     def __init__(self, task_params, data_queue, figsize=(8,10), update_rate=1, time_before=0.02, time_after=0.02):
@@ -348,7 +346,9 @@ class ERPAnalysisWorker(AnalysisWorker):
         '''
         Cleanup tasks after the experiment ends, e.g. saving the figure.
         '''
-        self.ds.stop()
+        self.ds.stop()      
+        # TO-DO: implenent saving figures
+
 
 class OnlineDataServer(threading.Thread):
     '''
