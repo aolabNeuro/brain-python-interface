@@ -1,7 +1,9 @@
+import datetime
 import time
 import json
 import socket
 import select
+import os
 import multiprocessing as mp
 import threading
 import queue
@@ -126,6 +128,37 @@ class BehaviorAnalysisWorker(AnalysisWorker):
     calibration coefficients are available. 
     '''
    
+    def __init__(self, task_params, data_queue, calibration_dir='/var/tmp', **kwargs):
+        super().__init__(task_params, data_queue, **kwargs)
+        self.calibration_dir = calibration_dir
+
+    def init(self):
+        super().init()
+        self.cursor_pos = np.zeros(2)
+        self.eye_pos = np.zeros(2)
+        self.target_pos = {}
+        self.targets = {}
+        self.calibration_data = []
+        self.calibration_flag = True
+        self.eye_coeff = np.zeros((2, 2))
+        self.eye_coeff_corr = 0.5 # Don't accept anything lower than 0.5 by default
+
+        # Load previous calibration
+        subject = self.task_params.get('subject_name', 'None')
+        self.calibration_filename = f'calib_{subject}_{datetime.date.today()}.npy'
+        filepath = os.path.join(self.calibration_dir, self.calibration_filename)
+        if os.path.exists(filepath):
+            self.eye_coeff, self.eye_coeff_corr = np.load(filepath, allow_pickle=True)
+            self.calibration_flag = False
+
+        # Set up figure
+        bounds = self.task_params.get('cursor_bounds', (-10,10,0,0,-10,10))
+        self.ax.set_xlim(bounds[0], bounds[1])
+        self.ax.set_ylim(bounds[-2], bounds[-1])
+        self.ax.set_aspect('equal')
+        self.circles = PatchCollection([])
+        self.ax.add_collection(self.circles)
+
     def update_eye_calibration(self):
         '''
         Update the eye calibration coefficients using the collected data
@@ -156,26 +189,6 @@ class BehaviorAnalysisWorker(AnalysisWorker):
         except:
             targets = []
         return self.cursor_pos, calibrated_eye_pos, targets
-
-    def init(self):
-        super().init()
-        self.cursor_pos = np.zeros(2)
-        self.eye_pos = np.zeros(2)
-        self.target_pos = {}
-        self.targets = {}
-        self.calibration_data = []
-        self.calibration_flag = True
-        self.eye_coeff = np.zeros((2, 2))
-        self.eye_coeff_corr = 0.5 # Don't accept anything lower than 0.5 by default
-
-        bounds = self.task_params.get('cursor_bounds', (-10,10,0,0,-10,10))
-        self.ax.set_xlim(bounds[0], bounds[1])
-        self.ax.set_ylim(bounds[-2], bounds[-1])
-        self.ax.set_aspect('equal')
-
-        # Circles
-        self.circles = PatchCollection([])
-        self.ax.add_collection(self.circles)
 
     def handle_data(self, key, values):
         super().handle_data(key, values)
@@ -218,9 +231,10 @@ class BehaviorAnalysisWorker(AnalysisWorker):
 
     def cleanup(self):
 
-        # TO-DO: implement saving calibration
-        pass
-
+        # Save the calibration if it was performed
+        filepath = os.path.join(self.calibration_dir, self.calibration_filename)
+        if self.calibration_flag: # and not np.array_equal(self.eye_coeff, np.zeros((2, 2))):
+            np.save(filepath, (self.eye_coeff, self.eye_coeff_corr))
 
 class ERPAnalysisWorker(AnalysisWorker):
     '''
@@ -229,8 +243,8 @@ class ERPAnalysisWorker(AnalysisWorker):
     '''
     bufferlen = 5 # seconds of data to keep in the buffer
 
-    def __init__(self, task_params, data_queue, figsize=(8,10), update_rate=1, time_before=0.02, time_after=0.02):
-        super().__init__(task_params, data_queue, figsize=figsize, update_rate=update_rate)
+    def __init__(self, task_params, data_queue, update_rate=1, time_before=0.02, time_after=0.02, **kwargs):
+        super().__init__(task_params, data_queue, update_rate=update_rate, **kwargs)
         self.time_before = time_before
         self.time_after = time_after
 

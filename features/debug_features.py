@@ -51,16 +51,24 @@ class OnlineAnalysis(traits.HasTraits):
         self.online_analysis_sock = socket.socket(
             socket.AF_INET, # Internet
             socket.SOCK_DGRAM) # UDP
+        
+        # Send entry metadata
         self._send_online_analysis_msg('param', 'experiment_name', self.__class__.__name__)
         if hasattr(self, 'saveid'):
             self._send_online_analysis_msg('param', 'te_id', self.saveid)
         else:
             self._send_online_analysis_msg('param', 'te_id', 'None')
+        if hasattr(self, 'subject_name'):
+            self._send_online_analysis_msg('param', 'subject_name', self.subject_name)
+
+        # Send task metadata
         for key, value in self.get_trait_values().items():
             self._send_online_analysis_msg('param', key, value)
         if hasattr(self, 'sync_params'):
             for key, value in self.sync_params.items():
                 self._send_online_analysis_msg('param', key, value)
+        
+        # Send init message to trigger analysis workers
         self._send_online_analysis_msg('init', 'None')
 
     def _start_wait(self):
