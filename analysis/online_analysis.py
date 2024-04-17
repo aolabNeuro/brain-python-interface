@@ -116,6 +116,7 @@ class AnalysisWorker(mp.Process):
 
         self.cleanup()
         plt.close(self.fig)
+        print(self.__class__.__name__, 'stopped')
 
     def stop(self):
         self._stop_event.set()
@@ -480,6 +481,43 @@ class OnlineDataServer(threading.Thread):
 
         self._stop()
         self.sock.close()
+        print('OnlineDataServer shut down.')
 
     def stop(self):
         self._stop_event.set()
+
+
+if __name__ == '__main__':
+    import signal
+    import sys
+
+    # Parse arguments
+    # online_analysis [hostname] [port] [display]
+    if len(sys.argv) >= 2:
+        hostname = sys.argv[1]
+    else:
+        hostname = 'localhost'
+    
+    if len(sys.argv) >= 3:
+        port = sys.argv[2]
+    else:
+        port = 5000
+
+    if len(sys.argv) >= 4:
+        display = sys.argv[3]
+    else:
+        display = ':0'
+
+    # Start server
+    print(hostname, port, display)
+    os.environ['DISPLAY'] = display
+    analysis = OnlineDataServer(hostname, port)
+    analysis.start()
+
+    # Catch interrupts
+    def signal_handler(*args, **kwargs):
+        analysis.stop()
+        sys.exit(0)
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.pause()
+
