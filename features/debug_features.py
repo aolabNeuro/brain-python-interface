@@ -50,32 +50,52 @@ class OnlineAnalysis(traits.HasTraits):
         '''
         super().init()
         print('Starting online analysis socket...')
-        self.online_analysis_sock = socket.socket(
-            socket.AF_INET, # Internet
-            socket.SOCK_DGRAM) # UDP
+        try:
+            self.online_analysis_sock = socket.socket(
+                socket.AF_INET, # Internet
+                socket.SOCK_DGRAM) # UDP
+            self._send_online_analysis_msg('init', False) # Just a test message
+        except:
+            print('Could not connect to socket')
+            return
         
         # Send entry metadata
-        self._send_online_analysis_msg('param', 'experiment_name', self.__class__.__name__)
-        if hasattr(self, 'saveid'):
-            self._send_online_analysis_msg('param', 'te_id', self.saveid)
-        else:
-            self._send_online_analysis_msg('param', 'te_id', 'None')
-        if hasattr(self, 'subject_name'):
-            self._send_online_analysis_msg('param', 'subject_name', self.subject_name)
+        try:
+            self._send_online_analysis_msg('param', 'experiment_name', self.__class__.__name__)
+            if hasattr(self, 'saveid'):
+                self._send_online_analysis_msg('param', 'te_id', self.saveid)
+            else:
+                self._send_online_analysis_msg('param', 'te_id', 'None')
+            if hasattr(self, 'subject_name'):
+                self._send_online_analysis_msg('param', 'subject_name', self.subject_name)
+        except:
+            print('Problem sending entry metadata')
+            traceback.print_exc()
 
         # Send task metadata
         for key, value in self.get_trait_values().items():
-            if key in self.object_trait_names:
-                if key == 'decoder':
-                    self._send_online_analysis_msg('param', 'decoder_channels', value.channels)
-            else:
-                self._send_online_analysis_msg('param', key, value)
+            try:
+                if key in self.object_trait_names:
+                    if key == 'decoder':
+                        self._send_online_analysis_msg('param', 'decoder_channels', value.channels)
+                else:
+                    self._send_online_analysis_msg('param', key, value)
+            except:
+                print('Problem sending task metadata')
+                print(key, value)
+                traceback.print_exc()
+
         if hasattr(self, 'sync_params'):
             for key, value in self.sync_params.items():
-                self._send_online_analysis_msg('param', key, value)
-        
+                try:
+                    self._send_online_analysis_msg('param', key, value)
+                except:
+                    print('Problem sending sync param')
+                    print(key, value)
+                    traceback.print_exc()
+
         # Send init message to trigger analysis workers
-        self._send_online_analysis_msg('init', 'None')
+        self._send_online_analysis_msg('init', True)
         print('...done!')
 
     def _start_wait(self):
