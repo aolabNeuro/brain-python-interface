@@ -458,7 +458,7 @@ class OnlineDataServer(threading.Thread):
                 self.init()
             for _, data_queue in self.analysis_workers:
                 data_queue.put((key, values))
-        elif key == 'init':
+        elif key == 'init' and values[0]:
             self.is_running = True
             self.init()
         elif key == 'param':
