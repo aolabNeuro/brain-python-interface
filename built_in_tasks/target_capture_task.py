@@ -1612,8 +1612,10 @@ class EyeConstrainedHandCapture(ScreenTargetCapture):
         self.sync_event('TRIAL_END')
 
     def _start_reward(self):
-        #super()._start_reward()
-        self.targets[0].cue_trial_end_success()
+        if self.auto_hold_2nd_target:
+            self.targets[0].cue_trial_end_success()
+        else:
+            self.targets[1].cue_trial_end_success()
 
     def _end_reward(self):
         super()._end_reward()
@@ -1655,11 +1657,11 @@ class EyeConstrainedHandCapture(ScreenTargetCapture):
 
         '''
         rng = np.random.default_rng(seed=seed)
+        ntargets=3
         for _ in range(nblocks):
+            order = np.arange(ntargets**3)
             rng.shuffle(order)
             x_pos_candidate = [-dx,0,dx]
-            ntargets = len(x_pos_candidate)
-            order = np.arange(ntargets**3)
 
             for t in range(ntargets**3):
                 idx = np.base_repr(order[t],3).zfill(3) # convert a decimal number to ternary
@@ -1690,7 +1692,8 @@ class EyeConstrainedHandCapture(ScreenTargetCapture):
         '''
 
         ntargets = 3
-        gen = HandConstrainedEyeCapture.row_target(nblocks=nblocks,dx=dx,offset1=offset1,offset2=offset2,offset3=offset3,origin=origin,seed=seed)
+        gen = EyeConstrainedHandCapture.row_target(nblocks=nblocks,dx=dx,offset1=offset1,offset2=offset2,offset3=offset3,\
+                                                   origin=origin,seed=seed)
         for _ in range(nblocks*(ntargets**3)):
             idx1,idx2,idx3,pos1,pos2,pos3 = next(gen)
 
