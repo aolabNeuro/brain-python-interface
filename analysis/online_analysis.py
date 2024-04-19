@@ -429,7 +429,7 @@ class OnlineDataServer(threading.Thread):
         self.analysis_workers.append((BehaviorAnalysisWorker(self.task_params, data_queue), data_queue))
 
         # Is there an ECoG array?
-        if hasattr(self.task_params, 'record_headstage') and self.task_params['record_headstage']:
+        if 'record_headstage' in self.task_params and self.task_params['record_headstage']:
             data_queue = mp.Queue()
             self.analysis_workers.append((ERPAnalysisWorker(self.task_params, data_queue), data_queue))
 

@@ -1,6 +1,7 @@
 import cProfile
 import pstats
 import socket
+import traceback
 from riglib.experiment import traits
 import numpy as np
 import json
@@ -48,6 +49,7 @@ class OnlineAnalysis(traits.HasTraits):
         Send basic experiment info to the online analysis server
         '''
         super().init()
+        print('Starting online analysis socket...')
         self.online_analysis_sock = socket.socket(
             socket.AF_INET, # Internet
             socket.SOCK_DGRAM) # UDP
@@ -63,13 +65,18 @@ class OnlineAnalysis(traits.HasTraits):
 
         # Send task metadata
         for key, value in self.get_trait_values().items():
-            self._send_online_analysis_msg('param', key, value)
+            if key in self.object_trait_names:
+                if key == 'decoder':
+                    self._send_online_analysis_msg('param', 'decoder_channels', value.channels)
+            else:
+                self._send_online_analysis_msg('param', key, value)
         if hasattr(self, 'sync_params'):
             for key, value in self.sync_params.items():
                 self._send_online_analysis_msg('param', key, value)
         
         # Send init message to trigger analysis workers
         self._send_online_analysis_msg('init', 'None')
+        print('...done!')
 
     def _start_wait(self):
         if hasattr(super(), '_start_wait'):
@@ -87,7 +94,7 @@ class OnlineAnalysis(traits.HasTraits):
         if hasattr(self, 'plant'):
             self._send_online_analysis_msg('cursor', self.plant.get_endpoint_pos())
         if hasattr(self, 'eye_pos'):
-            self._send_online_analysis_msg('eye_pos', self.eye_pos)
+            self._send_online_analysis_msg('eye_pos', self.eye_pos[0,:])
 
     def set_state(self, condition, **kwargs):
         '''
