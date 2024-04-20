@@ -413,7 +413,7 @@ class MultiSource(DataSourceSystem):
     '''
     # Required by DataSourceSystem: update_freq and dtype (see make() below)
     update_freq = 25000.
-    dtype = np.dtype('uint16')
+    dtype = np.dtype('float')
 
     def __init__(self, headstage=7, channels=[]):
         '''
@@ -423,12 +423,12 @@ class MultiSource(DataSourceSystem):
                 33-96 are digital, and 97- are broadband channels
         '''
         # Initialize the servernode-control connection
-        self.conn = eCubeStream(debug=False)
+        self.conn = eCubeStream(debug=True)
         channels = np.array(channels)
-        self.analog_channels = channels[channels <= 32]
-        self.digital_channels = channels[(channels > 32) & (channels <= 96)] - 32
-        self.headstage = headstage
-        self.headstage_channels = channels[channels > 96] - 96
+        self.analog_channels = (channels[channels <= 32]).astype(int).tolist()
+        self.digital_channels = (channels[(channels > 32) & (channels <= 96)] - 32).astype(int).tolist()
+        self.headstage = int(headstage)
+        self.headstage_channels = (channels[channels > 96] - 96).astype(int).tolist()
 
         # Remove all existing sources
         subscribed = self.conn.listadded()
@@ -449,7 +449,7 @@ class MultiSource(DataSourceSystem):
 
         # Add the analog panel channels
         available = self.conn.listavailable()[1]
-        for ch in self.digital_channels:
+        for ch in self.analog_channels:
             if ch > available:
                 raise RuntimeError('requested channel {} is not available ({} connected)'.format(
                     ch, available))
@@ -495,9 +495,9 @@ class MultiSource(DataSourceSystem):
             if data_block[1] == "AnalogPanel":
                 self.gen = multi_chan_generator(data_block[2], self.analog_channels)
             elif data_block[1] == "DigitalPanelAsChans":
-                self.gen = multi_chan_generator(data_block[2], self.digital_channels+32)
+                self.gen = multi_chan_generator(data_block[2], [ch+32 for ch in self.digital_channels])
             elif data_block[1] == "Headstages":
-                self.gen = multi_chan_generator(data_block[2], self.headstage_channels+96)
+                self.gen = multi_chan_generator(data_block[2], [ch+96 for ch in self.headstage_channels])
             return next(self.gen)
     
 class MultiSource_File(DataSourceSystem):

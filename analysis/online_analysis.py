@@ -425,8 +425,8 @@ class OnlineDataServer(threading.Thread):
         '''
         # Always start with the behavior analysis worker
         print('init in state', self.state)
-        data_queue = mp.Queue()
-        self.analysis_workers.append((BehaviorAnalysisWorker(self.task_params, data_queue), data_queue))
+        # data_queue = mp.Queue()
+        # self.analysis_workers.append((BehaviorAnalysisWorker(self.task_params, data_queue), data_queue))
 
         # Is there an ECoG array?
         if 'record_headstage' in self.task_params and self.task_params['record_headstage']:
