@@ -464,7 +464,7 @@ class MultiSource(DataSourceSystem):
             channels [int array]: channel list (1-indexed) where channels 1-32 are analog, 
                 33-96 are digital, and 97- are broadband channels
         '''
-        self.conn = eCubeStream(debug=False)
+        self.conn = eCubeStream(snaddress='localhost', debug=True)
         channels = np.array(channels)
         self.analog_channels = (channels[channels <= 32]).astype(int).tolist()
         self.digital_channels = (channels[(channels > 32) & (channels <= 96)] - 32).astype(int).tolist()
@@ -475,6 +475,7 @@ class MultiSource(DataSourceSystem):
         self.headstage_idx = np.isin(headstage_sub[1], self.headstage_channels)
         self.analog_idx = np.isin(analog_sub, self.analog_channels)
         self.digital_idx = np.isin(digital_sub, self.digital_channels)
+        print('digital channels matched', np.sum(self.digital_idx))
 
     def start(self):
         print("Starting ecube streaming datasource...")
@@ -488,12 +489,6 @@ class MultiSource(DataSourceSystem):
         # Stop streaming
         if not self.conn.stop():
             del self.conn # try to force the streaming to end by deleting the ecube connection object
-            self.conn = eCubeStream(debug=True)
-
-        # Remove the added sources
-        self.conn.remove(('Headstages', self.headstage))
-        self.conn.remove(('AnalogPanel',))
-        self.conn.remove(('DigitalPanelAsChans',))
         
     def get(self):
         '''
@@ -508,6 +503,12 @@ class MultiSource(DataSourceSystem):
                     self.gen = multi_chan_generator(data_block[2][:,self.analog_idx], self.analog_channels)
                 else:
                     return self.get()
+            elif data_block[1] == "DigitalPanel": # If you subscribe to all digital channels this happens
+                if np.sum(self.digital_idx):
+                    digital_data = aopy.utils.convert_digital_to_channels(data_block[2])[:,self.digital_channels]
+                    self.gen = multi_chan_generator(digital_data, [ch+32 for ch in self.digital_channels])
+                else:
+                    return self.get()
             elif data_block[1] == "DigitalPanelAsChans":
                 if np.sum(self.digital_idx):
                     self.gen = multi_chan_generator(data_block[2][:,self.digital_idx], [ch+32 for ch in self.digital_channels])
@@ -518,6 +519,8 @@ class MultiSource(DataSourceSystem):
                     self.gen = multi_chan_generator(data_block[2][:,self.headstage_idx], [ch+96 for ch in self.headstage_channels])
                 else:
                     return self.get()
+            else:
+                return self.get()
             return next(self.gen)
     
 class MultiSource_File(DataSourceSystem):

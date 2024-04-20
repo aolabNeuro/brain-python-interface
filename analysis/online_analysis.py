@@ -339,6 +339,7 @@ class ERPAnalysisWorker(AnalysisWorker):
 
         # Update the total elapsed time
         self.clock_elapsed = clock_elapsed_new
+        print(clock_elapsed_new)
 
     def handle_data(self, key, values):
         super().handle_data(key, values)
