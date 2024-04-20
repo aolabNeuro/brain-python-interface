@@ -415,48 +415,6 @@ class MultiSource(DataSourceSystem):
     update_freq = 25000.
     dtype = np.dtype('uint16')
 
-    @classmethod
-    def pre_init(cls, headstage=7, digital_channels=[], analog_channels=[], headstage_channels=[]):
-        '''
-        Set up servernode with all the possible channels you want to use
-        '''
-        conn = eCubeStream(debug=False)
-
-        # Remove all existing sources
-        subscribed = conn.listadded()
-        if len(subscribed[0]) > 0:
-            conn.remove(('Headstages', headstage))
-        if len(subscribed[1]) > 0:
-            conn.remove(('AnalogPanel',))
-        if len(subscribed[2]) > 0:
-            conn.remove(('DigitalPanel',))
-
-        # Add the requested headstage channels if they are available
-        available = conn.listavailable()[0][headstage-1] # (headstages, analog, digital); ch are 1-indexed
-        for ch in headstage_channels:
-            if ch > available:
-                raise RuntimeError('requested channel {} is not available ({} connected)'.format(
-                    ch, available))
-            conn.add(('Headstages', headstage, (ch, ch)))
-
-        # Add the analog panel channels
-        available = conn.listavailable()[1]
-        for ch in analog_channels:
-            if ch > available:
-                raise RuntimeError('requested channel {} is not available ({} connected)'.format(
-                    ch, available))
-            conn.add(('AnalogPanel', (ch, ch)))
-
-        # Add the digital panel channels
-        available = conn.listavailable()[2]
-        for ch in digital_channels:
-            if ch > available:
-                raise RuntimeError('requested channel {} is not available ({} connected)'.format(
-                    ch, available))
-            conn.add(('DigitalPanelAsChans', (ch, ch)))
-
-        subscribed = conn.listadded() # in debug mode this prints out the added channels
-
     def __init__(self, headstage=7, channels=[]):
         '''
         Inputs:
@@ -464,17 +422,48 @@ class MultiSource(DataSourceSystem):
             channels [int array]: channel list (1-indexed) where channels 1-32 are analog, 
                 33-96 are digital, and 97- are broadband channels
         '''
+        # Initialize the servernode-control connection
         self.conn = eCubeStream(debug=False)
         channels = np.array(channels)
         self.analog_channels = channels[channels <= 32]
         self.digital_channels = channels[(channels > 32) & (channels <= 96)] - 32
         self.headstage = headstage
         self.headstage_channels = channels[channels > 96] - 96
-        headstage_sub, analog_sub, digital_sub = self.conn.listadded()
-        assert np.all(headstage_sub[0] == self.headstage) # can't handle multiple headstages yet
-        self.headstage_idx = np.isin(headstage_sub[1], self.headstage_channels)
-        self.analog_idx = np.isin(analog_sub, self.analog_channels)
-        self.digital_idx = np.isin(digital_sub, self.digital_channels)
+
+        # Remove all existing sources
+        subscribed = self.conn.listadded()
+        if len(subscribed[0]) > 0:
+            self.conn.remove(('Headstages', self.headstage))
+        if len(subscribed[1]) > 0:
+            self.conn.remove(('AnalogPanel',))
+        if len(subscribed[2]) > 0:
+            self.conn.remove(('DigitalPanel',))
+
+        # Add the requested headstage channels if they are available
+        available = self.conn.listavailable()[0][self.headstage-1] # (headstages, analog, digital); ch are 1-indexed
+        for ch in self.headstage_channels:
+            if ch > available:
+                raise RuntimeError('requested channel {} is not available ({} connected)'.format(
+                    ch, available))
+            self.conn.add(('Headstages', self.headstage, (ch, ch)))
+
+        # Add the analog panel channels
+        available = self.conn.listavailable()[1]
+        for ch in self.digital_channels:
+            if ch > available:
+                raise RuntimeError('requested channel {} is not available ({} connected)'.format(
+                    ch, available))
+            self.conn.add(('AnalogPanel', (ch, ch)))
+
+        # Add the digital panel channels
+        available = self.conn.listavailable()[2]
+        for ch in self.digital_channels:
+            if ch > available:
+                raise RuntimeError('requested channel {} is not available ({} connected)'.format(
+                    ch, available))
+            self.conn.add(('DigitalPanelAsChans', (ch, ch)))
+
+        subscribed = self.conn.listadded() # in debug mode this prints out the added channels
 
     def start(self):
         print("Starting ecube streaming datasource...")
@@ -504,11 +493,11 @@ class MultiSource(DataSourceSystem):
         except StopIteration:
             data_block = self.conn.get() # in the form of (time_stamp, data_source, data_content)
             if data_block[1] == "AnalogPanel":
-                self.gen = multi_chan_generator(data_block[2][:,self.analog_idx], self.analog_channels)
+                self.gen = multi_chan_generator(data_block[2], self.analog_channels)
             elif data_block[1] == "DigitalPanelAsChans":
-                self.gen = multi_chan_generator(data_block[2][:,self.digital_idx], self.digital_channels+32)
+                self.gen = multi_chan_generator(data_block[2], self.digital_channels+32)
             elif data_block[1] == "Headstages":
-                self.gen = multi_chan_generator(data_block[2][:,self.headstage_idx], self.headstage_channels+96)
+                self.gen = multi_chan_generator(data_block[2], self.headstage_channels+96)
             return next(self.gen)
     
 class MultiSource_File(DataSourceSystem):
