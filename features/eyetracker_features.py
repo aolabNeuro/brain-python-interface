@@ -382,13 +382,13 @@ class EyeCalibration(traits.HasTraits):
             if len(self.eye_pos) == 0:
                 self.eye_pos = np.zeros((1,6))*np.nan
             else:
-                self.task_data['eye'] = self.eye_pos[[0],:]
+                self.eye_pos = self.eye_pos[[0],:]
         else:
             if len(self.eye_pos) == 0:
                 self.eye_pos = np.zeros((1,2))*np.nan
             else:
-                self.task_data['eye'] = self.eye_pos[0]
-        
+                self.eye_pos = self.eye_pos[0]
+        self.task_data['eye'] = self.eye_pos
 
         # Do calibration
         ave_pos = self.eye_pos
