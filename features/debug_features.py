@@ -39,11 +39,14 @@ class OnlineAnalysis(traits.HasTraits):
                 strings.append(json.dumps(v.tolist()))
             elif isinstance(v, np.ndarray):
                 strings.append(json.dumps(v[0]))
+            elif isinstance(v, np.generic):
+                strings.append(json.dumps(v.item()))
             else:
                 try:
                     strings.append(json.dumps(v))
                 except (TypeError, OverflowError):
-                    print('Could not convert to json:', v)
+                    print('Could not convert to json:', v, 'for key:', key)
+                    traceback.print_exc()
                     strings.append('null')
         payload = '#'.join(strings)
         self.online_analysis_sock.sendto(f'{key}%{payload}'.encode('utf-8'), (self.online_analysis_ip, self.online_analysis_port))
@@ -118,7 +121,7 @@ class OnlineAnalysis(traits.HasTraits):
         if hasattr(self, 'plant'):
             self._send_online_analysis_msg('cursor', self.plant.get_endpoint_pos())
         if hasattr(self, 'eye_pos'):
-            self._send_online_analysis_msg('eye_pos', self.eye_pos[0,:])
+            self._send_online_analysis_msg('eye_pos', self.eye_pos)
 
     def set_state(self, condition, **kwargs):
         '''

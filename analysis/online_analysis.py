@@ -141,7 +141,7 @@ class BehaviorAnalysisWorker(AnalysisWorker):
         self.targets = {}
         self.calibration_data = []
         self.calibration_flag = True
-        self.eye_coeff = np.zeros((2, 2))
+        self.eye_coeff = np.array([[1,0],[1,0]])
         self.eye_coeff_corr = 0.5 # Don't accept anything lower than 0.5 by default
 
         # Load previous calibration
@@ -234,7 +234,7 @@ class BehaviorAnalysisWorker(AnalysisWorker):
 
         # Save the calibration if it was performed
         filepath = os.path.join(self.calibration_dir, self.calibration_filename)
-        if self.calibration_flag: # and not np.array_equal(self.eye_coeff, np.zeros((2, 2))):
+        if self.calibration_flag and not np.array_equal(self.eye_coeff, np.array([[1,0],[1,0]])):
             np.save(filepath, (self.eye_coeff, self.eye_coeff_corr))
 
 class ERPAnalysisWorker(AnalysisWorker):
