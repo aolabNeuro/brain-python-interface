@@ -387,6 +387,13 @@ class OnlineDataServer(threading.Thread):
         # Initialize workers
         self.data_worker = None
         self.analysis_workers = []
+        try:
+            MultiSource.pre_init(digital_channels=list(range(1,65)), 
+                                 analog_channels=list(range(1,33)), 
+                                 headstage_channels=list(range(1,257)))
+            print('eCube streaming initialized')
+        except:
+            pass
 
         # Initialize the server
         self._stop_event = threading.Event()

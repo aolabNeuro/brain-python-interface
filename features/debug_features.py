@@ -40,7 +40,11 @@ class OnlineAnalysis(traits.HasTraits):
             elif isinstance(v, np.ndarray):
                 strings.append(json.dumps(v[0]))
             else:
-                strings.append(json.dumps(v))
+                try:
+                    strings.append(json.dumps(v))
+                except (TypeError, OverflowError):
+                    print('Could not convert to json:', v)
+                    strings.append('null')
         payload = '#'.join(strings)
         self.online_analysis_sock.sendto(f'{key}%{payload}'.encode('utf-8'), (self.online_analysis_ip, self.online_analysis_port))
 
