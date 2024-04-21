@@ -136,3 +136,32 @@ class OnlineAnalysis(traits.HasTraits):
         '''
         self._send_online_analysis_msg('sync_event', event_name, event_data)
         super().sync_event(event_name, event_data=event_data, immediate=immediate)
+
+class ReplayCursor():
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.replay_cursor_data = kwargs.pop('replay_cursor_data')
+
+    def move_effector(self, *args, **kwargs):
+        if self.cycle_count >= len(self.replay_cursor_data):
+            self.state = None
+            return
+        pos = self.replay_cursor_data[self.cycle_count]
+        self.task_data['manual_input'] = pos
+        self.plant.set_endpoint_pos(pos)
+
+class ReplayEye():
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.replay_eye_data = kwargs.pop('replay_eye_data')
+
+    def _cycle(self):
+        if self.cycle_count >= len(self.replay_eye_data):
+            self.state = None
+            return
+        pos = self.replay_eye_data[self.cycle_count]
+        self.eye_pos = pos
+        self.task_data['eye'] = pos
+        
