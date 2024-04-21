@@ -164,7 +164,7 @@ class BehaviorAnalysisWorker(AnalysisWorker):
         '''
         Update the eye calibration coefficients using the collected data
         '''
-        if self.calibration_flag and len(self.calibration_data) > 0:
+        if self.calibration_flag and len(self.calibration_data) > 3:
             eye_data, cursor_data = zip(*self.calibration_data)
             eye_data = np.array(eye_data)
             cursor_data = np.array(cursor_data)
@@ -172,6 +172,7 @@ class BehaviorAnalysisWorker(AnalysisWorker):
             if np.all(abs(correlation_coeff) > self.eye_coeff_corr):
                 self.eye_coeff_corr = np.min(abs(correlation_coeff))
                 self.eye_coeff = np.vstack((slopes, intercepts)).T
+                print('updated calibration:', self.eye_coeff, self.eye_coeff_corr)
             
     def get_current_pos(self):
         '''
@@ -433,8 +434,8 @@ class OnlineDataServer(threading.Thread):
         '''
         # Always start with the behavior analysis worker
         print('init in state', self.state)
-        # data_queue = mp.Queue()
-        # self.analysis_workers.append((BehaviorAnalysisWorker(self.task_params, data_queue), data_queue))
+        data_queue = mp.Queue()
+        self.analysis_workers.append((BehaviorAnalysisWorker(self.task_params, data_queue), data_queue))
 
         # Is there an ECoG array?
         if 'record_headstage' in self.task_params and self.task_params['record_headstage']:

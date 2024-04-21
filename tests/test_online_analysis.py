@@ -1,7 +1,7 @@
 import time
 from riglib import experiment
 from analysis import online_analysis
-from features.debug_features import OnlineAnalysis
+from features.debug_features import OnlineAnalysis, ReplayCursor, ReplayEye
 from features.peripheral_device_features import MouseControl
 from built_in_tasks.manualcontrolmultitasks import ManualControl
 from riglib.stereo_opengl.window import Window2D
@@ -72,19 +72,37 @@ class TestOnlineAnalysis(unittest.TestCase):
 
         analysis = online_analysis.OnlineDataServer('localhost', 5000)
 
+        # Load replay data
+        import tables
+        test_dir = os.path.dirname(os.path.abspath(__file__))
+        hdf_filepath = os.path.join(test_dir, 'test_data/beig20240419_21_te16793.hdf')
+        with tables.open_file(hdf_filepath, 'r') as f:
+            task = f.root.task.read()
+            trial = f.root.trials.read()
+        targets = []
+        for trial in trial:
+            trial_num = trial['trial']
+            if len(targets) <= trial_num:
+                targets.append(([],[]))
+            targets[trial_num][0].append(trial['index'])
+            targets[trial_num][1].append(trial['target'])
+        cursor = task['cursor']
+        eye = task['eye']
+
         # Start exp 1
         os.environ['DISPLAY'] = ':0.0'
-        # seq = ManualControl.centerout_2D(nblocks=1, distance=5)
-        # Exp = experiment.make(ManualControl, feats=[Window2D, MouseControl, OnlineAnalysis])
-        # exp = Exp(seq, fps=10, session_length=28, online_analysis_ip='localhost', online_analysis_port=5000,
-        #           fullscreen=False, window_size=(800,600), rotation='xzy')
-        # print(exp.dtype)
-        # exp.init()
+        seq = targets
+        Exp = experiment.make(ManualControl, feats=[Window2D, ReplayCursor, ReplayEye, OnlineAnalysis])
+        exp = Exp(seq, fps=120, session_length=28, online_analysis_ip='localhost', online_analysis_port=5000,
+                  fullscreen=False, window_size=(800,600), replay_cursor_data=cursor,
+                  replay_eye_data=eye, wait_time=0)
+
+        print(exp.dtype)
+        exp.init()
 
         # Start analysis
         analysis.start()
-        time.sleep(20)
-        #exp.run()
+        exp.run()
 
         # Wrap up
         analysis.stop()

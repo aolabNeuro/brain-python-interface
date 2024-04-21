@@ -158,10 +158,11 @@ class ReplayEye():
         self.replay_eye_data = kwargs.pop('replay_eye_data')
 
     def _cycle(self):
+        super()._cycle()
         if self.cycle_count >= len(self.replay_eye_data):
             self.state = None
             return
         pos = self.replay_eye_data[self.cycle_count]
         self.eye_pos = pos
-        self.task_data['eye'] = pos
-        
+        if 'eye' in self.task_data.dtype.names:
+            self.task_data['eye'] = pos
