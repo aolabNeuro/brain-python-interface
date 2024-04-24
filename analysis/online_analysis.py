@@ -144,12 +144,18 @@ class BehaviorAnalysisWorker(AnalysisWorker):
         self.eye_coeff = np.array([[1,0],[1,0]])
         self.eye_coeff_corr = 0.5 # Don't accept anything lower than 0.5 by default
 
-        # Load previous calibration
+        # Load previous calibration if it exists
         subject = self.task_params.get('subject_name', 'None')
         self.calibration_filename = f'calib_{subject}_{datetime.date.today()}.npy'
         filepath = os.path.join(self.calibration_dir, self.calibration_filename)
         if os.path.exists(filepath):
             self.eye_coeff, self.eye_coeff_corr = np.load(filepath, allow_pickle=True)
+            self.calibration_flag = False
+
+        # Turn off automatic calibration if this isn't a MC task
+        if 'target_radius' not in self.task_params or self.task_params['target_radius'] >= 10:
+            self.calibration_flag = False
+        if 'rotation' not in self.task_params or self.task_params['rotation'] != 'yzx':
             self.calibration_flag = False
 
         # Set up figure
@@ -291,6 +297,7 @@ class ERPAnalysisWorker(AnalysisWorker):
         super().update()
 
         print('update')
+        t0 = time.perf_counter()
 
         # Keep track of clock cycles
         clock_data = self.ds.get_new(map_channels_for_multisource(digital_channels=[self.clock_dch]))[0]
@@ -323,6 +330,9 @@ class ERPAnalysisWorker(AnalysisWorker):
             if time + self.time_after > clock_elapsed_new:
                 ignored_trigger_cycles.append(cycle)
                 continue
+            elif time - self.time_before < clock_elapsed_new - nt:
+                print('missed cycle', cycle, 'at time', time)
+                continue
             erp = aopy.analysis.calc_erp(lfp, [time - clock_elapsed_new + nt], self.time_before, self.time_after, fs)
             self.erp = np.concatenate((self.erp, erp), axis=2)
         self.trigger_cycles = ignored_trigger_cycles
@@ -334,6 +344,9 @@ class ERPAnalysisWorker(AnalysisWorker):
             if time + self.time_after > clock_elapsed_new:
                 ignored_trigger_times.append(time)
                 continue
+            elif time - self.time_before < clock_elapsed_new - nt:
+                print('missed trigger', time)
+                continue
             erp = aopy.analysis.calc_erp(lfp, [time - clock_elapsed_new + nt], self.time_before, self.time_after, fs)
             self.erp = np.concatenate((self.erp, erp), axis=2)
         self.trigger_times = ignored_trigger_times
@@ -341,6 +354,13 @@ class ERPAnalysisWorker(AnalysisWorker):
         # Update the total elapsed time
         self.clock_elapsed = clock_elapsed_new
         print(clock_elapsed_new)
+
+        # Update the ERP
+        t1 = time.perf_counter()
+        fs = self.ds.source.update_freq / self.lfp_downsample
+        max_erp = aopy.analysis.get_max_erp(self.erp, self.time_before, self.time_after, fs, trial_average=True)
+        self.data_map = aopy.visualization.get_data_map(max_erp*1.907348633e-7*1e6, self.elec_pos[:,0], self.elec_pos[:,1])
+        print(f'update time: {time.perf_counter() - t0:.2f} (erp time: {time.perf_counter() - t1:.2f})')
 
     def handle_data(self, key, values):
         super().handle_data(key, values)
@@ -351,10 +371,7 @@ class ERPAnalysisWorker(AnalysisWorker):
 
     def draw(self):
         super().draw()
-        fs = self.ds.source.update_freq / self.lfp_downsample
-        max_erp = aopy.analysis.get_max_erp(self.erp, self.time_before, self.time_after, fs, trial_average=True)
-        data_map = aopy.visualization.get_data_map(max_erp*1.907348633e-7*1e6, self.elec_pos[:,0], self.elec_pos[:,1])
-        self.erp_im.set_data(data_map)
+        self.erp_im.set_data(self.data_map)
         self.erp_text.set_text(f"{self.erp.shape[2]} trials")
 
     def cleanup(self):
