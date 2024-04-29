@@ -354,7 +354,7 @@ class LFP_Plus_Trigger_File(DataSourceSystem):
     def __init__(self, channels, ecube_bmi_filename=None, trig_channel=0, trig_included_in_channels=False):
         
         if not ecube_bmi_filename:
-            ecube_bmi_filename = "/data/raw/ecube/2022-08-19_BMI3D_te6569"
+            ecube_bmi_filename = "/Users/leoscholl/2023-10-10_BMI3D_te11503"
 
         # Open the file
         self.trig_channel = trig_channel
@@ -389,7 +389,212 @@ class LFP_Plus_Trigger_File(DataSourceSystem):
                 data_block = np.zeros((int(728/25),len(self.channels)))
             self.gen = multi_chan_generator(data_block, self.channels, downsample=25)
             return next(self.gen)
+        
+def map_channels_for_multisource(headstage_channels=[], analog_channels=[], digital_channels=[]):
+    '''
+    Utility to convert the channel numbers to the format used by the MultiSource class
+
+    Args:
+        headstage_channels (list): list of 1-indexed headstage channels
+        analog_channels (list): list of 1-indexed analog channels
+        digital_channels (list): list of 1-indexed digital channels
+
+    Returns:
+        np.array: channel numbers in the format used by the MultiSource class
+    '''
+    return np.concatenate((analog_channels, np.array(digital_channels)+32, np.array(headstage_channels)+96))
+
+class MultiSource(DataSourceSystem):
+    '''
+    Adds Analog, Digital and Broadband channels. Compatible with riglib.source.MultiChanDataSource.
+    Because of the way the system is set up, Analog channels map from 1-32, Digital channels 
+    from 33-96, and Broadband channels from 97- onwards. Use the mapping utility to convert channels.
+    Not tested for use with BMI, as the latency is likely higher than streaming only broadband data.
+    '''
+    # Required by DataSourceSystem: update_freq and dtype (see make() below)
+    update_freq = 25000.
+    dtype = np.dtype('float')
+
+    @classmethod
+    def pre_init(cls, headstage=7, digital_channels=[], analog_channels=[], headstage_channels=[]):
+        '''
+        Set up servernode with all the possible channels you want to use
+        '''
+        conn = eCubeStream(snaddress='localhost', debug=True)
+
+        # Remove all existing sources
+        subscribed = conn.listadded()
+        if len(subscribed[0]) > 0:
+            conn.remove(('Headstages', headstage))
+        if len(subscribed[1]) > 0:
+            conn.remove(('AnalogPanel',))
+        if len(subscribed[2]) > 0:
+            conn.remove(('DigitalPanel',))
+
+        # Add the requested headstage channels if they are available
+        available = conn.listavailable()[0][headstage-1] # (headstages, analog, digital); ch are 1-indexed
+        for ch in headstage_channels:
+            if ch > available:
+                raise RuntimeError('requested channel {} is not available ({} connected)'.format(
+                    ch, available))
+            conn.add(('Headstages', headstage, (ch, ch)))
+
+        # Add the analog panel channels
+        available = conn.listavailable()[1]
+        for ch in analog_channels:
+            if ch > available:
+                raise RuntimeError('requested channel {} is not available ({} connected)'.format(
+                    ch, available))
+            conn.add(('AnalogPanel', (ch, ch)))
+
+        # Add the digital panel channels
+        available = conn.listavailable()[2]
+        for ch in digital_channels:
+            if ch > available:
+                raise RuntimeError('requested channel {} is not available ({} connected)'.format(
+                    ch, available))
+            conn.add(('DigitalPanelAsChans', (ch, ch)))
+
+        subscribed = conn.listadded() # in debug mode this prints out the added channels
+
+    def __init__(self, headstage=7, channels=[]):
+        '''
+        Inputs:
+            headstages int: headstage number (1-indexed)
+            channels [int array]: channel list (1-indexed) where channels 1-32 are analog, 
+                33-96 are digital, and 97- are broadband channels
+        '''
+        self.conn = eCubeStream(snaddress='localhost', debug=True)
+        channels = np.array(channels)
+        self.analog_channels = (channels[channels <= 32]).astype(int).tolist()
+        self.digital_channels = (channels[(channels > 32) & (channels <= 96)] - 32).astype(int).tolist()
+        self.headstage = headstage
+        self.headstage_channels = (channels[channels > 96] - 96).astype(int).tolist()
+        headstage_sub, analog_sub, digital_sub = self.conn.listadded()
+        assert np.all(headstage_sub[0] == self.headstage) # can't handle multiple headstages yet
+        self.headstage_idx = np.isin(headstage_sub[1], self.headstage_channels)
+        self.analog_idx = np.isin(analog_sub, self.analog_channels)
+        self.digital_idx = np.isin(digital_sub, self.digital_channels)
+        print('digital channels matched', np.sum(self.digital_idx))
+
+    def start(self):
+        print("Starting ecube streaming datasource...")
+        self.conn.start()
+
+        # Start with an empty generator
+        self.gen = iter(())
     
+    def stop(self):
+
+        # Stop streaming
+        if not self.conn.stop():
+            del self.conn # try to force the streaming to end by deleting the ecube connection object
+        
+    def get(self):
+        '''
+        Retrieve a packet from the server
+        '''
+        try:
+            return next(self.gen)
+        except StopIteration:
+            data_block = self.conn.get() # in the form of (time_stamp, data_source, data_content)
+            if data_block[1] == "AnalogPanel":
+                if np.sum(self.analog_idx):
+                    self.gen = multi_chan_generator(data_block[2][:,self.analog_idx], self.analog_channels)
+                else:
+                    return self.get()
+            elif data_block[1] == "DigitalPanel": # If you subscribe to all digital channels this happens
+                if np.sum(self.digital_idx):
+                    digital_data = aopy.utils.convert_digital_to_channels(data_block[2])[:,self.digital_channels]
+                    self.gen = multi_chan_generator(digital_data, [ch+32 for ch in self.digital_channels])
+                else:
+                    return self.get()
+            elif data_block[1] == "DigitalPanelAsChans":
+                if np.sum(self.digital_idx):
+                    self.gen = multi_chan_generator(data_block[2][:,self.digital_idx], [ch+32 for ch in self.digital_channels])
+                else:
+                    return self.get()
+            elif data_block[1] == "Headstages":
+                if np.sum(self.headstage_idx):
+                    self.gen = multi_chan_generator(data_block[2][:,self.headstage_idx], [ch+96 for ch in self.headstage_channels])
+                else:
+                    return self.get()
+            else:
+                return self.get()
+            return next(self.gen)
+    
+class MultiSource_File(DataSourceSystem):
+    '''
+    Adds digital, analog, and headstage data, but reading from file. Compatible with riglib.source.MultiChanDataSource
+    '''
+    # Required by DataSourceSystem: update_freq and dtype (see make() below)
+    update_freq = 25000.
+    chunksize = 728
+    dtype = np.dtype('float')
+
+    def __init__(self, channels, ecube_bmi_filename=None):
+        
+        if not ecube_bmi_filename:
+            # ecube_bmi_filename = "/media/moor-data/raw/ecube/2024-03-04_BMI3D_te14929" # laser
+            ecube_bmi_filename = "/media/moor-data/raw/ecube/2024-03-06_BMI3D_te15031" # mc
+        # Open the file
+        channels = np.array(channels)
+        self.analog_channels = (channels[channels <= 32] - 1).astype('int')
+        self.digital_channels = (channels[(channels > 32) & (channels <= 96)] - 33).astype('int')
+        self.headstage_channels = (channels[channels > 96] - 97).astype('int')
+
+        self.headstage_file = aopy.data.load_ecube_data_chunked(ecube_bmi_filename, "Headstages", channels=self.headstage_channels, chunksize=self.chunksize)
+        self.analog_file = aopy.data.load_ecube_data_chunked(ecube_bmi_filename, "AnalogPanel", channels=self.analog_channels, chunksize=self.chunksize)
+        self.digital_file = aopy.data.load_ecube_data_chunked(ecube_bmi_filename, "DigitalPanel", chunksize=self.chunksize)
+        self.flag = "Headstages"
+        self.gen = iter(())
+        self.t0 = time.perf_counter()
+        
+    def _next_gen(self, file, channels):
+        try:
+            data_block = next(file)
+        except StopIteration:
+            data_block = np.zeros((int(self.chunksize),len(channels)))
+        self.gen = multi_chan_generator(data_block, channels)
+        return next(self.gen)
+
+    def get(self):
+        '''
+        Read a "packet" worth of data from one of the files
+        '''
+        try:
+            return next(self.gen)
+        except (StopIteration, AttributeError):
+            if self.flag == "Headstages" and len(self.headstage_channels) > 0:
+                self.flag = "DigitalPanelAsChans"
+                return self._next_gen(self.headstage_file, self.headstage_channels+97)
+            elif self.flag == "Headstages":
+                self.flag = "DigitalPanelAsChans"
+            
+            if self.flag == "DigitalPanelAsChans" and len(self.digital_channels) > 0:
+                self.flag = "AnalogPanel"
+                try:
+                    # Special consideration for digital panel to convert bits to channels
+                    data_block = next(self.digital_file)
+                    data_block = aopy.utils.convert_digital_to_channels(data_block)[:,self.digital_channels]
+                except StopIteration:
+                    data_block = np.zeros((int(self.chunksize),len(self.digital_channels)))
+                self.gen = multi_chan_generator(data_block, self.digital_channels+33)
+                return next(self.gen)
+            elif self.flag == "DigitalPanelAsChans":
+                self.flag = "AnalogPanel"
+            
+            if self.flag == "AnalogPanel" and len(self.analog_channels) > 0:
+                self.flag = "Headstages"
+                while time.perf_counter() - self.t0 < 1./(25000/self.chunksize):
+                    pass
+                self.t0 = time.perf_counter()
+                return self._next_gen(self.analog_file, self.analog_channels+1)
+            elif self.flag == "AnalogPanel":
+                self.flag = "Headstages"
+                return self.get() # Try again
+            
+
 class LFP_Blanking(LFP_Plus_Trigger):
     '''
     Blanks LFP data in the interval when the trigger is on. Compatible with riglib.source.MultiChanDataSource.

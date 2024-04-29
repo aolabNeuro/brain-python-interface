@@ -589,6 +589,8 @@ class MultiChanDataSource(mp.Process):
         object
             The arbitrary value associated with the named attribute, if it exists.
         '''
+        if attr == 'methods':
+            return super().__getattr__(attr)
         if attr in self.methods:
             return FuncProxy(attr, self.pipe, self.cmd_event)
         elif not attr.beginsWith("__"):
