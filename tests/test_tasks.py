@@ -9,7 +9,7 @@ from features.hdf_features import SaveHDF
 from riglib.stereo_opengl.window import WindowDispl2D
 from riglib import experiment
 from features.peripheral_device_features import ForceControl, MouseControl
-from features.optitrack_features import OptitrackSimulate, Optitrack
+from features.optitrack_features import OptitrackSimulate, Optitrack, SpheresToCylinders
 from features.reward_features import ProgressBar
 import cProfile
 import pstats
@@ -56,7 +56,7 @@ class TestManualControlTasks(unittest.TestCase):
         exp.rotation = 'xzy'
         exp.run()
 
-    # @unittest.skip("")
+    @unittest.skip("")
     def test_force_task(self):
         print("Running force task test")
         exp = init_exp(DiskMatching, [ForceControl, Window2D, Autostart], None) # , window_size=(1000,800)
@@ -73,6 +73,14 @@ class TestManualControlTasks(unittest.TestCase):
         exp = init_exp(TrackingTask, [MouseControl, Window2D, ProgressBar], seq)
         exp.rotation = 'xzy'
         exp.run()
+
+    # @unittest.skip("only to test 3d window")
+    def test_3d(self):
+        seq = ManualControl.centerout_2D()
+        exp = init_exp(ManualControl, [MouseControl, SpheresToCylinders], seq, stereo_mode='projection',
+                       rotation='xyz', window_size=(1000,800), fullscreen=False, limit2d=False)
+        exp.run()
+
 
 class TestSeqGenerators(unittest.TestCase):
 
