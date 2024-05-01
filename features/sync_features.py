@@ -66,6 +66,7 @@ class HDFSync(traits.HasTraits):
         '''
         Send a sync event on the next cycle, unless 'immediate' flag is set
         '''
+        super().sync_event(event_name, event_data=event_data, immediate=immediate)
         if self.has_sync_event:
             if self.sync_event_record['code'] == self.sync_params['event_sync_dict']['TRIAL_END'] and event_name == 'PAUSE_START':
                 pass
