@@ -55,7 +55,7 @@ nidaq_sync_params.update(dict(
     sync_protocol_version = 10,
     sync_pulse_width = 0.003,
     event_sync_mask = 0xffffff,
-    event_sync_dch = range(16,24),
+    event_sync_dch = list(range(16,24)),
     screen_sync_pin = 8,
     screen_sync_dch = 24,
     screen_measure_dch = [5],
@@ -72,7 +72,7 @@ rig1_sync_params_arduino.update(dict(
     sync_protocol_version = 16,
     event_sync_mask = 0xfffffc,
     event_sync_data_shift = 2,
-    event_sync_dch = range(31,39),
+    event_sync_dch = list(range(31,39)),
     screen_sync_pin = 10,
     screen_sync_dch = 39,
     recording_pin = 11,
@@ -105,7 +105,7 @@ if hostname == 'pagaiisland2':
     arduino_sync_params = rig1_sync_params_arduino
 elif hostname == 'siberut-bmi':
     optitrack_address = '10.155.204.10'
-    optitrack_save_path = "C:/Users/aolab/Documents",
+    optitrack_save_path = "C:/Users/aolab/Documents"
     optitrack_sync_dch = 53 # 0-index
     screen_dist = 28
     screen_half_height = 10.25

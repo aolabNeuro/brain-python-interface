@@ -75,6 +75,9 @@ class SimClock(object):
     def tick(self, *args, **kwargs):
         pass
 
+    def get_fps(self):
+        return 0.
+
 class SimClockTick(object):
     '''
     Summary: A simulation pygame.clock to use in simulations that inherit from experiment.Experiment, to overwrite

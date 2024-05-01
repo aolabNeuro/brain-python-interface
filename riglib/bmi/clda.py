@@ -716,7 +716,7 @@ class KFRML(Updater):
         decoder : bmi.Decoder instance
             Reference to the Decoder instance
         half_life : float, optional
-            Half-life to use to calculate the parameter change step size. If not specified, the half-life specified when the Updater was constructed is used.
+            Half-life to use to calculate the parameter change step size [s]. If not specified, the half-life specified when the Updater was constructed is used.
         values : np.ndarray, optional
             Relative value of each sample of the batch. If not specified, each sample is assumed to have equal value.
         kwargs : dict

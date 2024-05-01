@@ -358,7 +358,7 @@ class EyeCalibration(traits.HasTraits):
         # Set up eye cursor
         self.eye_cursor = VirtualCircularTarget(target_radius=.5, target_color=(0., 1., 0., 0.75))
         self.target_location = np.array(self.starting_pos).copy()
-        self.calibrated_eye_pos = np.zeros((1,2))*np.nan
+        self.calibrated_eye_pos = np.zeros((2,))*np.nan
         for model in self.eye_cursor.graphics_models:
             self.add_model(model)
         
@@ -377,32 +377,17 @@ class EyeCalibration(traits.HasTraits):
                 self.eye_cursor.hide()
 
     def _cycle(self):
-        self.eye_pos = self.eye_data.get() # This is (1,6) array
-        if not self.keyboard_control:
-            if len(self.eye_pos) == 0:
-                self.eye_pos = np.zeros((1,6))*np.nan
-            else:
-                self.task_data['eye'] = self.eye_pos[[0],:]
-        else:
-            if len(self.eye_pos) == 0:
-                self.eye_pos = np.zeros((1,2))*np.nan
-            else:
-                self.task_data['eye'] = self.eye_pos[0]
-        
+        self._update_eye_pos()
 
         # Do calibration
         ave_pos = self.eye_pos
         if not self.keyboard_control:
-            calibrated_pos = aopy.postproc.get_calibrated_eye_data(self.eye_pos[0,:4],self.eye_coeff)
+            calibrated_pos = aopy.postproc.get_calibrated_eye_data(self.eye_pos[:4],self.eye_coeff)
             ave_pos = np.array([(calibrated_pos[0] + calibrated_pos[2])/2, (calibrated_pos[1] + calibrated_pos[3])/2])
-            ave_pos = np.expand_dims(ave_pos, axis=0)
         
         # Save calibration
         self.calibrated_eye_pos = ave_pos
-        if not self.keyboard_control:
-            self.task_data['calibrated_eye'] = self.calibrated_eye_pos[[0],:]
-        else:
-            self.task_data['calibrated_eye'] = self.calibrated_eye_pos[0]
+        self.task_data['calibrated_eye'] = ave_pos
 
         super(EyeStreaming, self)._cycle()
 
@@ -410,7 +395,7 @@ class EyeCalibration(traits.HasTraits):
         if np.any(np.isnan(self.calibrated_eye_pos)):
             pass
         else:
-            self.eye_cursor.move_to_position([self.calibrated_eye_pos[0][0],0,self.calibrated_eye_pos[0][1]])
+            self.eye_cursor.move_to_position([self.calibrated_eye_pos[0],0,self.calibrated_eye_pos[1]])
             if self.show_eye_pos:
                 self.eye_cursor.show()
 
@@ -424,13 +409,13 @@ class EyeStreaming(traits.HasTraits):
 
         # Visualize eye positions
         if self.keyboard_control:
-            self.eye_data = Eye(self.starting_pos[::2])
-            #self.eye_pos = np.zeros((1,2))*np.nan
+            self.eye_data = Eye([0,0])
+            self.eye_pos = np.zeros((2,))*np.nan
         else:
             from riglib import source
             from riglib.oculomatic import System
             self.eye_data = source.DataSource(System)
-            self.eye_pos = np.zeros((1,6))*np.nan
+            self.eye_pos = np.zeros((6,))*np.nan
 
 
     def init(self):
@@ -454,13 +439,21 @@ class EyeStreaming(traits.HasTraits):
                 print("Stopping streaming eye data")
                 self.eye_data.stop()
 
-    def _cycle(self):
-        self.eye_pos = self.eye_data.get() # This is (1,6) array
+    def _update_eye_pos(self):
         if not self.keyboard_control:
-            if len(self.eye_pos) == 0:
-                self.task_data['eye'] = np.zeros((1,6))*np.nan
+            eye_pos = self.eye_data.get() # This is (n,6) array of new values since we last checked
+            if eye_pos.ndim < 2 or eye_pos.size == 0:
+                eye_pos = np.zeros((6,))*np.nan
             else:
-                self.task_data['eye'] = self.eye_pos[[0],:]
+                eye_pos = eye_pos[-1,:] # the most recent position
+        else:
+            eye_pos = self.eye_data.get() # A list of lists of of x,y keyboard pos
+            eye_pos = eye_pos[0]
+        self.eye_pos = eye_pos
+        self.task_data['eye'] = eye_pos
+
+    def _cycle(self):
+        self._update_eye_pos()
         super()._cycle()
 
 

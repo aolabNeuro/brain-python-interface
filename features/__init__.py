@@ -3,7 +3,7 @@ Module for the core "features" that can be used to extend and customize a
 task/experiment by multiple inheritance.
 '''
 
-from features.debug_features import Profiler
+from features.debug_features import Profiler, OnlineAnalysis
 from features.laser_features import QwalorLaser, MultiQwalorLaser, SwitchedQwalorLaser, LaserState
 from riglib.stereo_opengl.window import WindowWithExperimenterDisplay, Window2D
 from .generator_features import Autostart, AdaptiveGenerator, IgnoreCorrectness, PoissonWait, Progressbar_fixation
@@ -68,6 +68,7 @@ built_in_features = dict(
     laser_state = LaserState,
     e3video = E3Video,
     debug = Profiler,
+    online_analysis = OnlineAnalysis,
     arduino_sync=ArduinoSync,
     screen_sync=ScreenSync,
     cursor_sync=CursorAnalogOut,
