@@ -420,7 +420,7 @@ class MultiSource(DataSourceSystem):
         '''
         Set up servernode with all the possible channels you want to use
         '''
-        conn = eCubeStream(snaddress='localhost', debug=True)
+        conn = eCubeStream(autoshutdown=False, debug=True)
 
         # Remove all existing sources
         subscribed = conn.listadded()
@@ -464,7 +464,7 @@ class MultiSource(DataSourceSystem):
             channels [int array]: channel list (1-indexed) where channels 1-32 are analog, 
                 33-96 are digital, and 97- are broadband channels
         '''
-        self.conn = eCubeStream(snaddress='localhost', debug=True)
+        self.conn = eCubeStream(autoshutdown=False, debug=True)
         channels = np.array(channels)
         self.analog_channels = (channels[channels <= 32]).astype(int).tolist()
         self.digital_channels = (channels[(channels > 32) & (channels <= 96)] - 32).astype(int).tolist()
@@ -483,6 +483,7 @@ class MultiSource(DataSourceSystem):
 
         # Start with an empty generator
         self.gen = iter(())
+        print('...started!')
     
     def stop(self):
 

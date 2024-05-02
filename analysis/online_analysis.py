@@ -72,7 +72,10 @@ class AnalysisWorker(mp.Process):
         '''
         Update the figure.
         '''
-        self.time_text.set_text(f"t={int(self.cycle_count/self.task_params['fps'])}s")
+        if 'fps' in self.task_params:
+            self.time_text.set_text(f"t={int(self.cycle_count/self.task_params['fps'])} s")
+        else:
+            self.time_text.set_text(f"t={int(self.cycle_count)} cycles")
 
     def cleanup(self):
         '''
@@ -94,7 +97,9 @@ class AnalysisWorker(mp.Process):
         # Initialize figure
         self.fig = plt.figure(figsize=self.figsize)
         self.ax = self.fig.add_subplot(111)
-        self.ax.text(0., 1.05, f"{self.task_params['experiment_name']} ({self.task_params['te_id']}) - {self.__class__.__name__}",
+        experiment_name = self.task_params.get('experiment_name', 'None')
+        te_id = self.task_params.get('te_id', 'None')
+        self.ax.text(0., 1.05, f"{experiment_name} ({te_id}) - {self.__class__.__name__}",
                      ha='left', va='center', fontsize=12, transform=self.ax.transAxes)
         self.time_text = self.ax.text(1., 1.05, '', ha='right', va='center', fontsize=12, transform=self.ax.transAxes)
         self.time_text.set_text('Waiting for data...')
@@ -107,7 +112,10 @@ class AnalysisWorker(mp.Process):
         t_update = time.perf_counter()
         while not self._stop_event.is_set():
             if time.perf_counter() - t_update > 1./self.update_rate:
-                self.update()
+                try:
+                    self.update()
+                except:
+                    traceback.print_exc()
                 t_update = time.perf_counter()
             self.draw()
             self.time_text.set_text(f"t={int(self.cycle_count/self.task_params['fps'])}s")
@@ -270,7 +278,7 @@ class ERPAnalysisWorker(AnalysisWorker):
         self.trigger_times = []
         self.lfp_downsample = 25
 
-        if hasattr(self.task_params, 'qwalor_trigger_dch'):
+        if 'qwalor_trigger_dch' in self.task_params:
             self.trigger_dch = self.task_params['qwalor_trigger_dch']
             channels = map_channels_for_multisource(headstage_channels=self.acq_ch, 
                                                          digital_channels=[self.clock_dch, self.trigger_dch])
@@ -282,23 +290,19 @@ class ERPAnalysisWorker(AnalysisWorker):
         print('datasource started')
 
         # Initialize the ERP data
-        self.erp = np.zeros((len(self.elec_pos), 
-                             int((self.time_before + self.time_after) * self.ds.source.update_freq/self.lfp_downsample), 
-                             0), dtype=self.ds.source.dtype)
+        self.erp = np.zeros((int((self.time_before + self.time_after) * self.ds.source.update_freq/self.lfp_downsample), 
+                             len(self.elec_pos), 0), dtype=self.ds.source.dtype)
         
         # Initialize the figure
         self.clim = (-100, 100)
-        self.erp_im = aopy.visualization.plot_spatial_map(np.zeros((16,16)), self.elec_pos[:,0], self.elec_pos[:,1], 
+        self.data_map = np.zeros((16,16))
+        self.erp_im = aopy.visualization.plot_spatial_map(self.data_map, self.elec_pos[:,0], self.elec_pos[:,1], 
                                                  cmap='bwr', ax=self.ax)
         self.erp_im.set_clim(self.clim)
         self.erp_text = self.ax.text(0.75, 1.05, '.', ha='center', va='center', fontsize=12, transform=self.ax.transAxes)
 
     def update(self):
         super().update()
-
-        print('update')
-        t0 = time.perf_counter()
-
         # Keep track of clock cycles
         clock_data = self.ds.get_new(map_channels_for_multisource(digital_channels=[self.clock_dch]))[0]
         if len(clock_data) == 0:
@@ -312,16 +316,17 @@ class ERPAnalysisWorker(AnalysisWorker):
         if self.trigger_dch:
             trigger_data = self.ds.get_new(map_channels_for_multisource(digital_channels=[self.trigger_dch]))[0]
             timestamps, edges = aopy.utils.detect_edges(trigger_data, self.ds.source.update_freq, rising=True, falling=False)   
-            self.trigger_times = np.concatenate((self.trigger_times, timestamps + clock_elapsed_prev))
-        
+            self.trigger_times = np.concatenate((self.trigger_times, timestamps + clock_elapsed_prev)).tolist()
+            print(f'got {len(timestamps)} new digital triggers')
+
         # Append new ERPs from trigger events
         fs = self.ds.source.update_freq / self.lfp_downsample
-        nt = 2 # seconds
-        npts = int(nt * fs)
+        nt = 2./self.update_rate # seconds
+        npts = int(nt * self.ds.source.update_freq)
         lfp = self.ds.get(npts, map_channels_for_multisource(headstage_channels=self.acq_ch))
         lfp = np.array(lfp)[:,::self.lfp_downsample].T # reshape and downsample (nt, nch)
         ignored_trigger_cycles = []
-        while self.trigger_cycles:
+        while len(self.trigger_cycles) > 0:
             cycle = self.trigger_cycles.pop()
             if cycle > len(self.clock_times):
                 ignored_trigger_cycles.append(cycle)
@@ -339,7 +344,7 @@ class ERPAnalysisWorker(AnalysisWorker):
 
         # Check for new digital triggers
         ignored_trigger_times = []
-        while self.trigger_times:
+        while len(self.trigger_times) > 0:
             time = self.trigger_times.pop()
             if time + self.time_after > clock_elapsed_new:
                 ignored_trigger_times.append(time)
@@ -353,14 +358,11 @@ class ERPAnalysisWorker(AnalysisWorker):
 
         # Update the total elapsed time
         self.clock_elapsed = clock_elapsed_new
-        print(clock_elapsed_new)
 
         # Update the ERP
-        t1 = time.perf_counter()
         fs = self.ds.source.update_freq / self.lfp_downsample
         max_erp = aopy.analysis.get_max_erp(self.erp, self.time_before, self.time_after, fs, trial_average=True)
         self.data_map = aopy.visualization.get_data_map(max_erp*1.907348633e-7*1e6, self.elec_pos[:,0], self.elec_pos[:,1])
-        print(f'update time: {time.perf_counter() - t0:.2f} (erp time: {time.perf_counter() - t1:.2f})')
 
     def handle_data(self, key, values):
         super().handle_data(key, values)
@@ -533,6 +535,11 @@ if __name__ == '__main__':
         display = sys.argv[3]
     else:
         display = ':0'
+
+    # Spin up servernode
+    # if hostname == '0.0.0.0':
+    #     import subprocess
+    #     subprocess.Popen('/home/aolab/code/bmi3d/riglib/ecube/servernode-control')
 
     # Start server
     print(hostname, port, display)
