@@ -406,7 +406,7 @@ def map_channels_for_multisource(headstage_channels=[], analog_channels=[], digi
 
 class MultiSource(DataSourceSystem):
     '''
-    Adds Analog, Digital and Broadband channels. Compatible with riglib.source.MultiChanDataSource.
+    Adds all Analog, Digital and Broadband channels. Compatible with riglib.source.MultiChanDataSource.
     Because of the way the system is set up, Analog channels map from 1-32, Digital channels 
     from 33-96, and Broadband channels from 97- onwards. Use the mapping utility to convert channels.
     Not tested for use with BMI, as the latency is likely higher than streaming only broadband data.
@@ -416,7 +416,7 @@ class MultiSource(DataSourceSystem):
     dtype = np.dtype('float')
 
     @classmethod
-    def pre_init(cls, headstage=7, digital_channels=[], analog_channels=[], headstage_channels=[]):
+    def pre_init(cls, headstage=7, n_digital_channels=64, n_analog_channels=32, n_headstage_channels=256):
         '''
         Set up servernode with all the possible channels you want to use
         '''
@@ -431,29 +431,10 @@ class MultiSource(DataSourceSystem):
         if len(subscribed[2]) > 0:
             conn.remove(('DigitalPanel',))
 
-        # Add the requested headstage channels if they are available
-        available = conn.listavailable()[0][headstage-1] # (headstages, analog, digital); ch are 1-indexed
-        for ch in headstage_channels:
-            if ch > available:
-                raise RuntimeError('requested channel {} is not available ({} connected)'.format(
-                    ch, available))
-            conn.add(('Headstages', headstage, (ch, ch)))
-
-        # Add the analog panel channels
-        available = conn.listavailable()[1]
-        for ch in analog_channels:
-            if ch > available:
-                raise RuntimeError('requested channel {} is not available ({} connected)'.format(
-                    ch, available))
-            conn.add(('AnalogPanel', (ch, ch)))
-
-        # Add the digital panel channels
-        available = conn.listavailable()[2]
-        for ch in digital_channels:
-            if ch > available:
-                raise RuntimeError('requested channel {} is not available ({} connected)'.format(
-                    ch, available))
-            conn.add(('DigitalPanelAsChans', (ch, ch)))
+        # Add all available channels
+        conn.add(('Headstages', headstage, (1, n_headstage_channels)))
+        conn.add(('AnalogPanel', (1, n_analog_channels)))
+        conn.add(('DigitalPanelAsChans', (1, n_digital_channels)))
 
         subscribed = conn.listadded() # in debug mode this prints out the added channels
 

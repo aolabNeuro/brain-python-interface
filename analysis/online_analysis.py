@@ -11,6 +11,7 @@ import traceback
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.collections import PatchCollection
+from matplotlib.widgets import Button, Slider, Cursor
 import aopy
 from riglib.ecube import MultiSource, map_channels_for_multisource
 from riglib.source import MultiChanDataSource
@@ -99,8 +100,7 @@ class AnalysisWorker(mp.Process):
         self.ax = self.fig.add_subplot(111)
         experiment_name = self.task_params.get('experiment_name', 'None')
         te_id = self.task_params.get('te_id', 'None')
-        self.ax.text(0., 1.05, f"{experiment_name} ({te_id}) - {self.__class__.__name__}",
-                     ha='left', va='center', fontsize=12, transform=self.ax.transAxes)
+        self.fig.canvas.manager.set_window_title(f"{experiment_name} ({te_id}) - {self.__class__.__name__}")
         self.time_text = self.ax.text(1., 1.05, '', ha='right', va='center', fontsize=12, transform=self.ax.transAxes)
         self.time_text.set_text('Waiting for data...')
         self.init()
@@ -154,10 +154,10 @@ class BehaviorAnalysisWorker(AnalysisWorker):
 
         # Load previous calibration if it exists
         subject = self.task_params.get('subject_name', 'None')
-        self.calibration_filename = f'calib_{subject}_{datetime.date.today()}.npy'
+        self.calibration_filename = f'calib_{subject}_{datetime.date.today()}.pkl'
         filepath = os.path.join(self.calibration_dir, self.calibration_filename)
         if os.path.exists(filepath):
-            self.eye_coeff, self.eye_coeff_corr = np.load(filepath, allow_pickle=True)
+            self.eye_coeff, self.eye_coeff_corr = aopy.data.pkl_read(self.calibration_filename, self.calibration_dir)
             self.calibration_flag = False
 
         # Turn off automatic calibration if this isn't a MC task
@@ -250,7 +250,7 @@ class BehaviorAnalysisWorker(AnalysisWorker):
         # Save the calibration if it was performed
         filepath = os.path.join(self.calibration_dir, self.calibration_filename)
         if self.calibration_flag and not np.array_equal(self.eye_coeff, np.array([[1,0],[1,0]])):
-            np.save(filepath, (self.eye_coeff, self.eye_coeff_corr))
+            aopy.data.pkl_write(self.calibration_filename, (self.eye_coeff, self.eye_coeff_corr), self.calibration_dir)
 
 class ERPAnalysisWorker(AnalysisWorker):
     '''
@@ -259,10 +259,12 @@ class ERPAnalysisWorker(AnalysisWorker):
     '''
     bufferlen = 5 # seconds of data to keep in the buffer
 
-    def __init__(self, task_params, data_queue, update_rate=1, time_before=0.02, time_after=0.02, **kwargs):
+    def __init__(self, task_params, data_queue, update_rate=1, time_before=0.05, 
+                 time_after=0.1, figure_dir='/home/aolab/figures', **kwargs):
         super().__init__(task_params, data_queue, update_rate=update_rate, **kwargs)
         self.time_before = time_before
         self.time_after = time_after
+        self.figure_dir = figure_dir
 
     def init(self):
         super().init()
@@ -294,12 +296,38 @@ class ERPAnalysisWorker(AnalysisWorker):
                              len(self.elec_pos), 0), dtype=self.ds.source.dtype)
         
         # Initialize the figure
-        self.clim = (-100, 100)
         self.data_map = np.zeros((16,16))
         self.erp_im = aopy.visualization.plot_spatial_map(self.data_map, self.elec_pos[:,0], self.elec_pos[:,1], 
                                                  cmap='bwr', ax=self.ax)
-        self.erp_im.set_clim(self.clim)
+        self.erp_im.set_clim(-100, 100)
         self.erp_text = self.ax.text(0.75, 1.05, '.', ha='center', va='center', fontsize=12, transform=self.ax.transAxes)
+
+        # Add a slider to control the range
+        ax_slider = self.fig.add_axes([0.225, 0.075, 0.6, 0.03])
+        self.slider = Slider(
+            ax=ax_slider,
+            label='Range (uV)',
+            valmin=0.1,
+            valmax=1000,
+            valinit=100
+        )
+        self.slider.on_changed(lambda val: self.erp_im.set_clim(-val, val))
+
+        # And a button to show/hide channel numbers
+        self.labels = []
+        elec_pos, acq_ch, _ = aopy.data.load_chmap('ECoG244')
+        stim_pos, stim_ch, _ = aopy.data.load_chmap('Opto32')
+        for pos, ch in zip(elec_pos, acq_ch):
+            self.labels.append(aopy.visualization.annotate_spatial_map(pos, ch, 'c', 12, self.ax))
+        for pos, ch in zip(stim_pos, stim_ch):
+            self.labels.append(aopy.visualization.annotate_spatial_map(pos, ch, 'm', 12, self.ax))
+        def toggle_labels(event):
+            for label in self.labels:
+                label.set_visible(not label.get_visible())
+        toggle_labels(None)
+        ax_toggle = self.fig.add_axes([0.1, 0.025, 0.1, 0.025])
+        self.toggle = Button(ax_toggle, 'Labels')
+        self.toggle.on_clicked(toggle_labels)
 
     def update(self):
         super().update()
@@ -317,7 +345,6 @@ class ERPAnalysisWorker(AnalysisWorker):
             trigger_data = self.ds.get_new(map_channels_for_multisource(digital_channels=[self.trigger_dch]))[0]
             timestamps, edges = aopy.utils.detect_edges(trigger_data, self.ds.source.update_freq, rising=True, falling=False)   
             self.trigger_times = np.concatenate((self.trigger_times, timestamps + clock_elapsed_prev)).tolist()
-            print(f'got {len(timestamps)} new digital triggers')
 
         # Append new ERPs from trigger events
         fs = self.ds.source.update_freq / self.lfp_downsample
@@ -328,7 +355,7 @@ class ERPAnalysisWorker(AnalysisWorker):
         ignored_trigger_cycles = []
         while len(self.trigger_cycles) > 0:
             cycle = self.trigger_cycles.pop()
-            if cycle > len(self.clock_times):
+            if cycle >= len(self.clock_times):
                 ignored_trigger_cycles.append(cycle)
                 continue
             time = self.clock_times[cycle]
@@ -382,7 +409,14 @@ class ERPAnalysisWorker(AnalysisWorker):
         '''
         self.ds.stop()      
         # TO-DO: implenent saving figures
-
+        subject = self.task_params.get('subject_name', 'None')
+        te_id = self.task_params.get('te_id', 'None')
+        if te_id == 'None':
+            return
+        date = datetime.date.today()
+        filename = f'online_erp_{subject}_{te_id}_{date}.png'
+        plt.figure(self.fig)
+        aopy.visualization.savefig(self.figure_dir, filename, transparent=False)
 
 class OnlineDataServer(threading.Thread):
     '''
@@ -409,9 +443,7 @@ class OnlineDataServer(threading.Thread):
         self.data_worker = None
         self.analysis_workers = []
         try:
-            MultiSource.pre_init(digital_channels=list(range(1,65)), 
-                                 analog_channels=list(range(1,33)), 
-                                 headstage_channels=list(range(1,257)))
+            MultiSource.pre_init()
             print('eCube streaming initialized')
         except:
             pass
@@ -481,9 +513,6 @@ class OnlineDataServer(threading.Thread):
                 self.reset()
                 self.is_running = False
                 self.is_completed = True
-            elif not self.is_running and not self.is_completed: # check in case we missed the init message
-                self.is_running = True
-                self.init()
             for _, data_queue in self.analysis_workers:
                 data_queue.put((key, values))
         elif key == 'init' and values[0]:
