@@ -6,7 +6,7 @@ task/experiment by multiple inheritance.
 from features.debug_features import Profiler, OnlineAnalysis
 from features.laser_features import QwalorLaser, MultiQwalorLaser, SwitchedQwalorLaser, LaserState
 from riglib.stereo_opengl.window import WindowWithExperimenterDisplay, Window2D
-from .generator_features import Autostart, AdaptiveGenerator, IgnoreCorrectness, PoissonWait, Progressbar_fixation
+from .generator_features import Autostart, AdaptiveGenerator, IgnoreCorrectness, PoissonWait, Progressbar_fixation, HideLeftTrajectory
 from .peripheral_device_features import Button, Joystick, DualJoystick, Joystick_plus_TouchSensor, KeyboardControl, MouseControl, ForceControl
 from .reward_features import RewardSystem, TTLReward, JuiceLogging, PelletReward, JackpotRewards, ProgressBar, TrackingRewards
 from .eyetracker_features import EyeData, CalibratedEyeData, SimulatedEyeData, FixationStart, EyeConstrained, EyeCalibration, EyeStreaming
@@ -80,7 +80,8 @@ built_in_features = dict(
     eye_calibration=EyeCalibration, 
     force_sensor=ForceControl,
     show_fixation_progress=Progressbar_fixation,
-    clda_kfrml=CLDA_KFRML_IntendedVelocity
+    clda_kfrml=CLDA_KFRML_IntendedVelocity,
+    hide_left_trajectory=HideLeftTrajectory,
 )
 
 # >>> features.built_in_features['autostart'].__module__

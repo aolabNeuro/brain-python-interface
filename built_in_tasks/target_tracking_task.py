@@ -591,7 +591,6 @@ class ScreenTargetTracking(TargetTracking, Window):
 
             self.target.show()
             self.trajectory.show()
-            self.box.show()
             # print('SHOW TRAJ')
             self.sync_event('TARGET_ON')
 
