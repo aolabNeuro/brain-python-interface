@@ -16,6 +16,7 @@ setuptools.setup(
         "celery",
         "jinja2",
         "scipy",
+        "numpy==1.26",
         "traits",
         "pandas",
         "patsy",
@@ -29,5 +30,8 @@ setuptools.setup(
         "tables",
         "h5py",
         "pymysql",
+        "matplotlib",
+        "pyfirmata",
+        "hdfwriter==0.1.4",
     ]
 )
