@@ -502,7 +502,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         '''
         cursor_pos = self.plant.get_endpoint_pos()
         d = np.linalg.norm(cursor_pos - self.target.get_position())
-        return d > (self.target_radius - self.cursor_radius) or super()._test_leave_target(time_in_state)
+        return np.isnan(d) or d > (self.target_radius - self.cursor_radius) or super()._test_leave_target(time_in_state)
 
     #### STATE FUNCTIONS ####
     def setup_start_wait(self):

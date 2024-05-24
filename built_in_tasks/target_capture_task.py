@@ -386,7 +386,7 @@ class ScreenTargetCapture(TargetCapture, Window):
         cursor_pos = self.plant.get_endpoint_pos()
         d = np.linalg.norm(cursor_pos - self.targs[self.target_index])
         rad = self.target_radius - self.cursor_radius
-        return d > rad or super()._test_leave_target(ts)
+        return np.isnan(d) or d > rad or super()._test_leave_target(ts)
 
     #### STATE FUNCTIONS ####
     def _start_wait(self):
