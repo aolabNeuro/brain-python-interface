@@ -4,15 +4,16 @@ Features for a touch sensor on the neurosync arduino
 '''
 from riglib.experiment import traits
 from riglib import touch_data
-from features.peripheral_device_features import KeyboardControl
 import numpy as np
 import pygame
+from riglib.experiment import traits
+
 
 ########################################################################################################
 # Touch sensor datasources
 ########################################################################################################
 
-class MouseEmulateTouch(KeyboardControl):
+class MouseEmulateTouch(traits.HasTraits):
     '''
     Emulate a touch screen by detecting when mouse position doesn't update
     '''
@@ -21,7 +22,7 @@ class MouseEmulateTouch(KeyboardControl):
 
     def init(self, *args, **kwargs):
         super().init(*args, **kwargs)
-        n_repeat_delay = int(self.mouse_repeat_delay / self.fps)
+        n_repeat_delay = int(self.mouse_repeat_delay * self.fps)
         self.joystick = MouseHistory(self.window_size, self.screen_cm, 
                                      np.array(self.starting_pos[::2]), n_repeat_delay=n_repeat_delay)
 
@@ -45,9 +46,9 @@ class MouseHistory():
         self.history[:-1, :] = self.history[1:, :]
         self.history[-1, :] = self.pos
         if np.all(np.diff(self.history, axis=0) == 0):
-            return [np.nan*self.pos]
-        else:
-            return [self.pos]
+            self.pos[0] = np.nan
+            self.pos[1] = np.nan
+        return [self.pos]
 
 class TouchDataFeature(traits.HasTraits):
     '''
