@@ -4,10 +4,50 @@ Features for a touch sensor on the neurosync arduino
 '''
 from riglib.experiment import traits
 from riglib import touch_data
+from features.peripheral_device_features import KeyboardControl
+import numpy as np
+import pygame
 
 ########################################################################################################
 # Touch sensor datasources
 ########################################################################################################
+
+class MouseEmulateTouch(KeyboardControl):
+    '''
+    Emulate a touch screen by detecting when mouse position doesn't update
+    '''
+
+    mouse_repeat_delay = traits.Float(1., desc="Time in seconds before the same mouse position causes the cursor to disappear")
+
+    def init(self, *args, **kwargs):
+        super().init(*args, **kwargs)
+        n_repeat_delay = int(self.mouse_repeat_delay / self.fps)
+        self.joystick = MouseHistory(self.window_size, self.screen_cm, 
+                                     np.array(self.starting_pos[::2]), n_repeat_delay=n_repeat_delay)
+
+class MouseHistory():
+    '''
+    Pretend to be a data source
+    '''
+
+    def __init__(self, window_size, screen_cm, start_pos, n_repeat_delay=3):
+        self.window_size = window_size
+        self.screen_cm = screen_cm
+        self.history = np.zeros((n_repeat_delay, 2))
+        self.pos = [0., 0.]
+        self.pos[0] = start_pos[0]
+        self.pos[1] = start_pos[1]
+
+    def get(self):
+        pos = pygame.mouse.get_pos()
+        self.pos[0] = (pos[0] / self.window_size[0] - 0.5) * self.screen_cm[0]
+        self.pos[1] = -(pos[1] / self.window_size[1] - 0.5) * self.screen_cm[1] # pygame counts (0,0) as the top left
+        self.history[:-1, :] = self.history[1:, :]
+        self.history[-1, :] = self.pos
+        if np.all(np.diff(self.history, axis=0) == 0):
+            return [np.nan*self.pos]
+        else:
+            return [self.pos]
 
 class TouchDataFeature(traits.HasTraits):
     '''
