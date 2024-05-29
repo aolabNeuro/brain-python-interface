@@ -152,6 +152,9 @@ class BehaviorAnalysisWorker(AnalysisWorker):
         self.eye_coeff = np.array([[1,0],[1,0]])
         self.eye_coeff_corr = 0.5 # Don't accept anything lower than 0.5 by default
 
+        self.range = 10 # seconds of data to keep in the buffer
+        self.eye_diam = np.zeros((int(self.range*self.task_params['fps']), int(2)))
+
         # Load previous calibration if it exists
         subject = self.task_params.get('subject_name', 'None')
         self.calibration_filename = f'calib_{subject}_{datetime.date.today()}.pkl'
@@ -174,6 +177,12 @@ class BehaviorAnalysisWorker(AnalysisWorker):
         self.circles = PatchCollection([])
         self.ax.add_collection(self.circles)
 
+        # Set up eye diameter figure    FIGURE THIS OUT
+        # diam_ax, diam_fig = plt.subplots()
+
+        self.diam_ax = self.fig.add_axes([0, 0.1, 1, 0.1])
+        self.diam_plot = self.diam_ax.plot([], [], 'b-')[0]
+
     def update_eye_calibration(self):
         '''
         Update the eye calibration coefficients using the collected data
@@ -194,10 +203,10 @@ class BehaviorAnalysisWorker(AnalysisWorker):
 
         Returns:
             cursor_pos ((2,) tuple): Current cursor position
-            eye_pos ((2,) tuple): Current eye position
+            eye_pos ((2,) tuple): Current eye position and diameters
             targets (list): List of active targets in (position, radius, color) format
         '''
-        calibrated_eye_pos = aopy.data.get_calibrated_eye_data(self.eye_pos, self.eye_coeff)
+        calibrated_eye_pos = aopy.data.get_calibrated_eye_data(self.eye_pos[0:2], self.eye_coeff)
         try:
             radius = self.task_params['target_radius']
             color = self.task_params['target_color']
@@ -228,22 +237,33 @@ class BehaviorAnalysisWorker(AnalysisWorker):
             self.cursor_pos = np.array(values[0])[[0,2]]
         elif key == 'eye_pos':
             self.eye_pos = np.array(values[0])[:2]
+
+            # Update eye diameter
+            self.temp = np.array(values[0])[4:]
+            self.eye_diam = np.roll(self.eye_diam, -1, axis=0)
+            self.eye_diam[-1] = self.temp
+
         elif key == 'target_location':
             target_idx, target_location = values
             self.target_pos[int(target_idx)] = np.array(target_location)[[0,2]]
 
-    def draw(self):
+    def draw(self): # TO-DO: add eye diam graph
         super().draw()
         cursor_pos, eye_pos, targets = self.get_current_pos()
         cursor_radius = self.task_params.get('cursor_radius', 0.25)
+        print(self.eye_diam[0])
+
         patches = [
             plt.Circle(cursor_pos, cursor_radius), 
-            plt.Circle(eye_pos, cursor_radius)
+            plt.Circle(eye_pos, self.eye_diam[0]-34)
         ] + [plt.Circle(pos, radius) for pos, radius, _ in targets]
         self.circles.set_paths(patches)
         colors = ['b', 'g'] + [c for _, _, c in targets]
         self.circles.set_facecolor(colors)
         self.circles.set_alpha(0.5)
+
+        # Update eye diameter plot
+        self.diam_plot.set_data(range(len(self.eye_diam)), self.eye_diam)
 
     def cleanup(self):
 
