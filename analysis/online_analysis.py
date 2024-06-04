@@ -97,7 +97,6 @@ class AnalysisWorker(mp.Process):
         
         # Initialize figure
         self.fig = plt.figure(figsize=self.figsize)
-        # self.ax = self.fig.add_subplot(111)
         self.ax = self.fig.add_axes([0, 0.2, 1, 0.7])
         experiment_name = self.task_params.get('experiment_name', 'None')
         te_id = self.task_params.get('te_id', 'None')
@@ -138,9 +137,12 @@ class BehaviorAnalysisWorker(AnalysisWorker):
     calibration coefficients are available. 
     '''
    
-    def __init__(self, task_params, data_queue, calibration_dir='/var/tmp', **kwargs):
+    def __init__(self, task_params, data_queue, calibration_dir='/var/tmp', buffer_time=10, ylim=1, px_per_cm=51.67, **kwargs):
         super().__init__(task_params, data_queue, **kwargs)
         self.calibration_dir = calibration_dir
+        self.buffer_time = buffer_time
+        self.ylim = ylim
+        self.px_per_cm = px_per_cm
 
     def init(self):
         super().init()
@@ -152,10 +154,8 @@ class BehaviorAnalysisWorker(AnalysisWorker):
         self.calibration_flag = True
         self.eye_coeff = np.array([[1,0],[1,0]])
         self.eye_coeff_corr = 0.5 # Don't accept anything lower than 0.5 by default
-        self.px_per_cm = 51.67 # pixels per cm of the eyeball
-
-        self.range = 10 # seconds of data to keep in the buffer
-        self.eye_diam = np.zeros((int(self.range*self.task_params['fps']), int(2)))
+        
+        self.eye_diam = np.zeros((int(self.buffer_time*self.task_params['fps']), int(2)))
 
         # Load previous calibration if it exists
         subject = self.task_params.get('subject_name', 'None')
@@ -179,13 +179,10 @@ class BehaviorAnalysisWorker(AnalysisWorker):
         self.circles = PatchCollection([])
         self.ax.add_collection(self.circles)
 
-        # eye diameter plot parameters
-        self.y_lim = 1
-
         # Set up eye diameter figure  
         self.diam_ax = self.fig.add_axes([0.1, 0.06, 0.8, 0.11])
-        self.diam_ax.set_ylim(0, self.y_lim)
-        self.diam_ax.set_xlim(-self.range, 0)
+        self.diam_ax.set_ylim(0, self.ylim)
+        self.diam_ax.set_xlim(-self.buffer_time, 0)
         self.diam_ax.set_xlabel('Time (s)')
         self.diam_ax.set_ylabel('Eye Diameter (cm)')
         self.diam_plot = self.diam_ax.plot([], [], 'green')[0]
@@ -255,7 +252,7 @@ class BehaviorAnalysisWorker(AnalysisWorker):
             target_idx, target_location = values
             self.target_pos[int(target_idx)] = np.array(target_location)[[0,2]]
 
-    def draw(self): # TO-DO: add eye diam graph
+    def draw(self):
         super().draw()
         cursor_pos, eye_pos, targets = self.get_current_pos()
         cursor_radius = self.task_params.get('cursor_radius', 0.25)
