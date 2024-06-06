@@ -117,9 +117,20 @@ elif hostname == 'booted-server':
     screen_half_height = 5
     default_db = 'tablet'
     secret_dbnames = ['tablet']
+elif hostname == 'bonnet-bmi':
+    # optitrack_address = '10.155.204.10'
+    # optitrack_save_path = "C:/Users/aolab/Documents"
+    # optitrack_sync_dch = 53 # 0-index
+    # window_size = (2560, 1440)
+    # screen_dist = 28
+    # screen_half_height = 15
+    default_db = 'human'
+    secret_dbnames = ['human']
+    # arduino_sync_params = human_sync_params_arduino
 elif hostname in ['moor', 'crab-eating', 'ecube']:
     default_db = 'booth'
     secret_dbnames = [
+        'human',
         'booth',
         'tablet',
         'test',
