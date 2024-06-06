@@ -117,7 +117,7 @@ elif hostname == 'booted-server':
     screen_half_height = 5
     default_db = 'tablet'
     secret_dbnames = ['tablet']
-elif hostname in ['moor', 'crab-eating']:
+elif hostname in ['moor', 'crab-eating', 'ecube']:
     default_db = 'booth'
     secret_dbnames = [
         'booth',

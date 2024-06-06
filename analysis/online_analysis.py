@@ -11,6 +11,7 @@ import traceback
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.collections import PatchCollection
+from matplotlib.widgets import Button, Slider, Cursor
 import aopy
 from riglib.ecube import MultiSource, map_channels_for_multisource
 from riglib.source import MultiChanDataSource
@@ -46,7 +47,7 @@ class AnalysisWorker(mp.Process):
     calibration of eye data to target locations when the cursor enters the target.
     '''
 
-    def __init__(self, task_params, data_queue, figsize=(8,10), update_rate=60, fps=60):
+    def __init__(self, task_params, data_queue, figsize=(8,8), update_rate=60, fps=60):
         self.task_params = task_params
         self._stop_event = mp.Event()
         self.data_queue = data_queue
@@ -72,7 +73,10 @@ class AnalysisWorker(mp.Process):
         '''
         Update the figure.
         '''
-        self.time_text.set_text(f"t={int(self.cycle_count/self.task_params['fps'])}s")
+        if 'fps' in self.task_params:
+            self.time_text.set_text(f"t={int(self.cycle_count/self.task_params['fps'])} s")
+        else:
+            self.time_text.set_text(f"t={int(self.cycle_count)} cycles")
 
     def cleanup(self):
         '''
@@ -93,9 +97,10 @@ class AnalysisWorker(mp.Process):
         
         # Initialize figure
         self.fig = plt.figure(figsize=self.figsize)
-        self.ax = self.fig.add_subplot(111)
-        self.ax.text(0., 1.05, f"{self.task_params['experiment_name']} ({self.task_params['te_id']}) - {self.__class__.__name__}",
-                     ha='left', va='center', fontsize=12, transform=self.ax.transAxes)
+        self.ax = self.fig.add_axes([0, 0.2, 1, 0.7])
+        experiment_name = self.task_params.get('experiment_name', 'None')
+        te_id = self.task_params.get('te_id', 'None')
+        self.fig.canvas.manager.set_window_title(f"{experiment_name} ({te_id}) - {self.__class__.__name__}")
         self.time_text = self.ax.text(1., 1.05, '', ha='right', va='center', fontsize=12, transform=self.ax.transAxes)
         self.time_text.set_text('Waiting for data...')
         self.init()
@@ -107,7 +112,10 @@ class AnalysisWorker(mp.Process):
         t_update = time.perf_counter()
         while not self._stop_event.is_set():
             if time.perf_counter() - t_update > 1./self.update_rate:
-                self.update()
+                try:
+                    self.update()
+                except:
+                    traceback.print_exc()
                 t_update = time.perf_counter()
             self.draw()
             self.time_text.set_text(f"t={int(self.cycle_count/self.task_params['fps'])}s")
@@ -129,9 +137,12 @@ class BehaviorAnalysisWorker(AnalysisWorker):
     calibration coefficients are available. 
     '''
    
-    def __init__(self, task_params, data_queue, calibration_dir='/var/tmp', **kwargs):
+    def __init__(self, task_params, data_queue, calibration_dir='/var/tmp', buffer_time=10, ylim=1, px_per_cm=51.67, **kwargs):
         super().__init__(task_params, data_queue, **kwargs)
         self.calibration_dir = calibration_dir
+        self.buffer_time = buffer_time
+        self.ylim = ylim
+        self.px_per_cm = px_per_cm
 
     def init(self):
         super().init()
@@ -143,13 +154,15 @@ class BehaviorAnalysisWorker(AnalysisWorker):
         self.calibration_flag = True
         self.eye_coeff = np.array([[1,0],[1,0]])
         self.eye_coeff_corr = 0.5 # Don't accept anything lower than 0.5 by default
+        
+        self.eye_diam = np.zeros((int(self.buffer_time*self.task_params['fps']), int(2)))
 
         # Load previous calibration if it exists
         subject = self.task_params.get('subject_name', 'None')
-        self.calibration_filename = f'calib_{subject}_{datetime.date.today()}.npy'
+        self.calibration_filename = f'calib_{subject}_{datetime.date.today()}.pkl'
         filepath = os.path.join(self.calibration_dir, self.calibration_filename)
         if os.path.exists(filepath):
-            self.eye_coeff, self.eye_coeff_corr = np.load(filepath, allow_pickle=True)
+            self.eye_coeff, self.eye_coeff_corr = aopy.data.pkl_read(self.calibration_filename, self.calibration_dir)
             self.calibration_flag = False
 
         # Turn off automatic calibration if this isn't a MC task
@@ -165,6 +178,15 @@ class BehaviorAnalysisWorker(AnalysisWorker):
         self.ax.set_aspect('equal')
         self.circles = PatchCollection([])
         self.ax.add_collection(self.circles)
+
+        # Set up eye diameter figure  
+        self.diam_ax = self.fig.add_axes([0.1, 0.06, 0.8, 0.11])
+        self.diam_ax.set_ylim(0, self.ylim)
+        self.diam_ax.set_xlim(-self.buffer_time, 0)
+        self.diam_ax.set_xlabel('Time (s)')
+        self.diam_ax.set_ylabel('Eye Diameter (cm)')
+        self.diam_plot = self.diam_ax.plot([], [], 'green')[0]
+
 
     def update_eye_calibration(self):
         '''
@@ -186,10 +208,10 @@ class BehaviorAnalysisWorker(AnalysisWorker):
 
         Returns:
             cursor_pos ((2,) tuple): Current cursor position
-            eye_pos ((2,) tuple): Current eye position
+            eye_pos ((2,) tuple): Current eye position and diameters
             targets (list): List of active targets in (position, radius, color) format
         '''
-        calibrated_eye_pos = aopy.data.get_calibrated_eye_data(self.eye_pos, self.eye_coeff)
+        calibrated_eye_pos = aopy.data.get_calibrated_eye_data(self.eye_pos[0:2], self.eye_coeff)
         try:
             radius = self.task_params['target_radius']
             color = self.task_params['target_color']
@@ -220,6 +242,12 @@ class BehaviorAnalysisWorker(AnalysisWorker):
             self.cursor_pos = np.array(values[0])[[0,2]]
         elif key == 'eye_pos':
             self.eye_pos = np.array(values[0])[:2]
+
+            # Update eye diameter
+            self.temp = np.array(values[0])[4:]
+            self.eye_diam = np.roll(self.eye_diam, -1, axis=0)
+            self.eye_diam[-1] = self.temp
+
         elif key == 'target_location':
             target_idx, target_location = values
             self.target_pos[int(target_idx)] = np.array(target_location)[[0,2]]
@@ -228,21 +256,27 @@ class BehaviorAnalysisWorker(AnalysisWorker):
         super().draw()
         cursor_pos, eye_pos, targets = self.get_current_pos()
         cursor_radius = self.task_params.get('cursor_radius', 0.25)
+        print(self.eye_diam[0])
+
         patches = [
             plt.Circle(cursor_pos, cursor_radius), 
-            plt.Circle(eye_pos, cursor_radius)
+            plt.Circle(eye_pos, self.eye_diam[-1, 0]/self.px_per_cm)
         ] + [plt.Circle(pos, radius) for pos, radius, _ in targets]
         self.circles.set_paths(patches)
         colors = ['b', 'g'] + [c for _, _, c in targets]
         self.circles.set_facecolor(colors)
         self.circles.set_alpha(0.5)
 
+        # Update eye diameter plot
+        self.diam_plot.set_data(np.arange(len(self.eye_diam)) * 1/(int(self.task_params['fps'])) - 10, 
+                                self.eye_diam[:, 0]/self.px_per_cm)
+
     def cleanup(self):
 
         # Save the calibration if it was performed
         filepath = os.path.join(self.calibration_dir, self.calibration_filename)
         if self.calibration_flag and not np.array_equal(self.eye_coeff, np.array([[1,0],[1,0]])):
-            np.save(filepath, (self.eye_coeff, self.eye_coeff_corr))
+            aopy.data.pkl_write(self.calibration_filename, (self.eye_coeff, self.eye_coeff_corr), self.calibration_dir)
 
 class ERPAnalysisWorker(AnalysisWorker):
     '''
@@ -251,10 +285,12 @@ class ERPAnalysisWorker(AnalysisWorker):
     '''
     bufferlen = 5 # seconds of data to keep in the buffer
 
-    def __init__(self, task_params, data_queue, update_rate=1, time_before=0.02, time_after=0.02, **kwargs):
+    def __init__(self, task_params, data_queue, update_rate=1, time_before=0.05, 
+                 time_after=0.1, figure_dir='/home/aolab/figures', **kwargs):
         super().__init__(task_params, data_queue, update_rate=update_rate, **kwargs)
         self.time_before = time_before
         self.time_after = time_after
+        self.figure_dir = figure_dir
 
     def init(self):
         super().init()
@@ -270,7 +306,7 @@ class ERPAnalysisWorker(AnalysisWorker):
         self.trigger_times = []
         self.lfp_downsample = 25
 
-        if hasattr(self.task_params, 'qwalor_trigger_dch'):
+        if 'qwalor_trigger_dch' in self.task_params:
             self.trigger_dch = self.task_params['qwalor_trigger_dch']
             channels = map_channels_for_multisource(headstage_channels=self.acq_ch, 
                                                          digital_channels=[self.clock_dch, self.trigger_dch])
@@ -282,23 +318,45 @@ class ERPAnalysisWorker(AnalysisWorker):
         print('datasource started')
 
         # Initialize the ERP data
-        self.erp = np.zeros((len(self.elec_pos), 
-                             int((self.time_before + self.time_after) * self.ds.source.update_freq/self.lfp_downsample), 
-                             0), dtype=self.ds.source.dtype)
+        self.erp = np.zeros((int((self.time_before + self.time_after) * self.ds.source.update_freq/self.lfp_downsample), 
+                             len(self.elec_pos), 0), dtype=self.ds.source.dtype)
         
         # Initialize the figure
-        self.clim = (-100, 100)
-        self.erp_im = aopy.visualization.plot_spatial_map(np.zeros((16,16)), self.elec_pos[:,0], self.elec_pos[:,1], 
+        self.data_map = np.zeros((16,16))
+        self.erp_im = aopy.visualization.plot_spatial_map(self.data_map, self.elec_pos[:,0], self.elec_pos[:,1], 
                                                  cmap='bwr', ax=self.ax)
-        self.erp_im.set_clim(self.clim)
+        self.erp_im.set_clim(-100, 100)
         self.erp_text = self.ax.text(0.75, 1.05, '.', ha='center', va='center', fontsize=12, transform=self.ax.transAxes)
+
+        # Add a slider to control the range
+        ax_slider = self.fig.add_axes([0.225, 0.075, 0.6, 0.03])
+        self.slider = Slider(
+            ax=ax_slider,
+            label='Range (uV)',
+            valmin=0.1,
+            valmax=1000,
+            valinit=100
+        )
+        self.slider.on_changed(lambda val: self.erp_im.set_clim(-val, val))
+
+        # And a button to show/hide channel numbers
+        self.labels = []
+        elec_pos, acq_ch, _ = aopy.data.load_chmap('ECoG244')
+        stim_pos, stim_ch, _ = aopy.data.load_chmap('Opto32')
+        for pos, ch in zip(elec_pos, acq_ch):
+            self.labels.append(aopy.visualization.annotate_spatial_map(pos, ch, 'c', 12, self.ax))
+        for pos, ch in zip(stim_pos, stim_ch):
+            self.labels.append(aopy.visualization.annotate_spatial_map(pos, ch, 'm', 12, self.ax))
+        def toggle_labels(event):
+            for label in self.labels:
+                label.set_visible(not label.get_visible())
+        toggle_labels(None)
+        ax_toggle = self.fig.add_axes([0.1, 0.025, 0.1, 0.025])
+        self.toggle = Button(ax_toggle, 'Labels')
+        self.toggle.on_clicked(toggle_labels)
 
     def update(self):
         super().update()
-
-        print('update')
-        t0 = time.perf_counter()
-
         # Keep track of clock cycles
         clock_data = self.ds.get_new(map_channels_for_multisource(digital_channels=[self.clock_dch]))[0]
         if len(clock_data) == 0:
@@ -312,18 +370,18 @@ class ERPAnalysisWorker(AnalysisWorker):
         if self.trigger_dch:
             trigger_data = self.ds.get_new(map_channels_for_multisource(digital_channels=[self.trigger_dch]))[0]
             timestamps, edges = aopy.utils.detect_edges(trigger_data, self.ds.source.update_freq, rising=True, falling=False)   
-            self.trigger_times = np.concatenate((self.trigger_times, timestamps + clock_elapsed_prev))
-        
+            self.trigger_times = np.concatenate((self.trigger_times, timestamps + clock_elapsed_prev)).tolist()
+
         # Append new ERPs from trigger events
         fs = self.ds.source.update_freq / self.lfp_downsample
-        nt = 2 # seconds
-        npts = int(nt * fs)
+        nt = 2./self.update_rate # seconds
+        npts = int(nt * self.ds.source.update_freq)
         lfp = self.ds.get(npts, map_channels_for_multisource(headstage_channels=self.acq_ch))
         lfp = np.array(lfp)[:,::self.lfp_downsample].T # reshape and downsample (nt, nch)
         ignored_trigger_cycles = []
-        while self.trigger_cycles:
+        while len(self.trigger_cycles) > 0:
             cycle = self.trigger_cycles.pop()
-            if cycle > len(self.clock_times):
+            if cycle >= len(self.clock_times):
                 ignored_trigger_cycles.append(cycle)
                 continue
             time = self.clock_times[cycle]
@@ -339,7 +397,7 @@ class ERPAnalysisWorker(AnalysisWorker):
 
         # Check for new digital triggers
         ignored_trigger_times = []
-        while self.trigger_times:
+        while len(self.trigger_times) > 0:
             time = self.trigger_times.pop()
             if time + self.time_after > clock_elapsed_new:
                 ignored_trigger_times.append(time)
@@ -353,14 +411,11 @@ class ERPAnalysisWorker(AnalysisWorker):
 
         # Update the total elapsed time
         self.clock_elapsed = clock_elapsed_new
-        print(clock_elapsed_new)
 
         # Update the ERP
-        t1 = time.perf_counter()
         fs = self.ds.source.update_freq / self.lfp_downsample
         max_erp = aopy.analysis.get_max_erp(self.erp, self.time_before, self.time_after, fs, trial_average=True)
         self.data_map = aopy.visualization.get_data_map(max_erp*1.907348633e-7*1e6, self.elec_pos[:,0], self.elec_pos[:,1])
-        print(f'update time: {time.perf_counter() - t0:.2f} (erp time: {time.perf_counter() - t1:.2f})')
 
     def handle_data(self, key, values):
         super().handle_data(key, values)
@@ -380,7 +435,14 @@ class ERPAnalysisWorker(AnalysisWorker):
         '''
         self.ds.stop()      
         # TO-DO: implenent saving figures
-
+        subject = self.task_params.get('subject_name', 'None')
+        te_id = self.task_params.get('te_id', 'None')
+        if te_id == 'None':
+            return
+        date = datetime.date.today()
+        filename = f'online_erp_{subject}_{te_id}_{date}.png'
+        plt.figure(self.fig)
+        aopy.visualization.savefig(self.figure_dir, filename, transparent=False)
 
 class OnlineDataServer(threading.Thread):
     '''
@@ -407,9 +469,7 @@ class OnlineDataServer(threading.Thread):
         self.data_worker = None
         self.analysis_workers = []
         try:
-            MultiSource.pre_init(digital_channels=list(range(1,65)), 
-                                 analog_channels=list(range(1,33)), 
-                                 headstage_channels=list(range(1,257)))
+            MultiSource.pre_init()
             print('eCube streaming initialized')
         except:
             pass
@@ -479,9 +539,6 @@ class OnlineDataServer(threading.Thread):
                 self.reset()
                 self.is_running = False
                 self.is_completed = True
-            elif not self.is_running and not self.is_completed: # check in case we missed the init message
-                self.is_running = True
-                self.init()
             for _, data_queue in self.analysis_workers:
                 data_queue.put((key, values))
         elif key == 'init' and values[0]:
@@ -533,6 +590,11 @@ if __name__ == '__main__':
         display = sys.argv[3]
     else:
         display = ':0'
+
+    # Spin up servernode
+    # if hostname == '0.0.0.0':
+    #     import subprocess
+    #     subprocess.Popen('/home/aolab/code/bmi3d/riglib/ecube/servernode-control')
 
     # Start server
     print(hostname, port, display)
