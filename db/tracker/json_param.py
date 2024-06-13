@@ -83,6 +83,8 @@ def norm_trait(trait, value):
             record = Model.objects.get(pk=value)
             value = record.get()
         # Otherwise, let's hope it's already an instance
+    elif ttype == 'Array':
+        value = np.array(value)
     elif ttype == 'DataFile':
         # Similar to Instance traits, except we always know to use models.DataFile as the database table to look up the primary key
         from . import models
