@@ -19,7 +19,7 @@ class SaveHDF():
         Secondary init function. See riglib.experiment.Experiment.init()
         Prior to starting the task, this 'init' starts an HDFWriter sink.
         '''
-        self.h5file = tempfile.NamedTemporaryFile(suffix=".h5", delete=False)
+        self.h5file = tempfile.NamedTemporaryFile(suffix=".h5", dir='/var/tmp', delete=False)
         self.h5file.flush()
         self.h5file.close()
 
