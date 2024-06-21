@@ -13,6 +13,35 @@ sec_per_min = 60
 
 class Joystick(object):
     '''
+    Grab x,y position data from a usb joystick using pygame
+    '''
+    def init(self, *args, **kwargs):
+        super().init(*args, **kwargs)
+        self.joystick = JoystickInput(self.screen_cm)
+
+class JoystickInput():
+    '''
+    Pretend to be a data source for a joystick. Scales the (-1,1) axis outputs to the screen dimensions
+    '''
+
+    def __init__(self, screen_cm):
+        self.screen_cm = screen_cm
+
+        # Check if joystick is connected
+        pygame.joystick.init()
+        if pygame.joystick.get_count() == 0:
+            raise Exception("No joystick connected!")
+        self.joystick = pygame.joystick.Joystick(0)
+
+    def get(self):
+        pos = np.array([
+            self.joystick.get_axis(0) * self.screen_cm[0],
+            self.joystick.get_axis(1) * self.screen_cm[1]
+        ])
+        return [pos]
+
+class PhidgetsJoystick(object):
+    '''
     Code to use an analog joystick with signals digitized by the phidgets board
     '''
     def init(self):
