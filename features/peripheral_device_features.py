@@ -7,11 +7,12 @@ import numpy as np
 import pygame
 from riglib import gpio
 from config.rig_defaults import force_sensor_address
+from riglib.experiment import traits
 
 ###### CONSTANTS
 sec_per_min = 60
 
-class Joystick(object):
+class Joystick(traits.HasTraits):
     '''
     Grab x,y position data from a usb joystick using pygame
     '''
@@ -36,7 +37,7 @@ class JoystickInput():
     def get(self):
         pos = np.array([
             self.joystick.get_axis(0) * self.screen_cm[0],
-            self.joystick.get_axis(1) * self.screen_cm[1]
+            -self.joystick.get_axis(1) * self.screen_cm[1]
         ])
         return [pos]
 
