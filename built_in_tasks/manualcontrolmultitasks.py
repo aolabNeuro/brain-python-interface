@@ -97,7 +97,7 @@ class ManualControlMixin(traits.HasTraits):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.current_pt=np.zeros([3]) #keep track of current pt
-        self.last_pt=self.starting_pos #keep track of last pt to calc. velocity
+        self.last_pt = np.array(self.starting_pos) #keep track of last pt to calc. velocity
         self._quality_window_size = 500 # how many cycles to accumulate quality statistics
         self.reportstats['Input quality'] = "100 %"
         if self.random_rewards:
