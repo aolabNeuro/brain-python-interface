@@ -28,6 +28,10 @@ class JoystickInput():
     def __init__(self, screen_cm):
         self.screen_cm = screen_cm
 
+        # Enable polling the controller when the mouse isn't on the screen
+        import os
+        os.environ["SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS"] = "1"
+
         # Check if joystick is connected
         pygame.joystick.init()
         if pygame.joystick.get_count() == 0:
