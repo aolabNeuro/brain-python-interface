@@ -61,7 +61,10 @@ class Cube(TriMesh):
         super(Cube, self).__init__(pts, np.array(polys), 
             tcoords=tcoord, normals=normals, **kwargs)
 
-class Cylinder(TriMesh):
+class Pipe(TriMesh):
+    '''
+    Open pipe standing on the xy-plane with the z-axis as the height dimension
+    '''
     def __init__(self, height=1, radius=1, segments=36, **kwargs):
         self.height = height
         self.radius = radius
@@ -82,8 +85,69 @@ class Cylinder(TriMesh):
         n = 1./segments
         tcoord = np.vstack([tcoord*[n,1], tcoord*[n,0]])
 
-        super(Cylinder, self).__init__(pts, np.array(polys), 
+        super().__init__(pts, np.array(polys), 
             tcoords=tcoord, normals=normals, **kwargs)
+        
+class Disk(TriMesh):
+    def __init__(self, radius=1, segments=36, **kwargs):
+        pts = [[0, 0, 0]]  # Center point
+        
+        # Calculate points around the circumference
+        angle_increment = 2 * pi / (segments - 2) # not sure why this works
+        for i in range(segments):
+            x = radius * np.cos(i * angle_increment)
+            y = radius * np.sin(i * angle_increment)
+            pts.append([x, y, 0])
+
+        pts = np.array(pts)
+        
+        # Create polygons
+        polys = [(0, i, (i + 1) % segments) for i in range(segments)]
+
+        # Texture coordinates
+        tcoords = np.zeros((segments + 1, 2))
+        tcoords[1:, 0] = np.cos(np.linspace(0, 2 * np.pi, segments))
+        tcoords[1:, 1] = np.sin(np.linspace(0, 2 * np.pi, segments))
+        
+        normals = [(0, 0, 1)] * segments
+        
+        super().__init__(pts, np.array(polys), 
+                                    tcoords=tcoords, normals=np.array(normals), **kwargs)
+
+class Cylinder(TriMesh):
+    '''
+    Closed cylinder centered on the xy-plane with the z-axis as the height dimension
+
+    Args:
+        TriMesh (_type_): _description_
+    '''
+    def __init__(self, height=1, radius=1, segments=36, **kwargs):
+        self.height = height
+        self.radius = radius
+
+        body_mesh = Pipe(height, radius, segments)
+        top_mesh = Disk(radius, segments)
+        bottom_mesh = Disk(radius, segments)
+
+        # Adjust polygon indices for top and bottom based on total number of vertices
+        offset_body = len(body_mesh.verts)
+        offset_top = offset_body + len(top_mesh.verts)
+
+        total_pts = np.concatenate([body_mesh.verts + np.array([0, 0, -height/2, 0]),
+                                    top_mesh.verts + np.array([0, 0, height/2, 0]), 
+                                    bottom_mesh.verts + np.array([0, 0, -height/2, 0])])
+        total_normals = np.concatenate([body_mesh.normals, top_mesh.normals, bottom_mesh.normals])
+        total_tcoords = np.concatenate([body_mesh.tcoords, top_mesh.tcoords, bottom_mesh.tcoords])
+
+        # Update polygons to account for mesh offsets 
+        body_polys = body_mesh.polys + 0  # Keep body polygon indices the same 
+        top_polys = top_mesh.polys + offset_body
+        bottom_polys = bottom_mesh.polys + offset_top
+
+        total_polys = np.concatenate([body_polys, top_polys, bottom_polys])
+
+        # Create the final mesh with combined data
+        super().__init__(total_pts, total_polys, tcoords=total_tcoords, normals=total_normals, **kwargs)
 
 class Cable(TriMesh):
     def __init__(self,radius=.5, trajectory = np.array([np.sin(x) for x in range(60)]), segments=12,**kwargs):
