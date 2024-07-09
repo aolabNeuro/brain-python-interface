@@ -12,7 +12,7 @@ from riglib import sink
 
 class MockDataSourceSystem(source.DataSourceSystem):
     update_freq = 2000
-    dtype = np.dtype([("value", np.float)])
+    dtype = np.dtype([("value", float)])
     attr_to_test_access = 43
 
     state = 0

@@ -15,7 +15,7 @@ class Kinarmdata(DataSourceSystem):
 
     #  dtype is the numpy data type of items that will go 
     #  into the (multi-channel, in this case) datasource's ringbuffer
-    dtype = np.dtype((np.float, (3, 50)))
+    dtype = np.dtype((float, (3, 50)))
 
     def __init__(self, addr=("192.168.0.8", 9090)):
         '''
@@ -68,5 +68,5 @@ def make(cls=DataSourceSystem, *args, **kwargs):
     def init(self, *args, **kwargs):
         super(self.__class__, self).__init__(*args, **kwargs)
     
-    dtype = np.dtype((np.float, (3, 50)))    
+    dtype = np.dtype((float, (3, 50)))    
     return type(cls.__name__, (cls,), dict(dtype=dtype, __init__=init))

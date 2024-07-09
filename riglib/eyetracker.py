@@ -16,7 +16,7 @@ class Simulate(object):
     Feature (task add-on) to simulate the eyetracker.
     '''
     update_freq = 500
-    dtype = np.dtype((np.float, (2,)))
+    dtype = np.dtype((float, (2,)))
 
     def __init__(self, fixations=[(0,0), (-0.6,0.3), (0.6,0.3)], isi=500, slen=15):
         '''
@@ -109,7 +109,7 @@ class System(object):
     System representing the EyeLink eyetracker. Compatible with riglib.source.DataSource
     '''
     update_freq = 500
-    dtype = np.dtype((np.float, (2,)))
+    dtype = np.dtype((float, (2,)))
 
     def __init__(self, address='10.0.0.2'):
         '''

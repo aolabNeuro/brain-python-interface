@@ -8,7 +8,7 @@ from riglib.source import DataSourceSystem
 
 class SerialPortSource(DataSourceSystem):
     default_response = []
-    dtype = np.dtype([("sensor_data", np.float)])
+    dtype = np.dtype([("sensor_data", float)])
     update_freq = 100
 
     def __init__(self, port, baudrate):
