@@ -8,6 +8,7 @@ import time
 import numpy as np
 import os
 from config.rig_defaults import optitrack as defaults
+from riglib.stereo_opengl.primitives import Cylinder, Sphere
 
 ########################################################################################################
 # Optitrack datasources
@@ -199,6 +200,24 @@ class HidePlantOnPause():
     def _cycle(self):
         self.plant_visible = not self.pause
         super()._cycle()
+
+class SpheresToCylinders():
+    '''
+    Convert spheres to cylinders pointing in and out of the screen up to the bounds.
+    '''
+    
+    def add_model(self, model):
+        '''
+        Hijack spheres and switch them for cylinders along the y-axis
+        '''
+        if isinstance(model, Sphere) and model.radius > 1:
+            height = self.cursor_bounds[3] - self.cursor_bounds[2]
+            tmp_model = Cylinder(height, model.radius, color=model.color)
+            print('Switched sphere for cylinder')
+            model.verts, model.polys, model.tcoords, model.normals = tmp_model.verts, tmp_model.polys, tmp_model.tcoords, tmp_model.normals
+            model.rotate_x(90)
+        super().add_model(model)
+
 
 # Helper class for natnet logging
 import logging

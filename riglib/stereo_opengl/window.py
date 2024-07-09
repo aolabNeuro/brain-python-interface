@@ -48,10 +48,12 @@ class Window(LogExperiment):
     screen_dist = traits.Float(defaults['screen_dist'], desc="Screen to eye distance (cm)")
     screen_half_height = traits.Float(defaults['screen_half_height'], desc="Screen half height (cm)")
     iod = traits.Float(2.5, desc="Intraocular distance (cm)")     # intraocular distance
+    stereo_mode = traits.OptionsList(['mirror', 'projection', 'anaglyph'], desc="Stereo mode", 
+                                     bmi3d_input_options=['mirror', 'projection', 'anaglyph'])
 
     show_environment = traits.Int(0, desc="Show wireframe box around environment")
 
-    hidden_traits = ['screen_dist', 'screen_half_height', 'iod', 'show_environment', 'background']
+    hidden_traits = ['stereo_mode', 'screen_dist', 'screen_half_height', 'iod', 'show_environment', 'background']
 
     def __init__(self, *args, **kwargs):
         self.display_start_pos = kwargs.pop('display_start_pos', "0,0")
@@ -96,7 +98,7 @@ class Window(LogExperiment):
         glClearDepth(1.0)
         glDepthMask(GL_TRUE)
         glEnable(GL_CULL_FACE) # temporary solution to alpha blending issue with spheres. just draw the front half of the sphere
-        glCullFace(GL_FRONT) # actually it's the back half of the sphere we want since everything is mirrored
+        glCullFace(GL_BACK)
 
         self.renderer = self._get_renderer()
 
@@ -112,7 +114,15 @@ class Window(LogExperiment):
     def _get_renderer(self):
         near = 1
         far = 1024
-        return stereo.MirrorDisplay(self.window_size, self.fov, near, far, self.screen_dist, self.iod)
+        if self.stereo_mode == 'mirror':
+            glCullFace(GL_FRONT)
+            return stereo.MirrorDisplay(self.window_size, self.fov, near, far, self.screen_dist, self.iod)
+        elif self.stereo_mode == 'projection':
+            return render.Renderer(self.window_size, self.fov, near, far)
+        elif self.stereo_mode == 'anaglyph':
+            return stereo.Anaglyph(self.window_size, self.fov, near, far, self.screen_dist, self.iod)
+        else:
+            raise ValueError("Unknown stereo mode: %s" % self.stereo_mode)
 
     def set_eye(self, pos, vec, reset=True):
         '''Set the eye's position and direction. Camera starts at (0,0,0), pointing towards positive y'''
@@ -386,15 +396,10 @@ class Window2D():
     '''
     Render the world in 2D without lighting
     '''
-    def screen_init(self):
-        super().screen_init()
-    #     glBlendEquation(GL_MAX)
-    #     glBlendFunc(GL_ONE, GL_ONE) # temporary solution to weird blending issue with spheres
-        glCullFace(GL_BACK) # temporary solution #2 to alpha blending issue with spheres. just draw the front half of the sphere
-
     def _get_renderer(self):
+        glCullFace(GL_BACK)
         return render.Renderer2D(self.screen_cm)
-
+    
 class FakeWindow(Window):
     '''
     A dummy class to secretly avoid rendering graphics without
