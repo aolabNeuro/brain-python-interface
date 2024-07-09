@@ -20,7 +20,7 @@ from .arduino_features import PlexonSerialDIORowByte
 from .blackrock_features import BlackrockBMI
 from .blackrock_features import RelayBlackrockByte
 from .ecube_features import EcubeFileBMI, EcubeBMI, RecordECube
-from .sync_features import ArduinoSync, CursorAnalogOut, ScreenSync
+from .sync_features import ArduinoSync, CursorAnalogOut, ScreenSync, HDFSync
 from .neuropixel_features import RecordNeuropixels
 from .clda_features import CLDA_KFRML_IntendedVelocity
 
@@ -31,6 +31,7 @@ built_in_features = dict(
     reward_system=RewardSystem, 
     pellet_reward=PelletReward,
     saveHDF=SaveHDF,
+    syncHDF=HDFSync,
     autostart=Autostart,
     poisson_wait=PoissonWait,
     window2D=Window2D,
