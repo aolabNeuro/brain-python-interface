@@ -2,7 +2,7 @@
 Base tasks for generic point-to-point reaching
 '''
 import numpy as np
-from riglib.stereo_opengl.primitives import Cable, Sphere, Cube, Torus
+from riglib.stereo_opengl.primitives import Cable, Sphere, Cube, Torus, Text
 from riglib.stereo_opengl.primitives import Cylinder, Plane, Sphere, Cube
 from riglib.stereo_opengl.models import FlatMesh, Group
 from riglib.stereo_opengl.textures import Texture, TexModel
@@ -249,3 +249,27 @@ class VirtualTorusTarget(VirtualCircularTarget):
         pos = self.sphere.xfm.move
         # Not yet implmented. Hopefully not needed.
         return False
+
+class TextTarget():   
+
+    def __init__(self, text, color, font_size=48, starting_pos=np.zeros(3)):
+        self.text = text
+        self.color = color
+        self.font_size = font_size
+        self.position = starting_pos
+        self.int_position = starting_pos
+        self._pickle_init()
+
+    def _pickle_init(self):
+        print('making Text')
+        self.model = Text(self.text, self.font_size, color=self.color, )
+        self.graphics_models = [self.model]
+        self.model.translate(*self.position)
+
+    def move_to_position(self, new_pos):
+        self.int_position = new_pos
+        self.drive_to_new_pos()
+
+    def drive_to_new_pos(self):
+        self.position = self.int_position
+        self.model.translate(*self.position, reset=True)

@@ -403,7 +403,7 @@ class Experiment(ThreadedFSM, traits.HasTraits, metaclass=ExperimentMeta):
         super(Experiment, self)._cycle()
 
         # Send task data to any registered sinks
-        if self.task_data is not None:
+        if hasattr(self, 'task_data') and self.task_data is not None:
             self.sinks.send("task", self.task_data)
 
         # Update report stats periodically
