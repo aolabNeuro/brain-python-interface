@@ -20,6 +20,8 @@ import time
 
 from riglib.stereo_opengl.ik import RobotArm
 
+from built_in_tasks.target_graphics import TextTarget
+
 import pygame
 
 # arm4j = RobotArmGen2D(link_radii=.2, joint_radii=.2, link_lengths=[4,4,2,2])
@@ -48,6 +50,8 @@ class Test2(Window2D, Window):
             self.count+=1
         if ts > 4 and self.count<len(pos_list)+1:
             win.remove_model(reward_text)
+            target = TextTarget('hi', [1,1,1,1], [0,0,0,1], 1)
+            win.add_model(target.model)
             self.count += 1
         self.draw_world()
 

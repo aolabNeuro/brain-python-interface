@@ -404,7 +404,7 @@ class Text(Plane, TexModel):
             return None
 
     def __init__(self, height, text, font_size=28, color=[1, 1, 1, 1], justify='left', 
-                 font_name='Arial', texture_size=(256,256), background_color=[0, 0, 0, 1]):
+                 font_name='ubuntu', texture_size=(256,256), background_color=[0, 0, 0, 1]):
         color = tuple((255*np.array(color)).astype(int))
         background_color = tuple((255*np.array(background_color)).astype(int))
 

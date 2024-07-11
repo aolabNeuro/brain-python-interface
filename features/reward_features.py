@@ -303,29 +303,32 @@ class ScoreRewards(traits.HasTraits):
     score_timed_state = traits.String("target", desc="State to display the score after")
 
     def __init__(self, *args, **kwargs):
-        super().__init(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.reportstats['Score'] = 0
 
     def _start_reward(self):
         if hasattr(super(), '_start_reward'):
             super()._start_reward()
-        timed_state = 0
+        timed_state = None
         idx = -1
         while timed_state is None and -idx-1 < len(self.state_log):
             if self.state_log[idx][0] == self.score_timed_state:
-                timed_state = self.state_log[idx][1]
+                timed_state = 1 + (self.state_log[-1][1] - self.state_log[idx][1])
             idx -= 1
-        score = int(100./timed_state)
+        if timed_state is None:
+            score = 100.
+        else:
+            score = 10*int(10./timed_state)
         self.reportstats['Score'] += score
-        self.score_display = TextTarget(self.reportstats['Score'], height=self.score_display_height, 
+        self.score_display = TextTarget(str(score), height=self.score_display_height, 
                                         color=self.score_display_color, background_color=self.background)
-        self.score_display.translate(*self.score_display_location)
-        self.add_model(self.score_display)
+        self.score_display.move_to_position(self.score_display_location)
+        self.add_model(self.score_display.model)
 
     def _end_reward(self):
         if hasattr(super(), '_end_reward'):
             super()._end_reward()
-        self.remove_model(self.score_display)
+        self.remove_model(self.score_display.model)
         
 
 """"" BELOW THIS IS ALL THE OLD CODE ASSOCIATED WITH REWARD FEATURES"""

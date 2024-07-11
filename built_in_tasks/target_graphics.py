@@ -252,9 +252,10 @@ class VirtualTorusTarget(VirtualCircularTarget):
 
 class TextTarget():   
 
-    def __init__(self, text, color, height=1, starting_pos=np.zeros(3)):
+    def __init__(self, text, color, background_color, height=1, starting_pos=np.zeros(3)):
         self.text = text
         self.color = color
+        self.background_color = background_color
         self.size = height * 7.5 # scale according to how much height the font takes up
         self.position = starting_pos
         self.int_position = starting_pos
