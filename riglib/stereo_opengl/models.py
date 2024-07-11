@@ -135,9 +135,9 @@ class Group(Model):
     def remove(self, model):
         # remove the redundant models
         if model not in self.models:
+            print('model not found in group')
             return
         self.models.remove(model)
-        del model
 
     def init(self):
         for model in self.models:
