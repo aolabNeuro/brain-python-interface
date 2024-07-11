@@ -16,7 +16,7 @@ import matplotlib.tri as mtri
 from .models import TriMesh
 from .textures import Texture, TexModel
 from PIL import Image, ImageDraw, ImageFont
-from OpenGL.GL import *
+import matplotlib.font_manager as fm
 
 class Plane(TriMesh):
     def __init__(self, width=1, height=1, **kwargs):
@@ -386,37 +386,36 @@ class Chain(object):
         else:
             return [value] * num_joints
 
-class Text(TexModel):
+class Text(Plane, TexModel):
 
-    def __init__(self, text, font_size, color=[1, 1, 1, 1], font_path='/usr/share/fonts/truetype/ubuntu/Ubuntu-C.ttf', texture_size=(256,256)):
+    @staticmethod
+    def find_font_file(font_name):
+        try:
+            font_prop = fm.FontProperties(fname=fm.findfont(fm.FontProperties(family=font_name)))
+            font_path = font_prop.get_file()
+            return font_path
+        except Exception as e:
+            return None
+
+    def __init__(self, width, height, text, font_size, color=[1, 1, 1, 1], font_name='Arial', texture_size=(256,256)):
 
         # Create a PIL image with a black background
         image = Image.new('RGBA', texture_size, (0, 0, 0, 255))
         draw = ImageDraw.Draw(image)
 
-        print('made PIL Image')
-
         # Load a font
+        font_path = Text.find_font_file(font_name)
         font = ImageFont.truetype(font_path, font_size)
 
         # Draw text onto the image
         draw.text((10, 10), text, font=font, fill=(255, 255, 255, 255))
 
         # Convert PIL image to OpenGL texture format
-        texture_data = np.array(image)
+        texture_data = np.flipud(image)
         tex = Texture(texture_data)
 
-        super().__init__(tex=tex, color=color)
-
-    def draw(self, ctx):
-        super().draw(ctx)
-        glBindTexture(GL_TEXTURE_2D, self.tex.tex)
-        glBegin(GL_QUADS)
-        glVertex3f(-1.0, -1.0, 0.0)  # Bottom-left
-        glVertex3f(1.0, -1.0, 0.0)   # Bottom-right
-        glVertex3f(1.0, 1.0, 0.0)    # Top-right
-        glVertex3f(-1.0, 1.0, 0.0)   # Top-left
-        glEnd()
+        super().__init__(width, height, tex=tex, color=color, specular_color=(0.,0,0,0))
+        self.rotate_x(90)
 
 ##### 2-D primitives #####
 

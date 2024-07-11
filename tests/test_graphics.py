@@ -7,7 +7,7 @@ import numpy as np
 import os
 os.environ['DISPLAY'] = ':0'
 
-from riglib.stereo_opengl.window import Window, FPScontrol
+from riglib.stereo_opengl.window import Window, Window2D, FPScontrol
 from riglib.stereo_opengl.primitives import Cylinder, Plane, Sphere, Cone, Text
 from riglib.stereo_opengl.models import FlatMesh, Group
 from riglib.stereo_opengl.textures import Texture, TexModel
@@ -22,9 +22,11 @@ from riglib.stereo_opengl.ik import RobotArm
 
 import pygame
 
-arm4j = RobotArmGen2D(link_radii=.2, joint_radii=.2, link_lengths=[4,4,2,2])
-cone = Sphere(radius=1)
-reward_text = Text("score", 50, color=[1,1,1,1])
+# arm4j = RobotArmGen2D(link_radii=.2, joint_radii=.2, link_lengths=[4,4,2,2])
+# cone = Sphere(radius=1)
+TexSphere = type("TexSphere", (Sphere, TexModel), {})
+TexPlane = type("TexPlane", (Plane, TexModel), {})
+reward_text = Text(5, 5, "0.5", 50, color=[1,1,1,1])
 
 pos_list = np.array([[0,0,0],[0,0,5]])
 
@@ -32,7 +34,7 @@ class Test2(Window):
 
     def __init__(self, *args, **kwargs):
         self.count=0
-        super(Test2,self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def _start_draw(self):
         #arm4j.set_joint_pos([0,0,np.pi/2,np.pi/2])
@@ -49,9 +51,12 @@ class Test2(Window):
 
 if __name__ == "__main__":
     win = Test2(window_size=(500, 500), fullscreen=False, stereo_mode='projection')
-    win.add_model(cone)
-    win.add_model(arm4j)
+    # win.add_model(cone)
+    # win.add_model(arm4j)
     win.add_model(reward_text)
+    # win.add_model(TexSphere(radius=4, shininess=30, tex=cloudy_tex()).translate(-5,0,0))
+    # win.add_model(TexPlane(5,5, tex=cloudy_tex(), specular_color=(0.,0,0,0)).rotate_x(90))
+
     #win.screen_init()
     #win.draw_world()
     win.run()
