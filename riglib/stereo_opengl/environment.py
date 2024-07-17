@@ -62,12 +62,12 @@ class Grid(Group):
         -------
         Grid instance
         '''
-        grid_tex = create_grid_texture(50)
+        grid_tex = create_grid_texture()
         self.grid = Group([
-            TexPlane(size,size, color=(0,0,0,1), tex=grid_tex).rotate_y(90).translate(-size/2,-size/2,size/2),
-            TexPlane(size,size, color=(0,0,0,1), tex=grid_tex).rotate_y(270).translate(size/2,-size/2,-size/2),
-            TexPlane(size,size, color=(0,0,0,1), tex=grid_tex).rotate_x(0).translate(-size/2,-size/2,-size/2),
-            TexPlane(size,size, color=(0,0,0,1), tex=grid_tex).rotate_x(180).translate(-size/2,size/2,size/2),
-            TexPlane(size,size, color=(0,0,0,1), tex=grid_tex).rotate_x(90).translate(-size/2,size/2,-size/2),
+            TexPlane(size,size, specular_color=(0,0,0,0), tex=grid_tex).rotate_y(90).translate(-size/2,-size/2,size/2),
+            TexPlane(size,size, specular_color=(0,0,0,0), tex=grid_tex).rotate_y(270).translate(size/2,-size/2,-size/2),
+            TexPlane(size,size, specular_color=(0,0,0,0), tex=grid_tex).rotate_x(0).translate(-size/2,-size/2,-size/2),
+            TexPlane(size,size, specular_color=(0,0,0,0), tex=grid_tex).rotate_x(180).translate(-size/2,size/2,size/2),
+            TexPlane(size,size, specular_color=(0,0,0,0), tex=grid_tex).rotate_x(90).translate(-size/2,size/2,-size/2),
         ])
         super(Grid, self).__init__([self.grid], **kwargs)
