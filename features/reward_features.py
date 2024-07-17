@@ -321,7 +321,7 @@ class ScoreRewards(traits.HasTraits):
             score = 10*int(10./timed_state)
         self.reportstats['Score'] += score
         self.score_display = TextTarget(str(score), height=self.score_display_height, 
-                                        color=self.score_display_color, background_color=self.background)
+                                        color=self.score_display_color)
         self.score_display.move_to_position(self.score_display_location)
         self.add_model(self.score_display.model)
 
