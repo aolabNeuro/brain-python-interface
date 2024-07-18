@@ -90,7 +90,8 @@ def cloudy_tex(size=(512,512)):
     im -= im.min()
     return Texture(im / im.max())
 
-def create_grid_texture(size=800, density=50, thickness=3, line_color=[0, 0, 0, 1], background_color=[1, 1, 1, 1]):
+def create_grid_texture(size=800, density=50, thickness=3, line_color=[0.5, 0.5, 0.5, 1], 
+                        background_color=[0.1, 0.1, 0.1, 1]):
     """
     Create a grid texture.
     """

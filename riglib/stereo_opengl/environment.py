@@ -11,7 +11,7 @@ class Box(Group):
     '''
     Construct a 3D wireframe box in the world to add some depth cue references
     '''
-    def __init__(self, **kwargs):
+    def __init__(self, sidelen=10, **kwargs):
         '''
         Constructor for Box 
 
@@ -25,7 +25,6 @@ class Box(Group):
         Box instance
         '''
         bcolor = (181/256., 116/256., 96/256., 1)
-        sidelen = 10
         linerad=.1
         self.vert_box = Group([
             Pipe(radius=linerad, height=sidelen, color=bcolor).translate(-sidelen/2, -sidelen/2, -sidelen/2),
