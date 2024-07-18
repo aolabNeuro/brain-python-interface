@@ -19,10 +19,6 @@ class Conditions(Sequence):
     trial_time = traits.Float(1.0, desc="Trial duration (s)")
     sequence_generators = ['null_sequence']
 
-    def init(self):
-        self.trial_dtype = np.dtype([('trial', 'u4'), ('index', 'u4')])
-        super().init()
-
     def _parse_next_trial(self):
         self.trial_index = self.next_trial
 
@@ -81,14 +77,10 @@ class LaserConditions(Conditions):
         super().__init__(*args, **kwargs)
 
     def init(self):
-        self.trial_dtype = np.dtype([
-            ('trial', 'u4'), 
-            ('index', 'u4'),
-            ('laser', 'S32'),
-            ('power', 'f8'),
-            ('edges', 'f8', MAX_RECORD_EDGES),
-            ])
-        super(Conditions, self).init()
+        self.add_trial_dtype('laser', 'S32', (1,))
+        self.add_trial_dtype('power', 'f8', (1,))
+        self.add_trial_dtype('edges', 'f8', MAX_RECORD_EDGES)
+        super().init()
     
     def run(self):
         if not (hasattr(self, 'lasers') and len(self.lasers) > 0):

@@ -73,7 +73,9 @@ class TargetTracking(Sequence):
     tracking_reward_interval = traits.Float(.5, desc="Length of time between reward for tracking in (must be greater than reward time)")
     
     def init(self):
-        self.trial_dtype = np.dtype([('trial', 'u4'), ('index', 'u4'), ('target', 'f8',(3,)), ('disturbance', 'f8',(3,)), ('is_disturbance', '?')])
+        self.add_trial_dtype('target', 'f8',(3,))
+        self.add_trial_dtype('disturbance', 'f8',(3,))
+        self.add_trial_dtype('is_disturbance', '?', (1,))
         super().init()
 
         self.frame_index = 0 # index in the frame in a trial

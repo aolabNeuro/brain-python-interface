@@ -778,7 +778,7 @@ class Sequence(LogExperiment):
         else:
             raise ValueError("Input argument to Sequence 'gen' must be of 'generator' type!")
 
-        self.trial_dtype = np.dtype([('time', 'u8'), ('trial', 'u4')]) # to be overridden in init()
+        self.trial_dtype = np.dtype([('trial', 'u4'), ('index', 'u4')])
 
         super(Sequence, self).__init__(*args, **kwargs)
 
@@ -792,6 +792,18 @@ class Sequence(LogExperiment):
         self.trial_record = np.zeros((1,), dtype=dtype)
         self.sinks.register("trials", dtype)
         super().init(*args, **kwargs)
+
+    def add_trial_dtype(self, name, dtype, shape):
+        '''
+        Add to the trial_dtype of the task. The trial's dtype attribute is used to determine
+        which trial attributes to save to file.
+        '''
+        new_field = (name, dtype, shape)
+        existing_field_names = [x[0] for x in self.trial_dtype]
+        if name in existing_field_names:
+            raise Exception("Duplicate add_dtype functionc call for task data field: %s" % name)
+        else:
+            self.trial_dtype.append(new_field)
 
     def _start_wait(self):
         '''

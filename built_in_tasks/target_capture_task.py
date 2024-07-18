@@ -62,7 +62,7 @@ class TargetCapture(Sequence):
     num_targets_per_attempt = traits.Int(2, desc="Minimum number of target acquisitions to be counted as an attempt")
 
     def init(self):
-        self.trial_dtype = np.dtype([('trial', 'u4'), ('index', 'u4'), ('target', 'f8', (3,))])
+        self.add_trial_dtype('target', 'f8', (3,))
         super().init()
 
     def _start_wait(self):
