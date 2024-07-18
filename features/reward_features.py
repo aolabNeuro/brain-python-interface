@@ -295,7 +295,8 @@ class TrackingRewards(traits.HasTraits):
 class ScoreRewards(traits.HasTraits):
     '''
     Add a "score" to the task that awards points based on target acquisition speed. 
-    The score is displayed after each reward and on the web GUI.
+    The score is displayed after each reward and on the web GUI. The running score also gets
+    saved as a value in the task data called 'reward_score'.
 
     Note:
         Only works with target acquisition tasks.
@@ -308,6 +309,11 @@ class ScoreRewards(traits.HasTraits):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.reportstats['Score'] = 0
+    
+    def init(self):
+        self.add_dtype('reward_score', 'f8', (1,))
+        super().init()
+        self.task_data['reward_score'] = 0
 
     def _start_reward(self):
         if hasattr(super(), '_start_reward'):
@@ -327,12 +333,12 @@ class ScoreRewards(traits.HasTraits):
                                         color=self.score_display_color, background_color=self.background)
         self.score_display.move_to_position(self.score_display_location)
         self.add_model(self.score_display.model)
+        self.task_data['reward_score'] += score
 
     def _end_reward(self):
         if hasattr(super(), '_end_reward'):
             super()._end_reward()
         self.remove_model(self.score_display.model)
-        
 
 """"" BELOW THIS IS ALL THE OLD CODE ASSOCIATED WITH REWARD FEATURES"""
 
