@@ -294,8 +294,11 @@ class TrackingRewards(traits.HasTraits):
 
 class ScoreRewards(traits.HasTraits):
     '''
-    Add a "score" to the task that keeps track of the number of successful trials and
-    the time taken to complete them. The score is displayed after each reward.
+    Add a "score" to the task that awards points based on target acquisition speed. 
+    The score is displayed after each reward and on the web GUI.
+
+    Note:
+        Only works with target acquisition tasks.
     '''
     score_display_location = traits.Tuple((10, 0, 10), desc="Location to display the score (in cm)")
     score_display_height = traits.Float(1, desc="Height of the score display (in cm)")
@@ -313,10 +316,10 @@ class ScoreRewards(traits.HasTraits):
         idx = -1
         while timed_state is None and -idx-1 < len(self.state_log):
             if self.state_log[idx][0] == self.score_timed_state:
-                timed_state = 1 + (self.state_log[-1][1] - self.state_log[idx][1])
+                timed_state = self.state_log[-1][1] - self.state_log[idx][1]
             idx -= 1
-        if timed_state is None:
-            score = 100.
+        if timed_state is None or timed_state == 0.:
+            score = 0.
         else:
             score = 10*int(10./timed_state)
         self.reportstats['Score'] += score
