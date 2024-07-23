@@ -6,6 +6,7 @@ from built_in_tasks.target_capture_task import ScreenTargetCapture
 from built_in_tasks.passivetasks import YouTube
 from features.generator_features import Autostart
 from features.hdf_features import SaveHDF
+from riglib.stereo_opengl.environment import Grid
 from riglib.stereo_opengl.window import WindowDispl2D
 from riglib import experiment
 from features.peripheral_device_features import ForceControl, MouseControl
@@ -37,6 +38,7 @@ class TestManualControlTasks(unittest.TestCase):
         seq = ManualControl.centerout_2D()
         exp = init_exp(ManualControl, [MouseControl, Window2D, ScoreRewards], seq, window_size=(1200,800), fullscreen=False)
         exp.rotation = 'xzy'
+        exp.stereo_mode = 'projection'
         exp.run()
     
     @unittest.skip("")

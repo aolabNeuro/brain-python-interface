@@ -133,6 +133,7 @@ class NIDAQSync(HDFSync):
         super(HDFSync, self).__init__(*args, **kwargs)
         self.sync_params = nidaq_sync_params
         self.sync_gpio = NIGPIO()
+        self.sync_every_cycle = True
         print("NIDAQ sync active")
 
     def sync_code(self, code, delay=0.):
@@ -165,6 +166,7 @@ class ArduinoSync(NIDAQSync):
     
     def __init__(self, *args, **kwargs):
         super(HDFSync, self).__init__(*args, **kwargs)
+        self.sync_every_cycle = True
         self.sync_params = arduino_sync_params
         self.sync_gpio = TeensyGPIO(self.sync_gpio_port)
 
