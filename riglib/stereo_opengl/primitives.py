@@ -386,7 +386,14 @@ class Chain(object):
         else:
             return [value] * num_joints
 
-class Text(Plane, TexModel):
+TexCube = type("TexCube", (Cube, TexModel), {})
+TexPlane = type("TexPlane", (Plane, TexModel), {})
+TexSphere = type("TexSphere", (Sphere, TexModel), {})
+TexCylinder = type("TexCylinder", (Cylinder, TexModel), {})
+TexPipe = type("TexPipe", (Pipe, TexModel), {})
+TexCone = type("TexCone", (Cone, TexModel), {})
+
+class Text(TexPlane):
     '''
     A 2D plane with text rendered on. The plane coordinates are its bottom-left corner,
     and the text is rendered along the bottom edge of the plane, either left or right justified.
@@ -404,12 +411,11 @@ class Text(Plane, TexModel):
             return None
 
     def __init__(self, height, text, font_size=28, color=[1, 1, 1, 1], justify='left', 
-                 font_name='ubuntu', texture_size=(256,256), background_color=[0, 0, 0, 1]):
+                 font_name='ubuntu', texture_size=(256,256), **kwargs):
         color = tuple((255*np.array(color)).astype(int))
-        background_color = tuple((255*np.array(background_color)).astype(int))
 
         # Create a PIL image with a transparent background
-        image = Image.new('RGBA', texture_size, background_color)
+        image = Image.new('RGBA', texture_size, (0,0,0,0))
         draw = ImageDraw.Draw(image)
 
         # Load a font
@@ -429,7 +435,7 @@ class Text(Plane, TexModel):
         tex = Texture(texture_data)
         width = height * texture_size[0] / texture_size[1]
 
-        super().__init__(width, height, tex=tex, specular_color=(0.,0,0,0))
+        super().__init__(width, height, specular_color=[0,0,0,0], tex=tex, **kwargs)
         self.rotate_x(90) # Make the text face the camera
 
 ##### 2-D primitives #####

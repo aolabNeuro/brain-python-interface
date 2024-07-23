@@ -89,3 +89,20 @@ def cloudy_tex(size=(512,512)):
     im = np.abs(np.fft.ifft2(np.fft.fftshift(mask * fim)))
     im -= im.min()
     return Texture(im / im.max())
+
+def create_grid_texture(size=800, density=50, thickness=3, line_color=[0.5, 0.5, 0.5, 1], 
+                        background_color=[0.1, 0.1, 0.1, 1]):
+    """
+    Create a grid texture.
+    """
+    size = int(size)
+    thickness = int(thickness)
+    grid_texture = np.ones((size, size, 4)) * background_color  # RGB image
+
+    # Draw horizontal grid lines
+    for r in range((size + 1)//density):
+        start = int(r * density)
+        grid_texture[start:start+thickness, :, :] = line_color
+        grid_texture[:, start:start+thickness, :] = line_color
+
+    return Texture(grid_texture/np.max(grid_texture))

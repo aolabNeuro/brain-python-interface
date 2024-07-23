@@ -26,7 +26,7 @@ class Texture(object):
             if tex.shape[-1] == 3:
                 tex = np.dstack([tex, np.ones(tex.shape[:-1])])
             size = tex.shape[:2]
-            tex = tex.astype(np.uint8).tostring()
+            tex = tex.astype(np.uint8).tobytes()
         elif isinstance(tex, str):
             im = pygame.image.load(tex)
             size = tex.get_size()

@@ -6,6 +6,10 @@ uniform sampler2D texture;
 varying vec2 vtexcoord;
 
 void main() {
-    vec4 frag_diffuse = vec4(texture2D(texture, vtexcoord).rgb + basecolor.rgb, basecolor.a);
+    vec4 texcolor = texture2D(texture, vtexcoord);
+    vec4 frag_diffuse = vec4(
+        texcolor.rgb + basecolor.rgb,
+        texcolor.a * basecolor.a
+    );
     gl_FragColor = frag_diffuse;
 }

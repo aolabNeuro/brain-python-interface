@@ -21,7 +21,11 @@ vec4 phong() {
          eye = normalize(-vposition),
          reflection = normalize(-reflect(mv_light_direction, normal));
     
-    vec4 frag_diffuse = vec4(texture2D(texture, vtexcoord).rgb + basecolor.rgb, basecolor.a);
+    vec4 texcolor = texture2D(texture, vtexcoord);
+    vec4 frag_diffuse = vec4(
+        texcolor.rgb + basecolor.rgb,
+        texcolor.a * basecolor.a
+    );
 
     vec4 diffuse_factor
         = max(-dot(normal, mv_light_direction), 0.0) * light_diffuse;
