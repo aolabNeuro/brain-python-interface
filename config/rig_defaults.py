@@ -117,9 +117,20 @@ elif hostname == 'booted-server':
     screen_half_height = 5
     default_db = 'tablet'
     secret_dbnames = ['tablet']
+elif hostname == 'human-bmi':
+    optitrack_address = '128.95.215.191'
+    optitrack_save_path = "D:\optitrack_data"
+    optitrack_sync_dch = 53 # 0-index
+    window_size = (1920, 1200)
+    screen_dist = 80
+    screen_half_height = 16
+    default_db = 'human'
+    secret_dbnames = ['human']
+    # arduino_sync_params = human_sync_params_arduino
 elif hostname in ['moor', 'crab-eating', 'ecube']:
     default_db = 'booth'
     secret_dbnames = [
+        'human',
         'booth',
         'tablet',
         'test',

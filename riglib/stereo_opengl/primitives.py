@@ -14,6 +14,9 @@ except:
 import matplotlib.tri as mtri
 
 from .models import TriMesh
+from .textures import Texture, TexModel
+from PIL import Image, ImageDraw, ImageFont
+import matplotlib.font_manager as fm
 
 class Plane(TriMesh):
     def __init__(self, width=1, height=1, **kwargs):
@@ -382,6 +385,52 @@ class Chain(object):
             return value
         else:
             return [value] * num_joints
+
+class Text(Plane, TexModel):
+    '''
+    A 2D plane with text rendered on. The plane coordinates are its bottom-left corner,
+    and the text is rendered along the bottom edge of the plane, either left or right justified.
+    Text is always rendered on a square texture, so the width and height of the plane
+    are the same.
+    '''
+
+    @staticmethod
+    def find_font_file(font_name):
+        try:
+            font_prop = fm.FontProperties(fname=fm.findfont(fm.FontProperties(family=font_name)))
+            font_path = font_prop.get_file()
+            return font_path
+        except Exception as e:
+            return None
+
+    def __init__(self, height, text, font_size=28, color=[1, 1, 1, 1], justify='left', 
+                 font_name='ubuntu', texture_size=(256,256), background_color=[0, 0, 0, 1]):
+        color = tuple((255*np.array(color)).astype(int))
+        background_color = tuple((255*np.array(background_color)).astype(int))
+
+        # Create a PIL image with a transparent background
+        image = Image.new('RGBA', texture_size, background_color)
+        draw = ImageDraw.Draw(image)
+
+        # Load a font
+        font_path = Text.find_font_file(font_name)
+        font = ImageFont.truetype(font_path, font_size)
+
+        # Draw text onto the image
+        if justify == 'left':
+            draw.text((10, texture_size[0]-10), text, font=font, 
+                      anchor='lb', fill=color)
+        else:
+            draw.text((texture_size[0]-10, texture_size[1]-10), text, font=font, 
+                    anchor='rb', fill=color)
+
+        # Convert PIL image to OpenGL texture format
+        texture_data = np.flipud(image)
+        tex = Texture(texture_data)
+        width = height * texture_size[0] / texture_size[1]
+
+        super().__init__(width, height, tex=tex, specular_color=(0.,0,0,0))
+        self.rotate_x(90) # Make the text face the camera
 
 ##### 2-D primitives #####
 

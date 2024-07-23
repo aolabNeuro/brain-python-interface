@@ -4,3 +4,4 @@ libatlas-base-dev
 gfortran
 libhdf5-dev
 ufw
+python3-pyaudio

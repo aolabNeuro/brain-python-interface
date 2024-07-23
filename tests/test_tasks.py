@@ -6,11 +6,12 @@ from built_in_tasks.target_capture_task import ScreenTargetCapture
 from built_in_tasks.passivetasks import YouTube
 from features.generator_features import Autostart
 from features.hdf_features import SaveHDF
+from riglib.stereo_opengl.environment import Grid
 from riglib.stereo_opengl.window import WindowDispl2D
 from riglib import experiment
 from features.peripheral_device_features import ForceControl, MouseControl
 from features.optitrack_features import OptitrackSimulate, Optitrack, SpheresToCylinders
-from features.reward_features import ProgressBar
+from features.reward_features import ProgressBar, ScoreRewards
 import cProfile
 import pstats
 from riglib.stereo_opengl.window import Window, Window2D
@@ -36,8 +37,9 @@ class TestManualControlTasks(unittest.TestCase):
     @unittest.skip("")
     def test_exp(self):
         seq = ManualControl.centerout_2D()
-        exp = init_exp(ManualControl, [MouseControl, Window2D], seq)
+        exp = init_exp(ManualControl, [MouseControl, Window2D, ScoreRewards], seq)
         exp.rotation = 'xzy'
+        exp.stereo_mode = 'projection'
         exp.run()
     
     @unittest.skip("")

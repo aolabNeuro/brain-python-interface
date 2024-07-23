@@ -58,7 +58,7 @@ terminator. If 'test' is sent as the message, 5 packets:
 
 Data packets
 ------------
-All data will be sent as double (np.float). Sending an eye data at (.1, .2) 
+All data will be sent as double (float). Sending an eye data at (.1, .2) 
 looks like this:
     0001 000 63     0001 000 201    0001 000 153    0001 000 153
     0001 000 153    0001 000 153    0001 000 153    0001 000 154

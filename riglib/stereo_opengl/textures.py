@@ -67,7 +67,14 @@ class Texture(object):
         if filename is not None:
             np.save(filename, im)
         return im
-
+    
+    def delete(self):
+        if self.tex is not None:
+            glBindTexture(GL_TEXTURE_2D, 0)
+            glDeleteTextures(1, [self.tex])
+            error = glGetError()
+            if error != GL_NO_ERROR:
+                print(f"Error after deleting texture: {error}")
 
 class MultiTex(object):
     '''This is not ready yet!'''

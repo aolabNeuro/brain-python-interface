@@ -12,7 +12,6 @@ Owl==0.2.1
 paho_mqtt==1.5.1
 pandas==1.5.3
 Phidgets==2.1.8
-pyaudio==0.2.14
 PyAutoGUI==0.9.50
 pyFirmata==1.1.0
 pygame==2.0.0

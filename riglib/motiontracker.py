@@ -274,9 +274,9 @@ def make(marker_count, cls=System, **kwargs):
     def init(self, **kwargs):
         super(self.__class__, self).__init__(marker_count=marker_count, **kwargs)
     
-    dtype = np.dtype((np.float, (marker_count, 4)))
+    dtype = np.dtype((float, (marker_count, 4)))
     if cls == AligningSystem:
-        dtype = np.dtype((np.float, (marker_count+6, 4)))
+        dtype = np.dtype((float, (marker_count+6, 4)))
     return type(cls.__name__, (cls,), dict(dtype=dtype, __init__=init))
 
 
