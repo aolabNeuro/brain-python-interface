@@ -49,6 +49,7 @@ elif [ "$HOST" = "booted-server" ]; then
     conda activate bmi3d
 fi
 export DISPLAY=$DISPLAY
+export BMI3D_PORT=$PORT
 
 # #Check /storage (exist )
 # storage=$(python $BMI3D/config_files/check_storage.py 2>&1)
