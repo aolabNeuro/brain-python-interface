@@ -1,21 +1,5 @@
 #!/bin/bash
 
-# Set display
-HOST=`hostname -s`
-if [ "$HOST" = "pagaiisland2" ] || [ "$HOST" = "siberut-bmi" ]; then
-    export DISPLAY=':0.1'
-    echo "Moving display to :0.1"
-elif [ "$HOST" = "pagaiisland-surface" ]; then
-    export DISPLAY=localhost:0
-    export LIBGL_ALWAYS_INDIRECT=0
-    echo "success"
-elif [ "$HOST" = "booted-server" ]; then
-    export DISPLAY=':1'
-    Xvnc :1 -securityTypes None -geometry 1920x1080 -nocursor &
-    eval "$(conda shell.bash hook)"
-    conda activate bmi3d
-fi
-
 # Find the BMI3D directory
 FILE=$(realpath "$0")
 DB=$(dirname "$FILE")
@@ -25,8 +9,21 @@ cd $DB
 # Check inputs
 LOG=false
 TEST=false
+PORT=8000
+DISPLAY=':0'
 [[ "$@" =~ '-log' ]] && LOG=true
 [[ "$@" =~ '-test' ]] && TEST=true
+ARGCOUNT=$#
+[[ "$LOG" == "true" ]] && ARGCOUNT=$((ARGCOUNT-1))
+[[ "$TEST" == "true" ]] && ARGCOUNT=$((ARGCOUNT-1))
+if (($ARGCOUNT > 0)); then
+    DISPLAY=${@:1+$#-$ARGCOUNT:1}
+    echo $DISPLAY
+fi
+if (($ARGCOUNT > 1)); then
+    PORT=${@:$#:1}
+    echo $PORT
+fi
 
 # Start logging
 if [ "$LOG" == "false" ]
@@ -37,6 +34,21 @@ then
     /bin/bash ./runserver.sh -log "$@" | tee -a $BMI3D/log/runserver_log
     exit 0
 fi
+
+# Set display
+HOST=`hostname -s`
+if [ "$HOST" = "pagaiisland2" ] || [ "$HOST" = "siberut-bmi" ]; then
+    DISPLAY=':0.1'
+    echo "Moving display to :0.1"
+elif [ "$HOST" = "booted-server" ]; then
+    if [ "$DISPLAY" = ":0" ]; then
+        DISPLAY=':1'
+    fi
+    Xvnc $DISPLAY -securityTypes None -geometry 1920x1080 -nocursor &
+    eval "$(conda shell.bash hook)"
+    conda activate bmi3d
+fi
+export DISPLAY=$DISPLAY
 
 # #Check /storage (exist )
 # storage=$(python $BMI3D/config_files/check_storage.py 2>&1)
@@ -116,7 +128,7 @@ trap "kill 0" EXIT
 
 # Start python processes
 cd $BMI3D
-python manage.py runserver 0.0.0.0:8000 --noreload &
+python manage.py runserver 0.0.0.0:$PORT --noreload &
 # if [ "$HOST" = "pagaiisland2" ] || [ "$HOST" = "siberut-bmi" ]; then
 #     celery -A db.tracker worker -l INFO &
 # fi
