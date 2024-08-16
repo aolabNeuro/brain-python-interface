@@ -48,8 +48,8 @@ class Window(LogExperiment):
     screen_dist = traits.Float(defaults['screen_dist'], desc="Screen to eye distance (cm)")
     screen_half_height = traits.Float(defaults['screen_half_height'], desc="Screen half height (cm)")
     iod = traits.Float(2.5, desc="Intraocular distance (cm)")     # intraocular distance
-    stereo_mode = traits.OptionsList(['mirror', 'projection', 'anaglyph'], desc="Stereo mode", 
-                                     bmi3d_input_options=['mirror', 'projection', 'anaglyph'])
+    stereo_mode = traits.OptionsList(['hmd', 'mirror', 'projection', 'anaglyph'], desc="Stereo mode", 
+                                     bmi3d_input_options=['hmd', 'mirror', 'projection', 'anaglyph'])
 
     show_environment = traits.Int(0, desc="Show wireframe box around environment")
 
@@ -117,6 +117,9 @@ class Window(LogExperiment):
         if self.stereo_mode == 'mirror':
             glCullFace(GL_FRONT)
             return stereo.MirrorDisplay(self.window_size, self.fov, near, far, self.screen_dist, self.iod)
+        if self.stereo_mode == 'hmd':
+            glCullFace(GL_FRONT)
+            return stereo.MirrorDisplay(self.window_size, self.fov, near, far, self.screen_dist, self.iod, flip=False)
         elif self.stereo_mode == 'projection':
             return render.Renderer(self.window_size, self.fov, near, far)
         elif self.stereo_mode == 'anaglyph':
