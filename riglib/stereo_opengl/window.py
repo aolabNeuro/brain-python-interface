@@ -14,7 +14,7 @@ from .render import stereo, render
 from .models import Group
 from .xfm import Quaternion
 from .primitives import Sphere, Cube, Chain
-from .environment import Box
+from .environment import Box, Grid
 from .primitives import Cylinder, Sphere, Cone
 import socket
 
@@ -67,8 +67,10 @@ class Window(LogExperiment):
         self.fov = np.degrees(np.arctan(self.screen_half_height/self.screen_dist))*2
         self.screen_cm = [2 * self.screen_half_height * self.window_size[0]/self.window_size[1], 2 * self.screen_half_height]
 
-        if self.show_environment:
+        if self.show_environment == 1:
             self.add_model(Box())
+        elif self.show_environment == 2:
+            self.add_model(Grid(size=20))
 
     def set_os_params(self):
         os.environ['SDL_VIDEO_WINDOW_POS'] = self.display_start_pos
@@ -118,7 +120,6 @@ class Window(LogExperiment):
             glCullFace(GL_FRONT)
             return stereo.MirrorDisplay(self.window_size, self.fov, near, far, self.screen_dist, self.iod)
         if self.stereo_mode == 'hmd':
-            glCullFace(GL_FRONT)
             return stereo.MirrorDisplay(self.window_size, self.fov, near, far, self.screen_dist, self.iod, flip=False)
         elif self.stereo_mode == 'projection':
             return render.Renderer(self.window_size, self.fov, near, far)
