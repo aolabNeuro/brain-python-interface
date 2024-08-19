@@ -3,7 +3,7 @@
 # Set display
 HOST=`hostname -s`
 if [ "$HOST" = "pagaiisland2" ] || [ "$HOST" = "siberut-bmi" ] || [ "$HOST" = "human-bmi" ]; then
-    export DISPLAY=':0.1'
+    export DISPLAY=':0.2'
     echo "Moving display to :0.1"
 elif [ "$HOST" = "pagaiisland-surface" ]; then
     export DISPLAY=localhost:0

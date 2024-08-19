@@ -53,11 +53,11 @@ class MirrorDisplay(Renderer):
         h = int(h)
 
         # draw the portion of the screen with lower-left corner (0, 0), width 'w' and height 'h'
-        glViewport(0, 0, w, h)
+        glViewport(100, 0, w, h)
         super(MirrorDisplay, self).draw(root, p_matrix=self.projections[0], **kwargs)
 
         # draw the portion of the screen with lower-left corner (w, 0), width 'w' and height 'h'
-        glViewport(w, 0, w, h)
+        glViewport(w-100, 0, w, h)
         super(MirrorDisplay, self).draw(root, p_matrix=self.projections[1], **kwargs)
 
 class DualMultisizeDisplay(Renderer):
