@@ -15,6 +15,7 @@ import matplotlib.tri as mtri
 
 from .models import TriMesh
 from .textures import Texture, TexModel
+from OpenGL.GL import GL_NEAREST
 from PIL import Image, ImageDraw, ImageFont
 import matplotlib.font_manager as fm
 
@@ -438,6 +439,14 @@ class Text(TexPlane):
         super().__init__(width, height, specular_color=[0,0,0,0], tex=tex, **kwargs)
         self.rotate_x(90) # Make the text face the camera
 
+class AprilTag(TexPlane):
+
+    def __init__(self, id, size, alpha=1, **kwargs):
+        filepath = f"riglib/pupillabs/tag36h11/tag36_11_{id:05d}.png"
+        apriltag = Texture(filepath, minfilter=GL_NEAREST, magfilter=GL_NEAREST)
+        super().__init__(size, size, color=[0,0,0,alpha], specular_color=[0,0,0,0], tex=apriltag)
+        self.rotate_x(90)
+        
 ##### 2-D primitives #####
 
 class Shape2D(object):
