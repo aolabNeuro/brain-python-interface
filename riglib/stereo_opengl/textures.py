@@ -31,7 +31,7 @@ class Texture(object):
         elif isinstance(tex, str):
             im = pygame.image.load(tex)
             size = im.get_size()
-            tex = pygame.image.tostring(im, 'RGBA')
+            tex = pygame.image.tostring(im, 'RGBA', True)
         
         self.texstr = tex
         self.size = size
