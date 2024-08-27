@@ -256,7 +256,6 @@ class BehaviorAnalysisWorker(AnalysisWorker):
         super().draw()
         cursor_pos, eye_pos, targets = self.get_current_pos()
         cursor_radius = self.task_params.get('cursor_radius', 0.25)
-        print(self.eye_diam[0])
 
         patches = [
             plt.Circle(cursor_pos, cursor_radius), 
