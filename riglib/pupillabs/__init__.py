@@ -56,10 +56,10 @@ class System(DataSourceSystem):
         '''
         
         '''
-        ctx = zmq.Context()
-        pupil_remote = ctx.socket(zmq.REQ)
+        self.ctx = zmq.Context()
+        self.pupil_remote = self.ctx.socket(zmq.REQ)
         # The REQ talks to Pupil remote and receives the session unique IPC SUB PORT
-        pupil_remote.connect(f'tcp://{self.ip}:{self.port}') #connect to eye tracker
+        self.pupil_remote.connect(f'tcp://{self.ip}:{self.port}') #connect to eye tracker
 
         # rec_name = 'test'
         # req.send_string(f'R {rec_name}') # start recording
@@ -72,30 +72,24 @@ class System(DataSourceSystem):
         # self.offset = measure_clock_offset(pupil_remote, clock_function=local_clock)
         # print(f"\n Pupillab Clock offset (1 measurement): {self.offset} seconds")
 
-        pupil_remote.send_string('SUB_PORT') # Request 'SUB_PORT' for reading data
-        sub_port = pupil_remote.recv_string()
+        self.pupil_remote.send_string('SUB_PORT') # Request 'SUB_PORT' for reading data
+        sub_port = self.pupil_remote.recv_string()
 
         # open sub ports to listen to pupil; sub: subport that receives surface data
-        self.sub = ctx.socket(zmq.SUB) # open a sub port to listen to pupil surface topic
+        self.sub = self.ctx.socket(zmq.SUB) # open a sub port to listen to pupil surface topic
         self.sub.connect(f'tcp://{self.ip}:{sub_port}')
         # self.sub.setsockopt_string(zmq.SUBSCRIBE, f"surfaces.{surface_name}")
         self.sub.subscribe(f"surfaces")  # receive all surface messages
         self.sub.subscribe("gaze")  # receive all gaze messages
         self.sub.subscribe('pupil.0.2d')  # receive all pupil0 messages, right eye
         self.sub.subscribe('pupil.1.2d')  # receive all pupil1 messages, left eye
-        pupil_remote.close()
 
     def stop(self):
         self.sub.close()
-        
-        ctx = zmq.Context()
-        pupil_remote = ctx.socket(zmq.REQ)
-        # The REQ talks to Pupil remote and receives the session unique IPC SUB PORT
-        pupil_remote.connect(f'tcp://{self.ip}:{self.port}') #connect to eye tracker
-
         # req.send_string('r') # stop recording
         # print('pupillab stopped recording in Pupil Capture')
-        pupil_remote.close()
+        self.pupil_remote.close()
+        self.ctx.term()
 
     def get(self):
         """
@@ -106,14 +100,18 @@ class System(DataSourceSystem):
         diameter0, diameter1 = (np.nan, np.nan)
         timestamp = np.nan
 
-        while self.sub.poll(1000./self.update_freq) == zmq.POLLIN: # clear the buffer after
-            topic, payload = self.sub.recv_multipart(flags=zmq.NOBLOCK) #noblock for recv(), unless it will wait until messages come in
+        coords = [raw[0], raw[1], confidence, timestamp, diameter0, diameter1]
+
+        t0 = time.perf_counter()
+        while (time.perf_counter() - t0 < 1./self.update_freq) and np.count_nonzero(np.isnan(coords)) > 0:
+            if not self.sub.poll(0) == zmq.POLLIN:
+                continue
+
+            topic, payload = self.sub.recv_multipart(flags=zmq.NOBLOCK)
             message = msgpack.loads(payload, raw=False)
-        
+            
             if topic.startswith(b"surfaces"): # get the surface datum when gaze in on the surface
                 # self.mapper.update_homography(message["img_to_surf_trans"])
-                if not "gaze_on_surfaces" in message.keys():
-                    continue
                 for message in message["gaze_on_surfaces"]:
                     if message["topic"].startswith("gaze.3d.01"):
                         raw = message["norm_pos"]
@@ -125,7 +123,9 @@ class System(DataSourceSystem):
             elif topic.startswith(b"pupil.1.2d"):
                 diameter1 = float(message["diameter"]) # pupil 1 diamter, left eye, unit: pixel
 
-        coords = [raw[0], raw[1], diameter0, diameter1, confidence, timestamp]
+            coords = [raw[0], raw[1], confidence, timestamp, diameter0, diameter1]
+
+        time.sleep(1./self.update_freq)
         coords = np.expand_dims(coords, axis=0)
         return coords
 

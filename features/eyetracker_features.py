@@ -283,7 +283,7 @@ class PupilLabStreaming(traits.HasTraits):
     surface_marker_count = traits.Int(0, desc="How many surface markers to draw")
 
     def __init__(self, *args, **kwargs):
-        super(EyeStreaming, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         
         # Add apriltag models
         centers = utils.calculate_square_positions(self.screen_half_height, self.window_size, 
@@ -294,12 +294,12 @@ class PupilLabStreaming(traits.HasTraits):
 
         # Visualize eye positions
         from riglib import source
-        from riglib.oculomatic import System
+        from riglib.pupillabs import System
         self.eye_data = source.DataSource(System)
         self.eye_pos = np.zeros((8,))*np.nan
 
     def init(self):
-        self.add_dtype('eye', 'f8', (8,))
+        self.add_dtype('eye', 'f8', (6,))
         super().init()
 
     def run(self):
@@ -314,10 +314,18 @@ class PupilLabStreaming(traits.HasTraits):
             print("Stopping streaming eye data")
             self.eye_data.stop()
 
+    def _start_None(self):
+        '''
+        Code to run before the 'None' state starts (i.e., the task stops)
+        '''
+        self.eye_data.stop()
+        super()._start_None()
+
     def _update_eye_pos(self):
-        eye_pos = self.eye_data.get() # This is (n,8) array of new values since we last checked
+        eye_pos = self.eye_data.get() # This is (n,6) array of new values since we last checked
+        print(eye_pos)
         if eye_pos.ndim < 2 or eye_pos.size == 0:
-            eye_pos = np.zeros((8,))*np.nan
+            eye_pos = np.zeros((6,))*np.nan
         else:
             eye_pos = eye_pos[-1,:] # the most recent position
         self.eye_pos = eye_pos
