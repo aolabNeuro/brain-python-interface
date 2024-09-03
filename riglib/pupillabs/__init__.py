@@ -108,13 +108,10 @@ class System(DataSourceSystem):
             topic, payload = self.sub.recv_multipart(flags=zmq.NOBLOCK)
             message = msgpack.loads(payload, raw=False)
             
-            if topic.startswith(b"surfaces"): # get the surface datum when gaze in on the surface
-                # self.mapper.update_homography(message["img_to_surf_trans"])
-                for message in message["gaze_on_surfaces"]:
-                    if message["topic"].startswith("gaze.3d.01"):
-                        raw = message["norm_pos"]
-                        timestamp = message["timestamp"]
-                        confidence = message["confidence"]
+            if message["topic"].startswith("gaze.3d.01"):
+                raw = message["norm_pos"]
+                timestamp = message["timestamp"]
+                confidence = message["confidence"]
 
             elif topic.startswith(b"pupil.0.2d"):
                 diameter0 = float(message["diameter"]) # pupil 0 diamter, right eye, unit: pixel
@@ -122,8 +119,8 @@ class System(DataSourceSystem):
                 diameter1 = float(message["diameter"]) # pupil 1 diamter, left eye, unit: pixel
 
             coords = [raw[0], raw[1], confidence, timestamp, diameter0, diameter1]
+            time.sleep(0.001)  # sleep for 1 ms to avoid busy waiting
 
-        time.sleep(1./self.update_freq)
         coords = np.expand_dims(coords, axis=0)
         return coords
 

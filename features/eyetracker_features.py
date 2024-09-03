@@ -323,7 +323,6 @@ class PupilLabStreaming(traits.HasTraits):
 
     def _update_eye_pos(self):
         eye_pos = self.eye_data.get() # This is (n,6) array of new values since we last checked
-        print(eye_pos)
         if eye_pos.ndim < 2 or eye_pos.size == 0:
             eye_pos = np.zeros((6,))*np.nan
         else:
