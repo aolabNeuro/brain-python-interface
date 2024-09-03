@@ -99,11 +99,9 @@ class System(DataSourceSystem):
         confidence = np.nan
         diameter0, diameter1 = (np.nan, np.nan)
         timestamp = np.nan
-
         coords = [raw[0], raw[1], confidence, timestamp, diameter0, diameter1]
 
-        t0 = time.perf_counter()
-        while (time.perf_counter() - t0 < 1./self.update_freq) and np.count_nonzero(np.isnan(coords)) > 0:
+        while np.count_nonzero(np.isnan(coords)) > 0:
             if not self.sub.poll(0) == zmq.POLLIN:
                 continue
 
