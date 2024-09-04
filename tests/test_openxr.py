@@ -3,6 +3,8 @@ from OpenGL import GL
 from OpenGL.GL.shaders import compileShader, compileProgram
 import xr
 
+from riglib.stereo_opengl.utils import offaxis_frusta
+
 def initialize():
     # Create OpenXR context
     context = xr.ContextObject(
@@ -12,25 +14,41 @@ def initialize():
             ],
         ),
     )
+    context.__enter__()
     
     # Compile shaders
     vertex_shader = compileShader(
         inspect.cleandoc("""
         #version 430
         
+        // Adapted from @jherico's RiftDemo.py in pyovr
+        
+        /*  Draws a cube:
+        
+           2________ 3
+           /|      /|
+         6/_|____7/ |
+          | |_____|_| 
+          | /0    | /1
+          |/______|/
+          4       5          
+
+         */
+
         layout(location = 0) uniform mat4 Projection = mat4(1);
         layout(location = 4) uniform mat4 ModelView = mat4(1);
         layout(location = 8) uniform float Size = 0.3;
 
+        // Minimum Y value is zero, so cube sits on the floor in room scale
         const vec3 UNIT_CUBE[8] = vec3[8](
-          vec3(-1.0, -0.0, -1.0),
-          vec3(+1.0, -0.0, -1.0),
-          vec3(-1.0, +2.0, -1.0),
-          vec3(+1.0, +2.0, -1.0),
-          vec3(-1.0, -0.0, +1.0),
-          vec3(+1.0, -0.0, +1.0),
-          vec3(-1.0, +2.0, +1.0),
-          vec3(+1.0, +2.0, +1.0)
+          vec3(-1.0, -0.0, -1.0), // 0: lower left rear
+          vec3(+1.0, -0.0, -1.0), // 1: lower right rear
+          vec3(-1.0, +2.0, -1.0), // 2: upper left rear
+          vec3(+1.0, +2.0, -1.0), // 3: upper right rear
+          vec3(-1.0, -0.0, +1.0), // 4: lower left front
+          vec3(+1.0, -0.0, +1.0), // 5: lower right front
+          vec3(-1.0, +2.0, +1.0), // 6: upper left front
+          vec3(+1.0, +2.0, +1.0)  // 7: upper right front
         );
 
         const vec3 UNIT_CUBE_NORMALS[6] = vec3[6](
@@ -43,12 +61,12 @@ def initialize():
         );
 
         const int CUBE_INDICES[36] = int[36](
-          0, 1, 2, 2, 1, 3,
-          4, 6, 5, 6, 7, 5,
-          0, 2, 4, 4, 2, 6,
-          1, 3, 5, 5, 3, 7,
-          2, 6, 3, 6, 3, 7,
-          0, 1, 4, 4, 1, 5
+          0, 1, 2, 2, 1, 3, // rear
+          4, 6, 5, 6, 7, 5, // front
+          0, 2, 4, 4, 2, 6, // left
+          1, 3, 5, 5, 3, 7, // right
+          2, 6, 3, 6, 3, 7, // top
+          0, 1, 4, 4, 1, 5  // bottom
         );
 
         out vec3 _color;
@@ -78,13 +96,17 @@ def initialize():
         }
         """), GL.GL_FRAGMENT_SHADER)
     shader = compileProgram(vertex_shader, fragment_shader)
-
-    # Generate VAO
     vao = GL.glGenVertexArrays(1)
-    GL.glBindVertexArray(vao)
+    GL.glEnable(GL.GL_BLEND)
+    GL.glDepthFunc(GL.GL_LESS)
     GL.glEnable(GL.GL_DEPTH_TEST)
-    GL.glClearColor(0.2, 0.2, 0.2, 1)
+    # glEnable(GL_TEXTURE_2D)
+    GL.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA)
+    GL.glClearColor(0., 0., 0., 1.)
     GL.glClearDepth(1.0)
+    GL.glDepthMask(GL.GL_TRUE)
+    GL.glEnable(GL.GL_CULL_FACE) # temporary solution to alpha blending issue with spheres. just draw the front half of the sphere
+    GL.glCullFace(GL.GL_BACK)
     
     return context, shader, vao
 
@@ -139,6 +161,8 @@ def main():
     # Cleanup if needed
     # context.destroy()
     # GL.glDeleteVertexArrays(1, vao)
+    context.__exit__()
+
 
 if __name__ == "__main__":
     main()

@@ -1,5 +1,4 @@
 #version 110
-uniform mat4 modelview;
 uniform vec4 basecolor;
 uniform vec4 spec_color;
 
@@ -16,7 +15,7 @@ const vec4 light_ambient = vec4(0.2, 0.2, 0.2, 1.);
 const vec4 light_specular = vec4(1.0, 1.0, 1.0, 1.0);
 
 vec4 phong() {
-    vec3 mv_light_direction = (modelview * light_direction).xyz,
+    vec3 mv_light_direction = (light_direction).xyz,
          normal = normalize(vnormal),
          eye = normalize(-vposition),
          reflection = normalize(-reflect(mv_light_direction, normal));

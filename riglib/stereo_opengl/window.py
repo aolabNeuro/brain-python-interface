@@ -8,6 +8,9 @@ import numpy as np
 from OpenGL.GL import *
 import xr
 
+from riglib.stereo_opengl.utils import offaxis_frusta
+from scipy.spatial.transform import Rotation
+
 from ..experiment import LogExperiment
 from ..experiment import traits
 
@@ -203,76 +206,29 @@ class WindowVR(Window):
     '''
 
     def screen_init(self):
-        # Create an OpenXR instance
-        instance = xr.create_instance(
-            xr.InstanceCreateInfo(
-                enabled_extension_names = [xr.KHR_OPENGL_ENABLE_EXTENSION_NAME]
-            )
-        )
-        system_id = xr.get_system(
-            instance=instance,
-            get_info=xr.SystemGetInfo(
-                form_factor=xr.FormFactor.HEAD_MOUNTED_DISPLAY,
+        
+        context = xr.ContextObject(
+            instance_create_info=xr.InstanceCreateInfo(
+                enabled_extension_names=[
+                    xr.KHR_OPENGL_ENABLE_EXTENSION_NAME,
+                ],
             ),
         )
-
-        graphics = xr.OpenGLGraphics(
-            instance=instance,
-            system=system_id,
-            title="Horatio Hornblower",
-        )   
-        graphics.make_current()
-     
-        graphics_binding_pointer = cast(pointer(graphics.graphics_binding), c_void_p)
-        self.xr_session = xr.create_session(
-            instance=instance,
-            create_info=xr.SessionCreateInfo(
-                system_id=system_id,
-                next=graphics_binding_pointer,
-            ),
-        )
-
-        self.xr_space = xr.create_reference_space(
-            session=self.xr_session,
-            create_info=xr.ReferenceSpaceCreateInfo(),
-        )
+        context.__enter__()
 
         # Create swapchains
         view_configuration_type = xr.ViewConfigurationType.PRIMARY_STEREO
         config_views = xr.enumerate_view_configuration_views(
-            instance=instance,
-            system_id=system_id,
+            instance=context.instance,
+            system_id=context.system_id,
             view_configuration_type=view_configuration_type,
         )
-        graphics.initialize_resources()
-        
-        # Create a swapchain for each view.
-        swapchains = []
-        swapchain_image_buffers = []
-        swapchain_image_ptr_buffers = []
-        for vp in config_views:
-            # Create the swapchain.
-            swapchain_create_info = xr.SwapchainCreateInfo(
-                array_size=1,
-                format=GL_RGBA8,
-                width=vp.recommended_image_rect_width,
-                height=vp.recommended_image_rect_height,
-                mip_count=1,
-                face_count=1,
-                sample_count=vp.recommended_swapchain_sample_count,
-                usage_flags=xr.SwapchainUsageFlags.SAMPLED_BIT | xr.SwapchainUsageFlags.COLOR_ATTACHMENT_BIT,
-            )
-            
-            swapchain = xr.create_swapchain(
-                session=self.xr_session,
-                create_info=swapchain_create_info,
-
-            )
-            swapchains.append(swapchain)
                 
         self.window_size = (
             config_views[0].recommended_image_rect_width * 2,
             config_views[0].recommended_image_rect_height)
+        
+        self.screen_dist = 10.5
         
         glEnable(GL_BLEND)
         glDepthFunc(GL_LESS)
@@ -283,16 +239,7 @@ class WindowVR(Window):
         glClearDepth(1.0)
         glDepthMask(GL_TRUE)
         glEnable(GL_CULL_FACE) # temporary solution to alpha blending issue with spheres. just draw the front half of the sphere
-        glCullFace(GL_BACK)
 
-
-
-        xr.begin_session(
-            session=self.xr_session,
-            begin_info=xr.SessionBeginInfo(
-                view_configuration_type,
-            ),
-        )
         self.renderer = self._get_renderer()
 
         #this effectively determines the modelview matrix
@@ -302,45 +249,62 @@ class WindowVR(Window):
         #up vector is always (0,0,1), why would I ever need to roll the camera?!
         self.set_eye((0, -self.screen_dist, 0), (0,0))
 
-    def _get_renderer(self):
-        glCullFace(GL_BACK)
-        return render.Renderer(self.window_size, self.fov, 1, 1024)
+        self.xr_frame_generator = context.frame_loop()
+        self.xr_context = context
 
-    def locate_views(self, frame_state):
-        view_locate_info = xr.ViewLocateInfo(
-            view_configuration_type=xr.ViewConfigurationType.PRIMARY_STEREO,
-            display_time=frame_state.predicted_display_time,
-            space=self.xr_space,
-        )
-        return xr.locate_views(self.xr_session, view_locate_info)
+        self.xr_view_init = [None, None]
+
+    def _get_renderer(self):
+        return render.Renderer(self.window_size, self.fov, 1, 1024)
     
     def draw_world(self):
         # Get the OpenXR views
-        frame_state = xr.wait_frame(self.xr_session)
-        xr.begin_frame(self.xr_session)
+        try:
+            frame_state = next(self.xr_frame_generator)
+        except StopIteration:
+            self.state = None  # Exit loop if the generator is exhausted
 
-        view_state, views = self.locate_views(frame_state)
+        for view_index, view in enumerate(self.xr_context.view_loop(frame_state)):
+            projection = offaxis_frusta((self.window_size[0]/2, self.window_size[1]), self.fov, 1, 1024, self.screen_dist, self.iod, flip=False)[view_index]
+            # print(view_index, projection)
+            # rot = Rotation.from_quat(view.pose.orientation.as_numpy()).as_rotvec()
+            # self.set_eye((0, -self.screen_dist, 0), (np.degrees(rot[0]),np.degrees(rot[2])))
+            # print(view.pose.position, view.pose.orientation)
+            angle_left, angle_right, angle_up, angle_down = view.fov.as_numpy()
+            projection = xr.Matrix4x4f.create_projection_fov(
+                graphics_api=xr.GraphicsAPI.OPENGL,
+                fov=xr.Fovf(angle_left, angle_right, angle_up, angle_down),
+                near_z=1,
+                far_z=1024,
+            ).as_numpy().reshape(4,4).T
+            # print(view_index, projection2)
 
-        # Set the eye position and direction
-        for view in views:
-            self.set_eye(view.pose.position, view.pose.orientation)
-            
-        # Draw the world
-        self.renderer.draw(self.world)
-        xr.end_frame(self.xr_session, xr.FrameEndInfo(
-            display_time=frame_state.predicted_display_time,
-        ))
-        self.renderer.draw_done()
+            # This normalization temporary until I figure out how to use stage coordinates
+            # if self.xr_view_init[view_index] is None:
+            #     self.xr_view_init[view_index] = view.pose.orientation.as_numpy()
+            pos = view.pose.position.as_numpy()
+            pos[1] -= self.screen_dist
+            # rot = Rotation.from_quat(self.xr_view_init[view_index]).inv() * Rotation.from_quat(view.pose.orientation.as_numpy())
+            self.set_eye(pos, (0,0))
+            to_view = xr.Matrix4x4f.create_translation_rotation_scale(
+                translation=(0.,0.,0.),
+                # rotation=xr.Quaternionf(*rot.as_quat()),
+                rotation=view.pose.orientation,
+                scale=(1,1,1),
+            )
+
+            # Draw the world
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+            self.renderer.draw(self.world, p_matrix=projection, modelview=to_view.as_numpy().reshape(4,4))
+            self.renderer.draw_done()
 
     def _test_stop(self, ts):
         super_stop = super(Window, self)._test_stop(ts)
         return super_stop
 
     def _start_None(self):
-        # Destroy the OpenXR session, swapchain, and instance
-        xr.destroy_session(self.xr_session)
-        xr.destroy_swapchain(self.xr_swapchain)
-        xr.destroy_instance(self.xr_instance)
+        self.xr_context.__exit__()
+        super(WindowVR, self)._start_None()
 
     def _cycle(self):
         super(Window, self)._cycle() # is this order intentional? why not cycle first then draw the screen?

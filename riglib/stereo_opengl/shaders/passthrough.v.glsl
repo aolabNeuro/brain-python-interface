@@ -17,7 +17,7 @@ varying float vshininess;
 
 void main(void) {
     vec4 eye_position = xfm * position;
-    gl_Position = p_matrix * eye_position;
+    gl_Position = p_matrix * modelview * eye_position;
     
     vposition = eye_position.xyz;
     vnormal   = (xfm * vec4(normal.xyz, 0.0)).xyz;

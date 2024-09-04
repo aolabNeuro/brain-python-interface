@@ -194,6 +194,7 @@ class TriMesh(Model):
     def init(self):
         allocated = super(TriMesh, self).init()
         if not allocated:
+            self.vao = glGenVertexArrays(1)
             self.vbuf = glGenBuffers(1)
             self.ebuf = glGenBuffers(1)
             glBindBuffer(GL_ARRAY_BUFFER, self.vbuf)
@@ -218,6 +219,7 @@ class TriMesh(Model):
     
     def draw(self, ctx):
         super(TriMesh, self).draw(ctx)
+        glBindVertexArray(self.vao)  # Bind VAO
         glEnableVertexAttribArray(ctx.attributes['position'])
         glBindBuffer(GL_ARRAY_BUFFER, self.vbuf)
         glVertexAttribPointer( ctx.attributes['position'],
