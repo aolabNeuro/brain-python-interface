@@ -204,54 +204,79 @@ class Swapchain(Structure):
         ("height", c_int32),
     ]
 
+import time
+class Clock():
+
+    def __init__(self, n_ticks=10):
+        self.start_time = self.get_time()
+        self.prev_ticks = np.zeros((n_ticks,))
+
+    def tick(self, fps):
+        self.prev_ticks = np.roll(self.prev_ticks, 1)
+        self.prev_ticks[0] = self.get_time()
+
+    def get_time(self):
+        return time.perf_counter()
+    
+    def get_fps(self):
+        return 1/np.mean(np.diff(self.prev_ticks))
+    
+
 class WindowVR(Window):
     '''
     An OpenXR window for rendering in VR to an HMD
     '''
 
     def screen_init(self):
-        
+        os.environ['XR_RUNTIME_JSON'] = '/usr/share/openxr/1/openxr_monado.json'
+        pygame.init()
+        self.screen_dist = 20.
+        self.clock = Clock()
+        self.fps = 90
+
         context = xr.ContextObject(
             instance_create_info=xr.InstanceCreateInfo(
                 enabled_extension_names=[
                     xr.KHR_OPENGL_ENABLE_EXTENSION_NAME,
                 ],
             ),
+            reference_space_create_info=xr.ReferenceSpaceCreateInfo(
+                reference_space_type=xr.ReferenceSpaceType.STAGE,
+                pose_in_reference_space=xr.Posef((0,0,0,1), (0,0,0)),
+                next=None,
+                type=xr.StructureType.REFERENCE_SPACE_CREATE_INFO,
+            )
         )
         context.__enter__()
 
         # Create swapchains
-        view_configuration_type = xr.ViewConfigurationType.PRIMARY_STEREO
         config_views = xr.enumerate_view_configuration_views(
             instance=context.instance,
             system_id=context.system_id,
-            view_configuration_type=view_configuration_type,
+            view_configuration_type=context.view_configuration_type,
         )
-                
         self.window_size = (
             config_views[0].recommended_image_rect_width * 2,
             config_views[0].recommended_image_rect_height)
         
-        self.screen_dist = 10.5
-        
         glEnable(GL_BLEND)
         glDepthFunc(GL_LESS)
         glEnable(GL_DEPTH_TEST)
-        # glEnable(GL_TEXTURE_2D)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glClearColor(*self.background)
         glClearDepth(1.0)
         glDepthMask(GL_TRUE)
         glEnable(GL_CULL_FACE) # temporary solution to alpha blending issue with spheres. just draw the front half of the sphere
-
+        glCullFace(GL_BACK)
         self.renderer = self._get_renderer()
 
         #this effectively determines the modelview matrix
+        self.add_model(Grid(100))
         self.world = Group(self.models)
         self.world.init()
 
         #up vector is always (0,0,1), why would I ever need to roll the camera?!
-        self.set_eye((0, -self.screen_dist, 0), (0,0))
+        self.set_eye((0,-self.screen_dist,0), (0,0))
 
         self.xr_frame_generator = context.frame_loop()
         self.xr_context = context
@@ -269,27 +294,16 @@ class WindowVR(Window):
             self.state = None  # Exit loop if the generator is exhausted
 
         for view_index, view in enumerate(self.xr_context.view_loop(frame_state)):
-            projection = offaxis_frusta((self.window_size[0]/2, self.window_size[1]), self.fov, 1, 1024, self.screen_dist, self.iod, flip=False)[view_index]
-            # print(view_index, projection)
+            # projection = offaxis_frusta((self.window_size[0]/2, self.window_size[1]), self.fov, 1, 1024, self.screen_dist, self.iod, flip=False)[view_index]
             # rot = Rotation.from_quat(view.pose.orientation.as_numpy()).as_rotvec()
-            # self.set_eye((0, -self.screen_dist, 0), (np.degrees(rot[0]),np.degrees(rot[2])))
             # print(view.pose.position, view.pose.orientation)
-            angle_left, angle_right, angle_up, angle_down = view.fov.as_numpy()
             projection = xr.Matrix4x4f.create_projection_fov(
                 graphics_api=xr.GraphicsAPI.OPENGL,
-                fov=xr.Fovf(angle_left, angle_right, angle_up, angle_down),
-                near_z=1,
+                fov=view.fov,
+                near_z=0.05,
                 far_z=1024,
             ).as_numpy().reshape(4,4).T
-            # print(view_index, projection2)
-
-            # This normalization temporary until I figure out how to use stage coordinates
-            # if self.xr_view_init[view_index] is None:
-            #     self.xr_view_init[view_index] = view.pose.orientation.as_numpy()
-            pos = view.pose.position.as_numpy()
-            pos[1] -= self.screen_dist
-            # rot = Rotation.from_quat(self.xr_view_init[view_index]).inv() * Rotation.from_quat(view.pose.orientation.as_numpy())
-            self.set_eye(pos, (0,0))
+    
             to_view = xr.Matrix4x4f.create_translation_rotation_scale(
                 translation=(0.,0.,0.),
                 # rotation=xr.Quaternionf(*rot.as_quat()),
@@ -307,13 +321,8 @@ class WindowVR(Window):
         return super_stop
 
     def _start_None(self):
-        self.xr_context.__exit__()
+        self.xr_context.__exit__(None, None, None)
         super(WindowVR, self)._start_None()
-
-    def _cycle(self):
-        super(Window, self)._cycle() # is this order intentional? why not cycle first then draw the screen?
-        self.requeue()
-        self.draw_world()
 
 class WindowWithExperimenterDisplay(Window):
     hostname = socket.gethostname()

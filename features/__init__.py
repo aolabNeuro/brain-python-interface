@@ -5,7 +5,7 @@ task/experiment by multiple inheritance.
 
 from features.debug_features import Profiler, OnlineAnalysis
 from features.laser_features import QwalorLaser, MultiQwalorLaser, SwitchedQwalorLaser, LaserState
-from riglib.stereo_opengl.window import WindowWithExperimenterDisplay, Window2D
+from riglib.stereo_opengl.window import WindowWithExperimenterDisplay, Window2D, WindowVR
 from .generator_features import Autostart, AdaptiveGenerator, IgnoreCorrectness, PoissonWait, RandomDelay, Progressbar_fixation
 from .peripheral_device_features import Button, Joystick, DualJoystick, Joystick_plus_TouchSensor, KeyboardControl, MouseControl, ForceControl
 from .reward_features import RewardSystem, TTLReward, JuiceLogging, PelletReward, JackpotRewards, ProgressBar, TrackingRewards, RewardAudio, PenaltyAudio, ScoreRewards
@@ -39,6 +39,7 @@ built_in_features = dict(
     rand_delay=RandomDelay,
     poisson_wait=PoissonWait,
     window2D=Window2D,
+    windowVR=WindowVR,
     adaptive_generator=AdaptiveGenerator,
     button=Button,
     ignore_correctness=IgnoreCorrectness,
