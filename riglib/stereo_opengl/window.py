@@ -219,7 +219,7 @@ class Clock():
         return time.perf_counter()
     
     def get_fps(self):
-        return 1/np.mean(np.diff(self.prev_ticks))
+        return -1/np.mean(np.diff(self.prev_ticks))
     
 
 class WindowVR(Window):
@@ -228,7 +228,8 @@ class WindowVR(Window):
     '''
 
     def screen_init(self):
-        os.environ['XR_RUNTIME_JSON'] = '/usr/share/openxr/1/openxr_monado.json'
+        # os.environ['XR_RUNTIME_JSON'] = '/usr/share/openxr/1/openxr_monado.json'
+        os.environ['XR_RUNTIME_JSON'] = '/home/aolab/.config/openxr/1/active_runtime.json'
         pygame.init()
         self.screen_dist = 20.
         self.clock = Clock()

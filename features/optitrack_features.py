@@ -210,7 +210,7 @@ class SpheresToCylinders():
         '''
         Hijack spheres and switch them for cylinders along the y-axis
         '''
-        if isinstance(model, Sphere) and model.radius > 1:
+        if isinstance(model, Sphere) and model.radius > 0.5:
             height = self.cursor_bounds[3] - self.cursor_bounds[2]
             tmp_model = Cylinder(height, model.radius, color=model.color)
             print('Switched sphere for cylinder')
@@ -218,7 +218,23 @@ class SpheresToCylinders():
             model.rotate_x(90)
         super().add_model(model)
 
+    def _test_enter_target(self, ts):
+        '''
+        return true if the distance between center of cursor and target is smaller than the cursor radius
+        '''
+        cursor_pos = self.plant.get_endpoint_pos()
+        d = np.linalg.norm(cursor_pos[[0,2]] - self.targs[self.target_index][[0,2]])
+        return d <= (self.target_radius - self.cursor_radius)
 
+    def _test_leave_target(self, ts):
+        '''
+        return true if cursor moves outside the exit radius
+        '''
+        cursor_pos = self.plant.get_endpoint_pos()
+        d = np.linalg.norm(cursor_pos[[0,2]] - self.targs[self.target_index][[0,2]])
+        rad = self.target_radius - self.cursor_radius
+        return d > rad
+    
 # Helper class for natnet logging
 import logging
 log_path = os.path.join(os.path.dirname(__file__), '../log/optitrack.log')
