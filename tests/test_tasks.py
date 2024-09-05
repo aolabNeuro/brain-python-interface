@@ -34,10 +34,9 @@ def init_exp(base_class, feats, seq=None, **kwargs):
 
 class TestManualControlTasks(unittest.TestCase):
 
-    @unittest.skip("")
     def test_exp(self):
         seq = ManualControl.centerout_2D()
-        exp = init_exp(ManualControl, [MouseControl, Window2D, ScoreRewards], seq)
+        exp = init_exp(ManualControl, [MouseControl, Window2D, ScoreRewards], seq, window_size=(1200,800), fullscreen=False)
         exp.rotation = 'xzy'
         exp.stereo_mode = 'projection'
         exp.run()
@@ -76,7 +75,7 @@ class TestManualControlTasks(unittest.TestCase):
         exp.rotation = 'xzy'
         exp.run()
 
-    # @unittest.skip("only to test 3d window")
+    @unittest.skip("only to test 3d window")
     def test_3d(self):
         seq = ManualControl.centerout_2D()
         exp = init_exp(ManualControl, [MouseControl, SpheresToCylinders], seq, stereo_mode='projection',

@@ -33,8 +33,8 @@ class MirrorDisplay(Renderer):
     '''The mirror display requires a left-right flip, otherwise the sides are messed up'''
     def __init__(self, window_size, fov, near, far, focal_dist, iod, **kwargs):
         w, h = window_size
-        super(MirrorDisplay, self).__init__((w/2,h), fov, near, far, **kwargs)
         flip = kwargs.pop('flip', True)
+        super(MirrorDisplay, self).__init__((w/2,h), fov, near, far, **kwargs)
         self.projections = offaxis_frusta((w/2, h), fov, near, far, focal_dist, iod, flip=flip)
     
     def draw(self, root, **kwargs):
@@ -79,7 +79,7 @@ class DualMultisizeDisplay(Renderer):
     def draw(self, root, **kwargs):
         '''
         Draw the 'root' model.
-
+        
         Parameters
         ----------
         root: stereo_opengl.models.Model instance

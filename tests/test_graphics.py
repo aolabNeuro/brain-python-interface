@@ -9,9 +9,9 @@ os.environ['DISPLAY'] = ':0'
 os.environ['XR_RUNTIME_JSON'] = '/usr/share/openxr/1/openxr_monado.json'
 
 from riglib.stereo_opengl.window import Window, Window2D, FPScontrol, WindowVR
-from riglib.stereo_opengl.primitives import Cylinder, Plane, Sphere, Cone, Text
+from riglib.stereo_opengl.environment import Grid
+from riglib.stereo_opengl.primitives import Cylinder, Cube, Plane, Sphere, Cone, Text, TexSphere, TexCube, TexPlane
 from riglib.stereo_opengl.models import FlatMesh, Group
-from riglib.stereo_opengl.textures import Texture, TexModel
 from riglib.stereo_opengl.render import ssao, stereo, Renderer
 from riglib.stereo_opengl.utils import cloudy_tex
 
@@ -64,7 +64,11 @@ if __name__ == "__main__":
     #win.add_model(reward_text.translate(5,0,-5))
     #win.add_model(TexSphere(radius=1, shininess=30, tex=cloudy_tex()).translate(0,0,0))
     #win.add_model(TexPlane(5,5, tex=cloudy_tex(), specular_color=(0.,0,0,0)).rotate_x(90))
-
+    win.add_model(Grid())
+    win.add_model(Sphere(2, color=[0.75,0.25,0.25,0.75]).translate(-5,0,0))
+    reward_text = Text(7.5, "123", justify='right', color=[1,0,1,0.75])
+    win.add_model(reward_text.translate(5,0,-5))
+    win.add_model(TexPlane(4,4,color=[0,0,0,0.9], tex=cloudy_tex()).rotate_x(90).translate(0,0,-5))
     #win.screen_init()
     #win.draw_world()
     win.run()
