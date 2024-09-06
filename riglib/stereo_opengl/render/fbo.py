@@ -1,5 +1,17 @@
-'''Needs docs'''
+'''
+FBO (Framebuffer Object) Module
 
+An FBO is an OpenGL object that allows rendering to off-screen buffers, which can be used as textures.
+This is useful for various rendering techniques like post-processing effects, shadow mapping, or
+rendering to multiple targets simultaneously.
+
+Key components:
+- FBO: The main framebuffer object
+- Attachments: Textures or renderbuffers that store the rendered output (color, depth, stencil)
+- Render targets: The buffers that OpenGL draws into (color attachments, depth attachment, etc.)
+
+This module provides classes to create and manage FBOs, as well as utilities for rendering to them.
+'''
 
 import numpy as np
 from OpenGL.GL import *

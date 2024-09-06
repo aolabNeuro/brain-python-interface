@@ -1,4 +1,15 @@
-'''Needs docs'''
+'''
+Screen Space Ambient Occlusion (SSAO) Renderer
+
+This module implements a Screen Space Ambient Occlusion renderer, which is a technique
+used to approximate ambient occlusion in real-time. SSAO adds depth and realism to 3D
+scenes by darkening areas that are occluded or surrounded by other geometry.
+
+The SSAO class extends FBOrender to provide a multi-pass rendering pipeline:
+1. Render scene to obtain normal and depth information
+2. Calculate ambient occlusion based on the normal and depth data
+3. Apply the ambient occlusion to the final render
+'''
 
 import numpy as np
 from OpenGL.GL import *
@@ -31,7 +42,7 @@ class SSAO(FBOrender):
         self.add_program("vblur", ("fsquad", "vblur"))
         self.add_program("ssao_pass3", ("passthru", "ssao_pass3"))
 
-        randtex = np.random.rand(3, w, h)
+        randtex = np.random.rand(3, int(w), int(h))
         randtex /= randtex.sum(0)
         self.rnm = Texture(randtex.T, wrap_x=GL_REPEAT, wrap_y=GL_REPEAT, 
             magfilter=GL_NEAREST, minfilter=GL_NEAREST)
@@ -42,7 +53,7 @@ class SSAO(FBOrender):
     def draw(self, root, **kwargs):
         #First, draw the whole damned scene, but only read the normals and depth into ssao
         glPushAttrib(GL_VIEWPORT_BIT)
-        glViewport( 0,0, self.size[0]/self.sf, self.size[1]/self.sf)
+        glViewport( 0,0, self.size[0]//self.sf, self.size[1]//self.sf)
         self.draw_to_fbo(self.normdepth, root, shader="ssao_pass1", **kwargs)
         
         #Now, do the actual ssao calculations, and draw it into ping

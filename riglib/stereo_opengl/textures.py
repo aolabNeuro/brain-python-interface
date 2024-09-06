@@ -39,16 +39,23 @@ class Texture(object):
     def init(self):
         gltex = glGenTextures(1)
         glBindTexture(GL_TEXTURE_2D, gltex)
+        
+        # Set texture parameters
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, self.opts['minfilter'])
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, self.opts['magfilter'])
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,     self.opts['wrap_x'])
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,     self.opts['wrap_y'])
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, self.opts['wrap_x'])
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, self.opts['wrap_y'])
+        
+        # Ensure width and height are integers
+        width, height = int(self.size[0]), int(self.size[1])
+        
+        # Create empty texture
         glTexImage2D(
-            GL_TEXTURE_2D, 0,                           #target, level
-            self.opts['iformat'],                       #internal format
-            self.size[0], self.size[1], 0,              #width, height, border
-            self.opts['exformat'], self.opts['dtype'],  #external format, type
-            self.texstr if self.texstr is not None else 0   #pixels
+            GL_TEXTURE_2D, 0,
+            self.opts['iformat'],
+            width, height, 0,
+            self.opts['exformat'], self.opts['dtype'],
+            None  # Use None instead of c_ubyte(0) for empty texture
         )
         
         self.tex = gltex

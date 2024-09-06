@@ -6,15 +6,15 @@ import os
 
 import numpy as np
 from OpenGL.GL import *
-import xr
-
-from riglib.stereo_opengl.utils import offaxis_frusta
-from scipy.spatial.transform import Rotation
+try:
+    import xr
+except:
+    print("No OpenXR support")
 
 from ..experiment import LogExperiment
 from ..experiment import traits
 
-from .render import stereo, render
+from .render import stereo, render, ssao
 from .models import Group
 from .xfm import Quaternion
 from .primitives import Sphere, Cube, Chain
@@ -116,7 +116,7 @@ class Window(LogExperiment):
         self.set_eye((0, -self.screen_dist, 0), (0,0))
 
         pygame.mouse.set_visible(False)
-
+    
     def _get_renderer(self):
         near = 1
         far = 1024
@@ -196,13 +196,6 @@ class Window(LogExperiment):
         self.requeue()
         self.draw_world()
 
-from ctypes import byref, c_int32, c_void_p, cast, POINTER, pointer, Structure
-class Swapchain(Structure):
-    _fields_ = [
-        ("handle", xr.Swapchain),
-        ("width", c_int32),
-        ("height", c_int32),
-    ]
 
 import time
 class Clock():
@@ -228,6 +221,8 @@ class WindowVR(Window):
     '''
 
     def screen_init(self):
+        from ctypes import byref, c_int32, c_void_p, cast, POINTER, pointer, Structure
+
         # os.environ['XR_RUNTIME_JSON'] = '/usr/share/openxr/1/openxr_monado.json'
         os.environ['XR_RUNTIME_JSON'] = '/home/aolab/.config/openxr/1/active_runtime.json'
         pygame.init()
@@ -415,6 +410,11 @@ class WindowVR(Window):
     def _start_None(self):
         self.xr_context.__exit__(None, None, None)
         super(WindowVR, self)._start_None()
+
+class WindowSSAO(Window):
+
+    def _get_renderer(self):
+        return ssao.SSAO(self.window_size, self.fov, 1, 1024)
 
 class WindowWithExperimenterDisplay(Window):
     hostname = socket.gethostname()
