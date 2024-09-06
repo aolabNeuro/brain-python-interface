@@ -11,7 +11,7 @@ from .peripheral_device_features import Button, Joystick, DualJoystick, Joystick
 from .reward_features import RewardSystem, TTLReward, JuiceLogging, PelletReward, JackpotRewards, ProgressBar, TrackingRewards, RewardAudio, PenaltyAudio, ScoreRewards
 from .eyetracker_features import EyeData, CalibratedEyeData, SimulatedEyeData, FixationStart, EyeConstrained, EyeCalibration, EyeStreaming
 from .phasespace_features import MotionData, MotionSimulate, MotionAutoAlign
-from .optitrack_features import Optitrack
+from .optitrack_features import Optitrack, SpheresToCylinders
 from .plexon_features import PlexonBMI, RelayPlexon, RelayPlexByte
 from .hdf_features import SaveHDF
 from .video_recording_features import SingleChannelVideo, E3Video
@@ -40,6 +40,7 @@ built_in_features = dict(
     poisson_wait=PoissonWait,
     window2D=Window2D,
     windowVR=WindowVR,
+    cylinder_center_out=SpheresToCylinders,
     adaptive_generator=AdaptiveGenerator,
     button=Button,
     ignore_correctness=IgnoreCorrectness,

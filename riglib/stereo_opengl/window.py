@@ -244,13 +244,99 @@ class WindowVR(Window):
             reference_space_create_info=xr.ReferenceSpaceCreateInfo(
                 reference_space_type=xr.ReferenceSpaceType.STAGE,
                 pose_in_reference_space=xr.Posef((0,0,0,1), (0,0,0)),
-                next=None,
-                type=xr.StructureType.REFERENCE_SPACE_CREATE_INFO,
-            )
+            ),
+            
         )
-        context.__enter__()
+        context.instance = xr.create_instance(
+            create_info=context._instance_create_info,
+        )
+        context.system_id = xr.get_system(
+            instance=context.instance,
+            get_info=xr.SystemGetInfo(
+                form_factor=context.form_factor,
+            ),
+        )
+
+        if context._session_create_info.next is None:
+            context.graphics = xr.OpenGLGraphics(
+                instance=context.instance,
+                system=context.system_id,
+                title=context._instance_create_info.application_info.application_name.decode()
+            )
+            context.graphics_binding_pointer = cast(pointer(context.graphics.graphics_binding), c_void_p)
+            context._session_create_info.next = context.graphics_binding_pointer
+        else:
+            context.graphics_binding_pointer = context._session_create_info.next
+
+        context._session_create_info.system_id = context.system_id
+        context.session = xr.create_session(
+            instance=context.instance,
+            create_info=context._session_create_info,
+        )
+        context.space = xr.create_reference_space(
+            session=context.session,
+            create_info=context._reference_space_create_info
+        )
+        context.default_action_set = xr.create_action_set(
+            instance=context.instance,
+            create_info=xr.ActionSetCreateInfo(
+                action_set_name="default_action_set",
+                localized_action_set_name="Default Action Set",
+                priority=0,
+            ),
+        )
+        context.action_sets.append(context.default_action_set)
 
         # Create swapchains
+        config_views = xr.enumerate_view_configuration_views(
+            instance=context.instance,
+            system_id=context.system_id,
+            view_configuration_type=context.view_configuration_type,
+        )
+        context.graphics.initialize_resources()
+        swapchain_formats = xr.enumerate_swapchain_formats(context.session)
+        color_swapchain_format = context.graphics.select_color_swapchain_format(swapchain_formats)
+        # Create a swapchain for each view.
+        context.swapchains.clear()
+        context.swapchain_image_buffers.clear()
+        context.swapchain_image_ptr_buffers.clear()
+        for vp in config_views:
+            # Create the swapchain.
+            swapchain_create_info = xr.SwapchainCreateInfo(
+                array_size=1,
+                format=GL_RGBA8,
+                width=vp.recommended_image_rect_width,
+                height=vp.recommended_image_rect_height,
+                mip_count=1,
+                face_count=1,
+                sample_count=vp.recommended_swapchain_sample_count,
+                usage_flags=xr.SwapchainUsageFlags.SAMPLED_BIT | xr.SwapchainUsageFlags.COLOR_ATTACHMENT_BIT,
+            )
+            swapchain = xr.context_object.SwapchainStruct(
+                xr.create_swapchain(
+                    session=context.session,
+                    create_info=swapchain_create_info,
+                ),
+                swapchain_create_info.width,
+                swapchain_create_info.height,
+            )
+            context.swapchains.append(swapchain)
+            swapchain_image_buffer = xr.enumerate_swapchain_images(
+                swapchain=swapchain.handle,
+                element_type=context.graphics.swapchain_image_type,
+            )
+            # Keep the buffer alive by moving it into the list of buffers.
+            context.swapchain_image_buffers.append(swapchain_image_buffer)
+            capacity = len(swapchain_image_buffer)
+            swapchain_image_ptr_buffer = (POINTER(xr.SwapchainImageBaseHeader) * capacity)()
+            for ix in range(capacity):
+                swapchain_image_ptr_buffer[ix] = cast(
+                    byref(swapchain_image_buffer[ix]),
+                    POINTER(xr.SwapchainImageBaseHeader))
+            context.swapchain_image_ptr_buffers.append(swapchain_image_ptr_buffer)
+        context.graphics.make_current()
+
+        # Query the swapchain size
         config_views = xr.enumerate_view_configuration_views(
             instance=context.instance,
             system_id=context.system_id,
@@ -260,6 +346,10 @@ class WindowVR(Window):
             config_views[0].recommended_image_rect_width * 2,
             config_views[0].recommended_image_rect_height)
         
+        swapchain_formats = xr.enumerate_swapchain_formats(context.session)
+        color_swapchain_format = context.graphics.select_color_swapchain_format(swapchain_formats)
+        print(color_swapchain_format)
+
         glEnable(GL_BLEND)
         glDepthFunc(GL_LESS)
         glEnable(GL_DEPTH_TEST)
@@ -315,7 +405,8 @@ class WindowVR(Window):
             # Draw the world
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
             self.renderer.draw(self.world, p_matrix=projection, modelview=to_view.as_numpy().reshape(4,4))
-            self.renderer.draw_done()
+        
+        self.renderer.draw_done()
 
     def _test_stop(self, ts):
         super_stop = super(Window, self)._test_stop(ts)
