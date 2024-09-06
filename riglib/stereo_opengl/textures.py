@@ -49,13 +49,13 @@ class Texture(object):
         # Ensure width and height are integers
         width, height = int(self.size[0]), int(self.size[1])
         
-        # Create empty texture
+        # Create and fill texture
         glTexImage2D(
             GL_TEXTURE_2D, 0,
             self.opts['iformat'],
             width, height, 0,
             self.opts['exformat'], self.opts['dtype'],
-            None  # Use None instead of c_ubyte(0) for empty texture
+            self.texstr
         )
         
         self.tex = gltex

@@ -9,14 +9,13 @@ uniform float farclip;
 
 varying vec2 uv;
 const float totStrength = 0.5;
-const float strength = 2.0;
+const float strength = 0.1;
 const float falloff = 0.0001;
-const float rad = .01;
+const float rad = .005;
 #define SAMPLES 16
 const float invSamples = -totStrength/float(SAMPLES);
 const float bias = 0.025;
 
-// Add back the lindepth function
 float lindepth(vec2 uv) {
    float n = nearclip; // camera z near
    float f = farclip; // camera z far
@@ -24,14 +23,13 @@ float lindepth(vec2 uv) {
    return (2.0 * n) / (f + n - z * (f - n));
 }
 
-// New function to generate a random vector
+// Function to generate a random vector
 vec3 randomVec(vec2 uv) {
     vec3 noise = texture2D(rnm, uv).xyz;
     return normalize(noise * 2.0 - 1.0);
 }
 
 void main(void) {
-    // Generate a random rotation vector
     vec3 randVec = randomVec(uv);
     
     vec3 norm = normalize(texture2D(normalMap,uv).xyz);
