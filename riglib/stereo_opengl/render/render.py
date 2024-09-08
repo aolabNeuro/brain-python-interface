@@ -95,31 +95,38 @@ class Renderer(object):
         return self.texunits[tex]
     
     def reset_texunits(self):
-        maxtex = glGetIntegerv(GL_MAX_TEXTURE_COORDS)
-        #Use first texture unit as the "blank" texture
-        self.texavail = set((i, globals()['GL_TEXTURE%d'%i]) for i in range(maxtex))
-        self.texunits = dict()
-    
+        maxtex = glGetIntegerv(GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS)
+        # print(f"Max texture units: {maxtex}")
+        # glActiveTexture(GL_TEXTURE0)  # Reset to default texture unit
+        self.texavail = set((i, globals()['GL_TEXTURE%d'%i]) for i in range(1, maxtex))
+        self.texunits = dict() 
+
     def add_shader(self, name, stype, filename, *includes):
         src = []
-        main = open(os.path.join(cwd, "shaders", filename))
-        version = main.readline().strip()
+        main_path = os.path.join(cwd, "shaders", filename)
+        with open(main_path, 'r') as main:
+            version = main.readline().strip()
+            main_content = main.read()
+        
         for inc in includes:
-            incfile = open(os.path.join(cwd, "shaders", inc))
-            ver = incfile.readline().strip()
-            assert ver == version, "Version: %s, %s"%(ver, version)
-            src.append(incfile.read())
-            incfile.close()
-        src.append(main.read())
-        main.close()
-
+            inc_path = os.path.join(cwd, "shaders", inc)
+            with open(inc_path, 'r') as incfile:
+                ver = incfile.readline().strip()
+                assert ver == version, f"Version mismatch: {ver} != {version}"
+                src.append(incfile.read())
+        
+        src.append(main_content)
+        
+        full_src = "\n".join([version] + src)
         shader = glCreateShader(stype)
-        glShaderSource(shader, "\n".join(src))
+        glShaderSource(shader, full_src)
         glCompileShader(shader)
 
         if not glGetShaderiv(shader, GL_COMPILE_STATUS):
             err = glGetShaderInfoLog(shader)
             glDeleteShader(shader)
+            print(f"Shader compilation error for {filename}:")  # Debug print
+            print(err.decode('utf-8'))  # Debug print
             raise Exception(err)
         
         self.shaders[name] = shader

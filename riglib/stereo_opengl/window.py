@@ -84,21 +84,25 @@ class Window(LogExperiment):
         self.set_os_params()
         pygame.init()
 
-        pygame.display.gl_set_attribute(pygame.GL_DEPTH_SIZE, 24)
+        # pygame.display.gl_set_attribute(pygame.GL_DEPTH_SIZE, 24)
+        # pygame.display.gl_set_attribute(pygame.GL_FRAMEBUFFER_SRGB_CAPABLE, True)
+        pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MAJOR_VERSION, 3)
+        pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MINOR_VERSION, 0)
+        pygame.display.gl_set_attribute(pygame.GL_CONTEXT_PROFILE_MASK, pygame.GL_CONTEXT_PROFILE_CORE)
         flags = pygame.DOUBLEBUF | pygame.HWSURFACE | pygame.OPENGL | pygame.NOFRAME
         if self.fullscreen:
             flags = flags | pygame.FULLSCREEN
         try:
-            pygame.display.gl_set_attribute(pygame.GL_MULTISAMPLEBUFFERS,1)
+            pygame.display.gl_set_attribute(pygame.GL_MULTISAMPLEBUFFERS,2)
             self.screen = pygame.display.set_mode(self.window_size, flags)
         except:
             pygame.display.gl_set_attribute(pygame.GL_MULTISAMPLEBUFFERS,0)
             self.screen = pygame.display.set_mode(self.window_size, flags)
 
+        glDisable(GL_FRAMEBUFFER_SRGB)
         glEnable(GL_BLEND)
         glDepthFunc(GL_LESS)
         glEnable(GL_DEPTH_TEST)
-        glEnable(GL_TEXTURE_2D)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glClearColor(*self.background)
         glClearDepth(1.0)

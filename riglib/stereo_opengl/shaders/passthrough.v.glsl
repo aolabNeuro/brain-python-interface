@@ -1,4 +1,4 @@
-#version 110
+#version 330 core
 
 uniform mat4 p_matrix;
 uniform mat4 xfm;
@@ -6,14 +6,14 @@ uniform mat4 modelview;
 uniform vec4 basecolor;
 uniform float shininess;
 
-attribute vec4 position;
-attribute vec2 texcoord;
-attribute vec4 normal;
+in vec4 position;
+in vec2 texcoord;
+in vec4 normal;
 
-varying vec3 vposition;
-varying vec3 vnormal;
-varying vec2 vtexcoord;
-varying float vshininess;
+out vec3 vposition;
+out vec3 vnormal;
+out vec2 vtexcoord;
+out float vshininess;
 
 void main(void) {
     vec4 eye_position = xfm * position;

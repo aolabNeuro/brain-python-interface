@@ -124,9 +124,9 @@ class ShaderProgram(object):
             
             for tex, funcs in list(models.items()):
                 if tex is None:
-                    self.uniforms.texture = ctx.get_texunit("None")
+                    self.uniforms.textureSampler = ctx.get_texunit("None")
                 else:
-                    self.uniforms.texture = ctx.get_texunit(tex)
+                    self.uniforms.textureSampler = ctx.get_texunit(tex)
 
                 for drawfunc in funcs:
                     drawfunc(self)

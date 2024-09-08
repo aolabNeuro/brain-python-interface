@@ -1,4 +1,4 @@
-#version 120
+#version 330 core
 
 uniform sampler2D rnm;
 uniform sampler2D normalMap;
@@ -7,32 +7,33 @@ uniform sampler2D depthMap;
 uniform float nearclip;
 uniform float farclip;
 
-varying vec2 uv;
-const float totStrength = 0.5;
+in vec2 uv;
+const float totStrength = 1.5;
 const float strength = 0.1;
-const float falloff = 0.0001;
-const float rad = .005;
-#define SAMPLES 16
+const float falloff = 0.001;
+const float rad = .01;
+#define SAMPLES 32
 const float invSamples = -totStrength/float(SAMPLES);
-const float bias = 0.025;
+
+out vec4 FragColor;
 
 float lindepth(vec2 uv) {
    float n = nearclip; // camera z near
    float f = farclip; // camera z far
-   float z = texture2D(depthMap, uv).z;
+   float z = texture(depthMap, uv).x;
    return (2.0 * n) / (f + n - z * (f - n));
 }
 
 // Function to generate a random vector
 vec3 randomVec(vec2 uv) {
-    vec3 noise = texture2D(rnm, uv).xyz;
+    vec3 noise = texture(rnm, uv).xyz;
     return normalize(noise * 2.0 - 1.0);
 }
 
 void main(void) {
     vec3 randVec = randomVec(uv);
     
-    vec3 norm = normalize(texture2D(normalMap,uv).xyz);
+    vec3 norm = normalize(texture(normalMap,uv).xyz);
     float depth = lindepth(uv);
 
     // current fragment coords in screen space
@@ -70,5 +71,5 @@ void main(void) {
     }
 
     // output the result
-    gl_FragColor = vec4(1.0 + bl * invSamples);
+    FragColor = vec4(clamp(1.0 + bl * invSamples, 0.0, 1.0));
 }

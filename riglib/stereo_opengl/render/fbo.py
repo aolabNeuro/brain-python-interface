@@ -56,7 +56,7 @@ class FBO(object):
                 if texture is None and attachment == GL_DEPTH_ATTACHMENT:
                     rb = glGenRenderbuffers(1)
                     glBindRenderbuffer(GL_RENDERBUFFER, rb)
-                    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, size[0], size[1])
+                    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, int(size[0]), int(size[1]))
                     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rb)
                 else:
                     if texture.tex is None:

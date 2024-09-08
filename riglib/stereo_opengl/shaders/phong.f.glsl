@@ -1,13 +1,15 @@
-#version 110
+#version 330 core
+
+uniform sampler2D textureSampler;
 uniform vec4 basecolor;
 uniform vec4 spec_color;
 
-uniform sampler2D texture;
+in vec3 vposition;
+in vec3 vnormal;
+in vec2 vtexcoord;
+in float vshininess;
 
-varying vec3 vposition;
-varying vec3 vnormal;
-varying vec2 vtexcoord;
-varying float vshininess;
+out vec4 FragColor;
 
 const vec4 light_direction = vec4(-1, 2, -2, 0.0);
 const vec4 light_diffuse = vec4(0.6, 0.6, 0.6, 0.0);
@@ -20,7 +22,7 @@ vec4 phong() {
          eye = normalize(-vposition),
          reflection = normalize(-reflect(mv_light_direction, normal));
     
-    vec4 texcolor = texture2D(texture, vtexcoord);
+    vec4 texcolor = texture(textureSampler, vtexcoord);
     vec4 frag_diffuse = vec4(
         texcolor.rgb + basecolor.rgb,
         texcolor.a * basecolor.a
@@ -33,5 +35,5 @@ vec4 phong() {
     vec4 specular_factor
         = pow(max(dot(-reflection, eye), 0.0), vshininess) * light_specular;
     
-    return ambient_diffuse_factor*frag_diffuse + specular_factor*spec_color;
+    return ambient_diffuse_factor * frag_diffuse + specular_factor * spec_color;
 }

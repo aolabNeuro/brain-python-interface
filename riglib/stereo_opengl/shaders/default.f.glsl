@@ -1,6 +1,7 @@
-#version 110
+#version 330 core
+
+vec4 phong(); // Forward declaration of the phong function
 
 void main() {
-    gl_FragColor = phong();
-    //gl_FragColor = vec4(vnormal, 1.);
+    FragColor = phong();
 }

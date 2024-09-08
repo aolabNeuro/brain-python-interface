@@ -37,9 +37,13 @@ class Texture(object):
         self.tex = None
 
     def init(self):
+        if self.tex is not None:
+            print(f"Texture already initialized: {self.tex}")
+            return
+
         gltex = glGenTextures(1)
         glBindTexture(GL_TEXTURE_2D, gltex)
-        
+                
         # Set texture parameters
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, self.opts['minfilter'])
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, self.opts['magfilter'])
@@ -57,6 +61,12 @@ class Texture(object):
             self.opts['exformat'], self.opts['dtype'],
             self.texstr
         )
+        
+        error = glGetError()
+        if error != GL_NO_ERROR:
+            print(f"OpenGL error after texture creation: {error}")
+        else:
+            print(f"Texture initialized successfully: {gltex}")
         
         self.tex = gltex
     

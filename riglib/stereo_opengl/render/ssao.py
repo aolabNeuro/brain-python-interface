@@ -19,9 +19,9 @@ from .fbo import FBOrender, FBO
 from ..textures import Texture
 
 class SSAO(FBOrender):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, sf=2, **kwargs):
         super(SSAO, self).__init__(*args, **kwargs)
-        self.sf = 3
+        self.sf = sf
         w, h = self.size[0] / self.sf, self.size[1] / self.sf
         
         self.normdepth = FBO(["color0", "depth"], size=(w,h))
@@ -42,6 +42,11 @@ class SSAO(FBOrender):
         self.add_program("vblur", ("fsquad", "vblur"))
         self.add_program("ssao_pass3", ("passthru", "ssao_pass3"))
 
+        # Some debug shaders
+        # self.add_shader("fsquad", GL_VERTEX_SHADER, "fsquad.v.glsl")
+        # self.add_shader("fsquad_frag", GL_FRAGMENT_SHADER, "fsquad.f.glsl")
+        # self.add_program("none", ("fsquad", "fsquad_frag"))
+
         randtex = np.random.rand(3, int(w), int(h))
         randtex /= randtex.sum(0)
         self.rnm = Texture(randtex.T, wrap_x=GL_REPEAT, wrap_y=GL_REPEAT, 
@@ -51,31 +56,31 @@ class SSAO(FBOrender):
         self.clips = args[2], args[3]
 
     def draw(self, root, **kwargs):
-        #First, draw the whole damned scene, but only read the normals and depth into ssao
-        glPushAttrib(GL_VIEWPORT_BIT)
-        glViewport( 0,0, self.size[0]//self.sf, self.size[1]//self.sf)
-        self.draw_to_fbo(self.normdepth, root, shader="ssao_pass1", **kwargs)
+        # Save the current viewport
+        original_viewport = glGetIntegerv(GL_VIEWPORT)
+
+        # Set the new viewport for SSAO calculations
+        new_viewport = (0, 0, self.size[0]//self.sf, self.size[1]//self.sf)
+        glViewport(*new_viewport)
+
+        # First, draw the whole scene, but only read the normals and depth into ssao
+        self.draw_to_fbo(self.normdepth, root, shader="ssao_pass1",
+                         nearclip=self.clips[0], farclip=self.clips[1], **kwargs)
         
-        #Now, do the actual ssao calculations, and draw it into ping
+        # Now, do the actual ssao calculations, and draw it into pong
         self.draw_fsquad_to_fbo(self.pong, "ssao_pass2", rnm=self.rnm,
             normalMap=self.normdepth['color0'], depthMap=self.normdepth['depth'],
             nearclip=self.clips[0], farclip=self.clips[1] )
         
-        #Blur the textures
+        # Blur the textures
         self.draw_fsquad_to_fbo(self.ping, "hblur", tex=self.pong['color0'], blur=1./(self.size[0]/self.sf))
         self.draw_fsquad_to_fbo(self.pong, "vblur", tex=self.ping['color0'], blur=1./(self.size[0]/self.sf))
-        
-        glPopAttrib()
-        #Actually draw the final image to the screen
-        win = glGetIntegerv(GL_VIEWPORT)
-        #Why is this call necessary at all?!
-        glViewport(*win)
-        
+ 
+        # Restore the original viewport
+        glViewport(*original_viewport)
         super(SSAO, self).draw(root, shader="ssao_pass3", shadow=self.pong['color0'], 
-            window=[float(i) for i in win], **kwargs)
-        
-        #self.draw_done()
-    
+            window=[float(i) for i in original_viewport], **kwargs)
+            
     def clear(self):
         self.normdepth.clear()
         self.ping.clear()

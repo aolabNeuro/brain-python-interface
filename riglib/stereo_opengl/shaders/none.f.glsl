@@ -1,15 +1,17 @@
-#version 110
+#version 330 core
 
 uniform vec4 basecolor;
-uniform sampler2D texture;
+uniform sampler2D textureSampler;
 
-varying vec2 vtexcoord;
+in vec2 vtexcoord;
+
+out vec4 FragColor;
 
 void main() {
-    vec4 texcolor = texture2D(texture, vtexcoord);
+    vec4 texcolor = texture(textureSampler, vtexcoord);
     vec4 frag_diffuse = vec4(
         texcolor.rgb + basecolor.rgb,
         texcolor.a * basecolor.a
     );
-    gl_FragColor = frag_diffuse;
+    FragColor = frag_diffuse;
 }

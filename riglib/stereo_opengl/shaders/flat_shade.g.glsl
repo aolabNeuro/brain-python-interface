@@ -1,28 +1,26 @@
-#version 120
-#extension GL_ARB_geometry_shader4 : enable
+#version 330 core
+layout(triangles) in;
+layout(triangle_strip, max_vertices = 3) out;
 
-varying in vec4 position[3];
-varying in vec3 normal[3];
-varying in vec2 texcoord[3];
+in vec4 position[];
+in vec3 normal[];
+in vec2 texcoord[];
 
-varying out vec4 vposition;
-varying out vec3 vnormal;
-varying out vec2 vtexcoord;
+out vec4 vposition;
+out vec3 vnormal;
+out vec2 vtexcoord;
 
 void main() {
-    int i;
-    vec4 vec1 = gl_PositionIn[1] - gl_PositionIn[0];
-    vec4 vec2 = gl_PositionIn[2] - gl_PositionIn[0];
-    vec3 normal = cross(vec1.xyz, vec2.xyz);
+    vec4 vec1 = gl_in[1].gl_Position - gl_in[0].gl_Position;
+    vec4 vec2 = gl_in[2].gl_Position - gl_in[0].gl_Position;
+    vec3 face_normal = normalize(cross(vec3(vec1), vec3(vec2)));
 
-    for(i = 0; i < gl_VerticesIn; i++) {
-        // copy attributes
-        gl_Position = gl_PositionIn[i];
+    for(int i = 0; i < 3; i++) {
+        gl_Position = gl_in[i].gl_Position;
         vposition = position[i];
-        vnormal = normal[i];
+        vnormal = face_normal;
         vtexcoord = texcoord[i];
-
-        // done with the vertex
         EmitVertex();
     }
+    EndPrimitive();
 }
