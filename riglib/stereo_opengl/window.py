@@ -103,10 +103,10 @@ class Window(LogExperiment):
         glEnable(GL_BLEND)
         glDepthFunc(GL_LESS)
         glEnable(GL_DEPTH_TEST)
-        glBlendFunc(GL_DST_COLOR, GL_ZERO);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glClearColor(*self.background)
         glClearDepth(1.0)
-        glDepthMask(GL_FALSE)
+        glDepthMask(GL_TRUE)
         glEnable(GL_CULL_FACE) # temporary solution to alpha blending issue with spheres. just draw the front half of the sphere
         glCullFace(GL_BACK)
 
