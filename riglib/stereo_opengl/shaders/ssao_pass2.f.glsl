@@ -8,11 +8,11 @@ uniform float nearclip;
 uniform float farclip;
 
 in vec2 uv;
-const float totStrength = 1.5;
-const float strength = 0.1;
+const float totStrength = 1.0;
+const float strength = 1.5;
 const float falloff = 0.001;
-const float rad = .01;
-#define SAMPLES 32
+const float rad = .005;
+#define SAMPLES 64
 const float invSamples = -totStrength/float(SAMPLES);
 
 out vec4 FragColor;
