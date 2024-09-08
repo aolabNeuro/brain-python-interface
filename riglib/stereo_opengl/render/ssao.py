@@ -75,7 +75,10 @@ class SSAO(FBOrender):
         # Blur the textures
         self.draw_fsquad_to_fbo(self.ping, "hblur", tex=self.pong['color0'], blur=1./(self.size[0]/self.sf))
         self.draw_fsquad_to_fbo(self.pong, "vblur", tex=self.ping['color0'], blur=1./(self.size[0]/self.sf))
- 
+        # glViewport(*original_viewport)
+        # self.draw_fsquad("none", tex=self.normdepth['color0'])
+        # return
+
         # Restore the original viewport
         glViewport(*original_viewport)
         super(SSAO, self).draw(root, shader="ssao_pass3", shadow=self.pong['color0'], 

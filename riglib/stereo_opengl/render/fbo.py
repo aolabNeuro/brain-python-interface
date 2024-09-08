@@ -88,6 +88,11 @@ class FBO(object):
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
 class FBOrender(Renderer):
+
+    def __init__(self, *args, **kwargs):
+        super(FBOrender, self).__init__(*args, **kwargs)
+        self.vao = glGenVertexArrays(1)
+
     def draw_fsquad(self, shader, **kwargs):
         ctx = self.programs[shader]
         glUseProgram(ctx.program)
@@ -97,6 +102,7 @@ class FBOrender(Renderer):
             else:
                 ctx.uniforms[name] = v
         
+        glBindVertexArray(self.vao)
         glEnableVertexAttribArray(ctx.attributes['position'])
         glBindBuffer(GL_ARRAY_BUFFER, self.fsquad_buf[0])
         glVertexAttribPointer(ctx.attributes['position'],
@@ -105,7 +111,8 @@ class FBOrender(Renderer):
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.fsquad_buf[1]);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, GLvoidp(0))
         glDisableVertexAttribArray(ctx.attributes['position'])
-    
+        glBindVertexArray(0)
+
     def draw_fsquad_to_fbo(self, fbo, shader, **kwargs):
         glBindFramebuffer(GL_FRAMEBUFFER, fbo.fbo)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT)
