@@ -80,7 +80,7 @@ def offaxis_frusta(winsize, fov, near, far, focal_dist, iod, flip=False, flip_z=
 
     #return np.dot(left, lxfm), np.dot(right, rxfm)
 
-def cloudy_tex(size=(512,512)):
+def cloudy_tex(size=(512,512), alpha=0.5):
     '''Generates 1/f distributed noise and puts it into a texture. Looks like clouds'''
     im = np.random.randn(*size)
     grid = np.mgrid[-1:1:size[0]*1j, -1:1:size[1]*1j]
@@ -88,7 +88,10 @@ def cloudy_tex(size=(512,512)):
     fim = np.fft.fftshift(np.fft.fft2(im))
     im = np.abs(np.fft.ifft2(np.fft.fftshift(mask * fim)))
     im -= im.min()
-    return Texture(im / im.max())
+    im /= im.max()
+    im = np.tile(im, (4,1,1)).T
+    im[:,:,3] = alpha
+    return Texture(im)
 
 def create_grid_texture(size=800, density=50, thickness=3, line_color=[0.5, 0.5, 0.5, 1], 
                         background_color=[0.1, 0.1, 0.1, 1]):
@@ -101,7 +104,7 @@ def create_grid_texture(size=800, density=50, thickness=3, line_color=[0.5, 0.5,
 
     # Draw horizontal grid lines
     for r in range((size + 1)//density):
-        start = int(r * density)
+        start = int(r * density - thickness//2)
         grid_texture[start:start+thickness, :, :] = line_color
         grid_texture[:, start:start+thickness, :] = line_color
 

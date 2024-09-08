@@ -14,6 +14,7 @@ out vec3 vposition;
 out vec3 vnormal;
 out vec2 vtexcoord;
 out float vshininess;
+out mat4 transform;
 
 void main(void) {
     vec4 eye_position = xfm * position;
@@ -23,4 +24,5 @@ void main(void) {
     vnormal   = (xfm * vec4(normal.xyz, 0.0)).xyz;
     vtexcoord = texcoord;
     vshininess = shininess;
+    transform = xfm;
 }

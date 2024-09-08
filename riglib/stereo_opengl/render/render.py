@@ -27,9 +27,12 @@ class Renderer(object):
             shaders = dict()
             shaders['passthru'] = GL_VERTEX_SHADER, "passthrough.v.glsl"
             shaders['default'] = GL_FRAGMENT_SHADER, "default.f.glsl", "phong.f.glsl"
+            shaders['ui_passthru'] = GL_VERTEX_SHADER, "passthrough2d.v.glsl"
+            shaders['ui_default'] = GL_FRAGMENT_SHADER, "none.f.glsl"
         if programs is None:
             programs = dict()
             programs['default'] = "passthru", "default"
+            programs['ui'] = "ui_passthru", "ui_default"
 
         #compile the given shaders and the programs
         self.shaders = dict()
@@ -136,7 +139,7 @@ class Renderer(object):
         sp = ShaderProgram(shaders)
         self.programs[name] = sp
     
-    def draw(self, root, shader=None, requeue=False, **kwargs):
+    def draw(self, root, shader=None, apply_default=False, requeue=False, **kwargs):
         if self.render_queue is None or requeue:
             self._queue_render(root)
         
@@ -146,8 +149,10 @@ class Renderer(object):
             kwargs['modelview'] = root._xfm.to_mat()
         
         if shader is not None:
-            for items in list(self.render_queue.values()):
-                self.programs[shader].draw(self, items, **kwargs)
+            if apply_default: # apply this shader to all models that don't have a program specified
+                self.programs[shader].draw(self, self.render_queue['default'], **kwargs)
+            else: # apply this shader to only the models that have this shader specified
+                self.programs[shader].draw(self, self.render_queue[shader], **kwargs)
         else:
             for name, program in list(self.programs.items()):
                 program.draw(self, self.render_queue[name], **kwargs)
@@ -167,6 +172,7 @@ class Renderer2D(Renderer):
         shaders['default'] = GL_FRAGMENT_SHADER, "none.f.glsl"
         programs = dict()
         programs['default'] = "passthru", "default"
+        programs['ui'] = "passthru", "default"
         super().__init__(screen_cm, np.nan, 1, 1024, shaders=shaders, programs=programs)
         w, h = screen_cm
         self.projection = orthographic(w, h, 1, 1024)

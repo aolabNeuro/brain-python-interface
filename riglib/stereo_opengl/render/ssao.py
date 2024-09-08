@@ -64,7 +64,7 @@ class SSAO(FBOrender):
         glViewport(*new_viewport)
 
         # First, draw the whole scene, but only read the normals and depth into ssao
-        self.draw_to_fbo(self.normdepth, root, shader="ssao_pass1",
+        self.draw_to_fbo(self.normdepth, root, shader="ssao_pass1", apply_default=True,
                          nearclip=self.clips[0], farclip=self.clips[1], **kwargs)
         
         # Now, do the actual ssao calculations, and draw it into pong
@@ -81,8 +81,9 @@ class SSAO(FBOrender):
 
         # Restore the original viewport
         glViewport(*original_viewport)
-        super(SSAO, self).draw(root, shader="ssao_pass3", shadow=self.pong['color0'], 
+        super(SSAO, self).draw(root, shader="ssao_pass3", apply_default=True, shadow=self.pong['color0'], 
             window=[float(i) for i in original_viewport], **kwargs)
+        super(SSAO, self).draw(root, shader="ui", **kwargs)
             
     def clear(self):
         self.normdepth.clear()

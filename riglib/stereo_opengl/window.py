@@ -65,6 +65,8 @@ class Window(LogExperiment):
 
         self.models = []
         self.world = None
+        self.ui_models = []
+        self.ui = None
         self.event = None
 
         # os.popen('sudo vbetool dpms on')
@@ -223,6 +225,8 @@ class WindowVR(Window):
     '''
     An OpenXR window for rendering in VR to an HMD
     '''
+
+    hidden_traits = ['fps', 'window_size', 'screen_dist']
 
     def screen_init(self):
         from ctypes import byref, c_int32, c_void_p, cast, POINTER, pointer, Structure

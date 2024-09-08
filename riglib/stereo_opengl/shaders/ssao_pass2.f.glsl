@@ -8,7 +8,7 @@ uniform float nearclip;
 uniform float farclip;
 
 in vec2 uv;
-const float totStrength = 1.0;
+const float totStrength = 0.5;
 const float strength = 1.5;
 const float falloff = 0.001;
 const float rad = .005;
