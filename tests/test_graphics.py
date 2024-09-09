@@ -5,7 +5,6 @@ import numpy as np
 
 import os
 os.environ['DISPLAY'] = ':0'
-# os.environ['XR_RUNTIME_JSON'] = '/usr/share/openxr/1/openxr_monado.json'
 
 from riglib.stereo_opengl.window import Window, Window2D, FPScontrol, WindowVR, WindowSSAO
 from riglib.stereo_opengl.environment import Box, Grid
@@ -35,7 +34,7 @@ orbit_speed = 1
 
 pos_list = np.array([[0,0,0],[0,0,5]])
 
-class Test2(Window2D, Window):
+class Test2(WindowSSAO, Window):
 
     def __init__(self, *args, **kwargs):
         self.count=0
@@ -72,16 +71,16 @@ class Test2(Window2D, Window):
 
 if __name__ == "__main__":
     win = Test2(window_size=(1000, 800), fullscreen=False, stereo_mode='projection')
-    win.add_model(Grid(25))
+    # win.add_model(Grid(1000))
     win.add_model(moon)
     win.add_model(Sphere(3, color=[0.75,0.25,0.25,0.75]).translate(-5,5,0))
     # win.add_model(arm4j)
     #win.add_model(reward_text.translate(5,0,-5))
-    win.add_model(TexSphere(radius=3, specular_color=[1,1,1,1], tex=cloudy_tex()).translate(5,0,0))
+    # win.add_model(TexSphere(radius=3, specular_color=[1,1,1,1], tex=cloudy_tex()).translate(5,0,0))
     # win.add_model(TexPlane(5,5, tex=cloudy_tex(), specular_color=(0.,0,0,1)).rotate_x(90))
     # win.add_model(TexPlane(5,5, specular_color=(0.,0,0,1), tex=cloudy_tex()).rotate_x(90))
-    reward_text = Text(7.5, "123", justify='right', color=[1,0,1,0.25]).translate(0,0,5)
-    win.add_model(reward_text)
+    # reward_text = Text(7.5, "123", justify='right', color=[1,0,1,0.25]).translate(0,0,5)
+    # win.add_model(reward_text)
     # win.add_model(TexPlane(4,4,color=[0,0,0,0.9], tex=cloudy_tex()).rotate_x(90).translate(0,0,-5))
     #win.screen_init()
     #win.draw_world()

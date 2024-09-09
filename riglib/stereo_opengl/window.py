@@ -250,15 +250,6 @@ class WindowVR(Window):
             ),
             
         )
-        context.instance = xr.create_instance(
-            create_info=context._instance_create_info,
-        )
-        context.system_id = xr.get_system(
-            instance=context.instance,
-            get_info=xr.SystemGetInfo(
-                form_factor=context.form_factor,
-            ),
-        )
         context.__enter__()
 
         # Query the swapchain size
@@ -271,16 +262,17 @@ class WindowVR(Window):
             config_views[0].recommended_image_rect_width * 2,
             config_views[0].recommended_image_rect_height)
 
-        glDisable(GL_FRAMEBUFFER_SRGB)
+        glEnable(GL_FRAMEBUFFER_SRGB)
         glEnable(GL_BLEND)
         glDepthFunc(GL_LESS)
-        glDisable(GL_DEPTH_TEST)
+        glEnable(GL_DEPTH_TEST)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glClearColor(*self.background)
         glClearDepth(1.0)
         glDepthMask(GL_TRUE)
         glEnable(GL_CULL_FACE) # temporary solution to alpha blending issue with spheres. just draw the front half of the sphere
         glCullFace(GL_BACK)
+
         self.renderer = self._get_renderer()
 
         #this effectively determines the modelview matrix
