@@ -121,9 +121,9 @@ elif hostname == 'human-bmi':
     optitrack_address = '128.95.215.191'
     optitrack_save_path = "D:\optitrack_data"
     optitrack_sync_dch = 53 # 0-index
-    window_size = (1920, 1200)
+    window_size = (1920, 1080)
     screen_dist = 80
-    screen_half_height = 16
+    screen_half_height = 16.5
     default_db = 'human'
     secret_dbnames = ['human']
     # arduino_sync_params = human_sync_params_arduino
