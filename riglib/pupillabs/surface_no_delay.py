@@ -74,7 +74,30 @@ class RadialDistortionCamera:
         :return: Projected 2D points
         """
         input_dim = object_points.ndim
+ # # matrix for camera distortion
+        # camera = RadialDistortionCamera(
+        #     resolution=(1280, 720),
+        #     cam_matrix=[
+        #         [794.3311439869655, 0.0, 633.0104437728625],
+        #         [0.0, 793.5290139393004, 397.36927353414865],
+        #         [0.0, 0.0, 1.0],
+        #     ],
+        #     dist_coefs=[
+        #         [
+        #             -0.3758628065070806,
+        #             0.1643326166951343,
+        #             0.00012182540692089567,
+        #             0.00013422608638039466,
+        #             0.03343691733865076,
+        #             0.08235235770849726,
+        #             -0.08225804883227375,
+        #             0.14463365333602152,
+        #         ]
+        #     ],
+        # )
 
+        # self.mapper = NoDelaySurfaceGazeMapper(camera)
+        # self.mapped_points = []
         object_points = object_points.reshape((1, -1, 3))
 
         if rvec is None:
