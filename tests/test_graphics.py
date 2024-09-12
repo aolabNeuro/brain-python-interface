@@ -34,7 +34,7 @@ orbit_speed = 1
 
 pos_list = np.array([[0,0,0],[0,0,5]])
 
-class Test2( WindowVR, Window):
+class Test2( WindowSSAO, WindowVR, Window):
 
     def __init__(self, *args, **kwargs):
         self.count=0
@@ -50,7 +50,7 @@ class Test2( WindowVR, Window):
         # self.add_model(TexSphere(radius=3, specular_color=[1,1,1,1], tex=cloudy_tex()).translate(5,0,0))
         # self.add_model(TexPlane(5,5, tex=cloudy_tex(), specular_color=(0.,0,0,1)).rotate_x(90))
         # self.add_model(TexPlane(5,5, specular_color=(0.,0,0,1), tex=cloudy_tex()).rotate_x(90))
-        reward_text = Text(7.5, "123", justify='right', color=[1,0,1,0.25])
+        reward_text = Text(7.5, "123", justify='right', color=[1,0,1,0.75])
         self.add_model(reward_text)
         # self.add_model(TexPlane(4,4,color=[0,0,0,0.9], tex=cloudy_tex()).rotate_x(90).translate(0,0,-5))
         #self.screen_init()

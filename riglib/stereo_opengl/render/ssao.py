@@ -58,6 +58,7 @@ class SSAO(FBOrender):
     def draw(self, root, **kwargs):
         # Save the current viewport
         original_viewport = glGetIntegerv(GL_VIEWPORT)
+        original_framebuffer = glGetIntegerv(GL_FRAMEBUFFER_BINDING)
 
         # Set the new viewport for SSAO calculations
         new_viewport = (0, 0, self.size[0]//self.sf, self.size[1]//self.sf)
@@ -74,12 +75,15 @@ class SSAO(FBOrender):
         # Blur the textures
         self.draw_fsquad_to_fbo(self.ping, "hblur", tex=self.pong['color0'], blur=1./(self.size[0]/self.sf))
         self.draw_fsquad_to_fbo(self.pong, "vblur", tex=self.ping['color0'], blur=1./(self.size[0]/self.sf))
+        
         # glViewport(*original_viewport)
-        # self.draw_fsquad("none", tex=self.normdepth['color0'])
+        # glBindFramebuffer(GL_FRAMEBUFFER, original_framebuffer)
+        # self.draw_fsquad("none", tex=self.pong['color0'])
         # return
 
         # Restore the original viewport
         glViewport(*original_viewport)
+        glBindFramebuffer(GL_FRAMEBUFFER, original_framebuffer)
         super(SSAO, self).draw(root, shader="ssao_pass3", apply_default=True, shadow=self.pong['color0'], 
             window=[float(i) for i in original_viewport], **kwargs)
         super(SSAO, self).draw(root, shader="ui", **kwargs)
