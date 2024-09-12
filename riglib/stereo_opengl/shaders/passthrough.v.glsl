@@ -17,12 +17,12 @@ out float vshininess;
 out mat4 transform;
 
 void main(void) {
-    vec4 eye_position = xfm * position;
+    vec4 eye_position = modelview * xfm * position;
     gl_Position = p_matrix * eye_position;
     
     vposition = eye_position.xyz;
     vnormal   = (xfm * vec4(normal.xyz, 0.0)).xyz;
     vtexcoord = texcoord;
     vshininess = shininess;
-    transform = xfm;
+    transform = inverse(modelview);
 }

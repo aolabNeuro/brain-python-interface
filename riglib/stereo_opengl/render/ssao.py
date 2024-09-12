@@ -19,7 +19,7 @@ from .fbo import FBOrender, FBO
 from ..textures import Texture
 
 class SSAO(FBOrender):
-    def __init__(self, *args, sf=2, **kwargs):
+    def __init__(self, *args, sf=1, **kwargs):
         super(SSAO, self).__init__(*args, **kwargs)
         self.sf = sf
         w, h = self.size[0] / self.sf, self.size[1] / self.sf
@@ -64,8 +64,7 @@ class SSAO(FBOrender):
         glViewport(*new_viewport)
 
         # First, draw the whole scene, but only read the normals and depth into ssao
-        self.draw_to_fbo(self.normdepth, root, shader="ssao_pass1", apply_default=True,
-                         nearclip=self.clips[0], farclip=self.clips[1], **kwargs)
+        self.draw_to_fbo(self.normdepth, root, shader="ssao_pass1", apply_default=True, **kwargs)
         
         # Now, do the actual ssao calculations, and draw it into pong
         self.draw_fsquad_to_fbo(self.pong, "ssao_pass2", rnm=self.rnm,
@@ -84,7 +83,7 @@ class SSAO(FBOrender):
         super(SSAO, self).draw(root, shader="ssao_pass3", apply_default=True, shadow=self.pong['color0'], 
             window=[float(i) for i in original_viewport], **kwargs)
         super(SSAO, self).draw(root, shader="ui", **kwargs)
-            
+        
     def clear(self):
         self.normdepth.clear()
         self.ping.clear()

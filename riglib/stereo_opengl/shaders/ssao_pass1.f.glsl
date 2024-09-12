@@ -2,9 +2,6 @@
 
 in vec3 vnormal;
 
-uniform float near_clip;
-uniform float far_clip;
-
 out vec4 normal_out;
 
 void main() {

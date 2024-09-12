@@ -12,7 +12,7 @@ in mat4 transform;
 
 out vec4 FragColor;
 
-const vec4 light_direction = vec4(-1, 2, -2, 0.0);
+const vec4 light_direction = vec4(-1, -2, -2, 0.0);
 const vec4 light_diffuse = vec4(0.6, 0.6, 0.6, 0.0);
 const vec4 light_ambient = vec4(0.2, 0.2, 0.2, 1.);
 const vec4 light_specular = vec4(1.0, 1.0, 1.0, 1.0);
@@ -22,7 +22,8 @@ vec4 phong() {
          normal = normalize(vnormal),
          eye = normalize(-vposition),
          reflection = normalize(-reflect(mv_light_direction, normal));
-    
+    normal = normalize((transform * vec4(vnormal, 0)).xyz);
+
     vec4 texcolor = texture(textureSampler, vtexcoord);
     vec4 frag_diffuse = vec4(
         texcolor.rgb + basecolor.rgb,

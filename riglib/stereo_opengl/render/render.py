@@ -146,7 +146,7 @@ class Renderer(object):
         if "p_matrix" not in kwargs:
             kwargs['p_matrix'] = self.projection
         if "modelview" not in kwargs:
-            kwargs['modelview'] = root._xfm.to_mat()
+            kwargs['modelview'] = np.eye(4)
         
         if shader is not None:
             if apply_default: # apply this shader to all models that don't have a program specified

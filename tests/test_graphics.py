@@ -34,7 +34,7 @@ orbit_speed = 1
 
 pos_list = np.array([[0,0,0],[0,0,5]])
 
-class Test2(WindowSSAO, Window):
+class Test2( WindowVR, Window):
 
     def __init__(self, *args, **kwargs):
         self.count=0
@@ -43,8 +43,18 @@ class Test2(WindowSSAO, Window):
     def _start_draw(self):
         #arm4j.set_joint_pos([0,0,np.pi/2,np.pi/2])
         #arm4j.get_endpoint_pos()
-        # reward_text.attach()
-        pass
+        self.add_model(moon)
+        self.add_model(Sphere(3, color=[0.75,0.25,0.25,0.75]).translate(-5,5,0))
+        # self.add_model(arm4j)
+        #self.add_model(reward_text.translate(5,0,-5))
+        # self.add_model(TexSphere(radius=3, specular_color=[1,1,1,1], tex=cloudy_tex()).translate(5,0,0))
+        # self.add_model(TexPlane(5,5, tex=cloudy_tex(), specular_color=(0.,0,0,1)).rotate_x(90))
+        # self.add_model(TexPlane(5,5, specular_color=(0.,0,0,1), tex=cloudy_tex()).rotate_x(90))
+        reward_text = Text(7.5, "123", justify='right', color=[1,0,1,0.25])
+        self.add_model(reward_text)
+        # self.add_model(TexPlane(4,4,color=[0,0,0,0.9], tex=cloudy_tex()).rotate_x(90).translate(0,0,-5))
+        #self.screen_init()
+        #self.draw_world()
 
     def _while_draw(self):
         ts = time.time() - self.start_time
@@ -71,17 +81,4 @@ class Test2(WindowSSAO, Window):
 
 if __name__ == "__main__":
     win = Test2(window_size=(1000, 800), fullscreen=False, stereo_mode='projection')
-    # win.add_model(Grid(1000))
-    win.add_model(moon)
-    win.add_model(Sphere(3, color=[0.75,0.25,0.25,0.75]).translate(-5,5,0))
-    # win.add_model(arm4j)
-    #win.add_model(reward_text.translate(5,0,-5))
-    # win.add_model(TexSphere(radius=3, specular_color=[1,1,1,1], tex=cloudy_tex()).translate(5,0,0))
-    # win.add_model(TexPlane(5,5, tex=cloudy_tex(), specular_color=(0.,0,0,1)).rotate_x(90))
-    # win.add_model(TexPlane(5,5, specular_color=(0.,0,0,1), tex=cloudy_tex()).rotate_x(90))
-    # reward_text = Text(7.5, "123", justify='right', color=[1,0,1,0.25]).translate(0,0,5)
-    # win.add_model(reward_text)
-    # win.add_model(TexPlane(4,4,color=[0,0,0,0.9], tex=cloudy_tex()).rotate_x(90).translate(0,0,-5))
-    #win.screen_init()
-    #win.draw_world()
     win.run()
