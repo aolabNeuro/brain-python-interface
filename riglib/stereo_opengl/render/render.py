@@ -15,12 +15,14 @@ class _textrack(object):
     pass
 
 class Renderer(object):
-    def __init__(self, window_size, fov, near, far, shaders=None, programs=None):
+    def __init__(self, window_size, fov, near, far, modelview=None, shaders=None, programs=None, light_direction=None):
         self.render_queue = None
         self.size = window_size
         self.drawpos = 0,0
         w, h = window_size
         self.projection = perspective(fov, w / h, near, far)
+        self.light_direction = light_direction or (-1., -2., -2., 0.)
+        self.modelview = np.eye(4) if modelview is None else modelview
 
         #Add the default shaders
         if shaders is None:
@@ -146,7 +148,9 @@ class Renderer(object):
         if "p_matrix" not in kwargs:
             kwargs['p_matrix'] = self.projection
         if "modelview" not in kwargs:
-            kwargs['modelview'] = np.eye(4)
+            kwargs['modelview'] = self.modelview
+        if "light_direction" not in kwargs:
+            kwargs['light_direction'] = self.light_direction
         
         if shader is not None:
             if apply_default: # apply this shader to all models that don't have a program specified

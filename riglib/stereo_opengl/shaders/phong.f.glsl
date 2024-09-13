@@ -3,6 +3,7 @@
 uniform sampler2D textureSampler;
 uniform vec4 basecolor;
 uniform vec4 spec_color;
+uniform vec4 light_direction;
 
 in vec3 vposition;
 in vec3 vnormal;
@@ -12,7 +13,6 @@ in mat4 transform;
 
 out vec4 FragColor;
 
-const vec4 light_direction = vec4(-1, -2, -2, 0.0);
 const vec4 light_diffuse = vec4(0.6, 0.6, 0.6, 0.0);
 const vec4 light_ambient = vec4(0.2, 0.2, 0.2, 1.);
 const vec4 light_specular = vec4(1.0, 1.0, 1.0, 1.0);

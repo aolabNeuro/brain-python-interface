@@ -109,3 +109,39 @@ def create_grid_texture(size=800, density=50, thickness=3, line_color=[0.5, 0.5,
         grid_texture[:, start:start+thickness, :] = line_color
 
     return Texture(grid_texture/np.max(grid_texture))
+
+def look_at(eye, target, up):
+    # Convert inputs to numpy arrays
+    eye = np.array(eye)
+    target = np.array(target)
+    up = np.array(up)
+
+    # Calculate forward direction
+    forward = target - eye
+    forward = forward / np.linalg.norm(forward)
+
+    # Calculate right direction
+    right = np.cross(forward, up)
+    right = right / np.linalg.norm(right)
+
+    # Recalculate up direction
+    up = np.cross(right, forward)
+
+    # Create rotation matrix
+    rotation = np.array([
+        [right[0], right[1], right[2], 0],
+        [up[0], up[1], up[2], 0],
+        [-forward[0], -forward[1], -forward[2], 0],
+        [0, 0, 0, 1]
+    ])
+
+    # Create translation matrix
+    translation = np.array([
+        [1, 0, 0, -eye[0]],
+        [0, 1, 0, -eye[1]],
+        [0, 0, 1, -eye[2]],
+        [0, 0, 0, 1]
+    ])
+
+    # Combine rotation and translation
+    return np.dot(rotation, translation)
