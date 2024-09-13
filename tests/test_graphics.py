@@ -26,7 +26,7 @@ from OpenGL.GL import *
 
 # arm4j = RobotArmGen2D(link_radii=.2, joint_radii=.2, link_lengths=[4,4,2,2])
 moon = Sphere(radius=1, color=[0.25,0.25,0.75,0.5])
-orbit_radius = 5
+orbit_radius = 4
 orbit_speed = 1
 #TexSphere = type("TexSphere", (Sphere, TexModel), {})
 #TexPlane = type("TexPlane", (Plane, TexModel), {})
@@ -34,7 +34,7 @@ orbit_speed = 1
 
 pos_list = np.array([[0,0,0],[0,0,5]])
 
-class Test2( WindowSSAO, WindowVR, Window):
+class Test2( Window):
 
     def __init__(self, *args, **kwargs):
         self.count=0

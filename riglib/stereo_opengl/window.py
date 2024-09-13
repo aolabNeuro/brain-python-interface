@@ -6,6 +6,7 @@ import os
 
 import numpy as np
 from OpenGL.GL import *
+
 try:
     import xr
 except:
@@ -14,7 +15,7 @@ except:
 from ..experiment import LogExperiment
 from ..experiment import traits
 
-from .render import stereo, render, ssao
+from .render import stereo, render, ssao, shadow_map
 from .models import Group
 from .xfm import Quaternion
 from .primitives import Sphere, Cube, Chain
@@ -88,8 +89,8 @@ class Window(LogExperiment):
 
         # pygame.display.gl_set_attribute(pygame.GL_DEPTH_SIZE, 24)
         # pygame.display.gl_set_attribute(pygame.GL_FRAMEBUFFER_SRGB_CAPABLE, True)
-        pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MAJOR_VERSION, 4)
-        pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MINOR_VERSION, 5)
+        pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MAJOR_VERSION, 3)
+        pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MINOR_VERSION, 2)
         pygame.display.gl_set_attribute(pygame.GL_CONTEXT_PROFILE_MASK, pygame.GL_CONTEXT_PROFILE_CORE)
         flags = pygame.DOUBLEBUF | pygame.HWSURFACE | pygame.OPENGL | pygame.NOFRAME
         if self.fullscreen:
@@ -112,14 +113,16 @@ class Window(LogExperiment):
         glEnable(GL_CULL_FACE) # temporary solution to alpha blending issue with spheres. just draw the front half of the sphere
         glCullFace(GL_BACK)
 
-        self.renderer = self._get_renderer()
 
         #this effectively determines the modelview matrix
         self.world = Group(self.models)
         self.world.init()
 
         #up vector is always (0,0,1), why would I ever need to roll the camera?!
-        self.set_eye((0, -self.screen_dist, 0), (0,0))
+        self.set_eye((0, 0, 0), (0,0))
+        self.modelview = np.eye(4)
+        self.modelview[:3,-1] = [0,0,-self.screen_dist]
+        self.renderer = self._get_renderer()
 
         pygame.mouse.set_visible(False)
     
@@ -132,7 +135,7 @@ class Window(LogExperiment):
         if self.stereo_mode == 'hmd':
             return stereo.MirrorDisplay(self.window_size, self.fov, near, far, self.screen_dist, self.iod, flip=False)
         elif self.stereo_mode == 'projection':
-            return render.Renderer(self.window_size, self.fov, near, far)
+            return shadow_map.ShadowMapper(self.window_size, self.fov, near, far, modelview=self.modelview)
         elif self.stereo_mode == 'anaglyph':
             return stereo.Anaglyph(self.window_size, self.fov, near, far, self.screen_dist, self.iod)
         else:

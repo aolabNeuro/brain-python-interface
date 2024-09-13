@@ -3,6 +3,7 @@
 uniform mat4 p_matrix;
 uniform mat4 xfm;
 uniform mat4 modelview;
+uniform mat4 light_space_matrix;
 uniform vec4 basecolor;
 uniform float shininess;
 
@@ -15,6 +16,7 @@ out vec3 vnormal;
 out vec2 vtexcoord;
 out float vshininess;
 out mat4 transform;
+out vec4 frag_pos_light_space;
 
 void main(void) {
     vec4 eye_position = modelview * xfm * position;
@@ -25,4 +27,5 @@ void main(void) {
     vtexcoord = texcoord;
     vshininess = shininess;
     transform = inverse(modelview);
+    frag_pos_light_space = light_space_matrix * xfm * position;
 }
