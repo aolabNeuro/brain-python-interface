@@ -101,14 +101,16 @@ def create_grid_texture(size=800, density=50, thickness=3, line_color=[0.5, 0.5,
     size = int(size)
     thickness = int(thickness)
     grid_texture = np.ones((size, size, 4)) * background_color  # RGB image
+    num_lines = (size + 1)//density
+    line_spacing = size//num_lines
 
     # Draw horizontal grid lines
-    for r in range((size + 1)//density):
-        start = int(r * density - thickness//2)
+    for r in range(num_lines):
+        start = int(r * line_spacing - thickness//2)
         grid_texture[start:start+thickness, :, :] = line_color
         grid_texture[:, start:start+thickness, :] = line_color
 
-    return Texture(grid_texture/np.max(grid_texture))
+    return Texture(grid_texture/np.max(grid_texture), mipmap=True, anisotropic_filtering=2)
 
 def look_at(eye, target, up):
     # Convert inputs to numpy arrays
