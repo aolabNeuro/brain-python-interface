@@ -14,7 +14,7 @@ from riglib.stereo_opengl.render import ssao, stereo, Renderer
 from riglib.stereo_opengl.utils import cloudy_tex
 
 from riglib.stereo_opengl.ik import RobotArmGen2D
-from riglib.stereo_opengl.xfm import Quaternion
+from riglib.stereo_opengl.xfm import Quaternion, Transform
 import time
 
 from riglib.stereo_opengl.ik import RobotArm
@@ -28,6 +28,8 @@ from OpenGL.GL import *
 moon = Sphere(radius=1, color=[0.25,0.25,0.75,0.5])
 orbit_radius = 4
 orbit_speed = 1
+wobble_radius = 5
+wobble_speed = 0.5
 #TexSphere = type("TexSphere", (Sphere, TexModel), {})
 #TexPlane = type("TexPlane", (Plane, TexModel), {})
 #reward_text = Text(7.5, "123", justify='right', color=[1,0,1,1])
@@ -43,6 +45,7 @@ class Test2( Window):
     def _start_draw(self):
         #arm4j.set_joint_pos([0,0,np.pi/2,np.pi/2])
         #arm4j.get_endpoint_pos()
+        self.add_model(Grid(30))
         self.add_model(moon)
         self.add_model(Sphere(3, color=[0.75,0.25,0.25,0.75]).translate(-5,5,0))
         # self.add_model(arm4j)
@@ -64,6 +67,13 @@ class Test2( Window):
 
         moon.translate(x-5,z+5,0,reset=True)
 
+        x = wobble_radius * np.cos(ts * wobble_speed)
+        y = wobble_radius * np.sin(ts * wobble_speed)
+
+        xfm = Transform(move=[x,0,-self.screen_dist])
+        xfm.rotate_x(np.radians(y))
+        xfm.rotate_y(np.radians(x))
+        self.modelview = xfm.to_mat()
 
         if ts > 2 and self.count<len(pos_list):
             # reward_text.translate(*pos_list[self.count])

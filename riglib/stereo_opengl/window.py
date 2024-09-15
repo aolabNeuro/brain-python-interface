@@ -170,7 +170,7 @@ class Window(LogExperiment):
 
     def draw_world(self):
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-        self.renderer.draw(self.world)
+        self.renderer.draw(self.world, modelview=self.modelview)
         pygame.display.flip()
         self.renderer.draw_done()
 
