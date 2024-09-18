@@ -135,7 +135,7 @@ class Window(LogExperiment):
         if self.stereo_mode == 'hmd':
             return stereo.MirrorDisplay(self.window_size, self.fov, near, far, self.screen_dist, self.iod, flip=False)
         elif self.stereo_mode == 'projection':
-            return shadow_map.ShadowMapper(self.window_size, self.fov, near, far, modelview=self.modelview)
+            return render.Renderer(self.window_size, self.fov, near, far, modelview=self.modelview)
         elif self.stereo_mode == 'anaglyph':
             return stereo.Anaglyph(self.window_size, self.fov, near, far, self.screen_dist, self.iod)
         else:
@@ -380,7 +380,7 @@ class WindowVR(Window):
         self.xr_view_init = [None, None]
 
     def _get_renderer(self):
-        return render.Renderer(self.window_size, self.fov, 1, 1024)
+        return shadow_map.ShadowMapper(self.window_size, self.fov, 1, 1024)
     
     def draw_world(self):
         # Get the OpenXR views
