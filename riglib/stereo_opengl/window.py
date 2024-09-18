@@ -372,7 +372,7 @@ class WindowVR(Window):
         self.world.init()
 
         #up vector is always (0,0,1), why would I ever need to roll the camera?!
-        self.set_eye((0,-self.screen_dist,0), (0,0))
+        self.set_eye((0,0,0), (0,0))
 
         self.xr_frame_generator = context.frame_loop()
         self.xr_context = context
@@ -397,9 +397,9 @@ class WindowVR(Window):
                 far_z=1024,
             ).as_numpy().reshape(4,4).T
             position = -np.array([
-                view.pose.position[0]*100,
+                view.pose.position[0]*100 - self.offset[0],
                 view.pose.position[1]*100 - self.floor_dist,
-                view.pose.position[2]*100 - self.screen_dist,
+                view.pose.position[2]*100 + self.screen_dist,
             ])
             rotation = np.array([
                 -view.pose.orientation.w,
