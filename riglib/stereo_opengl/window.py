@@ -17,7 +17,7 @@ from ..experiment import traits
 
 from .render import stereo, render, ssao, shadow_map
 from .models import Group
-from .xfm import Quaternion
+from .xfm import Quaternion, Transform
 from .primitives import Sphere, Cube, Chain
 from .environment import Box, Grid
 from .primitives import Cylinder, Sphere, Cone
@@ -237,7 +237,6 @@ class WindowVR(Window):
         # os.environ['XR_RUNTIME_JSON'] = '/usr/share/openxr/1/openxr_monado.json'
         os.environ['XR_RUNTIME_JSON'] = '/home/aolab/.config/openxr/1/active_runtime.json'
         pygame.init()
-        self.screen_dist = 20.
         self.clock = Clock()
         self.fps = 90
 
@@ -367,7 +366,8 @@ class WindowVR(Window):
         self.renderer = self._get_renderer()
 
         #this effectively determines the modelview matrix
-        self.add_model(Grid(100))
+        self.floor_dist = 130
+        self.add_model(Grid(self.floor_dist*2))
         self.world = Group(self.models)
         self.world.init()
 
@@ -396,16 +396,23 @@ class WindowVR(Window):
                 near_z=0.05,
                 far_z=1024,
             ).as_numpy().reshape(4,4).T
-    
-            to_view = xr.Matrix4x4f.create_translation_rotation_scale(
-                translation=(0.,0.,0.),
-                rotation=view.pose.orientation,
-                scale=(1,1,1),
-            )
+            position = -np.array([
+                view.pose.position[0]*100,
+                view.pose.position[1]*100 - self.floor_dist,
+                view.pose.position[2]*100 - self.screen_dist,
+            ])
+            rotation = np.array([
+                -view.pose.orientation.w,
+                view.pose.orientation.x,
+                view.pose.orientation.y,
+                view.pose.orientation.z,
+            ])
+            xfm = Transform(move=position, rotate=Quaternion(*rotation))
+            self.modelview = xfm.to_mat(reverse=True)
 
             # Draw the world
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-            self.renderer.draw(self.world, p_matrix=projection, modelview=to_view.as_numpy().reshape(4,4))
+            self.renderer.draw(self.world, p_matrix=projection, modelview=self.modelview) #to_view.as_numpy().reshape(4,4))
         
         self.renderer.draw_done()
 

@@ -36,7 +36,7 @@ wobble_speed = 0.5
 
 pos_list = np.array([[0,0,0],[0,0,5]])
 
-class Test2( Window):
+class Test2(WindowVR, Window):
 
     def __init__(self, *args, **kwargs):
         self.count=0
@@ -45,7 +45,7 @@ class Test2( Window):
     def _start_draw(self):
         #arm4j.set_joint_pos([0,0,np.pi/2,np.pi/2])
         #arm4j.get_endpoint_pos()
-        self.add_model(Grid(30))
+        # self.add_model(Grid(30))
         self.add_model(moon)
         self.add_model(Sphere(3, color=[0.75,0.25,0.25,0.75]).translate(-5,5,0))
         # self.add_model(arm4j)
@@ -90,5 +90,6 @@ class Test2( Window):
             print(f"OpenGL error after drawing: {error}")
 
 if __name__ == "__main__":
-    win = Test2(window_size=(1000, 800), fullscreen=False, stereo_mode='projection')
+    win = Test2(window_size=(1000, 800), fullscreen=False, stereo_mode='projection',
+                screen_dist=50)
     win.run()

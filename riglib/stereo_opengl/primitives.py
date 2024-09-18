@@ -432,7 +432,7 @@ class Text(TexPlane):
 
         # Convert PIL image to OpenGL texture format
         texture_data = np.flipud(image)
-        tex = Texture(texture_data)
+        tex = Texture(texture_data, mipmap=True, anisotropic_filtering=2)
         width = height * texture_size[0] / texture_size[1]
 
         super().__init__(width, height, specular_color=[0,0,0,0], tex=tex, shader=shader, **kwargs)
