@@ -2,11 +2,11 @@ import time
 import traceback
 import numpy as np
 import zmq
-# from msgpack import loads
+from msgpack import loads
 import msgpack
 import time
-# from surface_no_delay import NoDelaySurfaceGazeMapper, RadialDistortionCamera
-# from pupillab_timesync import measure_clock_offset
+from .surface_no_delay import NoDelaySurfaceGazeMapper, RadialDistortionCamera
+from .pupillab_timesync import measure_clock_offset
 
 from riglib.source import DataSourceSystem
 
@@ -28,29 +28,29 @@ class System(DataSourceSystem):
         self.port = port # same as in the pupil remote gui
         
         # # matrix for camera distortion
-        # camera = RadialDistortionCamera(
-        #     resolution=(1280, 720),
-        #     cam_matrix=[
-        #         [794.3311439869655, 0.0, 633.0104437728625],
-        #         [0.0, 793.5290139393004, 397.36927353414865],
-        #         [0.0, 0.0, 1.0],
-        #     ],
-        #     dist_coefs=[
-        #         [
-        #             -0.3758628065070806,
-        #             0.1643326166951343,
-        #             0.00012182540692089567,
-        #             0.00013422608638039466,
-        #             0.03343691733865076,
-        #             0.08235235770849726,
-        #             -0.08225804883227375,
-        #             0.14463365333602152,
-        #         ]
-        #     ],
-        # )
+        camera = RadialDistortionCamera(
+            resolution=(1280, 720),
+            cam_matrix=[
+                [794.3311439869655, 0.0, 633.0104437728625],
+                [0.0, 793.5290139393004, 397.36927353414865],
+                [0.0, 0.0, 1.0],
+            ],
+            dist_coefs=[
+                [
+                    -0.3758628065070806,
+                    0.1643326166951343,
+                    0.00012182540692089567,
+                    0.00013422608638039466,
+                    0.03343691733865076,
+                    0.08235235770849726,
+                    -0.08225804883227375,
+                    0.14463365333602152,
+                ]
+            ],
+        )
 
-        # self.mapper = NoDelaySurfaceGazeMapper(camera)
-        # self.mapped_points = []
+        self.mapper = NoDelaySurfaceGazeMapper(camera)
+        self.mapped_points = []
     
     def start(self):
         '''
@@ -95,7 +95,7 @@ class System(DataSourceSystem):
         """
         read in a batch of eye data and retun x, y on surface & pupil diameters for each eye
         """
-        raw = (np.nan, np.nan)
+        raw = [np.nan, np.nan]
         confidence = np.nan
         diameter0, diameter1 = (np.nan, np.nan)
         timestamp = np.nan
@@ -107,11 +107,17 @@ class System(DataSourceSystem):
 
             topic, payload = self.sub.recv_multipart(flags=zmq.NOBLOCK)
             message = msgpack.loads(payload, raw=False)
-            
-            if message["topic"].startswith("gaze.3d.01"):
-                raw = message["norm_pos"]
-                timestamp = message["timestamp"]
-                confidence = message["confidence"]
+
+            if message["topic"].startswith("surfaces"):
+                self.mapper.update_homography(message["img_to_surf_trans"])
+
+            elif message["topic"].startswith("gaze.3d.01"):
+                mapped_gaze = self.mapper.gaze_to_surface(message["norm_pos"])
+                if mapped_gaze is not None:
+                    raw[0] = float(mapped_gaze.norm_x)
+                    raw[1] = float(mapped_gaze.norm_y)
+                    timestamp = message["timestamp"]
+                    confidence = message["confidence"]
 
             elif topic.startswith(b"pupil.0.2d"):
                 diameter0 = float(message["diameter"]) # pupil 0 diamter, right eye, unit: pixel
