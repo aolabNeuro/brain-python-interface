@@ -7,7 +7,8 @@ import os
 os.environ['DISPLAY'] = ':0'
 
 from features.optitrack_features import SpheresToCylinders
-from riglib.stereo_opengl.window import Window, Window2D, FPScontrol, WindowVR, WindowSSAO
+from riglib.stereo_opengl.window import Window, Window2D, FPScontrol, WindowSSAO
+from riglib.stereo_opengl.openxr import WindowVR
 from riglib.stereo_opengl.environment import Box, Grid
 from riglib.stereo_opengl.primitives import Cylinder, Cube, Plane, Sphere, Cone, Text, TexSphere, TexCube, TexPlane
 from riglib.stereo_opengl.models import FlatMesh, Group
@@ -40,7 +41,7 @@ wobble_speed = 0.5
 
 pos_list = np.array([[0,0,0],[0,0,5]])
 
-class Test2(SpheresToCylinders, Window):
+class Test2(Window):
 
     def __init__(self, *args, **kwargs):
         self.count=0

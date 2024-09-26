@@ -5,7 +5,8 @@ task/experiment by multiple inheritance.
 
 from features.debug_features import Profiler, OnlineAnalysis
 from features.laser_features import QwalorLaser, MultiQwalorLaser, SwitchedQwalorLaser, LaserState
-from riglib.stereo_opengl.window import WindowWithExperimenterDisplay, Window2D, WindowVR
+from riglib.stereo_opengl.window import WindowWithExperimenterDisplay, Window2D
+from riglib.stereo_opengl.openxr import WindowVR
 from .generator_features import Autostart, AdaptiveGenerator, IgnoreCorrectness, PoissonWait, RandomDelay, Progressbar_fixation
 from .peripheral_device_features import Button, Joystick, DualJoystick, Joystick_plus_TouchSensor, KeyboardControl, MouseControl, ForceControl
 from .reward_features import RewardSystem, TTLReward, JuiceLogging, PelletReward, JackpotRewards, ProgressBar, TrackingRewards, RewardAudio, PenaltyAudio, ScoreRewards
