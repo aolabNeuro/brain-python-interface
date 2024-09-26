@@ -135,7 +135,7 @@ class Window(LogExperiment):
         if self.stereo_mode == 'hmd':
             return stereo.MirrorDisplay(self.window_size, self.fov, near, far, self.screen_dist, self.iod, flip=False)
         elif self.stereo_mode == 'projection':
-            return render.Renderer(self.window_size, self.fov, near, far, modelview=self.modelview)
+            return shadow_map.ShadowMapper(self.window_size, self.fov, near, far, modelview=self.modelview)
         elif self.stereo_mode == 'anaglyph':
             return stereo.Anaglyph(self.window_size, self.fov, near, far, self.screen_dist, self.iod)
         else:
@@ -376,8 +376,6 @@ class WindowVR(Window):
 
         self.xr_frame_generator = context.frame_loop()
         self.xr_context = context
-
-        self.xr_view_init = [None, None]
 
     def _get_renderer(self):
         return shadow_map.ShadowMapper(self.window_size, self.fov, 1, 1024)

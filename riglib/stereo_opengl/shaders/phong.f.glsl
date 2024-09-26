@@ -27,6 +27,10 @@ float shadow_calc()
     projCoords = projCoords * 0.5 + 0.5;
     float currentDepth = projCoords.z;
 
+    // Check clips
+    if (currentDepth > 1.0 || frag_pos_light_space.z < -0.0) return 0.0;
+    if (length(spec_color) == 0.0) return 0.0;
+
     // PCF
     float shadow = 0.0;
     vec2 texelSize = 1.0 / textureSize(shadow_map, 0);

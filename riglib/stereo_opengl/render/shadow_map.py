@@ -24,10 +24,10 @@ class ShadowMapper(FBOrender):
         # Calculate light space matrix
         light_target = [0, 0, 0]
         light_up = [0, 1, 0]
-        near_plane = 1.0
-        far_plane = 1024.0
-        light_projection = perspective(60, 1, near_plane, far_plane)
-        light_view = look_at(-20*np.array(self.light_direction[:3]), light_target, light_up)
+        near_plane = 25.0
+        far_plane = 100.0
+        light_projection = perspective(75, 1, near_plane, far_plane)
+        light_view = look_at(-50*np.array(self.light_direction[:3])/np.linalg.norm(self.light_direction[:3]), light_target, light_up)
         self.light_space_matrix = np.dot(light_projection, light_view)
 
 
@@ -38,6 +38,7 @@ class ShadowMapper(FBOrender):
 
         # Set viewport for shadow map
         glViewport(0, 0, self.size[0], self.size[1])
+        glCullFace(GL_FRONT)
 
         # Render shadow map
         self.draw_to_fbo(self.shadow_map, root, shader="shadow_pass", apply_default=True, 
@@ -46,6 +47,7 @@ class ShadowMapper(FBOrender):
         # Restore original viewport and framebuffer
         glViewport(*original_viewport)
         glBindFramebuffer(GL_FRAMEBUFFER, original_framebuffer)
+        glCullFace(GL_BACK)
 
         return self.shadow_map['depth'], self.light_space_matrix
     

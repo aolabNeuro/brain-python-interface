@@ -6,6 +6,7 @@ import numpy as np
 import os
 os.environ['DISPLAY'] = ':0'
 
+from features.optitrack_features import SpheresToCylinders
 from riglib.stereo_opengl.window import Window, Window2D, FPScontrol, WindowVR, WindowSSAO
 from riglib.stereo_opengl.environment import Box, Grid
 from riglib.stereo_opengl.primitives import Cylinder, Cube, Plane, Sphere, Cone, Text, TexSphere, TexCube, TexPlane
@@ -25,7 +26,10 @@ import pygame
 from OpenGL.GL import *
 
 # arm4j = RobotArmGen2D(link_radii=.2, joint_radii=.2, link_lengths=[4,4,2,2])
-moon = Sphere(radius=1, color=[0.25,0.25,0.75,0.5])
+travel_speed = 0.5
+travel_radius = 10
+moon = Sphere(radius=0.5, color=[0.25,0.25,0.75,0.5])
+planet = Sphere(3, color=[0.75,0.25,0.25,0.75])
 orbit_radius = 4
 orbit_speed = 1
 wobble_radius = 5
@@ -36,18 +40,19 @@ wobble_speed = 0.5
 
 pos_list = np.array([[0,0,0],[0,0,5]])
 
-class Test2(WindowVR, Window):
+class Test2(SpheresToCylinders, Window):
 
     def __init__(self, *args, **kwargs):
         self.count=0
+        self.cursor_bounds = np.array([-15, 15, -15, 15, -15, 15])
         super().__init__(*args, **kwargs)
 
     def _start_draw(self):
         #arm4j.set_joint_pos([0,0,np.pi/2,np.pi/2])
         #arm4j.get_endpoint_pos()
-        # self.add_model(Grid(30))
+        self.add_model(Grid(100))
         self.add_model(moon)
-        self.add_model(Sphere(3, color=[0.75,0.25,0.25,0.75]).translate(-5,5,0))
+        self.add_model(planet)
         # self.add_model(arm4j)
         #self.add_model(reward_text.translate(5,0,-5))
         # self.add_model(TexSphere(radius=3, specular_color=[1,1,1,1], tex=cloudy_tex()).translate(5,0,0))
@@ -62,10 +67,16 @@ class Test2(WindowVR, Window):
     def _while_draw(self):
         ts = time.time() - self.start_time
         
+        x = travel_radius * np.cos(ts * travel_speed)
+        y = travel_radius * np.sin(ts * travel_speed)
+
+        pos = np.array([x, 0, y])
+
         x = orbit_radius * np.cos(ts * orbit_speed)
         z = orbit_radius * np.sin(ts * orbit_speed)
 
-        moon.translate(x-5,z+5,0,reset=True)
+        moon.translate(x+pos[0],z+pos[1],-z+pos[2],reset=True)
+        planet.translate(pos[0], pos[1], pos[2],reset=True)
 
         x = wobble_radius * np.cos(ts * wobble_speed)
         y = wobble_radius * np.sin(ts * wobble_speed)
@@ -91,5 +102,5 @@ class Test2(WindowVR, Window):
 
 if __name__ == "__main__":
     win = Test2(window_size=(1000, 800), fullscreen=False, stereo_mode='projection',
-                screen_dist=50)
+                screen_dist=50, screen_half_height=22.5)
     win.run()
