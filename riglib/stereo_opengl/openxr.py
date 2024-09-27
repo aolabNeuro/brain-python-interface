@@ -7,7 +7,8 @@ try:
     import xr
 except:
     print("No OpenXR support")
-
+    
+from ..experiment import traits
 from .render import stereo, render, ssao, shadow_map
 from .models import Group
 from .xfm import Quaternion, Transform
@@ -34,6 +35,8 @@ class WindowVR(Window):
     '''
     An OpenXR window for rendering in VR to an HMD
     '''
+
+    floor_dist = traits.Float(130., desc="Distance from the floor to the center of the screen")
 
     hidden_traits = ['fps', 'window_size', 'screen_dist']
 
@@ -169,10 +172,12 @@ class WindowVR(Window):
         glEnable(GL_CULL_FACE) # temporary solution to alpha blending issue with spheres. just draw the front half of the sphere
         glCullFace(GL_BACK)
 
+        if not hasattr(self, 'offset'):
+            self.offset = (0,0,0)
+
         self.renderer = self._get_renderer()
 
         #this effectively determines the modelview matrix
-        self.floor_dist = 130
         self.add_model(Grid(self.floor_dist*2))
         self.world = Group(self.models)
         self.world.init()
