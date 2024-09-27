@@ -5,7 +5,7 @@ Extensions of the render.Renderer class for stereo displays
 import numpy as np
 from OpenGL.GL import *
 
-from .render import Renderer
+from .shadow_map import ShadowMapper as Renderer
 from ..utils import offaxis_frusta
 
 class LeftRight(Renderer):
@@ -109,7 +109,6 @@ class Anaglyph(Renderer):
         self.projections = offaxis_frusta(self.size, fov, near, far, focal_dist, iod)
 
     def draw(self, root, **kwargs):
-        glViewport(0,0,self.size[0], self.size[1])
         glColorMask(GL_TRUE, GL_FALSE, GL_FALSE, GL_TRUE)
         super(Anaglyph, self).draw(root, p_matrix=self.projections[0], **kwargs)
         glClear(GL_DEPTH_BUFFER_BIT)
