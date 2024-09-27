@@ -3,6 +3,7 @@
 
 import numpy as np
 from OpenGL.GL import *
+import pygame
 
 from .models import Model
 
@@ -29,8 +30,8 @@ class Texture(object):
             tex = tex.astype(np.uint8).tobytes()
         elif isinstance(tex, str):
             im = pygame.image.load(tex)
-            size = tex.get_size()
-            tex = pygame.image.tostring(im, 'RGBA')
+            size = im.get_size()
+            tex = pygame.image.tostring(im, 'RGBA', True)
         
         self.texstr = tex
         self.size = size
