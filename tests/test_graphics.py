@@ -41,7 +41,7 @@ wobble_speed = 0.5
 
 pos_list = np.array([[0,0,0],[0,0,5]])
 
-class Test2(WindowVR, Window):
+class Test2(Window):
 
     def __init__(self, *args, **kwargs):
         self.count=0
@@ -76,7 +76,7 @@ class Test2(WindowVR, Window):
         x = orbit_radius * np.cos(ts * orbit_speed)
         z = orbit_radius * np.sin(ts * orbit_speed)
 
-        moon.translate(x+pos[0],z+pos[1],-z+pos[2],reset=True)
+        moon.translate(x+pos[0],z+pos[1],pos[2],reset=True)
         planet.translate(pos[0], pos[1], pos[2],reset=True)
 
         x = wobble_radius * np.cos(ts * wobble_speed)

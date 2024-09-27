@@ -61,8 +61,6 @@ class Window(LogExperiment):
 
         self.models = []
         self.world = None
-        self.ui_models = []
-        self.ui = None
         self.event = None
 
         # os.popen('sudo vbetool dpms on')
@@ -82,8 +80,8 @@ class Window(LogExperiment):
         self.set_os_params()
         pygame.init()
 
-        # pygame.display.gl_set_attribute(pygame.GL_DEPTH_SIZE, 24)
-        # pygame.display.gl_set_attribute(pygame.GL_FRAMEBUFFER_SRGB_CAPABLE, True)
+        pygame.display.gl_set_attribute(pygame.GL_DEPTH_SIZE, 24)
+        pygame.display.gl_set_attribute(pygame.GL_FRAMEBUFFER_SRGB_CAPABLE, True)
         pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MAJOR_VERSION, 3)
         pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MINOR_VERSION, 2)
         pygame.display.gl_set_attribute(pygame.GL_CONTEXT_PROFILE_MASK, pygame.GL_CONTEXT_PROFILE_CORE)
@@ -91,13 +89,13 @@ class Window(LogExperiment):
         if self.fullscreen:
             flags = flags | pygame.FULLSCREEN
         try:
-            pygame.display.gl_set_attribute(pygame.GL_MULTISAMPLEBUFFERS,2)
+            pygame.display.gl_set_attribute(pygame.GL_MULTISAMPLEBUFFERS,1)
             self.screen = pygame.display.set_mode(self.window_size, flags)
         except:
             pygame.display.gl_set_attribute(pygame.GL_MULTISAMPLEBUFFERS,0)
             self.screen = pygame.display.set_mode(self.window_size, flags)
 
-        glDisable(GL_FRAMEBUFFER_SRGB)
+        glDisable(GL_FRAMEBUFFER_SRGB) # disable gamma correction
         glEnable(GL_BLEND)
         glDepthFunc(GL_LESS)
         glEnable(GL_DEPTH_TEST)
@@ -125,12 +123,13 @@ class Window(LogExperiment):
         near = 1
         far = 1024
         if self.stereo_mode == 'mirror':
-            glCullFace(GL_FRONT)
+            self.modelview = np.dot(self.modelview, np.diag([-1,1,1,1]))
+            glFrontFace(GL_CW);  # Switch to clockwise winding for mirrored objects
             return stereo.MirrorDisplay(self.window_size, self.fov, near, far, self.screen_dist, self.iod)
         if self.stereo_mode == 'hmd':
-            return stereo.MirrorDisplay(self.window_size, self.fov, near, far, self.screen_dist, self.iod, flip=False)
+            return stereo.MirrorDisplay(self.window_size, self.fov, near, far, self.screen_dist, self.iod)
         elif self.stereo_mode == 'projection':
-            return shadow_map.ShadowMapper(self.window_size, self.fov, near, far, modelview=self.modelview)
+            return shadow_map.ShadowMapper(self.window_size, self.fov, near, far)
         elif self.stereo_mode == 'anaglyph':
             return stereo.Anaglyph(self.window_size, self.fov, near, far, self.screen_dist, self.iod)
         else:

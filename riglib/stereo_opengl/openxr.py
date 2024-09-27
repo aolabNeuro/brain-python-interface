@@ -40,6 +40,12 @@ class WindowVR(Window):
 
     hidden_traits = ['fps', 'window_size', 'screen_dist']
 
+    def init(self):
+        self.add_dtype('view_pose_position', 'f8', (2,3))
+        self.add_dtype('view_pose_rotation', 'f8', (2,4))
+        super().init()
+
+
     def screen_init(self):
         from ctypes import byref, c_int32, c_void_p, cast, POINTER, pointer, Structure
 
@@ -62,6 +68,12 @@ class WindowVR(Window):
             
         )
         # context.__enter__()
+
+        '''
+        Ideally we would use the context manager here, but it uses the default
+        swapchain image format, which is not guaranteed to be an SRGB format.
+        There might be a better way to handle this but for now this works.
+        '''
         context.instance = xr.create_instance(
             create_info=context._instance_create_info,
         )
@@ -110,7 +122,7 @@ class WindowVR(Window):
         )
         context.graphics.initialize_resources()
         swapchain_formats = xr.enumerate_swapchain_formats(context.session)
-        color_swapchain_format = context.graphics.select_color_swapchain_format(swapchain_formats)
+        color_swapchain_format = context.graphics.select_color_swapchain_format(swapchain_formats) # Ignore this
         # Create a swapchain for each view.
         context.swapchains.clear()
         context.swapchain_image_buffers.clear()
@@ -150,6 +162,9 @@ class WindowVR(Window):
                     POINTER(xr.SwapchainImageBaseHeader))
             context.swapchain_image_ptr_buffers.append(swapchain_image_ptr_buffer)
         context.graphics.make_current()
+        '''
+        End of context initialization
+        '''
 
         # Query the swapchain size
         config_views = xr.enumerate_view_configuration_views(
@@ -189,7 +204,11 @@ class WindowVR(Window):
         self.xr_context = context
 
     def _get_renderer(self):
-        return shadow_map.ShadowMapper(self.window_size, self.fov, 1, 1024)
+        near = 1
+        far = 1024
+        if self.stereo_mode == 'mirror':
+            glFrontFace(GL_CW);  # Switch to clockwise winding for mirrored objects
+        return shadow_map.ShadowMapper(self.window_size, self.fov, near, far)
     
     def draw_world(self):
         # Get the OpenXR views
@@ -209,20 +228,28 @@ class WindowVR(Window):
                 view.pose.position[0]*100 - self.offset[0],
                 view.pose.position[1]*100 - self.floor_dist,
                 view.pose.position[2]*100 + self.screen_dist,
-            ])
+            ]) # Not sure why this needs to be negated, something to do with the handedness of the coordinate system??
             rotation = np.array([
-                -view.pose.orientation.w,
+                -view.pose.orientation.w, # Also not sure why I need to negate the w component
                 view.pose.orientation.x,
                 view.pose.orientation.y,
                 view.pose.orientation.z,
             ])
-            xfm = Transform(move=position, rotate=Quaternion(*rotation))
+            xfm = Transform(move=position, rotate=Quaternion(*rotation)) 
             self.modelview = xfm.to_mat(reverse=True)
+
+            # Optionally mirror the view along the y-axis
+            if self.stereo_mode == 'mirror':
+                self.modelview = np.dot(self.modelview, np.diag([-1,1,1,1]))
 
             # Draw the world
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
             self.renderer.draw(self.world, p_matrix=projection, modelview=self.modelview) #to_view.as_numpy().reshape(4,4))
         
+            # Save the pose data
+            self.task_data['view_pose_position'][view_index,:] = position
+            self.task_data['view_pose_rotation'][view_index,:] = rotation
+
         self.renderer.draw_done()
 
     def _test_stop(self, ts):

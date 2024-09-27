@@ -35,9 +35,11 @@ class ShadowMapper(FBOrender):
         # Save current viewport and framebuffer
         original_viewport = glGetIntegerv(GL_VIEWPORT)
         original_framebuffer = glGetIntegerv(GL_FRAMEBUFFER_BINDING)
+        original_winding_order = glGetIntegerv(GL_FRONT_FACE)
 
         # Set viewport for shadow map
         glViewport(0, 0, self.size[0], self.size[1])
+        glFrontFace(GL_CCW)
         glCullFace(GL_FRONT)
 
         # Render shadow map
@@ -45,6 +47,7 @@ class ShadowMapper(FBOrender):
                          light_space_matrix=self.light_space_matrix, **kwargs)
 
         # Restore original viewport and framebuffer
+        glFrontFace(original_winding_order)
         glViewport(*original_viewport)
         glBindFramebuffer(GL_FRAMEBUFFER, original_framebuffer)
         glCullFace(GL_BACK)
