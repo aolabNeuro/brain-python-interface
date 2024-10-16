@@ -49,6 +49,7 @@ class TargetTracking(Sequence):
         timeout_penalty = dict(timeout_penalty_end="wait", start_pause="pause", end_state=True),
         hold_penalty = dict(hold_penalty_end="wait", hold_penalty_end_retry="wait_retry", start_pause="pause", end_state=True),
         tracking_out_penalty = dict(tracking_out_penalty_end="wait", start_pause="pause", end_state=True),
+        inactive_tracking_penalty = dict(inactive_tracking_penalty_end="wait", start_pause="pause", end_state=True),
         reward = dict(reward_end="wait", start_pause="pause", stoppable=False, end_state=True),
         pause = dict(end_pause="wait", end_state=True)
         # all end_states will result in trial counter +1, so if you start pause during a penalty state, 
@@ -64,6 +65,8 @@ class TargetTracking(Sequence):
     reward_time = traits.Float(.5, desc="Length of reward dispensation")
     timeout_time = traits.Float(10, desc="Time allowed to go between trajectories")
     timeout_penalty_time = traits.Float(1, desc="Length of penalty time for initiation timeout error")
+    inactive_tracking = traits.Float(2, desc = "Length of time allowed for inactive tracking error")
+    inactive_tracking_penalty_time = traits.Float(0, desc="Length of penalty time for inactive tracking error")
     hold_time = traits.Float(.1, desc="Time of hold required at target before trajectory begins")
     hold_penalty_time = traits.Float(1, desc="Length of penalty time for target hold error")
     tracking_out_time = traits.Float(2.5, desc="Time allowed to be tracking outside the target") # AKA tolerance time
@@ -79,6 +82,7 @@ class TargetTracking(Sequence):
         self.frame_index = 0 # index in the frame in a trial
         self.total_distance_error = 0 # Euclidian distance between cursor and target during each trial
         self.trial_timed_out = True # check if the trial is finished
+        self.inactive_tracking = True
         self.plant_position = []
         self.disturbance_trial = False
         self.repeat_freq_set = False
@@ -248,6 +252,18 @@ class TargetTracking(Sequence):
         '''Nothing generic to do.'''
         pass
 
+    def _start_inactive_tracking_penalty_time(self):
+        '''Nothing generic to do.'''
+        pass
+
+    def _while_inactive_tracking_penalty_time(self):
+        self.pos_offset = [0,0,0]
+        self.vel_offset = [0,0,0]
+
+    def _end_inactive_tracking_penalty_time(self):
+        '''Nothing generic to do.'''
+        pass
+
     def _start_reward(self):
         '''Nothing generic to do.'''
         pass
@@ -303,9 +319,15 @@ class TargetTracking(Sequence):
 
     def _test_tracking_out_timeout(self, time_in_state):
         return time_in_state > self.tracking_out_time
+    
+    def _test_inactive_tracking(self, time_in_state):
+        return time_in_state > self.inactive_tracking # change this
 
     def _test_timeout_penalty_end(self, time_in_state):
         return time_in_state > self.timeout_penalty_time #or self.pause
+    
+    def _test_inactive_tracking_penalty_end(self, time_in_state):
+        return time_in_state > self.inactive_tracking_penalty_time #or self.pause
 
     def _test_hold_penalty_end(self, time_in_state):
         return (time_in_state > self.hold_penalty_time) and (self.tries==self.max_hold_attempts) #or self.pause
@@ -313,7 +335,7 @@ class TargetTracking(Sequence):
     def _test_hold_penalty_end_retry(self, time_in_state):
         return (time_in_state > self.hold_penalty_time) and (self.tries<self.max_hold_attempts) #or self.pause
 
-    def _test_tracking_out_penalty_end(self, time_in_state):
+    def _test_tracking_out_penalty_end(self, time_in_state):  # test when penalty state has ended
         return time_in_state > self.tracking_out_penalty_time #or self.pause
 
     def _test_reward_end(self, time_in_state):
@@ -503,6 +525,13 @@ class ScreenTargetTracking(TargetTracking, Window):
         cursor_pos = self.plant.get_endpoint_pos()
         d = np.linalg.norm(cursor_pos - self.target.get_position())
         return d > (self.target_radius - self.cursor_radius) or super()._test_leave_target(time_in_state)
+    
+    def _test_cursor_is_still(self, prev_cursor = 0):
+        '''
+        Test if the cursor has been still
+        '''
+        cursor_pos = self.plant.get_endpoint_pos()
+        return cursor_pos == prev_cursor, prev_cursor
 
     #### STATE FUNCTIONS ####
     def setup_start_wait(self):
