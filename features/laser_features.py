@@ -285,6 +285,10 @@ class LaserState(traits.HasTraits):
                     wait_time+width > self.laser_max_stim_time):
                     continue
 
+                # Skip the pulse if the width is exactly zero
+                if width == 0.0:
+                    continue
+
                 # Trigger digital wave
                 wave = DigitalWave(laser, mask=1<<laser.port)
                 wave.set_edges([wait_time, wait_time+width], True)
