@@ -44,8 +44,8 @@ class TargetTracking(Sequence):
         wait_retry = dict(start_trial="trajectory", start_pause="pause"),
         trajectory = dict(enter_target="hold", timeout="timeout_penalty", start_pause="pause"),
         hold = dict(hold_complete="tracking_in", leave_target="hold_penalty", start_pause="pause"),
-        tracking_in = dict(trial_complete="reward", leave_target="tracking_out", start_pause="pause"),
-        tracking_out = dict(trial_complete="reward", enter_target="tracking_in", tracking_out_timeout="tracking_out_penalty", start_pause="pause"),
+        tracking_in = dict(trial_complete="reward", leave_target="tracking_out", start_pause="pause", cursor_is_still="inactive_tracking_penalty"),
+        tracking_out = dict(trial_complete="reward", enter_target="tracking_in", tracking_out_timeout="tracking_out_penalty", start_pause="pause", cursor_is_still="inactive_tracking_penalty"),
         timeout_penalty = dict(timeout_penalty_end="wait", start_pause="pause", end_state=True),
         hold_penalty = dict(hold_penalty_end="wait", hold_penalty_end_retry="wait_retry", start_pause="pause", end_state=True),
         tracking_out_penalty = dict(tracking_out_penalty_end="wait", start_pause="pause", end_state=True),
@@ -527,14 +527,18 @@ class ScreenTargetTracking(TargetTracking, Window):
         d = np.linalg.norm(cursor_pos - self.target.get_position())
         return d > (self.target_radius - self.cursor_radius) or super()._test_leave_target(time_in_state)
     
-    ### UTILS FUNCTIONS ####
     # TODO
-    def cursor_is_still(self, prev_cursor = [0,0,0]):
+    def _test_cursor_is_still(self, prev_cursor = [0,0,0]):
         '''
         Test if the cursor has been still
         '''
         cursor_pos = self.plant.get_endpoint_pos()
-        return cursor_pos == prev_cursor and self.count >= self.inactive_tracking
+        
+        if cursor_pos == prev_cursor and self.count >= self.inactive_tracking:
+            return True
+        
+        self.count = 0
+        return False
 
     #### STATE FUNCTIONS ####
     def setup_start_wait(self):
@@ -660,9 +664,8 @@ class ScreenTargetTracking(TargetTracking, Window):
         # TODO
         self.update_frame()
         self.count += self.frame_index / self.fps
-        if self.cursor_is_still(cursor_pos):
-            # go to penalty
-            return
+        # if self.cursor_is_still(cursor_pos):
+        #     # go to penalty
 
         # Check if the trial is over and there are no more target frames to display
         if self.frame_index+self.lookahead >= np.shape(self.targs)[0]:
@@ -691,7 +694,8 @@ class ScreenTargetTracking(TargetTracking, Window):
 
         # Move target and trajectory to next frame so it appears to be moving
         self.update_frame()
-
+        self.count += self.frame_index / self.fps
+        
         # Check if the trial is over and there are no more target frames to display
         if self.frame_index+self.lookahead >= np.shape(self.targs)[0]:
             self.trial_timed_out = True
