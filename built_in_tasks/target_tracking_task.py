@@ -83,7 +83,6 @@ class TargetTracking(Sequence):
         self.frame_index = 0 # index in the frame in a trial
         self.total_distance_error = 0 # Euclidian distance between cursor and target during each trial
         self.trial_timed_out = True # check if the trial is finished
-        self.inactive_tracking = True
         self.plant_position = []
         self.disturbance_trial = False
         self.repeat_freq_set = False
@@ -253,15 +252,15 @@ class TargetTracking(Sequence):
         '''Nothing generic to do.'''
         pass
 
-    def _start_inactive_tracking_penalty_time(self):
+    def _start_inactive_tracking_penalty(self):
         '''Nothing generic to do.'''
         pass
 
-    def _while_inactive_tracking_penalty_time(self):
+    def _while_inactive_tracking_penalty(self):
         self.pos_offset = [0,0,0]
         self.vel_offset = [0,0,0]
 
-    def _end_inactive_tracking_penalty_time(self):
+    def _end_inactive_tracking_penalty(self):
         '''Nothing generic to do.'''
         pass
 
@@ -321,8 +320,8 @@ class TargetTracking(Sequence):
     def _test_tracking_out_timeout(self, time_in_state):
         return time_in_state > self.tracking_out_time
     
-    def _test_inactive_tracking(self, time_in_state):
-        return time_in_state > self.inactive_tracking # change this
+    # def _test_inactive_tracking(self, time_in_state):
+    #     return time_in_state > self.inactive_tracking # change this
 
     def _test_timeout_penalty_end(self, time_in_state):
         return time_in_state > self.timeout_penalty_time #or self.pause
@@ -347,6 +346,10 @@ class TargetTracking(Sequence):
         return False
 
     def _test_leave_target(self, time_in_state):
+        '''This function is task-specific and not much can be done generically'''
+        return False
+    
+    def _test_cursor_is_still(self, time_in_state):
         '''This function is task-specific and not much can be done generically'''
         return False
 
@@ -411,6 +414,8 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.cursor_vis_prev = True
         self.lookahead = 30 # number of frames to create a "lookahead" window of 0.5 seconds (half the screen)
         self.original_limit1d = self.limit1d # keep track of original settable trait
+
+        self.count = 0
         
         if not self.always_1d:
             self.limit1d = False # allow 2d movement before center-hold initiation
@@ -451,6 +456,8 @@ class ScreenTargetTracking(TargetTracking, Window):
         '''
         Calls any update functions necessary and redraws screen
         '''
+        # print(self.count)
+        self.prev_cursor = self.last_pt
         self.move_effector(pos_offset=np.asarray(self.pos_offset), vel_offset=np.asarray(self.vel_offset))
 
         # Run graphics commands to show/hide the plant if the visibility has changed
@@ -528,17 +535,22 @@ class ScreenTargetTracking(TargetTracking, Window):
         return d > (self.target_radius - self.cursor_radius) or super()._test_leave_target(time_in_state)
     
     # TODO
-    def _test_cursor_is_still(self, prev_cursor = [0,0,0]):
+    def _test_cursor_is_still(self, time_in_state):
         '''
         Test if the cursor has been still
         '''
+        print(self.count, self.frame_index)
         cursor_pos = self.plant.get_endpoint_pos()
+        if ((cursor_pos == self.prev_cursor).all()):
+            print('same pos')
+            self.count += self.frame_index / self.fps
+        else:
+            self.count = 0
         
-        if cursor_pos == prev_cursor and self.count >= self.inactive_tracking:
-            return True
-        
-        self.count = 0
-        return False
+        return (self.count >= self.inactive_tracking) or super()._test_cursor_is_still(time_in_state)
+
+        # print(cursor_pos, self.prev_cursor, self.count)
+        # print(self.inactive_tracking, self.count, self.frame_index)
 
     #### STATE FUNCTIONS ####
     def setup_start_wait(self):
@@ -563,6 +575,8 @@ class ScreenTargetTracking(TargetTracking, Window):
         # Set up for progress bar
         self.bar_width = 12        
         self.tracking_frame_index = 0
+
+        # Set up for inactive tracking
         self.count = 0
         
         # Set up the next trajectory
@@ -663,9 +677,6 @@ class ScreenTargetTracking(TargetTracking, Window):
         
         # TODO
         self.update_frame()
-        self.count += self.frame_index / self.fps
-        # if self.cursor_is_still(cursor_pos):
-        #     # go to penalty
 
         # Check if the trial is over and there are no more target frames to display
         if self.frame_index+self.lookahead >= np.shape(self.targs)[0]:
@@ -694,7 +705,6 @@ class ScreenTargetTracking(TargetTracking, Window):
 
         # Move target and trajectory to next frame so it appears to be moving
         self.update_frame()
-        self.count += self.frame_index / self.fps
         
         # Check if the trial is over and there are no more target frames to display
         if self.frame_index+self.lookahead >= np.shape(self.targs)[0]:
@@ -722,8 +732,8 @@ class ScreenTargetTracking(TargetTracking, Window):
     # TODO
     def _start_inactive_tracking_penalty(self):
         super()._start_inactive_tracking_penalty()
-        # print('START TIMEOUT')
-        self.sync_event('INACTIVE_TRACKING_PENALTY')
+        print('START INACTIVE PENALTY')
+        self.sync_event('TIMEOUT_PENALTY')
 
         # self.in_end_state = True
         self.setup_screen_reset()
@@ -943,7 +953,7 @@ class ScreenTargetTracking(TargetTracking, Window):
             trials['ref'][trial_id] = ref_trajectory/ref_A   # previously, denominator was np.sum(a_ref)
             trials['dis'][trial_id] = dis_trajectory/dis_A   # previously, denominator was np.sum(a_dis)
             # print(trial_order, ref_A, dis_A)
-        
+
         return trials, trial_order
 
     @staticmethod
