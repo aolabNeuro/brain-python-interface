@@ -539,18 +539,15 @@ class ScreenTargetTracking(TargetTracking, Window):
         '''
         Test if the cursor has been still
         '''
-        print(self.count, self.frame_index)
+        # print(self.count, self.frame_index)
         cursor_pos = self.plant.get_endpoint_pos()
-        if ((cursor_pos == self.prev_cursor).all()):
-            print('same pos')
-            self.count += self.frame_index / self.fps
+        if (cursor_pos == self.prev_cursor).all():
+            # print('same pos')
+            self.count += 1/self.fps
         else:
             self.count = 0
         
         return (self.count >= self.inactive_tracking) or super()._test_cursor_is_still(time_in_state)
-
-        # print(cursor_pos, self.prev_cursor, self.count)
-        # print(self.inactive_tracking, self.count, self.frame_index)
 
     #### STATE FUNCTIONS ####
     def setup_start_wait(self):
@@ -674,8 +671,6 @@ class ScreenTargetTracking(TargetTracking, Window):
                 self.pos_offset = self.disturbance_path[self.frame_index]
 
         # Move target and trajectory to next frame so it appears to be moving
-        
-        # TODO
         self.update_frame()
 
         # Check if the trial is over and there are no more target frames to display
