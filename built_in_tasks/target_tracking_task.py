@@ -49,6 +49,7 @@ class TargetTracking(Sequence):
         timeout_penalty = dict(timeout_penalty_end="wait", start_pause="pause", end_state=True),
         hold_penalty = dict(hold_penalty_end="wait", hold_penalty_end_retry="wait_retry", start_pause="pause", end_state=True),
         tracking_out_penalty = dict(tracking_out_penalty_end="wait", start_pause="pause", end_state=True),
+        # TODO
         inactive_tracking_penalty = dict(inactive_tracking_penalty_end="wait", start_pause="pause", end_state=True),
         reward = dict(reward_end="wait", start_pause="pause", stoppable=False, end_state=True),
         pause = dict(end_pause="wait", end_state=True)
@@ -526,12 +527,14 @@ class ScreenTargetTracking(TargetTracking, Window):
         d = np.linalg.norm(cursor_pos - self.target.get_position())
         return d > (self.target_radius - self.cursor_radius) or super()._test_leave_target(time_in_state)
     
-    def _test_cursor_is_still(self, prev_cursor = 0):
+    ### UTILS FUNCTIONS ####
+    # TODO
+    def cursor_is_still(self, prev_cursor = [0,0,0]):
         '''
         Test if the cursor has been still
         '''
         cursor_pos = self.plant.get_endpoint_pos()
-        return cursor_pos == prev_cursor, prev_cursor
+        return cursor_pos == prev_cursor and self.count >= self.inactive_tracking
 
     #### STATE FUNCTIONS ####
     def setup_start_wait(self):
@@ -556,6 +559,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         # Set up for progress bar
         self.bar_width = 12        
         self.tracking_frame_index = 0
+        self.count = 0
         
         # Set up the next trajectory
         next_trajectory = np.array(np.squeeze(self.targs)[:,2])
@@ -652,7 +656,13 @@ class ScreenTargetTracking(TargetTracking, Window):
                 self.pos_offset = self.disturbance_path[self.frame_index]
 
         # Move target and trajectory to next frame so it appears to be moving
+        
+        # TODO
         self.update_frame()
+        self.count += self.frame_index / self.fps
+        if self.cursor_is_still(cursor_pos):
+            # go to penalty
+            return
 
         # Check if the trial is over and there are no more target frames to display
         if self.frame_index+self.lookahead >= np.shape(self.targs)[0]:
@@ -703,6 +713,26 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def _end_timeout_penalty(self):
         super()._end_timeout_penalty()
+        self.sync_event('TRIAL_END')
+    
+    # TODO
+    def _start_inactive_tracking_penalty(self):
+        super()._start_inactive_tracking_penalty()
+        # print('START TIMEOUT')
+        self.sync_event('INACTIVE_TRACKING_PENALTY')
+
+        # self.in_end_state = True
+        self.setup_screen_reset()
+
+        # skip to next generated trial using same freq set
+        self.repeat_freq_set = True
+
+    def _while_inactive_tracking_penalty(self):
+        super()._while_inactive_tracking_penalty()
+        # # Add disturbance
+
+    def _end_inactive_tracking_penalty(self):
+        super()._end_inactive_tracking_penalty()
         self.sync_event('TRIAL_END')
             
     def _start_hold_penalty(self):
