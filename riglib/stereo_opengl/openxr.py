@@ -35,8 +35,11 @@ class WindowVR(Window):
     '''
     An OpenXR window for rendering in VR to an HMD
     '''
-
-    floor_dist = traits.Float(130., desc="Distance from the floor to the center of the screen")
+    camera_position = traits.Tuple((0, 0, -40), desc="Position of the camera (x,y,z) in cm world coordinates")
+    grid_size = traits.Float(130., desc="Size of the background grid in cm")
+    camera_orientation = traits.Tuple((1, 0, 0, 0), desc="Orientation of the camera (w, x, y, z) as a quaternion")
+    fixed_camera_position = traits.Tuple(False, desc="Fixed position of the camera")
+    fixed_camera_orientation = traits.Tuple(False, desc="Fixed orientation of the camera")
 
     hidden_traits = ['fps', 'window_size', 'screen_dist']
 
@@ -44,7 +47,6 @@ class WindowVR(Window):
         self.add_dtype('view_pose_position', 'f8', (2,3))
         self.add_dtype('view_pose_rotation', 'f8', (2,4))
         super().init()
-
 
     def screen_init(self):
         from ctypes import byref, c_int32, c_void_p, cast, POINTER, pointer, Structure
@@ -131,7 +133,7 @@ class WindowVR(Window):
             # Create the swapchain.
             swapchain_create_info = xr.SwapchainCreateInfo(
                 array_size=1,
-                format=GL_SRGB8_ALPHA8,
+                format=GL_SRGB8_ALPHA8, # Set to SRGB format otherwise the colors are washed out
                 width=vp.recommended_image_rect_width,
                 height=vp.recommended_image_rect_height,
                 mip_count=1,
@@ -184,22 +186,16 @@ class WindowVR(Window):
         glClearColor(*self.background)
         glClearDepth(1.0)
         glDepthMask(GL_TRUE)
-        glEnable(GL_CULL_FACE) # temporary solution to alpha blending issue with spheres. just draw the front half of the sphere
+        glEnable(GL_CULL_FACE)
         glCullFace(GL_BACK)
-
-        if not hasattr(self, 'offset'):
-            self.offset = (0,0,0)
 
         self.renderer = self._get_renderer()
 
         #this effectively determines the modelview matrix
-        self.add_model(Grid(self.floor_dist*2))
+        self.add_model(Grid(self.grid_size*2))
         self.world = Group(self.models)
         self.world.init()
-
-        #up vector is always (0,0,1), why would I ever need to roll the camera?!
         self.set_eye((0,0,0), (0,0))
-
         self.xr_frame_generator = context.frame_loop()
         self.xr_context = context
 
@@ -224,17 +220,23 @@ class WindowVR(Window):
                 near_z=0.05,
                 far_z=1024,
             ).as_numpy().reshape(4,4).T
-            position = -np.array([
-                view.pose.position[0]*100 - self.offset[0],
-                view.pose.position[1]*100 - self.floor_dist,
-                view.pose.position[2]*100 + self.screen_dist,
-            ]) # Not sure why this needs to be negated, something to do with the handedness of the coordinate system??
-            rotation = np.array([
-                -view.pose.orientation.w, # Also not sure why I need to negate the w component
-                view.pose.orientation.x,
-                view.pose.orientation.y,
-                view.pose.orientation.z,
-            ])
+            if self.fixed_camera_position:
+                position = self.camera_position
+            else:
+                position = -np.array([
+                    view.pose.position[0]*100 - self.camera_position[0],
+                    view.pose.position[1]*100 - self.camera_position[1] - self.grid_size,
+                    view.pose.position[2]*100 - self.camera_position[2],
+                ]) # Not sure why this needs to be negated, something to do with the handedness of the coordinate system??
+            if self.fixed_camera_orientation:
+                rotation = self.camera_orientation
+            else:
+                rotation = np.array([
+                    -view.pose.orientation.w, # Also not sure why I need to negate the w component
+                    view.pose.orientation.x,
+                    view.pose.orientation.y,
+                    view.pose.orientation.z,
+                ])
             xfm = Transform(move=position, rotate=Quaternion(*rotation)) 
             self.modelview = xfm.to_mat(reverse=True)
 
