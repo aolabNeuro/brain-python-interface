@@ -38,8 +38,8 @@ class WindowVR(Window):
     camera_position = traits.Tuple((0, 0, -40), desc="Position of the camera (x,y,z) in cm world coordinates")
     grid_size = traits.Float(130., desc="Size of the background grid in cm")
     camera_orientation = traits.Tuple((1, 0, 0, 0), desc="Orientation of the camera (w, x, y, z) as a quaternion")
-    fixed_camera_position = traits.Tuple(False, desc="Fixed position of the camera")
-    fixed_camera_orientation = traits.Tuple(False, desc="Fixed orientation of the camera")
+    fixed_camera_position = traits.Bool(False, desc="Fixed position of the camera")
+    fixed_camera_orientation = traits.Bool(False, desc="Fixed orientation of the camera")
 
     hidden_traits = ['fps', 'window_size', 'screen_dist']
 
@@ -198,6 +198,7 @@ class WindowVR(Window):
         self.set_eye((0,0,0), (0,0))
         self.xr_frame_generator = context.frame_loop()
         self.xr_context = context
+        print("Initialized OpenXR window")
 
     def _get_renderer(self):
         near = 1
