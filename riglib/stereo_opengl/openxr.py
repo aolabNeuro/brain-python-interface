@@ -222,7 +222,7 @@ class WindowVR(Window):
                 far_z=1024,
             ).as_numpy().reshape(4,4).T
             if self.fixed_camera_position:
-                position = self.camera_position
+                position = self.camera_position - np.array([1,0,0])*self.iod*(view_index-0.5)
             else:
                 position = -np.array([
                     view.pose.position[0]*100 - self.camera_position[0],
@@ -250,8 +250,8 @@ class WindowVR(Window):
             self.renderer.draw(self.world, p_matrix=projection, modelview=self.modelview) #to_view.as_numpy().reshape(4,4))
         
             # Save the pose data
-            self.task_data['view_pose_position'][view_index,:] = position
-            self.task_data['view_pose_rotation'][view_index,:] = rotation
+            self.task_data['view_pose_position'][:,view_index,:] = position
+            self.task_data['view_pose_rotation'][:,view_index,:] = rotation
 
         self.renderer.draw_done()
 
