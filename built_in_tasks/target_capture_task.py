@@ -269,7 +269,7 @@ class ScreenTargetCapture(TargetCapture, Window):
     limit2d = traits.Bool(True, desc="Limit cursor movement to 2D")
 
     sequence_generators = [
-        'out_2D', 'centerout_2D', 'centeroutback_2D', 'centerout_2D_select', 'rand_target_chain_2D', 'rand_target_chain_3D', 'corners_2D',
+        'out_2D', 'centerout_2D', 'centeroutback_2D', 'out_2D_select', 'centerout_2D_select', 'rand_target_chain_2D', 'rand_target_chain_3D', 'corners_2D',
     ]
 
     hidden_traits = ['cursor_color', 'target_color', 'cursor_bounds', 'cursor_radius', 'plant_hide_rate', 'starting_pos']
@@ -575,6 +575,23 @@ class ScreenTargetCapture(TargetCapture, Window):
             try:
                 next_indices, next_targs = next(gen)
                 if next_indices[1] in target_idx:
+                    yield next_indices, next_targs # only yield the targets that match target_idx
+            except StopIteration:
+                break
+
+    @staticmethod
+    def out_2D_select(nblocks=100, ntargets=8, distance=10, origin=(0,0,0), target_idx=[]):
+        '''
+        Generates a sequence of 2D (x and z) targets at a given distance from the origin, 
+        but lets you select which targets out of the total number you want to keep
+        '''
+        if type(target_idx) not in (list, tuple) or len(target_idx) == 0:
+            raise ValueError(f'Malformed target_idx selection "{target_idx}"! Input a list of [idx1, idx2, ...]')
+        gen = ScreenTargetCapture.out_2D(nblocks, ntargets, distance, origin)
+        while True:
+            try:
+                next_indices, next_targs = next(gen)
+                if next_indices[0] in target_idx:
                     yield next_indices, next_targs # only yield the targets that match target_idx
             except StopIteration:
                 break
