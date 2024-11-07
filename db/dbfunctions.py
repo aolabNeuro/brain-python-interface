@@ -1347,4 +1347,8 @@ def get_rawfiles_for_taskentry(e, system_subfolders=None):
         else:
             files[df.system.name] = filepath
 
+    params = e.task_params
+    if 'neuropixel_port1_site' in params:
+        files['neuropixels'] = f'neuropixels/{str(e.date.date())}_Neuropixel_{e.subject.name}_te{e.id}'
+
     return files
