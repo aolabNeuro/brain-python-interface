@@ -316,28 +316,28 @@ class ScoreRewards(traits.HasTraits):
         super().init()
         self.task_data['reward_score'] = 0
 
-'''
-   def _start_reward(self):
-        if hasattr(super(), '_start_reward'):
-            super()._start_reward()
-        timed_state = None
-        idx = -1
-        while timed_state is None and -idx-1 < len(self.state_log):
-            if self.state_log[idx][0] == self.score_timed_state:
-                timed_state = self.state_log[-1][1] - self.state_log[idx][1]
-            idx -= 1
-        if timed_state is None or timed_state == 0.:
-            score = 0.
-        else:
-            score = 10*int(10./timed_state)
-        self.reportstats['Score'] += score
-        self.score_display = TextTarget(str(score), height=self.score_display_height, 
-                                        color=self.score_display_color)
-        self.score_display.move_to_position(self.score_display_location)
-        self.add_model(self.score_display.model)
-        self.task_data['reward_score'] += score
-'''
-   def _start_reward(self):
+
+#   def _start_reward(self):
+#        if hasattr(super(), '_start_reward'):
+#            super()._start_reward()
+#        timed_state = None
+#        idx = -1
+#        while timed_state is None and -idx-1 < len(self.state_log):
+#            if self.state_log[idx][0] == self.score_timed_state:
+#                timed_state = self.state_log[-1][1] - self.state_log[idx][1]
+#            idx -= 1
+#        if timed_state is None or timed_state == 0.:
+#            score = 0.
+#        else:
+#            score = 10*int(10./timed_state)
+#        self.reportstats['Score'] += score
+#        self.score_display = TextTarget(str(score), height=self.score_display_height, 
+#                                        color=self.score_display_color)
+#        self.score_display.move_to_position(self.score_display_location)
+#        self.add_model(self.score_display.model)
+#        self.task_data['reward_score'] += score
+
+    def _start_reward(self):
         if hasattr(super(), '_start_reward'):
             super()._start_reward()
         move_error = aopy.analysis.behavior.compute_movement_error(np.array(self.cursor_traj)[:,:2], self.targs[self.target_index][:2])
