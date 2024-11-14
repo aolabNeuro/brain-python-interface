@@ -10,6 +10,7 @@ from riglib.audio import AudioPlayer
 from built_in_tasks.target_graphics import TextTarget, VirtualRectangularTarget
 import numpy as np
 import serial, glob
+import aopy
 
 ###### CONSTANTS
 sec_per_min = 60
@@ -315,7 +316,8 @@ class ScoreRewards(traits.HasTraits):
         super().init()
         self.task_data['reward_score'] = 0
 
-    def _start_reward(self):
+'''
+   def _start_reward(self):
         if hasattr(super(), '_start_reward'):
             super()._start_reward()
         timed_state = None
@@ -334,11 +336,26 @@ class ScoreRewards(traits.HasTraits):
         self.score_display.move_to_position(self.score_display_location)
         self.add_model(self.score_display.model)
         self.task_data['reward_score'] += score
+'''
+   def _start_reward(self):
+        if hasattr(super(), '_start_reward'):
+            super()._start_reward()
+        move_error = aopy.analysis.behavior.compute_movement_error(np.array(self.cursor_traj)[:,:2], self.targs[self.target_index][:2])
+        avg_error = np.mean(move_error)
+        score = int(100.0 - avg_error)
+        
+        self.reportstats['Score'] += score
+        self.score_display = TextTarget(str(score), height=self.score_display_height, 
+                                        color=self.score_display_color)
+        self.score_display.move_to_position(self.score_display_location)
+        self.add_model(self.score_display.model)
+        self.task_data['reward_score'] += score
 
     def _end_reward(self):
         if hasattr(super(), '_end_reward'):
             super()._end_reward()
         self.remove_model(self.score_display.model)
+
 
 """"" BELOW THIS IS ALL THE OLD CODE ASSOCIATED WITH REWARD FEATURES"""
 
