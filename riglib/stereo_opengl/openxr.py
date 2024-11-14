@@ -250,8 +250,9 @@ class WindowVR(Window):
             self.renderer.draw(self.world, p_matrix=projection, modelview=self.modelview) #to_view.as_numpy().reshape(4,4))
         
             # Save the pose data
-            self.task_data['view_pose_position'][:,view_index,:] = position
-            self.task_data['view_pose_rotation'][:,view_index,:] = rotation
+            if hasattr(self, 'task_data'):
+                self.task_data['view_pose_position'][:,view_index,:] = position
+                self.task_data['view_pose_rotation'][:,view_index,:] = rotation
 
         self.renderer.draw_done()
 

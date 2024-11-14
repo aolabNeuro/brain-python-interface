@@ -33,7 +33,7 @@ moon = Sphere(radius=0.5, color=[0.25,0.25,0.75,0.5])
 planet = Sphere(3, color=[0.75,0.25,0.25,0.75])
 orbit_radius = 4
 orbit_speed = 1
-wobble_radius = 5
+wobble_radius = 0
 wobble_speed = 0.5
 #TexSphere = type("TexSphere", (Sphere, TexModel), {})
 #TexPlane = type("TexPlane", (Plane, TexModel), {})
@@ -41,7 +41,7 @@ wobble_speed = 0.5
 
 pos_list = np.array([[0,0,0],[0,0,5]])
 
-class Test2(Window):
+class Test2(WindowVR, Window):
 
     def __init__(self, *args, **kwargs):
         self.count=0
@@ -102,6 +102,7 @@ class Test2(Window):
             print(f"OpenGL error after drawing: {error}")
 
 if __name__ == "__main__":
-    win = Test2(window_size=(1000, 800), fullscreen=False, stereo_mode='projection',
-                screen_dist=50, screen_half_height=22.5)
+    win = Test2(window_size=(1000, 800), fullscreen=False, stereo_mode='mirror',
+                screen_dist=50, screen_half_height=22.5, 
+                fixed_camera_position=True, fixed_camera_orientation=True)
     win.run()
