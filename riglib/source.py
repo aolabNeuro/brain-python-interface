@@ -8,7 +8,10 @@ import traceback
 import multiprocessing as mp
 from multiprocessing import sharedctypes as shm
 
+import hdfwriter
 import numpy as np
+
+from riglib.hdfwriter import supp_hdf
 from .mp_proxy import FuncProxy, RPCProcess
 
 from . import sink
@@ -273,22 +276,10 @@ class MultiChanDataSource(mp.Process):
 
 
     def register_supp_hdf(self):
-        try:
-            from ismore.brainamp import brainamp_hdf_writer
-        except:
-            from riglib.ismore import brainamp_hdf_writer
-        self.supp_hdf = brainamp_hdf_writer.BrainampData(self.supp_hdf_file, self.channels, self.send_to_sinks_dtype)
-
-
-    def verify_data_arrival(self):
-        try:
-            from ismore.brainamp.brainamp_features import verify_data_arrival
-        except:
-            from riglib.ismore.brainamp.brainamp_features import verify_data_arrival
-
+        self.supp_hdf = supp_hdf.SupplementaryHDF(self.supp_hdf_file, self.channels, 
+                                                  self.send_to_sinks_dtype, str(self.source))
         
-
-
+        
     def start(self, *args, **kwargs):
         '''
         From Python's docs on the multiprocessing module:

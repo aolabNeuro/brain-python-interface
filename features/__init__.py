@@ -5,6 +5,7 @@ task/experiment by multiple inheritance.
 
 from features.debug_features import Profiler, OnlineAnalysis
 from features.laser_features import QwalorLaser, MultiQwalorLaser, SwitchedQwalorLaser, LaserState
+from features.quattrocento_features import QuattBMI
 from riglib.stereo_opengl.window import WindowWithExperimenterDisplay, Window2D
 from .generator_features import Autostart, AdaptiveGenerator, IgnoreCorrectness, PoissonWait, RandomDelay, Progressbar_fixation
 from .peripheral_device_features import Button, Joystick, DualJoystick, Joystick_plus_TouchSensor, KeyboardControl, MouseControl, ForceControl
@@ -67,6 +68,7 @@ built_in_features = dict(
     ecube_playback_bmi = EcubeFileBMI,
     ecube_bmi = EcubeBMI,
     ecube_start = RecordECube,
+    quatt_bmi = QuattBMI,
     qwalor_laser = QwalorLaser,
     multi_qwalor_laser = MultiQwalorLaser,
     switched_qwalor_laser = SwitchedQwalorLaser,
