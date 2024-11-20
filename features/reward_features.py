@@ -340,7 +340,7 @@ class ScoreRewards(traits.HasTraits):
     def _start_reward(self):
         if hasattr(super(), '_start_reward'):
             super()._start_reward()
-        move_error = aopy.analysis.behavior.compute_movement_error(np.array(self.cursor_traj)[:,:2], self.targs[self.target_index][:2])
+        move_error = aopy.analysis.behavior.compute_movement_error(np.array(self.cursor_traj)[:,:2], self.target_location[[0,2]])
         avg_error = np.mean(move_error)
         score = int(100.0 - avg_error)
         
