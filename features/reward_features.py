@@ -3,6 +3,7 @@ Reward delivery features
 '''
 import time
 import os
+import socket
 import subprocess
 from riglib.experiment import traits
 from riglib.experiment.experiment import control_decorator
@@ -69,6 +70,8 @@ class PelletReward(RewardSystem):
         super(RewardSystem, self).__init__(*args, **kwargs)
         self.reward = RemoteReward()
         self.reportstats['Reward #'] = 0
+        hostname = socket.gethostname()
+        self.device_ip = socket.gethostbyname(hostname)
 
     def _start_reward(self):
         if hasattr(super(RewardSystem, self), '_start_reward'):
@@ -76,9 +79,10 @@ class PelletReward(RewardSystem):
         self.reportstats['Reward #'] += 1
         
         if self.reportstats['Reward #'] % self.trials_per_reward == 0:
-            for _ in range(self.pellets_per_reward): # call trigger num of pellets_per_reward time
-                self.reward.trigger()
-                time.sleep(0.5) # wait for 0.5 seconds
+            for _ in range(self.pellets_per_reward):  # call trigger num of pellets_per_reward time
+                print(self.device_ip)
+                self.reward.trigger(self.device_ip)
+                time.sleep(0.5)  # wait for 0.5 seconds
 
     def _end_reward(self):
         if hasattr(super(RewardSystem, self), '_end_reward'):
