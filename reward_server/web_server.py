@@ -2,10 +2,6 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import time
 from riglib import tablet_reward
 
-# ip address
-# this: 205.175.106.178
-# other: 10.19.216.239
-
 hostName = "0.0.0.0" # open to anyone on the LAN - careful to not run this on the internet!
 serverPort = 8080
 
@@ -26,7 +22,6 @@ class MyServer(BaseHTTPRequestHandler):
         self.wfile.write(bytes("</body></html>", "utf-8"))
 
     def do_POST(self):
-        print('go')
         tab = tablet_reward.open()
         tab.dispense()
         print('I got rest')
@@ -34,6 +29,7 @@ class MyServer(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-type", "text/html")
         self.end_headers()
+
 
 if __name__ == "__main__":        
     webServer = HTTPServer((hostName, serverPort), MyServer)
