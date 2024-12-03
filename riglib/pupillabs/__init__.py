@@ -136,6 +136,18 @@ class System(DataSourceSystem):
         coords = np.expand_dims(coords, axis=0)
         return coords
 
-
     
-class System(DataSourceSystem):
+class NoSurfaceTracking(System):
+
+    def __init__(self, ip="128.95.215.191", port="50020"):
+        '''
+        For eye tracking, need Pupil Capture running in the background (after calibration in Pupil Capture)
+        '''
+        # define a surface AOI
+        
+        # open a req port to talk to pupil
+        self.ip = ip  # remote ip or localhost
+        self.port = port # same as in the pupil remote gui
+        
+        self.mapper = None
+        self.mapped_points = []

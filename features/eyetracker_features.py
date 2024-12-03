@@ -294,8 +294,11 @@ class PupilLabStreaming(traits.HasTraits):
 
         # Visualize eye positions
         from riglib import source
-        from riglib.pupillabs import System
-        self.eye_data = source.DataSource(System)
+        from riglib.pupillabs import System, NoSurfaceTracking
+        if self.surface_marker_count > 0:
+            self.eye_data = source.DataSource(System)
+        else:
+            self.eye_data = source.DataSource(NoSurfaceTracking)
         self.eye_pos = np.zeros((8,))*np.nan
 
     def init(self):
