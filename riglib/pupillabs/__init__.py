@@ -111,13 +111,19 @@ class System(DataSourceSystem):
             if message["topic"].startswith("surfaces"):
                 self.mapper.update_homography(message["img_to_surf_trans"])
 
-            elif message["topic"].startswith("gaze.3d.01"):
+            elif message["topic"].startswith("gaze.3d.01") and self.mapper is not None:
                 mapped_gaze = self.mapper.gaze_to_surface(message["norm_pos"])
                 if mapped_gaze is not None:
                     raw[0] = float(mapped_gaze.norm_x)
                     raw[1] = float(mapped_gaze.norm_y)
                     timestamp = message["timestamp"]
                     confidence = message["confidence"]
+
+            elif message["topic"].startswith("gaze.3d.01"):
+                raw[0] = float(message["norm_pos"][0])
+                raw[1] = float(message["norm_pos"][1])
+                timestamp = message["timestamp"]
+                confidence = message["confidence"]
 
             elif topic.startswith(b"pupil.0.2d"):
                 diameter0 = float(message["diameter"]) # pupil 0 diamter, right eye, unit: pixel
@@ -132,3 +138,4 @@ class System(DataSourceSystem):
 
 
     
+class System(DataSourceSystem):
