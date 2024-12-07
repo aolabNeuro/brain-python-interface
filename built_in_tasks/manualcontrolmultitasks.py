@@ -92,6 +92,10 @@ class ManualControlMixin(traits.HasTraits):
     perturbation_rotation_z = traits.Float(0.0, desc="rotation about bmi3d z-axis in degrees")
     perturbation_rotation_x = traits.Float(0.0, desc="rotation about bmi3d x-axis in degrees")
     offset = traits.Array(value=[0,0,0], desc="Control offset")
+    limit_x = traits.Bool(False, desc="Limit cursor movement to 0 along the x-axis (left-right)")
+    limit_z = traits.Bool(False, desc="Limit cursor movement to 0 along the z-axis (up-down)")
+    limit_y = traits.Bool(True, desc="Limit cursor movement to 0 along the y-axis (into-out of screen)")
+
     is_bmi_seed = True
 
     def __init__(self, *args, **kwargs):
@@ -189,15 +193,13 @@ class ManualControlMixin(traits.HasTraits):
         # Transform coordinates
         coords = self._transform_coords(raw_coords)
         
-        try:
-            if self.limit2d:
-                coords[1] = 0
-            if self.limit1d:
-                coords[1] = 0
-                coords[0] = 0
-        except:
-            if self.limit2d:
-                coords[1] = 0
+        # Limit cursor movement
+        if self.limit_x:
+            coords[0] = 0
+        if self.limit_y:
+            coords[1] = 0
+        if self.limit_z:
+            coords[2] = 0
 
         # Add cursor disturbance
         coords += pos_offset

@@ -79,7 +79,7 @@ class TestManualControlTasks(unittest.TestCase):
     def test_3d(self):
         seq = ManualControl.centerout_2D()
         exp = init_exp(ManualControl, [MouseControl, SpheresToCylinders], seq, stereo_mode='projection',
-                       rotation='xyz', window_size=(1000,800), fullscreen=False, limit2d=False)
+                       rotation='xyz', window_size=(1000,800), fullscreen=False, limit_y=False)
         exp.run()
 
 

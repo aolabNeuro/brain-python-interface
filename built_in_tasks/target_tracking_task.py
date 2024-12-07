@@ -346,9 +346,6 @@ class ScreenTargetTracking(TargetTracking, Window):
     """Concrete implementation of Target Tracking task where the target is moving and
     are tracked by holding the cursor within the moving target"""
 
-    limit2d = traits.Bool(True, desc="Limit cursor movement to 2D")
-    limit1d = traits.Bool(True, desc="Limit cursor movement to 1D")
-
     sequence_generators = [
         'tracking_target_chain', 'tracking_target_debug', 'tracking_target_training'
     ]
@@ -374,6 +371,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     trajectory_amplitude = traits.Float(1, desc='Scale factor applied to the trajectory')
     disturbance_amplitude = traits.Float(1, desc='Scale factors applied to the disturbance')
     always_1d = traits.Bool(False, desc='always constrain movement to 1d')
+    limit_x = traits.Bool(True, desc='limit cursor movement to 0 on the x-axis (left-right)')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -387,10 +385,10 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.plant_vis_prev = True
         self.cursor_vis_prev = True
         self.lookahead = 30 # number of frames to create a "lookahead" window of 0.5 seconds (half the screen)
-        self.original_limit1d = self.limit1d # keep track of original settable trait
+        self.original_limit_x = self.limit_x # keep track of original settable trait
         
         if not self.always_1d:
-            self.limit1d = False # allow 2d movement before center-hold initiation
+            self.limit_x = False # allow 2d movement before center-hold initiation
         
         # Add graphics models for the plant and targets to the window
         if hasattr(self.plant, 'graphics_models'):
@@ -522,7 +520,7 @@ class ScreenTargetTracking(TargetTracking, Window):
 
         # Allow 2d movement
         if not self.always_1d:
-            self.limit1d = False
+            self.limit_x = False
 
         # Set up for progress bar
         self.bar_width = 12        
@@ -605,7 +603,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         # print('START TRACKING')
         self.sync_event('CURSOR_ENTER_TARGET')
         # Revert to settable trait
-        self.limit1d = self.original_limit1d
+        self.limit_x = self.original_limit_x
         # Cue successful tracking
         self.target.cue_trial_end_success()
 
