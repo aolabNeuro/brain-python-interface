@@ -35,9 +35,11 @@ class WindowVR(Window):
     '''
     An OpenXR window for rendering in VR to an HMD
     '''
-    camera_position = traits.Tuple((0, 0, -40), desc="Position of the camera (x,y,z) in cm world coordinates")
-    grid_size = traits.Float(130., desc="Size of the background grid in cm")
-    camera_orientation = traits.Tuple((1, 0, 0, 0), desc="Orientation of the camera (w, x, y, z) as a quaternion")
+    grid_size = traits.Float(130, desc="Size of the grid in cm")
+    grid_position = traits.Tuple((0, 0, 40), desc="Position of the grid in cm. If you want the floor of the grid to be on the floor of the world, set the z component to (grid_size - camera_offset[2])")
+    camera_offset = traits.Tuple((0, 40., 90), desc="Offset virtual screen to the camera in cm")
+    camera_position = traits.Tuple((0, 0, 0), desc="Absolute position of the camera (x,y,z) in cm world coordinates. Only used if fixed_camera_position is True")
+    camera_orientation = traits.Tuple((1, 0, 0, 0), desc="Orientation of the camera (w, x, y, z) as a quaternion. Only used if fixed_camera_orientation is True")
     fixed_camera_position = traits.Bool(False, desc="Fixed position of the camera")
     fixed_camera_orientation = traits.Bool(False, desc="Fixed orientation of the camera")
 
@@ -192,7 +194,7 @@ class WindowVR(Window):
         self.renderer = self._get_renderer()
 
         #this effectively determines the modelview matrix
-        self.add_model(Grid(self.grid_size*2))
+        self.add_model(Grid(self.grid_size*2).translate(self.grid_position))
         self.world = Group(self.models)
         self.world.init()
         self.set_eye((0,0,0), (0,0))
@@ -225,9 +227,9 @@ class WindowVR(Window):
                 position = self.camera_position - np.array([1,0,0])*self.iod*(view_index-0.5)
             else:
                 position = -np.array([
-                    view.pose.position[0]*100 - self.camera_position[0],
-                    view.pose.position[1]*100 - self.camera_position[1] - self.grid_size,
-                    view.pose.position[2]*100 - self.camera_position[2],
+                    view.pose.position[0]*100 - self.camera_position[0] - self.camera_offset[0],
+                    view.pose.position[1]*100 - self.camera_position[1] - self.camera_offset[1],
+                    view.pose.position[2]*100 - self.camera_position[2] - self.camera_offset[2],
                 ]) # Not sure why this needs to be negated, something to do with the handedness of the coordinate system??
             if self.fixed_camera_orientation:
                 rotation = self.camera_orientation
