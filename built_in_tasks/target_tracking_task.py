@@ -603,7 +603,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     def _start_tracking_in(self):
         super()._start_tracking_in()
         # print('START TRACKING')
-        self.sync_event('CURSOR_ENTER_TARGET')
+        self.sync_event('CURSOR_ENTER_TARGET') # TODO add second arg that is 0 during trajectory, 1 during ramp up, 2 during ramp down
         # Revert to settable trait
         self.limit1d = self.original_limit1d
         # Cue successful tracking
@@ -633,7 +633,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     def _start_tracking_out(self):
         super()._start_tracking_out()
         # print('STOP TRACKING')
-        self.sync_event('CURSOR_LEAVE_TARGET')
+        self.sync_event('CURSOR_LEAVE_TARGET') # TODO add second arg that is 0 during trajectory, 1 during ramp up, 2 during ramp down
         # Reset target color
         self.target.reset()
 
