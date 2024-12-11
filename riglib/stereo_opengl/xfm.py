@@ -226,13 +226,16 @@ class Transform(object):
             self.rotate = (rotate * self.rotate).norm()
         return self
     
-    def to_mat(self):
+    def to_mat(self, reverse=False):
         scale = np.eye(4)
         scale[(0,1,2), (0,1,2)] = self.scale
         move = np.eye(4)
         move[:3, -1] = self.move
         
-        return np.dot(move, np.dot(scale, self.rotate.to_mat()))
+        if reverse:
+            return np.dot(self.rotate.to_mat(), np.dot(scale, move))
+        else:
+            return np.dot(move, np.dot(scale, self.rotate.to_mat()))
 
 def test():
     world = Transform().rotate_x(np.radians(-90))

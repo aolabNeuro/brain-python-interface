@@ -134,7 +134,8 @@ class OnlineAnalysis(traits.HasTraits):
         '''
         Send sync events to the online analysis server
         '''
-        self._send_online_analysis_msg('sync_event', event_name, event_data)
+        if not immediate:
+            self._send_online_analysis_msg('sync_event', event_name, event_data)
         super().sync_event(event_name, event_data=event_data, immediate=immediate)
 
 class ReplayCursor():
