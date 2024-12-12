@@ -194,7 +194,7 @@ class WindowVR(Window):
         self.renderer = self._get_renderer()
 
         #this effectively determines the modelview matrix
-        self.add_model(Grid(self.grid_size*2).translate(self.grid_position))
+        self.add_model(Grid(self.grid_size*2).translate(self.grid_position[0], self.grid_position[1], self.grid_position[2]))
         self.world = Group(self.models)
         self.world.init()
         self.set_eye((0,0,0), (0,0))
@@ -227,9 +227,9 @@ class WindowVR(Window):
                 position = self.camera_position - np.array([1,0,0])*self.iod*(view_index-0.5)
             else:
                 position = -np.array([
-                    view.pose.position[0]*100 - self.camera_position[0] - self.camera_offset[0],
-                    view.pose.position[1]*100 - self.camera_position[1] - self.camera_offset[1],
-                    view.pose.position[2]*100 - self.camera_position[2] - self.camera_offset[2],
+                    view.pose.position[0]*100 + self.camera_offset[0],
+                    view.pose.position[1]*100 + self.camera_offset[1],
+                    view.pose.position[2]*100 + self.camera_offset[2],
                 ]) # Not sure why this needs to be negated, something to do with the handedness of the coordinate system??
             if self.fixed_camera_orientation:
                 rotation = self.camera_orientation
