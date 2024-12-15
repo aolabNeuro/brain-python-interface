@@ -88,6 +88,7 @@ class TargetTracking(Sequence):
         self.disturbance_trial = False
         self.repeat_freq_set = False
         self.gen_index = -1
+        self.ramp_counter = 0
 
         if self.velocity_control:
             print('VELOCITY CONTROL')
@@ -188,6 +189,28 @@ class TargetTracking(Sequence):
         self.vel_offset = [0,0,0]
 
     def _end_hold(self):
+        '''Nothing generic to do.'''
+        pass
+
+    def _start_tracking_in_ramp(self):
+        self.ramp_counter += 1
+
+    def _while_tracking_in_ramp(self):
+        '''Nothing generic to do.'''
+        pass
+
+    def _end_tracking_in_ramp(self):
+        '''Nothing generic to do.'''
+        pass
+
+    def _start_tracking_out_ramp(self):
+        self.ramp_counter += 1
+
+    def _while_tracking_out_ramp(self):
+        '''Nothing generic to do.'''
+        pass
+
+    def _end_tracking_out_ramp(self):
         '''Nothing generic to do.'''
         pass
 
@@ -605,12 +628,45 @@ class ScreenTargetTracking(TargetTracking, Window):
         super()._while_hold()
         # # Add disturbance
 
+    def _start_tracking_in_ramp(self):
+        super()._start_tracking_in_ramp()
+        # print('START TRACKING RAMP')
+        self.sync_event('CURSOR_ENTER_TARGET', self.ramp_counter)
+
+        # Revert to settable trait
+        self.limit1d = self.original_limit1d
+
+        # Cue successful tracking
+        self.target.cue_trial_end_success()
+
+    def _while_tracking_in_ramp(self):
+        super()._while_tracking_in_ramp()
+
+        # Add disturbance
+        cursor_pos = self.plant.get_endpoint_pos()
+        if self.disturbance_trial == True:
+            if self.velocity_control:
+                # TODO check manualcontrolmixin for how to implement velocity control
+                self.vel_offset = (cursor_pos + self.disturbance_path[self.frame_index])*1/self.fps
+            else: 
+                # position control
+                self.pos_offset = self.disturbance_path[self.frame_index]
+
+        # Move target and trajectory to next frame so it appears to be moving
+        self.update_frame()
+
+        # Check if the trial is over and there are no more target frames to display
+        if self.frame_index+self.lookahead >= np.shape(self.targs)[0]:
+            self.trial_timed_out = True
+        
     def _start_tracking_in(self):
         super()._start_tracking_in()
         # print('START TRACKING')
-        self.sync_event('CURSOR_ENTER_TARGET') # TODO add second arg that is 0 during trajectory, 1 during ramp up, 2 during ramp down
+        self.sync_event('CURSOR_ENTER_TARGET')
+
         # Revert to settable trait
         self.limit1d = self.original_limit1d
+
         # Cue successful tracking
         self.target.cue_trial_end_success()
 
@@ -634,11 +690,39 @@ class ScreenTargetTracking(TargetTracking, Window):
         if self.frame_index+self.lookahead >= np.shape(self.targs)[0]:
             self.trial_timed_out = True
             
+    def _start_tracking_out_ramp(self):
+        super()._start_tracking_out_ramp()
+        # print('STOP TRACKING')
+        self.sync_event('CURSOR_LEAVE_TARGET', self.ramp_counter)
+
+        # Reset target color
+        self.target.reset()
+
+    def _while_tracking_out_ramp(self):
+        super()._while_tracking_out_ramp()
+
+        # Add disturbance
+        cursor_pos = self.plant.get_endpoint_pos()
+        if self.disturbance_trial == True:
+            if self.velocity_control:
+                # TODO check manualcontrolmixin for how to implement velocity control
+                self.vel_offset = (cursor_pos + self.disturbance_path[self.frame_index])*1/self.fps
+            else: 
+                # position control
+                self.pos_offset = self.disturbance_path[self.frame_index]
+
+        # Move target and trajectory to next frame so it appears to be moving
+        self.update_frame()
+
+        # Check if the trial is over and there are no more target frames to display
+        if self.frame_index+self.lookahead >= np.shape(self.targs)[0]:
+            self.trial_timed_out = True
 
     def _start_tracking_out(self):
         super()._start_tracking_out()
         # print('STOP TRACKING')
-        self.sync_event('CURSOR_LEAVE_TARGET') # TODO add second arg that is 0 during trajectory, 1 during ramp up, 2 during ramp down
+        self.sync_event('CURSOR_LEAVE_TARGET')
+        
         # Reset target color
         self.target.reset()
 
@@ -965,7 +1049,7 @@ class ScreenTargetTracking(TargetTracking, Window):
                 ref_trajectory[:,2] = trials['ref'][trial_id]
                 dis_trajectory[:,2] = trials['dis'][trial_id] # scale will determine lower limit of target size for perfect tracking
                 pts.append(ref_trajectory)
-                yield idx, pts, disturbance, dis_trajectory, sample_rate
+                yield idx, pts, disturbance, dis_trajectory, sample_rate, ramp, ramp_down
                 idx += 1
 
     @staticmethod
