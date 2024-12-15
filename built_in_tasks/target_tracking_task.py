@@ -515,24 +515,6 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.trajectory.show()
         self.frame_index +=1
 
-    #### TEST FUNCTIONS ####
-    def _test_enter_target(self, time_in_state):
-        '''
-        Test if the cursor is inside the center target 
-        '''
-        cursor_pos = self.plant.get_endpoint_pos()
-        d = np.linalg.norm(cursor_pos - self.target.get_position())
-        return d <= (self.target_radius - self.cursor_radius) or super()._test_enter_target(time_in_state) or (self.hold_time==0 and self.state=='trajectory')
-
-    def _test_leave_target(self, time_in_state):
-        '''
-        Test if the cursor is outside the center target
-        '''
-        cursor_pos = self.plant.get_endpoint_pos()
-        d = np.linalg.norm(cursor_pos - self.target.get_position())
-        return d > (self.target_radius - self.cursor_radius) or super()._test_leave_target(time_in_state)
-
-    #### STATE FUNCTIONS ####
     def setup_start_wait(self):
         if self.calc_trial_num() == 0:
             # Instantiate the targets here so they don't show up in any states that might come before "wait" 
@@ -583,6 +565,52 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.bar.hide()
         self.bar.reset()
 
+    def setup_start_tracking_in(self):
+        # Revert to settable trait
+        self.limit1d = self.original_limit1d
+        # Cue successful tracking
+        self.target.cue_trial_end_success()
+
+    def setup_start_tracking_out(self):
+        # Reset target color
+        self.target.reset()
+
+    def setup_while_tracking(self):
+        # Add disturbance
+        cursor_pos = self.plant.get_endpoint_pos()
+        if self.disturbance_trial == True:
+            if self.velocity_control:
+                # TODO check manualcontrolmixin for how to implement velocity control
+                self.vel_offset = (cursor_pos + self.disturbance_path[self.frame_index])*1/self.fps
+            else: 
+                # position control
+                self.pos_offset = self.disturbance_path[self.frame_index]
+
+        # Move target and trajectory to next frame so it appears to be moving
+        self.update_frame()
+
+        # Check if the trial is over and there are no more target frames to display
+        if self.frame_index+self.lookahead >= np.shape(self.targs)[0]:
+            self.trial_timed_out = True
+
+    #### TEST FUNCTIONS ####
+    def _test_enter_target(self, time_in_state):
+        '''
+        Test if the cursor is inside the center target 
+        '''
+        cursor_pos = self.plant.get_endpoint_pos()
+        d = np.linalg.norm(cursor_pos - self.target.get_position())
+        return d <= (self.target_radius - self.cursor_radius) or super()._test_enter_target(time_in_state) or (self.hold_time==0 and self.state=='trajectory')
+
+    def _test_leave_target(self, time_in_state):
+        '''
+        Test if the cursor is outside the center target
+        '''
+        cursor_pos = self.plant.get_endpoint_pos()
+        d = np.linalg.norm(cursor_pos - self.target.get_position())
+        return d > (self.target_radius - self.cursor_radius) or super()._test_leave_target(time_in_state)
+
+    #### STATE FUNCTIONS ####
     def _start_wait(self):
         super()._start_wait()
         self.setup_start_wait()
@@ -598,7 +626,6 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def _while_wait_retry(self):
         super()._while_wait_retry()
-        # # Add disturbance
 
     def _start_trajectory(self):
         super()._start_trajectory()
@@ -615,7 +642,6 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def _while_trajectory(self):
         super()._while_trajectory()
-        # # Add disturbance
 
     def _start_hold(self):
         super()._start_hold()
@@ -626,125 +652,46 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def _while_hold(self):
         super()._while_hold()
-        # # Add disturbance
 
     def _start_tracking_in_ramp(self):
         super()._start_tracking_in_ramp()
+        self.setup_start_tracking_in()
         # print('START TRACKING RAMP')
         self.sync_event('CURSOR_ENTER_TARGET', self.ramp_counter)
 
-        # Revert to settable trait
-        self.limit1d = self.original_limit1d
-
-        # Cue successful tracking
-        self.target.cue_trial_end_success()
-
     def _while_tracking_in_ramp(self):
         super()._while_tracking_in_ramp()
-
-        # Add disturbance
-        cursor_pos = self.plant.get_endpoint_pos()
-        if self.disturbance_trial == True:
-            if self.velocity_control:
-                # TODO check manualcontrolmixin for how to implement velocity control
-                self.vel_offset = (cursor_pos + self.disturbance_path[self.frame_index])*1/self.fps
-            else: 
-                # position control
-                self.pos_offset = self.disturbance_path[self.frame_index]
-
-        # Move target and trajectory to next frame so it appears to be moving
-        self.update_frame()
-
-        # Check if the trial is over and there are no more target frames to display
-        if self.frame_index+self.lookahead >= np.shape(self.targs)[0]:
-            self.trial_timed_out = True
+        self.setup_while_tracking()
         
     def _start_tracking_in(self):
         super()._start_tracking_in()
+        self.setup_start_tracking_in()
         # print('START TRACKING')
         self.sync_event('CURSOR_ENTER_TARGET')
 
-        # Revert to settable trait
-        self.limit1d = self.original_limit1d
-
-        # Cue successful tracking
-        self.target.cue_trial_end_success()
-
     def _while_tracking_in(self):
         super()._while_tracking_in()
-    
-        # Add disturbance
-        cursor_pos = self.plant.get_endpoint_pos()
-        if self.disturbance_trial == True:
-            if self.velocity_control:
-                # TODO check manualcontrolmixin for how to implement velocity control
-                self.vel_offset = (cursor_pos + self.disturbance_path[self.frame_index])*1/self.fps
-            else: 
-                # position control
-                self.pos_offset = self.disturbance_path[self.frame_index]
-
-        # Move target and trajectory to next frame so it appears to be moving
-        self.update_frame()
-
-        # Check if the trial is over and there are no more target frames to display
-        if self.frame_index+self.lookahead >= np.shape(self.targs)[0]:
-            self.trial_timed_out = True
+        self.setup_while_tracking()
             
     def _start_tracking_out_ramp(self):
         super()._start_tracking_out_ramp()
+        self.setup_start_tracking_out()
         # print('STOP TRACKING')
         self.sync_event('CURSOR_LEAVE_TARGET', self.ramp_counter)
 
-        # Reset target color
-        self.target.reset()
-
     def _while_tracking_out_ramp(self):
         super()._while_tracking_out_ramp()
-
-        # Add disturbance
-        cursor_pos = self.plant.get_endpoint_pos()
-        if self.disturbance_trial == True:
-            if self.velocity_control:
-                # TODO check manualcontrolmixin for how to implement velocity control
-                self.vel_offset = (cursor_pos + self.disturbance_path[self.frame_index])*1/self.fps
-            else: 
-                # position control
-                self.pos_offset = self.disturbance_path[self.frame_index]
-
-        # Move target and trajectory to next frame so it appears to be moving
-        self.update_frame()
-
-        # Check if the trial is over and there are no more target frames to display
-        if self.frame_index+self.lookahead >= np.shape(self.targs)[0]:
-            self.trial_timed_out = True
+        self.setup_while_tracking()
 
     def _start_tracking_out(self):
         super()._start_tracking_out()
+        self.setup_start_tracking_out()
         # print('STOP TRACKING')
         self.sync_event('CURSOR_LEAVE_TARGET')
-        
-        # Reset target color
-        self.target.reset()
 
     def _while_tracking_out(self):
         super()._while_tracking_out()
-
-        # Add disturbance
-        cursor_pos = self.plant.get_endpoint_pos()
-        if self.disturbance_trial == True:
-            if self.velocity_control:
-                # TODO check manualcontrolmixin for how to implement velocity control
-                self.vel_offset = (cursor_pos + self.disturbance_path[self.frame_index])*1/self.fps
-            else: 
-                # position control
-                self.pos_offset = self.disturbance_path[self.frame_index]
-
-        # Move target and trajectory to next frame so it appears to be moving
-        self.update_frame()
-
-        # Check if the trial is over and there are no more target frames to display
-        if self.frame_index+self.lookahead >= np.shape(self.targs)[0]:
-            self.trial_timed_out = True
+        self.setup_while_tracking()
 
     def _start_timeout_penalty(self):
         super()._start_timeout_penalty()
