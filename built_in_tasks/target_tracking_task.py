@@ -331,10 +331,10 @@ class TargetTracking(Sequence):
     def _test_traj_complete(self, time_in_state):
         return self.frame_index + self.lookahead == self.trajectory_length - self.ramp_down_time*self.sample_rate
 
-    def _test_ramp_and_trial_complete(self, time_in_state):
+    def _test_ramp_and_trial_complete(self, time_in_state): # TODO works with nonzero ramps, check when one/both ramps = 0s
         return self.frame_index + self.lookahead == self.trajectory_length
 
-    def _test_trial_complete(self, time_in_state):
+    def _test_trial_complete(self, time_in_state): # TODO is separate test function needed?
         '''Test whether the trajectory is finished'''
         return self.frame_index + self.lookahead == self.trajectory_length
 
@@ -666,7 +666,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         super()._start_tracking_in_ramp()
         self.setup_start_tracking_in()
         print('START TRACKING RAMP')
-        self.sync_event('CURSOR_ENTER_TARGET', self.ramp_counter)
+        self.sync_event('CURSOR_ENTER_TARGET', self.ramp_counter) # TODO test when there is only a ramp down
 
     def _while_tracking_in_ramp(self):
         super()._while_tracking_in_ramp()
