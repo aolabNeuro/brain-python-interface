@@ -43,9 +43,14 @@ class TargetTracking(Sequence):
         wait = dict(start_trial="trajectory", start_pause="pause"),
         wait_retry = dict(start_trial="trajectory", start_pause="pause"),
         trajectory = dict(enter_target="hold", timeout="timeout_penalty", start_pause="pause"),
-        hold = dict(hold_complete="tracking_in", leave_target="hold_penalty", start_pause="pause"),
-        tracking_in = dict(trial_complete="reward", leave_target="tracking_out", start_pause="pause"),
-        tracking_out = dict(trial_complete="reward", enter_target="tracking_in", tracking_out_timeout="tracking_out_penalty", start_pause="pause"),
+        hold = dict(hold_complete="tracking_in_ramp", leave_target="hold_penalty", start_pause="pause"),
+
+        tracking_in_ramp = dict(ramp_complete="tracking_in", ramp_and_trial_complete="reward", leave_target="tracking_out_ramp", start_pause="pause"),
+        tracking_out_ramp = dict(ramp_complete="tracking_out", ramp_and_trial_complete="reward", enter_target="tracking_in_ramp", tracking_out_timeout="tracking_out_penalty", start_pause="pause"),
+        
+        tracking_in = dict(traj_complete="tracking_in_ramp", trial_complete="reward", leave_target="tracking_out", start_pause="pause"),
+        tracking_out = dict(traj_complete="tracking_out_ramp", trial_complete="reward", enter_target="tracking_in", tracking_out_timeout="tracking_out_penalty", start_pause="pause"),
+        
         timeout_penalty = dict(timeout_penalty_end="wait", start_pause="pause", end_state=True),
         hold_penalty = dict(hold_penalty_end="wait", hold_penalty_end_retry="wait_retry", start_pause="pause", end_state=True),
         tracking_out_penalty = dict(tracking_out_penalty_end="wait", start_pause="pause", end_state=True),
