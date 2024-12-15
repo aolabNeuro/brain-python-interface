@@ -99,8 +99,8 @@ class TargetTracking(Sequence):
 
     def _parse_next_trial(self):
         '''Get the required data from the generator'''
-        # yield idx, pts, disturbance, dis_trajectory, sample_rate :
-        self.gen_index, self.targs, self.disturbance_trial, self.disturbance_path, self.sample_rate = self.next_trial # targs and disturbance are same length
+        # yield idx, targs, disturbance, dis_trajectory, sample_rate, ramp, ramp_down :
+        self.gen_index, self.targs, self.disturbance_trial, self.disturbance_path, self.sample_rate, self.ramp_up_time, self.ramp_down_time = self.next_trial # targs and disturbance are same length
 
         self.targs = np.squeeze(self.targs,axis=0)
         self.disturbance_path = np.squeeze(self.disturbance_path)
@@ -324,6 +324,15 @@ class TargetTracking(Sequence):
             - Manually triggered by experimenter
         '''
         return time_in_state > self.hold_time
+
+    def _test_ramp_complete(self, time_in_state):
+        return self.frame_index + self.lookahead == self.ramp_up_time*self.sample_rate
+
+    def _test_traj_complete(self, time_in_state):
+        return self.frame_index + self.lookahead == self.trajectory_length - self.ramp_down_time*self.sample_rate
+
+    def _test_ramp_and_trial_complete(self, time_in_state):
+        return self.frame_index + self.lookahead == self.trajectory_length
 
     def _test_trial_complete(self, time_in_state):
         '''Test whether the trajectory is finished'''
@@ -656,7 +665,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     def _start_tracking_in_ramp(self):
         super()._start_tracking_in_ramp()
         self.setup_start_tracking_in()
-        # print('START TRACKING RAMP')
+        print('START TRACKING RAMP')
         self.sync_event('CURSOR_ENTER_TARGET', self.ramp_counter)
 
     def _while_tracking_in_ramp(self):
@@ -666,7 +675,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     def _start_tracking_in(self):
         super()._start_tracking_in()
         self.setup_start_tracking_in()
-        # print('START TRACKING')
+        print('START TRACKING')
         self.sync_event('CURSOR_ENTER_TARGET')
 
     def _while_tracking_in(self):
@@ -676,7 +685,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     def _start_tracking_out_ramp(self):
         super()._start_tracking_out_ramp()
         self.setup_start_tracking_out()
-        # print('STOP TRACKING')
+        print('STOP TRACKING RAMP')
         self.sync_event('CURSOR_LEAVE_TARGET', self.ramp_counter)
 
     def _while_tracking_out_ramp(self):
@@ -686,7 +695,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     def _start_tracking_out(self):
         super()._start_tracking_out()
         self.setup_start_tracking_out()
-        # print('STOP TRACKING')
+        print('STOP TRACKING')
         self.sync_event('CURSOR_LEAVE_TARGET')
 
     def _while_tracking_out(self):
@@ -979,7 +988,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         Returns
         -------
         idx : [nblocks*ntrials x 1] array of trial indices
-        pts : [nblocks*ntrials x 1] array of 3D target coordinates
+        targs : [nblocks*ntrials x 1] array of 3D target coordinates
         disturbance : boolean
         dis_trajectory : [nblocks*ntrials x 1] array of 3D disturbance coordinates
         '''
@@ -990,13 +999,13 @@ class ScreenTargetTracking(TargetTracking, Window):
                 num_trials=ntrials, time_length=time_length, seed=seed, sample_rate=sample_rate, base_period=base_period, ramp=ramp, ramp_down=ramp_down, num_primes=num_primes
                 )
             for trial_id in range(ntrials):
-                pts = []
+                targs = []
                 ref_trajectory = np.zeros((int((time_length+ramp+ramp_down)*sample_rate),3))
                 dis_trajectory = ref_trajectory.copy()
                 ref_trajectory[:,2] = trials['ref'][trial_id]
                 dis_trajectory[:,2] = trials['dis'][trial_id] # scale will determine lower limit of target size for perfect tracking
-                pts.append(ref_trajectory)
-                yield idx, pts, disturbance, dis_trajectory, sample_rate, ramp, ramp_down
+                targs.append(ref_trajectory)
+                yield idx, targs, disturbance, dis_trajectory, sample_rate, ramp, ramp_down
                 idx += 1
 
     @staticmethod
@@ -1015,13 +1024,13 @@ class ScreenTargetTracking(TargetTracking, Window):
                 #     plt.figure(); plt.plot(trials['times'][trial_id],trials['ref'][trial_id])
                 #     plt.plot(trials['times'][trial_id],trials['dis'][trial_id])
                 #     plt.show()
-                pts = []
+                targs = []
                 ref_trajectory = np.zeros((int((time_length+ramp)*sample_rate),3))
                 dis_trajectory = ref_trajectory.copy()
                 ref_trajectory[:,2] = trials['ref'][trial_id]
                 dis_trajectory[:,2] = trials['dis'][trial_id] # scale will determine lower limit of target size for perfect tracking
-                pts.append(ref_trajectory)
-                yield idx, pts, disturbance, dis_trajectory, sample_rate
+                targs.append(ref_trajectory)
+                yield idx, targs, disturbance, dis_trajectory, sample_rate, ramp, ramp
                 idx += 1
     
     @staticmethod
