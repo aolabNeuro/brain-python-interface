@@ -295,7 +295,7 @@ class TrackingRewards(traits.HasTraits):
 
 class ScoreRewards(traits.HasTraits):
     '''
-    Add a "score" to the task that awards points based on target acquisition speed. 
+    Add a "score" to the task that awards points based on movement error in 2D. 
     The score is displayed after each reward and on the web GUI. The running score also gets
     saved as a value in the task data called 'reward_score'.
 
@@ -316,26 +316,6 @@ class ScoreRewards(traits.HasTraits):
         super().init()
         self.task_data['reward_score'] = 0
 
-
-#   def _start_reward(self):
-#        if hasattr(super(), '_start_reward'):
-#            super()._start_reward()
-#        timed_state = None
-#        idx = -1
-#        while timed_state is None and -idx-1 < len(self.state_log):
-#            if self.state_log[idx][0] == self.score_timed_state:
-#                timed_state = self.state_log[-1][1] - self.state_log[idx][1]
-#            idx -= 1
-#        if timed_state is None or timed_state == 0.:
-#            score = 0.
-#        else:
-#            score = 10*int(10./timed_state)
-#        self.reportstats['Score'] += score
-#        self.score_display = TextTarget(str(score), height=self.score_display_height, 
-#                                        color=self.score_display_color)
-#        self.score_display.move_to_position(self.score_display_location)
-#        self.add_model(self.score_display.model)
-#        self.task_data['reward_score'] += score
 
     def _start_reward(self):
         if hasattr(super(), '_start_reward'):
@@ -362,6 +342,29 @@ class ScoreRewards(traits.HasTraits):
             super()._end_reward()
         self.remove_model(self.score_display.model)
 
+class TimedScoreRewards(ScoreRewards):
+    '''
+    Add a "score" to the task that awards points based on target acquisition speed.
+    '''
+    def _start_reward(self):
+       if hasattr(super(), '_start_reward'):
+           super()._start_reward()
+       timed_state = None
+       idx = -1
+       while timed_state is None and -idx-1 < len(self.state_log):
+           if self.state_log[idx][0] == self.score_timed_state:
+               timed_state = self.state_log[-1][1] - self.state_log[idx][1]
+           idx -= 1
+       if timed_state is None or timed_state == 0.:
+           score = 0.
+       else:
+           score = 10*int(10./timed_state)
+       self.reportstats['Score'] += score
+       self.score_display = TextTarget(str(score), height=self.score_display_height, 
+                                       color=self.score_display_color)
+       self.score_display.move_to_position(self.score_display_location)
+       self.add_model(self.score_display.model)
+       self.task_data['reward_score'] += score
 
 """"" BELOW THIS IS ALL THE OLD CODE ASSOCIATED WITH REWARD FEATURES"""
 
