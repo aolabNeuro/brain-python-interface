@@ -302,7 +302,7 @@ class ScoreRewards(traits.HasTraits):
     Note:
         Only works with target acquisition tasks.
     '''
-    score_display_location = traits.Tuple((10, 0, 10), desc="Location to display the score (in cm)")
+    score_display_location = traits.Tuple((0, 0, 0), desc="Location to display the score (in cm)")
     score_display_height = traits.Float(1, desc="Height of the score display (in cm)")
     score_display_color = traits.Tuple((1, 1, 1, 1), desc="Color of the score display")
     score_timed_state = traits.String("target", desc="State to display the score after")
@@ -340,10 +340,16 @@ class ScoreRewards(traits.HasTraits):
     def _start_reward(self):
         if hasattr(super(), '_start_reward'):
             super()._start_reward()
-        move_error = aopy.analysis.behavior.compute_movement_error(np.array(self.cursor_traj)[:,:2], self.target_location[[0,2]])
-        avg_error = np.mean(move_error)
-        score = int(100.0 - avg_error)
-        
+
+        move_error = aopy.analysis.behavior.compute_movement_error(np.array(self.cursor_traj)[:,[0,2]], self.target_location[[0,2]])
+        avg_error = np.mean(abs(move_error))
+        score = int(100 - min(100, avg_error*20))
+
+        # import matplotlib.pyplot as plt
+        # plt.figure()
+        # plt.plot(move_error)        
+        # plt.show()
+
         self.reportstats['Score'] += score
         self.score_display = TextTarget(str(score), height=self.score_display_height, 
                                         color=self.score_display_color)
