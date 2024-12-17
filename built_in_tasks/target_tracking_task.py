@@ -142,6 +142,9 @@ class TargetTracking(Sequence):
         # saved plant poitions
         self.plant_position = []
 
+        # reset ramp counter
+        self.ramp_counter = 0
+
     def _start_wait(self):
         # Call parent method to draw the next target capture sequence from the generator
         super()._start_wait()
@@ -193,7 +196,8 @@ class TargetTracking(Sequence):
         pass
 
     def _start_tracking_in_ramp(self):
-        self.ramp_counter += 1
+        '''Nothing generic to do.'''
+        pass
 
     def _while_tracking_in_ramp(self):
         '''Nothing generic to do.'''
@@ -204,7 +208,8 @@ class TargetTracking(Sequence):
         pass
 
     def _start_tracking_out_ramp(self):
-        self.ramp_counter += 1
+        '''Nothing generic to do.'''
+        pass
 
     def _while_tracking_out_ramp(self):
         '''Nothing generic to do.'''
@@ -323,15 +328,20 @@ class TargetTracking(Sequence):
             - Sensorized object moved to the required location
             - Manually triggered by experimenter
         '''
+        self.ramp_counter = 1 # up ramp
         return time_in_state > self.hold_time
 
     def _test_ramp_complete(self, time_in_state):
-        return self.frame_index + self.lookahead == self.ramp_up_time*self.sample_rate
+        print(time_in_state)
+        return self.frame_index == self.ramp_up_time*self.sample_rate
 
     def _test_traj_complete(self, time_in_state):
+        print(time_in_state)
+        self.ramp_counter = 2 # down ramp
         return self.frame_index + self.lookahead == self.trajectory_length - self.ramp_down_time*self.sample_rate
 
     def _test_ramp_and_trial_complete(self, time_in_state): # TODO works with nonzero ramps, check when one/both ramps = 0s
+        print(time_in_state)
         return self.frame_index + self.lookahead == self.trajectory_length
 
     def _test_trial_complete(self, time_in_state): # TODO is separate test function needed?
