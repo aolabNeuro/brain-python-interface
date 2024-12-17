@@ -51,7 +51,7 @@ class Window(LogExperiment):
     stereo_mode = traits.OptionsList(['hmd', 'mirror', 'projection', 'anaglyph'], desc="Stereo mode", 
                                      bmi3d_input_options=['hmd', 'mirror', 'projection', 'anaglyph'])
 
-    show_environment = traits.Int(0, desc="Show wireframe box around environment")
+    show_environment = traits.Bool(False, desc="Show wireframe box around environment")
 
     hidden_traits = ['stereo_mode', 'screen_dist', 'screen_half_height', 'iod', 'show_environment', 'background']
 
@@ -66,11 +66,6 @@ class Window(LogExperiment):
         # os.popen('sudo vbetool dpms on')
         self.fov = np.degrees(np.arctan(self.screen_half_height/self.screen_dist))*2
         self.screen_cm = [2 * self.screen_half_height * self.window_size[0]/self.window_size[1], 2 * self.screen_half_height]
-
-        if self.show_environment == 1:
-            self.add_model(Box())
-        elif self.show_environment == 2:
-            self.add_model(Grid(size=20))
 
     def set_os_params(self):
         os.environ['SDL_VIDEO_WINDOW_POS'] = self.display_start_pos
@@ -118,6 +113,9 @@ class Window(LogExperiment):
         self.renderer = self._get_renderer()
 
         pygame.mouse.set_visible(False)
+
+        if self.show_environment:
+            self.add_model(Box())
     
     def _get_renderer(self):
         near = 1
