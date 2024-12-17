@@ -99,7 +99,7 @@ class Model(object):
 
         Returns: None
         '''
-        
+
         glUniformMatrix4fv(ctx.uniforms.xfm, 1, GL_TRUE, self._xfm.to_mat().astype(np.float32))
         glUniform4f(ctx.uniforms.basecolor, *kwargs.pop('color', self.color))
         glUniform4f(ctx.uniforms.spec_color, *kwargs.pop('specular_color', self.spec_color))
@@ -149,7 +149,8 @@ class Group(Model):
                 yield out
     
     def draw(self, ctx, **kwargs):
-        for model in self.models:
+        sorted_models = sorted(self.models, key=lambda obj: -obj.xfm.move[1])
+        for model in sorted_models:
             model.draw(ctx, **kwargs)
     
     def __getitem__(self, idx):
@@ -194,6 +195,7 @@ class TriMesh(Model):
     def init(self):
         allocated = super(TriMesh, self).init()
         if not allocated:
+            self.vao = glGenVertexArrays(1)
             self.vbuf = glGenBuffers(1)
             self.ebuf = glGenBuffers(1)
             glBindBuffer(GL_ARRAY_BUFFER, self.vbuf)
@@ -218,6 +220,7 @@ class TriMesh(Model):
     
     def draw(self, ctx):
         super(TriMesh, self).draw(ctx)
+        glBindVertexArray(self.vao)  # Bind VAO
         glEnableVertexAttribArray(ctx.attributes['position'])
         glBindBuffer(GL_ARRAY_BUFFER, self.vbuf)
         glVertexAttribPointer( ctx.attributes['position'],
@@ -249,6 +252,8 @@ class TriMesh(Model):
             glDisableVertexAttribArray(ctx.attributes['texcoord'])
         if self.normals is not None and ctx.attributes['normal'] != -1:
             glDisableVertexAttribArray(ctx.attributes['normal'])
+        glBindVertexArray(0)  # Unbind VAO
+
 
 class FlatMesh(TriMesh):
     '''Takes smoothed or no-normal meshes and gives them a flat shading'''
