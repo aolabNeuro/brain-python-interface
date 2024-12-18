@@ -49,6 +49,7 @@ class WindowVR(Window):
     def init(self):
         self.add_dtype('view_pose_position', 'f8', (2,3))
         self.add_dtype('view_pose_rotation', 'f8', (2,4))
+        self.add_dtype('modelview', 'f8', (2,4,4))
         super().init()
 
     def screen_init(self):
@@ -251,12 +252,13 @@ class WindowVR(Window):
 
             # Draw the world
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-            self.renderer.draw(self.world, p_matrix=projection, modelview=self.modelview) #to_view.as_numpy().reshape(4,4))
+            self.renderer.draw(self.world, p_matrix=projection, modelview=self.modelview)
         
             # Save the pose data
             if hasattr(self, 'task_data'):
                 self.task_data['view_pose_position'][:,view_index,:] = position
                 self.task_data['view_pose_rotation'][:,view_index,:] = rotation
+                self.task_data['modelview'][:,view_index] = self.modelview
 
         self.renderer.draw_done()
 
