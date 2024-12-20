@@ -8,12 +8,12 @@ compfilt = tables.Filters(complevel=5, complib="zlib", shuffle=True)
 
 class SupplementaryHDF(object):
 
-    def __init__(self, channels, sink_dtype, source, data_dir='/storage/supp_hdf/'):
+    def __init__(self, channels, sink_dtype, source, data_dir='/var/tmp/'):
 
         dt = datetime.datetime.now()
         tm = dt.time()
         self.filename = 'tmp_'+str(source)+str(dt.year)+str(dt.month)+str(dt.day)+'_'+tm.isoformat()+'.hdf'
-        self.h5_file = tables.openFile(os.path.join(data_dir, self.filename), "w")
+        self.h5_file = tables.open_file(os.path.join(data_dir, self.filename), "w")
 
         #If sink datatype is not specified: 
         if sink_dtype is None:
@@ -24,7 +24,7 @@ class SupplementaryHDF(object):
 
         else:
             self.send_to_sinks_dtype = sink_dtype
-        self.supp_data = self.h5_file.createTable("/", "data", self.send_to_sinks_dtype, filters=compfilt)
+        self.supp_data = self.h5_file.create_table("/", "data", self.send_to_sinks_dtype, filters=compfilt)
 
     def add_data(self, data):
         self.supp_data.append(data)
