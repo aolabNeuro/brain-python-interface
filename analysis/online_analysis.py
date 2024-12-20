@@ -137,7 +137,7 @@ class BehaviorAnalysisWorker(AnalysisWorker):
     calibration coefficients are available. 
     '''
    
-    def __init__(self, task_params, data_queue, calibration_dir='/var/tmp', buffer_time=10, ylim=1, px_per_cm=51.67, **kwargs):
+    def __init__(self, task_params, data_queue, calibration_dir='/var/tmp', buffer_time=1, ylim=1, px_per_cm=51.67, **kwargs):
         super().__init__(task_params, data_queue, **kwargs)
         self.calibration_dir = calibration_dir
         self.buffer_time = buffer_time
@@ -155,7 +155,7 @@ class BehaviorAnalysisWorker(AnalysisWorker):
         self.eye_coeff = np.array([[1,0],[1,0]])
         self.eye_coeff_corr = 0.5 # Don't accept anything lower than 0.5 by default
         
-        self.eye_diam = np.zeros((int(self.buffer_time*self.task_params['fps']), int(2)))
+        self.eye_diam = np.zeros((int(self.buffer_time*self.task_params['fps']), 3))
 
         # Load previous calibration if it exists
         subject = self.task_params.get('subject_name', 'None')
@@ -186,6 +186,8 @@ class BehaviorAnalysisWorker(AnalysisWorker):
         self.diam_ax.set_xlabel('Time (s)')
         self.diam_ax.set_ylabel('Eye Diameter (cm)')
         self.diam_plot = self.diam_ax.plot([], [], 'green')[0]
+        self.x_plot = self.diam_ax.plot([], [], 'blue')[0]
+        self.y_plot = self.diam_ax.plot([], [], 'cyan')[0]
 
 
     def update_eye_calibration(self):
@@ -244,7 +246,7 @@ class BehaviorAnalysisWorker(AnalysisWorker):
             self.eye_pos = np.array(values[0])[:2]
 
             # Update eye diameter
-            self.temp = np.array(values[0])[4:]
+            self.temp = np.array(values[0])[[0,1,4]]
             self.eye_diam = np.roll(self.eye_diam, -1, axis=0)
             self.eye_diam[-1] = self.temp
 
@@ -267,8 +269,12 @@ class BehaviorAnalysisWorker(AnalysisWorker):
         self.circles.set_alpha(0.5)
 
         # Update eye diameter plot
-        self.diam_plot.set_data(np.arange(len(self.eye_diam)) * 1/(int(self.task_params['fps'])) - 10, 
-                                self.eye_diam[:, 0]/self.px_per_cm)
+        self.x_plot.set_data(np.arange(len(self.eye_diam)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
+                                self.eye_diam[:, 0])
+        self.y_plot.set_data(np.arange(len(self.eye_diam)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
+                                self.eye_diam[:, 1])
+        self.diam_plot.set_data(np.arange(len(self.eye_diam)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
+                                self.eye_diam[:, 2]/self.px_per_cm)
 
     def cleanup(self):
 
