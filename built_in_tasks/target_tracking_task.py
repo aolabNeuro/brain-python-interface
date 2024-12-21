@@ -332,16 +332,13 @@ class TargetTracking(Sequence):
         return time_in_state > self.hold_time
 
     def _test_ramp_complete(self, time_in_state):
-        print(time_in_state)
         return self.frame_index == self.ramp_up_time*self.sample_rate
 
     def _test_traj_complete(self, time_in_state):
-        print(time_in_state)
         self.ramp_counter = 2 # down ramp
         return self.frame_index + self.lookahead == self.trajectory_length - self.ramp_down_time*self.sample_rate
 
     def _test_ramp_and_trial_complete(self, time_in_state): # TODO works with nonzero ramps, check when one/both ramps = 0s
-        print(time_in_state)
         return self.frame_index + self.lookahead == self.trajectory_length
 
     def _test_trial_complete(self, time_in_state): # TODO is separate test function needed?
@@ -572,8 +569,7 @@ class ScreenTargetTracking(TargetTracking, Window):
                 self.add_model(model)
 
         self.target.hide()
-        self.trajectory.hide()
-        # self.in_end_state = False      
+        self.trajectory.hide()   
 
     def setup_screen_reset(self):
         # Hide target and trajectory
@@ -675,7 +671,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     def _start_tracking_in_ramp(self):
         super()._start_tracking_in_ramp()
         self.setup_start_tracking_in()
-        print('START TRACKING RAMP')
+        print('START TRACKING RAMP', self.ramp_counter)
         self.sync_event('CURSOR_ENTER_TARGET', self.ramp_counter) # TODO test when there is only a ramp down
 
     def _while_tracking_in_ramp(self):
@@ -695,7 +691,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     def _start_tracking_out_ramp(self):
         super()._start_tracking_out_ramp()
         self.setup_start_tracking_out()
-        print('STOP TRACKING RAMP')
+        print('STOP TRACKING RAMP', self.ramp_counter)
         self.sync_event('CURSOR_LEAVE_TARGET', self.ramp_counter)
 
     def _while_tracking_out_ramp(self):
@@ -716,8 +712,6 @@ class ScreenTargetTracking(TargetTracking, Window):
         super()._start_timeout_penalty()
         # print('START TIMEOUT')
         self.sync_event('TIMEOUT_PENALTY')
-
-        # self.in_end_state = True
         self.setup_screen_reset()
 
         # skip to next generated trial using same freq set
@@ -725,7 +719,6 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def _while_timeout_penalty(self):
         super()._while_timeout_penalty()
-        # # Add disturbance
 
     def _end_timeout_penalty(self):
         super()._end_timeout_penalty()
@@ -735,8 +728,6 @@ class ScreenTargetTracking(TargetTracking, Window):
         super()._start_hold_penalty()
         # print('START HOLD TIMEOUT')
         self.sync_event('HOLD_PENALTY')
-
-        # self.in_end_state = True
         self.setup_screen_reset()
 
         # skip to next generated trial using same freq set
@@ -744,7 +735,6 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def _while_hold_penalty(self):
         super()._while_hold_penalty()
-        # # Add disturbance
 
     def _end_hold_penalty(self):
         super()._end_hold_penalty()
@@ -755,7 +745,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         super()._start_tracking_out_penalty()
         # print('START TRACKING TIMEOUT')
         self.sync_event('OTHER_PENALTY')
-        # self.in_end_state = True
+
         # Cue failed trial
         self.target.cue_trial_end_failure()
 
@@ -764,7 +754,6 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def _while_tracking_out_penalty(self):
         super()._while_tracking_out_penalty()
-        # # Add disturbance
 
     def _end_tracking_out_penalty(self):
         super()._end_tracking_out_penalty()
@@ -776,7 +765,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         super()._start_reward()
         # print('REWARD')
         self.sync_event('REWARD')
-        # self.in_end_state = True
+
         # Cue successful trial
         self.target.cue_trial_end_success()
         self.reward_frame_index = 0
@@ -786,7 +775,6 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def _while_reward(self):
         super()._while_reward()
-        # # Add disturbance
 
     def _end_reward(self):
         super()._end_reward()
