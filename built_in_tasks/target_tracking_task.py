@@ -43,7 +43,7 @@ class TargetTracking(Sequence):
         wait = dict(start_trial="trajectory", start_pause="pause"),
         wait_retry = dict(start_trial="trajectory", start_pause="pause"),
         trajectory = dict(enter_target="hold", timeout="timeout_penalty", start_pause="pause"),
-        hold = dict(hold_complete="tracking_in_ramp", leave_target="hold_penalty", start_pause="pause"),
+        hold = dict(hold_complete_go_ramp="tracking_in_ramp", hold_complete_no_ramp="tracking_in", leave_target="hold_penalty", start_pause="pause"),
 
         tracking_in_ramp = dict(ramp_complete="tracking_in", ramp_and_trial_complete="reward", leave_target="tracking_out_ramp", start_pause="pause"),
         tracking_out_ramp = dict(ramp_complete="tracking_out", ramp_and_trial_complete="reward", enter_target="tracking_in_ramp", tracking_out_timeout="tracking_out_penalty", start_pause="pause"),
@@ -88,7 +88,6 @@ class TargetTracking(Sequence):
         self.disturbance_trial = False
         self.repeat_freq_set = False
         self.gen_index = -1
-        self.ramp_counter = 0
 
         if self.velocity_control:
             print('VELOCITY CONTROL')
@@ -111,6 +110,10 @@ class TargetTracking(Sequence):
         self.targs = self.trajectory_amplitude*self.targs
         self.disturbance_path = self.disturbance_amplitude*self.disturbance_path
         # print(np.amax(self.targs), np.amax(self.disturbance_path))
+
+        self.ramp_counter = np.zeros((len(self.targs),), dtype='int')
+        self.ramp_counter[:int(self.ramp_up_time*self.sample_rate)] = 1
+        self.ramp_counter[-int(self.ramp_down_time*self.sample_rate):] = 2
 
         self.targs = np.concatenate((lookahead, self.targs),axis=0) # (time_length*sample_rate+30,3) # targs and disturbance are no longer same length
     
@@ -141,9 +144,6 @@ class TargetTracking(Sequence):
 
         # saved plant poitions
         self.plant_position = []
-
-        # reset ramp counter
-        self.ramp_counter = 0
 
     def _start_wait(self):
         # Call parent method to draw the next target capture sequence from the generator
@@ -328,37 +328,46 @@ class TargetTracking(Sequence):
             - Sensorized object moved to the required location
             - Manually triggered by experimenter
         '''
-        self.ramp_counter = 1 # up ramp
         return time_in_state > self.hold_time
 
+    def _test_hold_complete_go_ramp(self, time_in_state):
+        '''Test whether the target is held long enough and whether there is a ramp up before the trajectory'''
+        return (time_in_state > self.hold_time) and (self.ramp_up_time > 0)
+
+    def _test_hold_complete_no_ramp(self, time_in_state):
+        '''Test whether the target is held long enough and whether to go straight into the trajectory'''
+        return (time_in_state > self.hold_time) and (self.ramp_up_time == 0)
+
     def _test_ramp_complete(self, time_in_state):
+        '''Test whether the ramp up is finished'''
         return self.frame_index == self.ramp_up_time*self.sample_rate
 
     def _test_traj_complete(self, time_in_state):
-        self.ramp_counter = 2 # down ramp
-        return self.frame_index + self.lookahead == self.trajectory_length - self.ramp_down_time*self.sample_rate
+        '''Test whether the trajectory is finished and whether there is a ramp down before the trial ends'''
+        return (self.frame_index + self.lookahead == self.trajectory_length - self.ramp_down_time*self.sample_rate) and (self.ramp_down_time > 0)
 
-    def _test_ramp_and_trial_complete(self, time_in_state): # TODO works with nonzero ramps, check when one/both ramps = 0s
-        return self.frame_index + self.lookahead == self.trajectory_length
-
-    def _test_trial_complete(self, time_in_state): # TODO is separate test function needed?
-        '''Test whether the trajectory is finished'''
-        return self.frame_index + self.lookahead == self.trajectory_length
+    def _test_ramp_and_trial_complete(self, time_in_state):
+        '''Test whether the ramp down is finished, ending the trial'''
+        return (self.frame_index + self.lookahead == self.trajectory_length) and (self.ramp_down_time > 0)
+    
+    def _test_trial_complete(self, time_in_state):
+        '''Test whether the trajectory is finished, ending the trial'''
+        return (self.frame_index + self.lookahead == self.trajectory_length) and (self.ramp_down_time == 0)
 
     def _test_tracking_out_timeout(self, time_in_state):
         return time_in_state > self.tracking_out_time
 
     def _test_timeout_penalty_end(self, time_in_state):
-        return time_in_state > self.timeout_penalty_time #or self.pause
+        return time_in_state > self.timeout_penalty_time
 
     def _test_hold_penalty_end(self, time_in_state):
-        return (time_in_state > self.hold_penalty_time) and (self.tries==self.max_hold_attempts) #or self.pause
+        return (time_in_state > self.hold_penalty_time) and (self.tries==self.max_hold_attempts)
 
     def _test_hold_penalty_end_retry(self, time_in_state):
-        return (time_in_state > self.hold_penalty_time) and (self.tries<self.max_hold_attempts) #or self.pause
+        return (time_in_state > self.hold_penalty_time) and (self.tries<self.max_hold_attempts)
 
     def _test_tracking_out_penalty_end(self, time_in_state):
-        return time_in_state > self.tracking_out_penalty_time #or self.pause
+        return time_in_state > self.tracking_out_penalty_time
 
     def _test_reward_end(self, time_in_state):
         return time_in_state > self.reward_time
@@ -671,8 +680,9 @@ class ScreenTargetTracking(TargetTracking, Window):
     def _start_tracking_in_ramp(self):
         super()._start_tracking_in_ramp()
         self.setup_start_tracking_in()
-        print('START TRACKING RAMP', self.ramp_counter)
-        self.sync_event('CURSOR_ENTER_TARGET', self.ramp_counter) # TODO test when there is only a ramp down
+
+        print('START TRACKING RAMP', self.ramp_counter[self.frame_index])
+        self.sync_event('CURSOR_ENTER_TARGET', self.ramp_counter[self.frame_index]) # TODO test when there is only a ramp down
 
     def _while_tracking_in_ramp(self):
         super()._while_tracking_in_ramp()
@@ -691,8 +701,8 @@ class ScreenTargetTracking(TargetTracking, Window):
     def _start_tracking_out_ramp(self):
         super()._start_tracking_out_ramp()
         self.setup_start_tracking_out()
-        print('STOP TRACKING RAMP', self.ramp_counter)
-        self.sync_event('CURSOR_LEAVE_TARGET', self.ramp_counter)
+        print('STOP TRACKING RAMP', self.ramp_counter[self.frame_index])
+        self.sync_event('CURSOR_LEAVE_TARGET', self.ramp_counter[self.frame_index])
 
     def _while_tracking_out_ramp(self):
         super()._while_tracking_out_ramp()
