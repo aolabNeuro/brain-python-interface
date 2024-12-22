@@ -133,6 +133,9 @@ class EyeStreaming(traits.HasTraits):
     '''
 
     keyboard_control = traits.Bool(False, desc="Whether to replace eye control with keyboard control")
+    eye_labels = traits.Array(value=['le_x', 'le_y', 're_x', 're_y', 'le_diam', 're_diam'], desc="Description of eye data columns")
+
+    hidden_traits = ['eye_labels']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -281,6 +284,10 @@ class PupilLabStreaming(traits.HasTraits):
 
     surface_marker_size = traits.Float(2., desc="Size in cm of apriltag surface markers")
     surface_marker_count = traits.Int(0, desc="How many surface markers to draw")
+    eye_labels = traits.Array(value=['gaze_x', 'gaze_y', 'gaze_z', 'timestamp', 're_x', 're_y', 'le_x', 'le_y', 'le_diam', 're_diam'], 
+                              desc="Description of eye data columns")
+
+    hidden_traits = ['eye_labels']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -302,7 +309,7 @@ class PupilLabStreaming(traits.HasTraits):
         self.eye_pos = np.zeros((8,))*np.nan
 
     def init(self):
-        self.add_dtype('eye', 'f8', (6,))
+        self.add_dtype('eye', 'f8', (10,))
         super().init()
 
     def run(self):
@@ -325,9 +332,9 @@ class PupilLabStreaming(traits.HasTraits):
         super()._start_None()
 
     def _update_eye_pos(self):
-        eye_pos = self.eye_data.get() # This is (n,6) array of new values since we last checked
+        eye_pos = self.eye_data.get() # This is (n,11) array of new values since we last checked
         if eye_pos.ndim < 2 or eye_pos.size == 0:
-            eye_pos = np.zeros((6,))*np.nan
+            eye_pos = np.zeros((10,))*np.nan
         else:
             eye_pos = eye_pos[-1,:] # the most recent position
         self.eye_pos = eye_pos
