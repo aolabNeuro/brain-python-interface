@@ -133,7 +133,7 @@ class System(DataSourceSystem):
     
 class NoSurfaceTracking(System):
 
-    def __init__(self, ip="128.95.215.191", port="50020"):
+    def __init__(self, ip="128.95.215.191", port="50020", confidence_threshold=0.0):
         '''
         For eye tracking, need Pupil Capture running in the background (after calibration in Pupil Capture)
         '''
@@ -145,3 +145,5 @@ class NoSurfaceTracking(System):
         
         self.mapper = None
         self.mapped_points = []
+
+        self.confidence_threshold = confidence_threshold
