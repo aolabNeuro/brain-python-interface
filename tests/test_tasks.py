@@ -4,6 +4,7 @@ from built_in_tasks.manualcontrolmultitasks import TrackingTask, rotations, Manu
 from built_in_tasks.othertasks import Conditions, LaserConditions, SweptLaserConditions
 from built_in_tasks.target_capture_task import ScreenTargetCapture
 from built_in_tasks.passivetasks import YouTube
+from built_in_tasks.example_task import ExampleSequenceTask
 from features.generator_features import Autostart
 from features.hdf_features import SaveHDF
 from riglib.stereo_opengl.environment import Grid
@@ -34,11 +35,17 @@ def init_exp(base_class, feats, seq=None, **kwargs):
 
 class TestManualControlTasks(unittest.TestCase):
 
+    @unittest.skip("")
     def test_exp(self):
         seq = ManualControl.centerout_2D()
         exp = init_exp(ManualControl, [MouseControl, Window2D, ScoreRewards], seq, window_size=(1200,800), fullscreen=False)
         exp.rotation = 'xzy'
         exp.stereo_mode = 'projection'
+        exp.run()
+
+    def test_example_task(self):
+        seq = ManualControl.centerout_2D() #ExampleSequenceTask.example_generator()
+        exp = init_exp(ExampleSequenceTask, [Window2D], seq)
         exp.run()
     
     @unittest.skip("")
@@ -117,6 +124,7 @@ class TestSeqGenerators(unittest.TestCase):
         seq = SweptLaserConditions.single_laser_pulse()
         print(seq[0])
 
+    @unittest.skip("")
     def test_corners(self):
         seq = ScreenTargetCapture.corners_2D(chain_length=3)
         seq = list(seq)
