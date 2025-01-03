@@ -412,7 +412,7 @@ class Text(TexPlane):
             return None
 
     def __init__(self, height, text, font_size=28, color=[1, 1, 1, 1], justify='left', 
-                 font_name='ubuntu', texture_size=(256,256), **kwargs):
+                 font_name='ubuntu', texture_size=(256,256), shader='ui', **kwargs):
         color = tuple((255*np.array(color)).astype(int))
 
         # Create a PIL image with a transparent background
@@ -433,10 +433,10 @@ class Text(TexPlane):
 
         # Convert PIL image to OpenGL texture format
         texture_data = np.flipud(image)
-        tex = Texture(texture_data)
+        tex = Texture(texture_data, mipmap=True, anisotropic_filtering=2)
         width = height * texture_size[0] / texture_size[1]
 
-        super().__init__(width, height, specular_color=[0,0,0,0], tex=tex, **kwargs)
+        super().__init__(width, height, specular_color=[0,0,0,0], tex=tex, shader=shader, **kwargs)
         self.rotate_x(90) # Make the text face the camera
 
 class AprilTag(TexPlane):

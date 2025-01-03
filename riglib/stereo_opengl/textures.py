@@ -4,6 +4,7 @@
 import numpy as np
 from OpenGL.GL import *
 import pygame
+from OpenGL.GL.EXT.texture_filter_anisotropic import *
 
 from .models import Model
 
@@ -12,12 +13,16 @@ class Texture(object):
     def __init__(self, tex, size=None,
         magfilter=GL_LINEAR, minfilter=GL_LINEAR, 
         wrap_x=GL_CLAMP_TO_EDGE, wrap_y=GL_CLAMP_TO_EDGE,
-        iformat=GL_RGBA8, exformat=GL_RGBA, dtype=GL_UNSIGNED_BYTE):
+        iformat=GL_RGBA8, exformat=GL_RGBA, dtype=GL_UNSIGNED_BYTE,
+        mipmap=False, mipmap_filter=GL_LINEAR_MIPMAP_LINEAR,
+        anisotropic_filtering=0):
 
         self.opts = dict(
             magfilter=magfilter, minfilter=minfilter, 
             wrap_x=wrap_x, wrap_y=wrap_y,
-            iformat=iformat, exformat=exformat, dtype=dtype)
+            iformat=iformat, exformat=exformat, dtype=dtype,
+            mipmap=mipmap, mipmap_filter=mipmap_filter,
+            anisotropic_filtering=anisotropic_filtering)
 
         if isinstance(tex, np.ndarray):
             if tex.max() <= 1:
@@ -38,19 +43,52 @@ class Texture(object):
         self.tex = None
 
     def init(self):
+        if self.tex is not None:
+            print(f"Texture already initialized: {self.tex}")
+            return
+
         gltex = glGenTextures(1)
         glBindTexture(GL_TEXTURE_2D, gltex)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, self.opts['minfilter'])
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, self.opts['magfilter'])
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,     self.opts['wrap_x'])
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,     self.opts['wrap_y'])
+            
+        # Set texture parameters
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, self.opts['wrap_x'])
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, self.opts['wrap_y'])
+        
+        # Set filter parameters based on mipmap option
+        if self.opts['mipmap']:
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, self.opts['mipmap_filter'])
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, self.opts['magfilter'])
+        else:
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, self.opts['minfilter'])
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, self.opts['magfilter'])
+        
+        # Apply anisotropic filtering if requested
+        if self.opts['anisotropic_filtering'] > 0:
+            max_anisotropy = glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT)
+            anisotropy = min(self.opts['anisotropic_filtering'], max_anisotropy)
+            glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, anisotropy)
+
+        # Ensure width and height are integers
+        width, height = int(self.size[0]), int(self.size[1])
+        
+        # Create and fill texture
         glTexImage2D(
-            GL_TEXTURE_2D, 0,                           #target, level
-            self.opts['iformat'],                       #internal format
-            self.size[0], self.size[1], 0,              #width, height, border
-            self.opts['exformat'], self.opts['dtype'],  #external format, type
-            self.texstr if self.texstr is not None else 0   #pixels
+            GL_TEXTURE_2D, 0,
+            self.opts['iformat'],
+            width, height, 0,
+            self.opts['exformat'], self.opts['dtype'],
+            self.texstr
         )
+        
+        # Generate mipmaps if requested
+        if self.opts['mipmap']:
+            glGenerateMipmap(GL_TEXTURE_2D)
+        
+        error = glGetError()
+        if error != GL_NO_ERROR:
+            print(f"OpenGL error after texture creation: {error}")
+        else:
+            print(f"Texture initialized successfully: {gltex}")
         
         self.tex = gltex
     

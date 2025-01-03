@@ -55,7 +55,11 @@ class _getter(object):
         if attr not in self.cache:
             self.cache[attr] = self.func(self.prog, attr)
 
-        if isinstance(val, np.ndarray) and len(val.shape) > 1:
+        if isinstance(val, Texture):
+            # Handle texture uniforms
+            glUniform1i(self.cache[attr], val.texunit)
+
+        elif isinstance(val, np.ndarray) and len(val.shape) > 1:
             assert len(val.shape) <= 3
             if val.shape[-2:] in _mattypes:
                 nmats = val.shape[0] if len(val.shape) == 3 else 1
@@ -75,9 +79,19 @@ class _getter(object):
                 t = _typename[type(val[0])]
                 func = globals()['glUniform%d%s'%(len(val), t)]
                 func(self.cache[attr], *val)
-        elif isinstance(val, (int, float)): 
-            #single value, push with glUni2form1
-            globals()['glUniform1%s'%_typename[type(val)]](self.cache[attr], val)
+        elif isinstance(val, (int, float)):
+            # Handle scalar uniforms
+            try:
+                if attr in ['nearclip', 'farclip']:  # Force these to be floats
+                    glUniform1f(self.cache[attr], float(val))
+                else:
+                    t = _typename[type(val)]
+                    globals()[f'glUniform1{t}'](self.cache[attr], val)
+            except GLError as e:
+                print(f"OpenGL Error when setting uniform '{attr}': {e}")
+                print(f"Uniform location: {self.cache[attr]}, Value: {val}, Type: {type(val)}")
+        else:
+            print(f"Warning: Unsupported type {type(val)} for uniform '{attr}'")
 
 class ShaderProgram(object):
     def __init__(self, shaders):
@@ -97,21 +111,24 @@ class ShaderProgram(object):
     
     def draw(self, ctx, models, **kwargs):
         glUseProgram(self.program)
-        for name, v in list(kwargs.items()):
-            if isinstance(v, Texture):
-                self.uniforms[name] = ctx.get_texunit(v)
-            elif name in self.uniforms:
-                self.uniforms[name] = v
-            elif name in self.attributes:
-                self.attributes[name] = v
-            elif hasattr(v, "__call__"):
-                v(self)
-        
-        for tex, funcs in list(models.items()):
-            if tex is None:
-                self.uniforms.texture = ctx.get_texunit("None")
-            else:
-                self.uniforms.texture = ctx.get_texunit(tex)
+        try:
+            for name, v in list(kwargs.items()):
+                if isinstance(v, Texture):
+                    self.uniforms[name] = ctx.get_texunit(v)
+                elif name in self.uniforms:
+                    self.uniforms[name] = v
+                elif name in self.attributes:
+                    self.attributes[name] = v
+                elif hasattr(v, "__call__"):
+                    v(self)
+            
+            for tex, funcs in list(models.items()):
+                if tex is None:
+                    self.uniforms.textureSampler = ctx.get_texunit("None")
+                else:
+                    self.uniforms.textureSampler = ctx.get_texunit(tex)
 
-            for drawfunc in funcs:
-                drawfunc(self)
+                for drawfunc in funcs:
+                    drawfunc(self)
+        finally:
+            glUseProgram(0)  # Ensure we always unbind the program
