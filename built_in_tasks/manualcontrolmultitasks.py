@@ -92,7 +92,7 @@ class ManualControlMixin(traits.HasTraits):
     perturbation_rotation_z = traits.Float(0.0, desc="Experimental rotation about bmi3d z-axis in degrees")
     perturbation_rotation_x = traits.Float(0.0, desc="Experimental rotation about bmi3d x-axis in degrees")
     offset = traits.Array(value=[0,0,0], desc="Offset to transform raw to bmi3d coordinates")
-    exp_scale = traits.Float(1.0, desc="Experimental gain scale factor to manipulate the mapping to screen coordinates")
+    exp_gain = traits.Float(1.0, desc="Experimental gain scale factor to manipulate the mapping to screen coordinates")
     is_bmi_seed = True
 
     def __init__(self, *args, **kwargs):
@@ -150,7 +150,7 @@ class ManualControlMixin(traits.HasTraits):
         pertubation_rot = R.from_euler('y', self.pertubation_rotation, degrees=True) # this is perturb_rot_y
         perturb_rot_z = R.from_euler('z', self.perturbation_rotation_z, degrees=True)
         perturb_rot_x = R.from_euler('x', self.perturbation_rotation_x, degrees=True)
-        return np.linalg.multi_dot((new[0:3] * self.exp_scale, pertubation_rot.as_matrix(), perturb_rot_z.as_matrix(), perturb_rot_x.as_matrix()))
+        return np.linalg.multi_dot((new[0:3] * self.exp_gain, pertubation_rot.as_matrix(), perturb_rot_z.as_matrix(), perturb_rot_x.as_matrix()))
 
     def _get_manual_position(self):
         '''
