@@ -80,7 +80,7 @@ def offaxis_frusta(winsize, fov, near, far, focal_dist, iod, flip=False, flip_z=
 
     #return np.dot(left, lxfm), np.dot(right, rxfm)
 
-def cloudy_tex(size=(512,512)):
+def cloudy_tex(size=(512,512), alpha=0.5):
     '''Generates 1/f distributed noise and puts it into a texture. Looks like clouds'''
     im = np.random.randn(*size)
     grid = np.mgrid[-1:1:size[0]*1j, -1:1:size[1]*1j]
@@ -88,7 +88,10 @@ def cloudy_tex(size=(512,512)):
     fim = np.fft.fftshift(np.fft.fft2(im))
     im = np.abs(np.fft.ifft2(np.fft.fftshift(mask * fim)))
     im -= im.min()
-    return Texture(im / im.max())
+    im /= im.max()
+    im = np.tile(im, (4,1,1)).T
+    im[:,:,3] = alpha
+    return Texture(im)
 
 def create_grid_texture(size=800, density=50, thickness=3, line_color=[0.5, 0.5, 0.5, 1], 
                         background_color=[0.1, 0.1, 0.1, 1]):
@@ -98,11 +101,49 @@ def create_grid_texture(size=800, density=50, thickness=3, line_color=[0.5, 0.5,
     size = int(size)
     thickness = int(thickness)
     grid_texture = np.ones((size, size, 4)) * background_color  # RGB image
+    num_lines = (size + 1)//density
+    line_spacing = size//num_lines
 
     # Draw horizontal grid lines
-    for r in range((size + 1)//density):
-        start = int(r * density)
+    for r in range(num_lines):
+        start = int(r * line_spacing - thickness//2)
         grid_texture[start:start+thickness, :, :] = line_color
         grid_texture[:, start:start+thickness, :] = line_color
 
-    return Texture(grid_texture/np.max(grid_texture))
+    return Texture(grid_texture/np.max(grid_texture), mipmap=True, anisotropic_filtering=2)
+
+def look_at(eye, target, up):
+    # Convert inputs to numpy arrays
+    eye = np.array(eye)
+    target = np.array(target)
+    up = np.array(up)
+
+    # Calculate forward direction
+    forward = target - eye
+    forward = forward / np.linalg.norm(forward)
+
+    # Calculate right direction
+    right = np.cross(forward, up)
+    right = right / np.linalg.norm(right)
+
+    # Recalculate up direction
+    up = np.cross(right, forward)
+
+    # Create rotation matrix
+    rotation = np.array([
+        [right[0], right[1], right[2], 0],
+        [up[0], up[1], up[2], 0],
+        [-forward[0], -forward[1], -forward[2], 0],
+        [0, 0, 0, 1]
+    ])
+
+    # Create translation matrix
+    translation = np.array([
+        [1, 0, 0, -eye[0]],
+        [0, 1, 0, -eye[1]],
+        [0, 0, 1, -eye[2]],
+        [0, 0, 0, 1]
+    ])
+
+    # Combine rotation and translation
+    return np.dot(rotation, translation)
