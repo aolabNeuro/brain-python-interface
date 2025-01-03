@@ -43,9 +43,13 @@ class TestManualControlTasks(unittest.TestCase):
         exp.stereo_mode = 'projection'
         exp.run()
 
+    # @unittest.skip("")
     def test_example_task(self):
-        seq = ManualControl.centerout_2D() #ExampleSequenceTask.example_generator()
-        exp = init_exp(ExampleSequenceTask, [Window2D], seq)
+        seq = ExampleSequenceTask.example_generator()
+        print('Testing example task')
+        print(seq)
+        print(hasattr(seq, '__next__'))
+        exp = init_exp(ExampleSequenceTask, [], seq, window_size=(1200,800), fullscreen=False)
         exp.run()
     
     @unittest.skip("")

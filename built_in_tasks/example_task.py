@@ -27,13 +27,14 @@ class ExampleSequenceTask(Window, Sequence):
     target_on_time = traits.Float(1.0, desc="Time to display target")
 
     def __init__(self, *args, **kwargs):
-        super().__init__(self, *args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.target = VirtualCircularTarget(target_radius=1, target_color=[1,1,1,1])
         for model in self.target.graphics_models:
             self.add_model(model)
 
     def init(self):
         self.add_dtype('example_cycle_data_to_save', 'f8', (1,))
+        self.trial_dtype = np.dtype([('trial', 'u4'), ('index', 'u4'), ('target', 'f8', (3,))])
         super().init()
 
     def _cycle(self):
@@ -76,7 +77,8 @@ class ExampleSequenceTask(Window, Sequence):
         
         self.task_data['example_cycle_data_to_save'] = 2 # maybe you want to save some specific data here
         
-        self.target.drive_to_new_pos(self.target_location)
+        print("driving target to", self.target_location)
+        self.target.move_to_position(self.target_location)
         self.target.show()
 
     def _start_pause(self):
@@ -102,11 +104,8 @@ class ExampleSequenceTask(Window, Sequence):
         [10 x 1] array of tuples containing trial index and [1 x 3] target coordinates
 
         '''
-        pos = np.array([
-            1,
-            1,
-            2,
-        ]).T
+        
         for idx in range(10):
+            pos = np.array([idx,0,1]).T
             yield idx, pos
 
