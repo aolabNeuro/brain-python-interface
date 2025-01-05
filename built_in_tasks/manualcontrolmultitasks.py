@@ -8,10 +8,9 @@ from scipy.spatial.transform import Rotation as R
 from riglib.experiment import traits
 
 from .target_graphics import *
-from .target_capture_task import ScreenTargetCapture, ScreenReachAngle, SequenceCapture, HandConstrainedEyeCapture, ScreenTargetCapture_Saccade
+from .target_capture_task import ScreenTargetCapture
+from .target_capture_xt import ScreenReachAngle, SequenceCapture, HandConstrainedEyeCapture, ScreenTargetCapture_Saccade
 from .target_tracking_task import ScreenTargetTracking
-from riglib.stereo_opengl.window import WindowDispl2D
-
 
 rotations = dict(
     yzx = np.array(    # names come from rows (optitrack), but screen coords come from columns:
