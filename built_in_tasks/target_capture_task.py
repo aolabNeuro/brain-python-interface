@@ -269,7 +269,8 @@ class ScreenTargetCapture(TargetCapture, Window):
     limit2d = traits.Bool(True, desc="Limit cursor movement to 2D")
 
     sequence_generators = [
-        'out_2D', 'centerout_2D', 'centeroutback_2D', 'centerout_2D_select', 'rand_target_chain_2D', 'rand_target_chain_3D', 'corners_2D',
+        'out_2D', 'centerout_2D', 'centeroutback_2D', 'centerout_2D_select', 'rand_target_chain_2D', 
+        'rand_target_chain_3D', 'corners_2D', 'centerout_tabletop',
     ]
 
     hidden_traits = ['cursor_color', 'target_color', 'cursor_bounds', 'cursor_radius', 'plant_hide_rate', 'starting_pos']
@@ -693,6 +694,17 @@ class ScreenTargetCapture(TargetCapture, Window):
             idx = target_order[int(t*chain_length):int(t*chain_length+chain_length)]
             pos = [corners[int(i-1),:] for i in idx]
             yield idx, pos
+
+    @staticmethod
+    def centerout_tabletop(nblocks=100, ntargets=8, distance=10, origin=(0,0,0)):
+        '''
+        Generates a sequence of 2D (x and y) targets at a given distance from the origin.
+        Exactly the same as centerout_2D but on the xy plane instead of the xz plane.
+        '''
+        targets = ScreenTargetCapture.centerout_2D(nblocks, ntargets, distance, origin)
+        for idx, pos in targets:
+            targs = [t[[0,2,1]] for t in pos]
+            yield idx, targs
 
 class ScreenReachAngle(ScreenTargetCapture):
     '''
