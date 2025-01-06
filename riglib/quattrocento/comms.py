@@ -384,17 +384,24 @@ class QuattrocentoDriver():
 
 class QuattroOtlight:    
 
-    def __init__(self, host='127.0.0.1', port=31000, emg_channels=384, aux_channels=16, 
-                     accessory_channels=8, refresh_freq=1, sample_freq=2048):
-        
-        # Host should be set to the computer running the OTBioLab Light
-        # Refresh rate should be set as high as possible (32) and match what is set in OTBioLab
-        # Sample rate should be set to match what is set in OTBioLab
+    emg_channels = 384
+    aux_channels = 16
+    accessory_channels = 8
+
+    def __init__(self, host='127.0.0.1', port=31000, emg_ch_range=[16*8,16*8+64], refresh_freq=1, sample_freq=2048):
+        '''
+        Choose the same refresh frequency and sampling frequency as the settings in OTBioLabLight. The EMG channel range
+        describes the location of the electrodes in use. Default is MULTI IN 1 channels.
+
+        Parameters
+        ----------
+        Host should be set to the computer running the OTBioLab Light
+        Refresh rate should be set as high as possible (32) and match what is set in OTBioLab
+        Sample rate should be set to match what is set in OTBioLab
+        '''
         self.host = host
         self.port = port
-        self.emg_channels = emg_channels
-        self.aux_channels = aux_channels
-        self.accessory_channels = accessory_channels
+        self.emg_ch_range = emg_ch_range
         self.refresh_freq = refresh_freq
         self.sample_freq = sample_freq
 
@@ -448,12 +455,8 @@ class QuattroOtlight:
         aux_signals = data[:, self.emg_channels:(self.emg_channels+self.aux_channels)]
         sample_counter= data[:, -self.accessory_channels]
 
-        #select output channels
-        # emg_signals = emg_signals[:, self.output_channel_range]
-        # select MULTI IN 1 channels
-        # TODO: fix hard coding
-        # emg_signals = num data x num channels
-        emg_signals = emg_signals[:, 16*8:16*8+64]
+        # select only the output channels
+        emg_signals = emg_signals[:, self.emg_ch_range[0]:self.emg_ch_range[1]]
 
         return (emg_signals, aux_signals, sample_counter)
 
