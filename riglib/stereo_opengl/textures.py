@@ -86,8 +86,6 @@ class Texture(object):
         error = glGetError()
         if error != GL_NO_ERROR:
             print(f"OpenGL error after texture creation: {error}")
-        else:
-            print(f"Texture initialized successfully: {gltex}")
         
         self.tex = gltex
     
@@ -140,3 +138,6 @@ class TexModel(Model):
             yield shader, self.draw, self.tex
         else:
             yield self.shader, self.draw, self.tex
+
+    def release(self):
+        self.tex.delete()

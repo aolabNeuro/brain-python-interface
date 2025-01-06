@@ -339,6 +339,7 @@ class ScoreRewards(traits.HasTraits):
         if hasattr(super(), '_end_reward'):
             super()._end_reward()
         self.remove_model(self.score_display.model)
+        self.score_display.model.release()
 
 """"" BELOW THIS IS ALL THE OLD CODE ASSOCIATED WITH REWARD FEATURES"""
 
