@@ -32,15 +32,16 @@ class TargetCapture(Sequence):
     common type of motor control task.
     '''
     status = dict(
-        wait = dict(start_trial="target"),
-        target = dict(enter_target="hold", timeout="timeout_penalty"),
-        hold = dict(leave_target="hold_penalty", hold_complete="delay"),
-        delay = dict(leave_target="delay_penalty", delay_complete="targ_transition"),
+        wait = dict(start_trial="target", start_pause="pause"),
+        target = dict(enter_target="hold", timeout="timeout_penalty", start_pause="pause"),
+        hold = dict(leave_target="hold_penalty", hold_complete="delay", start_pause="pause"),
+        delay = dict(leave_target="delay_penalty", delay_complete="targ_transition", start_pause="pause"),
         targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target"),
-        timeout_penalty = dict(timeout_penalty_end="targ_transition", end_state=True),
-        hold_penalty = dict(hold_penalty_end="targ_transition", end_state=True),
-        delay_penalty = dict(delay_penalty_end="targ_transition", end_state=True),
-        reward = dict(reward_end="wait", stoppable=False, end_state=True)
+        timeout_penalty = dict(timeout_penalty_end="targ_transition", start_pause="pause", end_state=True),
+        hold_penalty = dict(hold_penalty_end="targ_transition", start_pause="pause", end_state=True),
+        delay_penalty = dict(delay_penalty_end="targ_transition", start_pause="pause", end_state=True),
+        reward = dict(reward_end="wait", stoppable=False, end_state=True),
+        pause = dict(end_pause="wait", end_state=True),
     )
 
     # initial state
@@ -190,6 +191,18 @@ class TargetCapture(Sequence):
         '''Nothing generic to do.'''
         pass
 
+    def _start_pause(self):
+        '''Nothing generic to do.'''
+        pass
+
+    def _while_pause(self):
+        '''Nothing generic to do.'''
+        pass
+
+    def _end_pause(self):
+        '''Nothing generic to do.'''
+        pass
+
     ################## State transition test functions ##################
     def _test_start_trial(self, time_in_state):
         '''Start next trial automatically. You may want this to instead be
@@ -199,7 +212,7 @@ class TargetCapture(Sequence):
         return True
 
     def _test_timeout(self, time_in_state):
-        return time_in_state > self.timeout_time or self.pause
+        return time_in_state > self.timeout_time
 
     def _test_hold_complete(self, time_in_state):
         '''
@@ -232,7 +245,7 @@ class TargetCapture(Sequence):
 
     def _test_trial_incomplete(self, time_in_state):
         '''Test whether the target capture sequence needs to be restarted'''
-        return (not self._test_trial_complete(time_in_state)) and (self.tries<self.max_attempts) and not self.pause
+        return (not self._test_trial_complete(time_in_state)) and (self.tries<self.max_attempts)
 
     def _test_timeout_penalty_end(self, time_in_state):
         return time_in_state > self.timeout_penalty_time
@@ -252,7 +265,13 @@ class TargetCapture(Sequence):
 
     def _test_leave_target(self, time_in_state):
         '''This function is task-specific and not much can be done generically'''
+        return False
+
+    def _test_start_pause(self, time_in_state):
         return self.pause
+
+    def _test_end_pause(self, time_in_state):
+        return not self.pause
 
     def update_report_stats(self):
         '''
@@ -491,6 +510,19 @@ class ScreenTargetCapture(TargetCapture, Window):
             target.hide()
             target.reset()
             
+    def _start_pause(self):
+        super()._start_pause()
+        self.sync_event('PAUSE_START') # this will overwrite TRIAL_END whenever you pause during an end state
+        
+        # Hide targets
+        for target in self.targets:
+            target.hide()
+            target.reset()
+
+    def _end_pause(self):
+        super()._end_pause()
+        self.sync_event('PAUSE_END')
+
     #### Generator functions ####
     '''
     Note to self: because of the way these get into the database, the parameters don't
