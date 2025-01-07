@@ -1,41 +1,74 @@
 import numpy as np
 import time
-from riglib.gpio import ArduinoGPIO, DigitalWave, TeensyGPIO
+from riglib.gpio import ArduinoGPIO, DigitalWave, TeensyGPIO, convert_masked_data_to_pins
 from riglib import source
 from riglib.ecube import Digital, LFP
 from features.sync_features import ArduinoSync
-from config.rig_defaults import rig2_sync_params_arduino
+from config.rig_defaults import rig2_sync_params_arduino, human_sync_params_arduino
 from config.rig_defaults import reward
 import aopy
 
 import unittest
 
-sync_params = rig2_sync_params_arduino # rig1_sync_params_arduino
+sync_params = human_sync_params_arduino # rig2_sync_params_arduino # rig1_sync_params_arduino
 
 class TestDIO(unittest.TestCase):
 
-    # def test_reward_out(self):
-    #     dio = ArduinoGPIO(reward['address'])
-    #     time.sleep(5)
+    @unittest.skip("")
+    def test_reward_out(self):
+        dio = ArduinoGPIO('/dev/teensydio')
+        time.sleep(5)
         
-    #     for pin in range(2,14):
-    #         print(pin)
-    #         # Send a bunch of pulses
-    #         pulse_width = 0.2
-    #         pulse_interval = 0.2
-    #         duration = 1
-    #         t0 = time.perf_counter()
-    #         while time.perf_counter() - t0 < duration:
-    #             dio.write(pin, 1)
-    #             t1 = time.perf_counter()
-    #             while time.perf_counter() - t1 < pulse_width:
-    #                 time.sleep(0)
-    #             dio.write(pin, 0)
-    #             t1 = time.perf_counter()
-    #             while time.perf_counter() - t1 < pulse_interval:
-    #                 time.sleep(0)
+        for pin in range(2,14):
+            print(pin)
+            # Send a bunch of pulses
+            pulse_width = 0.2
+            pulse_interval = 0.2
+            duration = 1
+            t0 = time.perf_counter()
+            while time.perf_counter() - t0 < duration:
+                dio.write(pin, 1)
+                t1 = time.perf_counter()
+                while time.perf_counter() - t1 < pulse_width:
+                    time.sleep(0.001)
+                dio.write(pin, 0)
+                t1 = time.perf_counter()
+                while time.perf_counter() - t1 < pulse_interval:
+                    time.sleep(0.001)
 
-    # @unittest.skip("")
+    def test_dio(self):
+        print("Testing direct connection to DIO")
+
+        # Connect to the DIO
+        mask = sync_params['event_sync_mask']
+        print(f'using mask: {mask}')
+        shift = sync_params['event_sync_data_shift']
+        dio = TeensyGPIO('/dev/teensydio', baudrate=57600)
+        dio.write_many(mask, 0)
+
+        pulse_data = mask
+        pins, values = convert_masked_data_to_pins(mask, pulse_data)
+        print(pins, values)
+
+        time.sleep(5)
+        print("Pulsing")
+        
+        # Send a bunch of pulses
+        pulse_width = 0.2
+        pulse_interval = 0.2
+        duration = 5
+        t0 = time.perf_counter()
+        while time.perf_counter() - t0 < duration:
+            dio.write_many(mask, pulse_data)
+            t1 = time.perf_counter()
+            while time.perf_counter() - t1 < pulse_width:
+                time.sleep(0.001)
+            dio.write_many(mask, 0)
+            t1 = time.perf_counter()
+            while time.perf_counter() - t1 < pulse_interval:
+                time.sleep(0.001)
+
+    @unittest.skip("")
     def test_dio_speed_direct(self):
         print("Testing direct connection to DIO")
 

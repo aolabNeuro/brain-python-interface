@@ -12,7 +12,9 @@ class SupplementaryHDF(object):
 
         dt = datetime.datetime.now()
         tm = dt.time()
-        self.filename = 'tmp_'+str(source)+str(dt.year)+str(dt.month)+str(dt.day)+'_'+tm.isoformat()+'.hdf'
+        subject = 'test' if not hasattr(source, 'subj') else source.subj
+        saveid = 'None' if not hasattr(source, 'saveid') else source.saveid
+        self.filename = f'tmp_{str(source)}_{subject}_{saveid}.hdf'
         self.h5_file = tables.open_file(os.path.join(data_dir, self.filename), "w")
 
         #If sink datatype is not specified: 

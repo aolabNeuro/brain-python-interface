@@ -20,13 +20,34 @@ class QuattBMI(CorticalBMI):
         '''
         super().__init__(*args, **kwargs)
         self.cortical_channels = np.arange(1,64+16+8+1) # 64 EMG + 16 AUX + 8 samples
+        quattrocento.EMG.subj = self.subject_name
+        quattrocento.EMG.saveid = self.saveid
 
         # These get read by CorticalData when initializing the extractor
         self._neural_src_type = source.MultiChanDataSource
         self._neural_src_kwargs = dict(
-            send_data_to_sink_manager=self.send_data_to_sink_manager, 
+            send_data_to_sink_manager=True, 
             channels=self.cortical_channels)
         self._neural_src_system_type = quattrocento.EMG
+
+    def cleanup(self, database, saveid, **kwargs):
+        '''
+        Function to run at 'cleanup' time, after the FSM has finished executing. See riglib.experiment.Experiment.cleanup
+        This 'cleanup' method links the file created to the database ID for the current TaskEntry
+        '''
+        # Sleep time so that the plx file has time to save cleanly
+        time.sleep(2)
+        dbname = kwargs['dbname'] if 'dbname' in kwargs else 'default'
+        filename = f'/var/tmp/tmp_{str(quattrocento.EMG)}_{self.subject_name}_{saveid}.hdf'
+        print(f"Saving {filename} to database {dbname}")
+        if saveid is not None:    
+            if dbname == 'default':
+                database.save_data(filename, "emg", saveid, True, False)
+            else:
+                database.save_data(filename, "emg", saveid, True, False, dbname=dbname)
+        else:
+            print('\n\nPlexon file not found properly! It will have to be manually linked!\n\n')
+
 
     @property 
     def sys_module(self):

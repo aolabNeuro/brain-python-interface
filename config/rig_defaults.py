@@ -70,6 +70,7 @@ rig1_sync_params_arduino = copy.copy(nidaq_sync_params)
 rig1_sync_params_arduino.update(dict(
     sync_protocol = 'rig1_arduino',
     sync_protocol_version = 16,
+    baudrate = 115200,
     event_sync_mask = 0xfffffc,
     event_sync_data_shift = 2,
     event_sync_dch = list(range(31,39)),
@@ -92,6 +93,25 @@ rig2_sync_params_arduino.update(dict(
     recording_dch = 52,
 ))
 arduino_sync_params = None
+human_sync_params_arduino = copy.copy(hdf_sync_params)
+human_sync_params_arduino.update(dict(
+    sync_protocol = 'human_arduino',
+    sync_protocol_version = 17,    
+    baudrate = 57600,
+    sync_pulse_width = 0.003,
+    event_sync_mask = 0x1000, # For now just send the sync pulse on the first digital channel
+    event_sync_data_shift = 13,
+    event_sync_dch = list(range(16,24)),
+    screen_sync_pin = 12,
+    screen_sync_dch = 65,
+    screen_measure_dch = [67],
+    screen_measure_ach = [68],
+    reward_measure_ach = [69],
+    right_eye_ach = [70, 71],
+    left_eye_ach = [72, 73],
+    recording_pin = 9,
+    recording_dch = 74,
+))
 
 # Rig-specific defaults
 if hostname == 'pagaiisland2':
@@ -126,7 +146,7 @@ elif hostname == 'human-bmi':
     screen_half_height = 16
     default_db = 'human'
     secret_dbnames = ['human']
-    # arduino_sync_params = human_sync_params_arduino
+    arduino_sync_params = human_sync_params_arduino
 elif hostname in ['moor', 'crab-eating', 'ecube']:
     default_db = 'booth'
     secret_dbnames = [

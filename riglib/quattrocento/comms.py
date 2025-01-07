@@ -452,8 +452,8 @@ class QuattroOtlight:
         data is num_data_points by num_channels
         """
         emg_signals  = data[:, :self.emg_channels]
-        aux_signals = data[:, self.emg_channels:(self.emg_channels+self.aux_channels)]
-        sample_counter= data[:, -self.accessory_channels]
+        aux_signals = data[:, self.emg_channels:self.emg_channels+self.aux_channels]
+        sample_counter = data[:, -self.accessory_channels:]
 
         # select only the output channels
         emg_signals = emg_signals[:, self.emg_ch_range[0]:self.emg_ch_range[1]]

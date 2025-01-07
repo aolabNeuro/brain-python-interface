@@ -269,7 +269,7 @@ class MultiChanDataSource(mp.Process):
             self.wrap_flags = shm.RawArray('b', self.n_chan)  # zeros/Falses by default
 
     def register_supp_hdf(self):
-        self.supp_hdf = supp_hdf.SupplementaryHDF(self.channels, self.send_to_sinks_dtype, str(self.source))
+        self.supp_hdf = supp_hdf.SupplementaryHDF(self.channels, self.send_to_sinks_dtype, self.source)
         
     def start(self, *args, **kwargs):
         '''

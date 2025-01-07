@@ -1,6 +1,6 @@
 import time
 from riglib import source
-from riglib.quattrocento import EMG
+from riglib.quattrocento import EMG, comms
 from riglib.bmi import state_space_models, train, extractor
 import numpy as np
 import unittest
@@ -8,6 +8,14 @@ import unittest
 STREAMING_DURATION = 3
 
 class TestStreaming(unittest.TestCase):
+
+    def test_direct(self):
+        qt = comms.QuattroOtlight(host='128.95.215.191')
+        qt.setup()
+        data = qt.read_emg()
+        for d in data:
+            print(d.shape)
+        qt.tear_down()
 
     @unittest.skip('works')
     def test_quattrocento_stream(self):
@@ -46,7 +54,7 @@ class TestStreaming(unittest.TestCase):
         self.assertEqual(data.shape[0], len(channels))
         self.assertEqual(data.shape[1], n_samples)
 
-    # @unittest.skip('works')
+    @unittest.skip('works')
     def test_update_frequency(self):
         channels = [1, 62]
         ds = source.MultiChanDataSource(EMG, channels=channels, send_data_to_sink_manager=True)
