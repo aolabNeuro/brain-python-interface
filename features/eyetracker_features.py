@@ -284,8 +284,20 @@ class PupilLabStreaming(traits.HasTraits):
 
     surface_marker_size = traits.Float(2., desc="Size in cm of apriltag surface markers")
     surface_marker_count = traits.Int(0, desc="How many surface markers to draw")
-    eye_labels = traits.Array(value=['gaze_x', 'gaze_y', 'gaze_z', 'timestamp', 're_x', 're_y', 'le_x', 'le_y', 'le_diam', 're_diam'], 
-                              desc="Description of eye data columns")
+    eye_labels = traits.Array(value=[
+        'binocular_gaze_x', 'binocular_gaze_y', 'binocular_gaze_z', 
+        'binocular_norm_x', 'binocular_norm_y', 
+        'le_gaze_x', 'le_gaze_y', 'le_gaze_z',
+        'le_norm_x', 'le_norm_y',
+        're_gaze_x', 're_gaze_y', 're_gaze_z',
+        're_norm_x', 're_norm_y',
+        'timestamp', 
+        're_x', 're_y', 
+        'le_x', 'le_y', 
+        'le_diam', 
+        're_diam'
+        ], 
+        desc="Description of eye data columns")
 
     hidden_traits = ['eye_labels']
 

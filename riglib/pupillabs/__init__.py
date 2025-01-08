@@ -96,7 +96,7 @@ class System(DataSourceSystem):
         """
         read in a batch of eye data and retun x, y on surface & pupil diameters for each eye
         """
-        coords = np.full((10,), np.nan)
+        coords = np.full((22,), np.nan)
 
         while np.count_nonzero(np.isnan(coords)) > 0:
             if not self.sub.poll(0) == zmq.POLLIN:
@@ -108,22 +108,31 @@ class System(DataSourceSystem):
             if message["topic"].startswith("surfaces"):
                 self.mapper.update_homography(message["img_to_surf_trans"])
 
-            elif message["topic"].startswith("gaze.3d.01") and self.mapper is not None and message["confidence"] >= self.confidence_threshold:
-                mapped_gaze = self.mapper.gaze_to_surface(message["norm_pos"])
-                if mapped_gaze is not None:
-                    coords[:3] = np.array(mapped_gaze.norm_x, mapped_gaze.norm_y, 0)
-                    coords[3] = message["timestamp"]
-
             elif message["topic"].startswith("gaze.3d.01") and message["confidence"] >= self.confidence_threshold:
                 coords[:3] = message["gaze_point_3d"]
-                coords[3] = message["timestamp"]
+                coords[3:5] = message["norm_pos"]
+
+                if self.mapper is not None:
+                    mapped_gaze = self.mapper.gaze_to_surface(message["norm_pos"])
+                    if mapped_gaze is not None:
+                        coords[3:5] = np.array(mapped_gaze.norm_x, mapped_gaze.norm_y)
+
+                coords[16] = message["timestamp"]
+
+            elif message["topic"].startswith("gaze.3d.0") and message["confidence"] >= self.confidence_threshold:
+                coords[6:9] = message["gaze_point_3d"]
+                coords[9:11] = message["norm_pos"]
+
+            elif message["topic"].startswith("gaze.3d.1") and message["confidence"] >= self.confidence_threshold:
+                coords[11:14] = message["gaze_point_3d"]
+                coords[14:16] = message["norm_pos"]
 
             elif topic.startswith(b"pupil.0.2d") and message["confidence"] >= self.confidence_threshold:
-                coords[6:8] = message["norm_pos"]
-                coords[9] = float(message["diameter"]) # pupil 0 diamter, right eye, unit: pixel
+                coords[17:19] = message["norm_pos"]
+                coords[21] = float(message["diameter"]) # pupil 0 diamter, right eye, unit: pixel
             elif topic.startswith(b"pupil.1.2d") and message["confidence"] >= self.confidence_threshold:
-                coords[4:6] = message["norm_pos"] 
-                coords[8] = float(message["diameter"]) # pupil 1 diamter, left eye, unit: pixel
+                coords[19:21] = message["norm_pos"] 
+                coords[22] = float(message["diameter"]) # pupil 1 diamter, left eye, unit: pixel
 
             time.sleep(0.001)  # sleep for 1 ms to avoid busy waiting
 
