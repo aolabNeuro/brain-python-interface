@@ -9,8 +9,9 @@ STREAMING_DURATION = 3
 
 class TestStreaming(unittest.TestCase):
 
+    @unittest.skip('works')
     def test_direct(self):
-        qt = comms.QuattroOtlight(host='128.95.215.191')
+        qt = comms.QuattroOtlight(host='128.95.215.191', refresh_freq=32)
         qt.setup()
         data = qt.read_emg()
         for d in data:

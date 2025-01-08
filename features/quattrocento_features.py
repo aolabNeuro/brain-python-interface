@@ -35,6 +35,7 @@ class QuattBMI(CorticalBMI):
         Function to run at 'cleanup' time, after the FSM has finished executing. See riglib.experiment.Experiment.cleanup
         This 'cleanup' method links the file created to the database ID for the current TaskEntry
         '''
+        super_result = super().cleanup(database, saveid, **kwargs)
         # Sleep time so that the plx file has time to save cleanly
         time.sleep(2)
         dbname = kwargs['dbname'] if 'dbname' in kwargs else 'default'
@@ -47,7 +48,7 @@ class QuattBMI(CorticalBMI):
                 database.save_data(filename, "emg", saveid, True, False, dbname=dbname)
         else:
             print('\n\nPlexon file not found properly! It will have to be manually linked!\n\n')
-
+        return super_result
 
     @property 
     def sys_module(self):
