@@ -14,7 +14,7 @@ pandas==1.5.3
 Phidgets==2.1.8
 PyAutoGUI==0.9.50
 pyFirmata==1.1.0
-pygame==2.0.0
+pygame ==2.0.0
 PyJWT==2.8.0
 PyLink==0.3.3
 PyMySQL==1.0.2
@@ -25,7 +25,7 @@ QtPy==1.9.0
 Requests==2.31.0
 scikit_learn==0.24.2
 scipy==1.5.4
-setuptools==65.5.0
+setuptools ==65.5.0
 statsmodels==0.14.1
 tables==3.9.2
 tabulate==0.9.0

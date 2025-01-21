@@ -3,8 +3,9 @@ import time
 from riglib import tablet_reward
 
 # ip address
-# this: 205.175.106.178
-# other: 10.19.216.239
+# this: 10.19.216.239 (prev)
+# other: 205.175.106.178 (should verify this)
+# new  192.168.0.62
 
 hostName = "0.0.0.0" # open to anyone on the LAN - careful to not run this on the internet!
 serverPort = 8080
