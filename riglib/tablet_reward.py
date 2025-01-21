@@ -49,6 +49,6 @@ class RemoteReward():
         url = f"http://{ip_address}:{self.serverPort}"
         print(url)
         try:
-            requests.post(url, timeout=3)
+            requests.post(url, timeout=3) #3
         except:
             traceback.print_exc()
