@@ -407,8 +407,12 @@ class ScreenTargetTracking(TargetTracking, Window):
             self.trajectory = VirtualCableTarget(target_radius=self.trajectory_radius, target_color=target_colors[self.trajectory_color])
 
             # This is the progress bar
-            self.bar = VirtualRectangularTarget(target_width=1, target_height=0, target_color=(0., 1., 0., 0.75), starting_pos=[0,0,9])
+            self.bar = VirtualRectangularTarget(target_width=1, target_height=0, target_color=(0., 1., 0., 0.75), starting_pos=[0,-15,9])
             # print('INIT TRAJ')
+
+            # This is a black cube that hides the "lookbehind" of trajectory
+            self.box = VirtualRectangularTarget(target_width=20, target_height=10, target_color=(0, 0, 0, 1), starting_pos=[-10,-1,0])
+            # target_width of RectangularTarget is total height, target_height is 1/2 of total width (from center to edge)
 
         # Declare any plant attributes which must be saved to the HDF file at the _cycle rate
         for attr in self.plant.hdf_attrs:
@@ -482,7 +486,7 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def update_frame(self):
         self.target.move_to_position(np.array([0,0,self.targs[self.frame_index+self.lookahead][2]])) # xzy
-        self.trajectory.move_to_position(np.array([-self.frame_index/3,0,0])) # same update constant works for 60 and 120 hz
+        self.trajectory.move_to_position(np.array([-self.frame_index/3,10,0])) # same update constant works for 60 and 120 hz
         self.target.show()
         self.trajectory.show()
         self.frame_index +=1
@@ -520,6 +524,10 @@ class ScreenTargetTracking(TargetTracking, Window):
                 self.add_model(model)
                 self.bar.hide()
 
+            for model in self.box.graphics_models:
+                self.add_model(model)
+                self.box.hide()
+
         # Allow 2d movement
         if not self.always_1d:
             self.limit1d = False
@@ -554,6 +562,8 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.trajectory.reset()
         self.bar.hide()
         self.bar.reset()
+        self.box.hide()
+        self.box.reset()
 
     def _start_wait(self):
         super()._start_wait()
@@ -570,13 +580,12 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def _while_wait_retry(self):
         super()._while_wait_retry()
-        # # Add disturbance
 
     def _start_trajectory(self):
         super()._start_trajectory()
         if self.frame_index == 0:
             self.target.move_to_position(np.array([0,0,self.targs[self.frame_index+self.lookahead][2]])) # tablet screen x-axis ranges -19,19, center 0
-            self.trajectory.move_to_position(np.array([0,0,0])) # tablet screen x-axis ranges 0,41.33333, center 22ish
+            self.trajectory.move_to_position(np.array([0,10,0])) # tablet screen x-axis ranges 0,41.33333, center 22ish
             # print(self.target.get_position())
             # print(self.trajectory.get_position())
 
@@ -587,7 +596,6 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def _while_trajectory(self):
         super()._while_trajectory()
-        # # Add disturbance
 
     def _start_hold(self):
         super()._start_hold()
@@ -598,7 +606,6 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def _while_hold(self):
         super()._while_hold()
-        # # Add disturbance
 
     def _start_tracking_in(self):
         super()._start_tracking_in()
@@ -689,7 +696,6 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def _while_hold_penalty(self):
         super()._while_hold_penalty()
-        # # Add disturbance
 
     def _end_hold_penalty(self):
         super()._end_hold_penalty()
@@ -709,7 +715,6 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def _while_tracking_out_penalty(self):
         super()._while_tracking_out_penalty()
-        # # Add disturbance
 
     def _end_tracking_out_penalty(self):
         super()._end_tracking_out_penalty()
@@ -731,7 +736,6 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def _while_reward(self):
         super()._while_reward()
-        # # Add disturbance
 
     def _end_reward(self):
         super()._end_reward()

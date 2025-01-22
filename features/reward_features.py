@@ -242,7 +242,7 @@ class ProgressBar(traits.HasTraits):
                 self.remove_model(model)
             del self.bar
 
-        self.bar = VirtualRectangularTarget(target_width=1.3, target_height=self.tracking_rate, target_color=(0., 1., 0., 0.75), starting_pos=[self.tracking_rate-self.bar_width,0,9])
+        self.bar = VirtualRectangularTarget(target_width=1.3, target_height=self.tracking_rate, target_color=(0., 1., 0., 0.75), starting_pos=[self.tracking_rate-self.bar_width,-15,9])
         for model in self.bar.graphics_models:
             self.add_model(model)
         self.bar.show()
@@ -258,7 +258,7 @@ class ProgressBar(traits.HasTraits):
         self.reward_frame_index += 1
         reward_numframe = self.reward_time*self.fps
         reward_amount = self.tracking_rate - self.reward_frame_index*self.tracking_rate/reward_numframe
-        self.bar = VirtualRectangularTarget(target_width=1.3, target_height=reward_amount, target_color=(0., 1., 0., 0.75), starting_pos=[reward_amount-self.bar_width,0,9])
+        self.bar = VirtualRectangularTarget(target_width=1.3, target_height=reward_amount, target_color=(0., 1., 0., 0.75), starting_pos=[reward_amount-self.bar_width,-15,9])
         for model in self.bar.graphics_models:
             self.add_model(model)
         self.bar.show()        
