@@ -7,7 +7,7 @@ from features.debug_features import Profiler, OnlineAnalysis
 from features.laser_features import QwalorLaser, MultiQwalorLaser, SwitchedQwalorLaser, LaserState
 from riglib.stereo_opengl.window import WindowWithExperimenterDisplay, Window2D
 from riglib.stereo_opengl.openxr import WindowVR
-from .generator_features import Autostart, AdaptiveGenerator, IgnoreCorrectness, PoissonWait, Progressbar_fixation, HideLeftTrajectory
+from .generator_features import Autostart, RandomDelay, AdaptiveGenerator, IgnoreCorrectness, PoissonWait, Progressbar_fixation, HideLeftTrajectory
 from .peripheral_device_features import Button, Joystick, DualJoystick, Joystick_plus_TouchSensor, KeyboardControl, MouseControl, ForceControl
 from .reward_features import RewardSystem, TTLReward, JuiceLogging, PelletReward, JackpotRewards, ProgressBar, TrackingRewards, RewardAudio, PenaltyAudio, ScoreRewards
 from .eyetracker_features import EyeData, CalibratedEyeData, SimulatedEyeData, FixationStart, EyeConstrained, EyeCalibration, EyeStreaming
