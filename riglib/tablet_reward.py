@@ -45,7 +45,7 @@ class RemoteReward():
         self.serverPort = 8080
 
     def trigger(self, ip_address):
-        url = f"http://{self.ip_address}:{self.serverPort}"
+        url = f"http://{ip_address}:{self.serverPort}"
         print(url)
         try:
             requests.post(url, timeout=3)

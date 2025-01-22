@@ -71,7 +71,7 @@ class PelletReward(RewardSystem):
         self.reward = RemoteReward()
         self.reportstats['Reward #'] = 0
         
-        if port_value == 8000:
+        if self.port_value == 8000:
             self.ip_address = "192.168.0.62"
         else:
             print('uh oh')
