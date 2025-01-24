@@ -112,8 +112,10 @@ class TargetTracking(Sequence):
         # print(np.amax(self.targs), np.amax(self.disturbance_path))
 
         self.ramp_counter = np.zeros((len(self.targs),), dtype='int')
-        self.ramp_counter[:int(self.ramp_up_time*self.sample_rate)] = 1
-        self.ramp_counter[-int(self.ramp_down_time*self.sample_rate):] = 2
+        if self.ramp_up_time > 0:
+            self.ramp_counter[:int(self.ramp_up_time*self.sample_rate)] = 1
+        if self.ramp_down_time > 0:
+            self.ramp_counter[-int(self.ramp_down_time*self.sample_rate):] = 2
 
         self.targs = np.concatenate((lookahead, self.targs),axis=0) # (time_length*sample_rate+30,3) # targs and disturbance are no longer same length
     
