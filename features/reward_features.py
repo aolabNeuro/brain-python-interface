@@ -72,7 +72,7 @@ class PelletReward(RewardSystem):
         self.reportstats['Reward #'] = 0
         
         if self.port_value == 8000:
-            self.ip_address = "192.168.0.62"
+            self.ip_address = "192.168.0.100"
         elif self.port_value == 9000:
             self.ip_address = "192.168.0.200"
         else:
