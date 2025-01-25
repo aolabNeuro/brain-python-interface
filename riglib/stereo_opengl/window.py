@@ -10,9 +10,9 @@ from OpenGL.GL import *
 from ..experiment import LogExperiment
 from ..experiment import traits
 
-from .render import stereo, render
+from .render import stereo, render, ssao, shadow_map
 from .models import Group
-from .xfm import Quaternion
+from .xfm import Quaternion, Transform
 from .primitives import Sphere, Cube, Chain
 from .environment import Box, Grid
 from .primitives import Cylinder, Sphere, Cone
@@ -51,7 +51,7 @@ class Window(LogExperiment):
     stereo_mode = traits.OptionsList(['hmd', 'mirror', 'projection', 'anaglyph'], desc="Stereo mode", 
                                      bmi3d_input_options=['hmd', 'mirror', 'projection', 'anaglyph'])
 
-    show_environment = traits.Int(0, desc="Show wireframe box around environment")
+    show_environment = traits.Bool(False, desc="Show wireframe box around environment")
 
     hidden_traits = ['stereo_mode', 'screen_dist', 'screen_half_height', 'iod', 'show_environment', 'background']
 
@@ -67,11 +67,6 @@ class Window(LogExperiment):
         self.fov = np.degrees(np.arctan(self.screen_half_height/self.screen_dist))*2
         self.screen_cm = [2 * self.screen_half_height * self.window_size[0]/self.window_size[1], 2 * self.screen_half_height]
 
-        if self.show_environment == 1:
-            self.add_model(Box())
-        elif self.show_environment == 2:
-            self.add_model(Grid(size=20))
-
     def set_os_params(self):
         os.environ['SDL_VIDEO_WINDOW_POS'] = self.display_start_pos
         os.environ['SDL_VIDEO_X11_WMCLASS'] = "monkey_experiment"
@@ -81,6 +76,10 @@ class Window(LogExperiment):
         pygame.init()
 
         pygame.display.gl_set_attribute(pygame.GL_DEPTH_SIZE, 24)
+        pygame.display.gl_set_attribute(pygame.GL_FRAMEBUFFER_SRGB_CAPABLE, True)
+        pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MAJOR_VERSION, 3)
+        pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MINOR_VERSION, 2)
+        pygame.display.gl_set_attribute(pygame.GL_CONTEXT_PROFILE_MASK, pygame.GL_CONTEXT_PROFILE_CORE)
         flags = pygame.DOUBLEBUF | pygame.HWSURFACE | pygame.OPENGL | pygame.NOFRAME
         if self.fullscreen:
             flags = flags | pygame.FULLSCREEN
@@ -91,10 +90,10 @@ class Window(LogExperiment):
             pygame.display.gl_set_attribute(pygame.GL_MULTISAMPLEBUFFERS,0)
             self.screen = pygame.display.set_mode(self.window_size, flags)
 
+        glDisable(GL_FRAMEBUFFER_SRGB) # disable gamma correction
         glEnable(GL_BLEND)
         glDepthFunc(GL_LESS)
         glEnable(GL_DEPTH_TEST)
-        glEnable(GL_TEXTURE_2D)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glClearColor(*self.background)
         glClearDepth(1.0)
@@ -102,27 +101,33 @@ class Window(LogExperiment):
         glEnable(GL_CULL_FACE) # temporary solution to alpha blending issue with spheres. just draw the front half of the sphere
         glCullFace(GL_BACK)
 
-        self.renderer = self._get_renderer()
 
         #this effectively determines the modelview matrix
         self.world = Group(self.models)
         self.world.init()
 
         #up vector is always (0,0,1), why would I ever need to roll the camera?!
-        self.set_eye((0, -self.screen_dist, 0), (0,0))
+        self.set_eye((0, 0, 0), (0,0))
+        self.modelview = np.eye(4)
+        self.modelview[:3,-1] = [0,0,-self.screen_dist]
+        self.renderer = self._get_renderer()
 
         pygame.mouse.set_visible(False)
 
+        if self.show_environment:
+            self.add_model(Box())
+    
     def _get_renderer(self):
         near = 1
         far = 1024
         if self.stereo_mode == 'mirror':
-            glCullFace(GL_FRONT)
+            self.modelview = np.dot(self.modelview, np.diag([-1,1,1,1]))
+            glFrontFace(GL_CW);  # Switch to clockwise winding for mirrored objects
             return stereo.MirrorDisplay(self.window_size, self.fov, near, far, self.screen_dist, self.iod)
         if self.stereo_mode == 'hmd':
-            return stereo.MirrorDisplay(self.window_size, self.fov, near, far, self.screen_dist, self.iod, flip=False)
+            return stereo.MirrorDisplay(self.window_size, self.fov, near, far, self.screen_dist, self.iod)
         elif self.stereo_mode == 'projection':
-            return render.Renderer(self.window_size, self.fov, near, far)
+            return shadow_map.ShadowMapper(self.window_size, self.fov, near, far)
         elif self.stereo_mode == 'anaglyph':
             return stereo.Anaglyph(self.window_size, self.fov, near, far, self.screen_dist, self.iod)
         else:
@@ -157,7 +162,7 @@ class Window(LogExperiment):
 
     def draw_world(self):
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-        self.renderer.draw(self.world)
+        self.renderer.draw(self.world, modelview=self.modelview)
         pygame.display.flip()
         self.renderer.draw_done()
 
@@ -191,6 +196,13 @@ class Window(LogExperiment):
         self.event = self._get_event()
         self.requeue()
         self.draw_world()
+
+    
+class WindowSSAO(Window):
+    '''Screen Space Ambient Occlusion (SSAO) window. Replaces the renderer with one using SSAO'''
+
+    def _get_renderer(self):
+        return ssao.SSAO(self.window_size, self.fov, 0.05, 1024)
 
 
 class WindowWithExperimenterDisplay(Window):
@@ -444,8 +456,8 @@ class FPScontrol(Window):
     '''A mixin that adds a WASD + Mouse controller to the window.
     Use WASD to move in XY plane, q to go down, e to go up'''
 
-    def init(self):
-        super(FPScontrol, self).init()
+    def screen_init(self):
+        super(FPScontrol, self).screen_init()
         pygame.mouse.set_visible(False)
         self.eyepos = [0,-self.screen_dist, 0]
         self.eyevec = [0,0]
