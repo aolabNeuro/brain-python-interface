@@ -287,11 +287,11 @@ class PupilLabStreaming(traits.HasTraits):
     eye_labels = traits.Array(value=[
         'binocular_gaze_x', 'binocular_gaze_y', 'binocular_gaze_z', 
         'binocular_norm_x', 'binocular_norm_y', 
+        'timestamp', 
         'le_gaze_x', 'le_gaze_y', 'le_gaze_z',
         'le_norm_x', 'le_norm_y',
         're_gaze_x', 're_gaze_y', 're_gaze_z',
         're_norm_x', 're_norm_y',
-        'timestamp', 
         're_x', 're_y', 
         'le_x', 'le_y', 
         'le_diam', 
@@ -321,7 +321,7 @@ class PupilLabStreaming(traits.HasTraits):
         self.eye_pos = np.zeros((8,))*np.nan
 
     def init(self):
-        self.add_dtype('eye', 'f8', (10,))
+        self.add_dtype('eye', 'f8', (22,))
         super().init()
 
     def run(self):
@@ -346,7 +346,7 @@ class PupilLabStreaming(traits.HasTraits):
     def _update_eye_pos(self):
         eye_pos = self.eye_data.get() # This is (n,11) array of new values since we last checked
         if eye_pos.ndim < 2 or eye_pos.size == 0:
-            eye_pos = np.zeros((10,))*np.nan
+            eye_pos = np.zeros((22,))*np.nan
         else:
             eye_pos = eye_pos[-1,:] # the most recent position
         self.eye_pos = eye_pos

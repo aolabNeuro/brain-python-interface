@@ -37,6 +37,7 @@ class CalibrateHMD(WindowVR, Sequence):
         for model in self.target.graphics_models:
             self.add_model(model)
 
+        print("Connecting to Pupil Service/Capture...")
         ctx = zmq.Context()
 
         # create a zmq REQ socket to talk to Pupil Service/Capture

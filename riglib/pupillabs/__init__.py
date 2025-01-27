@@ -14,7 +14,7 @@ class System(DataSourceSystem):
     '''
     
     '''
-    dtype = np.dtype((float, (10,)))
+    dtype = np.dtype((float, (22,)))
     update_freq = 200
     
     def __init__(self, ip="128.95.215.191", port="50020", confidence_threshold=0.0):
@@ -117,7 +117,7 @@ class System(DataSourceSystem):
                     if mapped_gaze is not None:
                         coords[3:5] = np.array(mapped_gaze.norm_x, mapped_gaze.norm_y)
 
-                coords[16] = message["timestamp"]
+                coords[5] = message["timestamp"]
 
             elif message["topic"].startswith("gaze.3d.0") and message["confidence"] >= self.confidence_threshold:
                 coords[6:9] = message["gaze_point_3d"]
@@ -128,11 +128,11 @@ class System(DataSourceSystem):
                 coords[14:16] = message["norm_pos"]
 
             elif topic.startswith(b"pupil.0.2d") and message["confidence"] >= self.confidence_threshold:
-                coords[17:19] = message["norm_pos"]
-                coords[21] = float(message["diameter"]) # pupil 0 diamter, right eye, unit: pixel
+                coords[16:18] = message["norm_pos"]
+                coords[18] = float(message["diameter"]) # pupil 0 diamter, right eye, unit: pixel
             elif topic.startswith(b"pupil.1.2d") and message["confidence"] >= self.confidence_threshold:
                 coords[19:21] = message["norm_pos"] 
-                coords[22] = float(message["diameter"]) # pupil 1 diamter, left eye, unit: pixel
+                coords[21] = float(message["diameter"]) # pupil 1 diamter, left eye, unit: pixel
 
             time.sleep(0.001)  # sleep for 1 ms to avoid busy waiting
 
