@@ -18,7 +18,8 @@ class CalibrateHMD(WindowVR, Sequence):
 
     status = dict(
         wait = dict(start_trial="target", start_pause="pause"),
-        target = dict(target_done="wait", start_pause="pause", end_state=True), # end_state is just for counting trials
+        target = dict(fixation="target_calibrate", start_pause="pause"),
+        target_calibrate = dict(target_done="wait", start_pause="pause", end_state=True), # end_state is just for counting trials
         pause = dict(end_pause="wait", end_state=True),
     )
 
@@ -27,8 +28,8 @@ class CalibrateHMD(WindowVR, Sequence):
 
     sequence_generators = ['target_generator']
 
-    example_param = traits.Float(0.0, desc="Example parameter (units)")
-    target_on_time = traits.Float(1.0, desc="Time to display target")
+    fixation_time = traits.Float(1.0, desc="Time in seconds to display target before calibration")
+    calibration_time = traits.Float(1.0, desc="Duration in seconds of each target calibration")
     startup_time = traits.Float(5.0, desc="Time to wait before starting first trial")
 
     def __init__(self, *args, **kwargs):
@@ -43,7 +44,7 @@ class CalibrateHMD(WindowVR, Sequence):
         # create a zmq REQ socket to talk to Pupil Service/Capture
         self.req = ctx.socket(zmq.REQ)
         self.req.connect("tcp://128.95.215.191:50020") # to-do don't hard code
-        
+
         # set start eye windows
         n = {"subject": "eye_process.should_start.0", "eye_id": 0, "args": {}} # delay?
         print(self.send_recv_notification(n))
@@ -81,7 +82,6 @@ class CalibrateHMD(WindowVR, Sequence):
         return float(self.req.recv_string())
 
     def init(self):
-        self.add_dtype('example_cycle_data_to_save', 'f8', (1,))
         self.trial_dtype = np.dtype([('trial', 'u4'), ('index', 'u4'), ('target', 'f8', (3,))])
         super().init()
 
@@ -99,9 +99,12 @@ class CalibrateHMD(WindowVR, Sequence):
 
     def _test_start_pause(self, ts):
         return self.pause
-    
+
+    def _test_fixation(self, ts):
+        return ts > self.fixation_time
+
     def _test_target_done(self, ts):
-        return ts > self.target_on_time
+        return ts > self.calibration_time
     
     def _test_end_pause(self, ts):
         return not self.pause
@@ -109,6 +112,7 @@ class CalibrateHMD(WindowVR, Sequence):
     def _parse_next_trial(self):
         '''Check that the generator has the required data'''
         self.target_idx, self.target_location = self.next_trial
+        self.target_location = np.array(self.target_location).astype(float)
         
         # Update the data sinks with trial information
         self.trial_record['trial'] = self.calc_trial_num()
@@ -124,14 +128,10 @@ class CalibrateHMD(WindowVR, Sequence):
 
     def _start_target(self):
         self.sync_event('TARGET_ON', 0xd)
-        
-        self.task_data['example_cycle_data_to_save'] = 2 # maybe you want to save some specific data here
-        
-        print("driving target to", self.target_location)
         self.target.move_to_position(self.target_location)
         self.target.show()
 
-    def _while_target(self):
+    def _while_target_calibrate(self):
         # get the current pupil time (pupil uses CLOCK_MONOTONIC with adjustable timebase).
         # You can set the pupil timebase to another clock and use that.
         
@@ -142,7 +142,7 @@ class CalibrateHMD(WindowVR, Sequence):
             datum0 = {"mm_pos": (self.target_location[0]*10, self.target_location[2]*10, self.target_location[1]*10), "timestamp": t}
             self.ref_data.append(datum0)
 
-    def _end_target(self):
+    def _end_target_calibrate(self):
         # Send ref data to Pupil Capture/Service:
         # This notification can be sent once at the end or multiple times.
         # During one calibraiton all new data will be appended.
@@ -179,9 +179,14 @@ class CalibrateHMD(WindowVR, Sequence):
             log_summary['n_success_trials'], log_summary['n_trials'], duration)
 
     @staticmethod
-    def target_generator():
+    def target_generator(size=10):
         '''
         Generates a sequence of targets
+
+        Parameters
+        ----------
+        size : int, optional
+            Distance between targets, by default 10
 
         Returns
         -------
@@ -189,22 +194,22 @@ class CalibrateHMD(WindowVR, Sequence):
 
         '''
         pos = [
-            [0, 0, -15],
+            [0, 0, -1],
             [0, 0, 0],
-            [0, 0, 15],
-            [-15, -15, -15],
-            [-15, -15, 0],
-            [-15, -15, 15],
-            [-15, 15, -15],
-            [-15, 15, 0],
-            [-15, 15, 15],
-            [15, -15, -15],
-            [15, -15, 0],
-            [15, -15, 15],
-            [15, 15, -15],
-            [15, 15, 0],
-            [15, 15, 15],
+            [0, 0, 1],
+            [-1, -1, -1],
+            [-1, -1, 0],
+            [-1, -1, 1],
+            [-1, 1, -1],
+            [-1, 1, 0],
+            [-1, 1, 1],
+            [1, -1, -1],
+            [1, -1, 0],
+            [1, -1, 1],
+            [1, 1, -1],
+            [1, 1, 0],
+            [1, 1, 1],
         ]
         for idx in range(len(pos)):
-            yield idx, pos[idx]
+            yield idx, np.array(pos[idx])*size
 
