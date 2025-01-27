@@ -138,7 +138,7 @@ class CalibrateHMD(WindowVR, Sequence):
             t = self.get_pupil_timestamp()
 
             # in this mockup  the left and right screen marker positions are identical.
-            datum0 = {"mm_pos": (self.target_location[0]*10, self.target_location[1]*10, self.target_location[2]*10), "timestamp": t}
+            datum0 = {"mm_pos": (self.target_location[0]*10, self.target_location[2]*10, self.target_location[1]*10), "timestamp": t}
             self.ref_data.append(datum0)
 
     def _end_target(self):
