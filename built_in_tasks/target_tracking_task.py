@@ -43,9 +43,14 @@ class TargetTracking(Sequence):
         wait = dict(start_trial="trajectory", start_pause="pause"),
         wait_retry = dict(start_trial="trajectory", start_pause="pause"),
         trajectory = dict(enter_target="hold", timeout="timeout_penalty", start_pause="pause"),
-        hold = dict(hold_complete="tracking_in", leave_target="hold_penalty", start_pause="pause"),
-        tracking_in = dict(trial_complete="reward", leave_target="tracking_out", start_pause="pause"),
-        tracking_out = dict(trial_complete="reward", enter_target="tracking_in", tracking_out_timeout="tracking_out_penalty", start_pause="pause"),
+        hold = dict(hold_complete_go_ramp="tracking_in_ramp", hold_complete_no_ramp="tracking_in", leave_target="hold_penalty", start_pause="pause"),
+
+        tracking_in_ramp = dict(ramp_complete="tracking_in", ramp_and_trial_complete="reward", leave_target="tracking_out_ramp", start_pause="pause"),
+        tracking_out_ramp = dict(ramp_complete="tracking_out", ramp_and_trial_complete="reward", enter_target="tracking_in_ramp", tracking_out_timeout="tracking_out_penalty", start_pause="pause"),
+        
+        tracking_in = dict(traj_complete="tracking_in_ramp", trial_complete="reward", leave_target="tracking_out", start_pause="pause"),
+        tracking_out = dict(traj_complete="tracking_out_ramp", trial_complete="reward", enter_target="tracking_in", tracking_out_timeout="tracking_out_penalty", start_pause="pause"),
+        
         timeout_penalty = dict(timeout_penalty_end="wait", start_pause="pause", end_state=True),
         hold_penalty = dict(hold_penalty_end="wait", hold_penalty_end_retry="wait_retry", start_pause="pause", end_state=True),
         tracking_out_penalty = dict(tracking_out_penalty_end="wait", start_pause="pause", end_state=True),
@@ -93,8 +98,8 @@ class TargetTracking(Sequence):
 
     def _parse_next_trial(self):
         '''Get the required data from the generator'''
-        # yield idx, pts, disturbance, dis_trajectory, sample_rate :
-        self.gen_index, self.targs, self.disturbance_trial, self.disturbance_path, self.sample_rate = self.next_trial # targs and disturbance are same length
+        # yield idx, targs, disturbance, dis_trajectory, sample_rate, ramp, ramp_down :
+        self.gen_index, self.targs, self.disturbance_trial, self.disturbance_path, self.sample_rate, self.ramp_up_time, self.ramp_down_time = self.next_trial # targs and disturbance are same length
 
         self.targs = np.squeeze(self.targs,axis=0)
         self.disturbance_path = np.squeeze(self.disturbance_path)
@@ -105,6 +110,12 @@ class TargetTracking(Sequence):
         self.targs = self.trajectory_amplitude*self.targs
         self.disturbance_path = self.disturbance_amplitude*self.disturbance_path
         # print(np.amax(self.targs), np.amax(self.disturbance_path))
+
+        self.ramp_counter = np.zeros((len(self.targs),), dtype='int')
+        if self.ramp_up_time > 0:
+            self.ramp_counter[:int(self.ramp_up_time*self.sample_rate)] = 1
+        if self.ramp_down_time > 0:
+            self.ramp_counter[-int(self.ramp_down_time*self.sample_rate):] = 2
 
         self.targs = np.concatenate((lookahead, self.targs),axis=0) # (time_length*sample_rate+30,3) # targs and disturbance are no longer same length
     
@@ -183,6 +194,30 @@ class TargetTracking(Sequence):
         self.vel_offset = [0,0,0]
 
     def _end_hold(self):
+        '''Nothing generic to do.'''
+        pass
+
+    def _start_tracking_in_ramp(self):
+        '''Nothing generic to do.'''
+        pass
+
+    def _while_tracking_in_ramp(self):
+        '''Nothing generic to do.'''
+        pass
+
+    def _end_tracking_in_ramp(self):
+        '''Nothing generic to do.'''
+        pass
+
+    def _start_tracking_out_ramp(self):
+        '''Nothing generic to do.'''
+        pass
+
+    def _while_tracking_out_ramp(self):
+        '''Nothing generic to do.'''
+        pass
+
+    def _end_tracking_out_ramp(self):
         '''Nothing generic to do.'''
         pass
 
@@ -297,24 +332,44 @@ class TargetTracking(Sequence):
         '''
         return time_in_state > self.hold_time
 
+    def _test_hold_complete_go_ramp(self, time_in_state):
+        '''Test whether the target is held long enough and whether there is a ramp up before the trajectory'''
+        return (time_in_state > self.hold_time) and (self.ramp_up_time > 0)
+
+    def _test_hold_complete_no_ramp(self, time_in_state):
+        '''Test whether the target is held long enough and whether to go straight into the trajectory'''
+        return (time_in_state > self.hold_time) and (self.ramp_up_time == 0)
+
+    def _test_ramp_complete(self, time_in_state):
+        '''Test whether the ramp up is finished'''
+        return self.frame_index == self.ramp_up_time*self.sample_rate
+
+    def _test_traj_complete(self, time_in_state):
+        '''Test whether the trajectory is finished and whether there is a ramp down before the trial ends'''
+        return (self.frame_index + self.lookahead == self.trajectory_length - self.ramp_down_time*self.sample_rate) and (self.ramp_down_time > 0)
+
+    def _test_ramp_and_trial_complete(self, time_in_state):
+        '''Test whether the ramp down is finished, ending the trial'''
+        return (self.frame_index + self.lookahead == self.trajectory_length) and (self.ramp_down_time > 0)
+    
     def _test_trial_complete(self, time_in_state):
-        '''Test whether the trajectory is finished'''
-        return self.frame_index + self.lookahead == self.trajectory_length
+        '''Test whether the trajectory is finished, ending the trial'''
+        return (self.frame_index + self.lookahead == self.trajectory_length) and (self.ramp_down_time == 0)
 
     def _test_tracking_out_timeout(self, time_in_state):
         return time_in_state > self.tracking_out_time
 
     def _test_timeout_penalty_end(self, time_in_state):
-        return time_in_state > self.timeout_penalty_time #or self.pause
+        return time_in_state > self.timeout_penalty_time
 
     def _test_hold_penalty_end(self, time_in_state):
-        return (time_in_state > self.hold_penalty_time) and (self.tries==self.max_hold_attempts) #or self.pause
+        return (time_in_state > self.hold_penalty_time) and (self.tries==self.max_hold_attempts)
 
     def _test_hold_penalty_end_retry(self, time_in_state):
-        return (time_in_state > self.hold_penalty_time) and (self.tries<self.max_hold_attempts) #or self.pause
+        return (time_in_state > self.hold_penalty_time) and (self.tries<self.max_hold_attempts)
 
     def _test_tracking_out_penalty_end(self, time_in_state):
-        return time_in_state > self.tracking_out_penalty_time #or self.pause
+        return time_in_state > self.tracking_out_penalty_time
 
     def _test_reward_end(self, time_in_state):
         return time_in_state > self.reward_time
@@ -487,24 +542,6 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.trajectory.show()
         self.frame_index +=1
 
-    #### TEST FUNCTIONS ####
-    def _test_enter_target(self, time_in_state):
-        '''
-        Test if the cursor is inside the center target 
-        '''
-        cursor_pos = self.plant.get_endpoint_pos()
-        d = np.linalg.norm(cursor_pos - self.target.get_position())
-        return d <= (self.target_radius - self.cursor_radius) or super()._test_enter_target(time_in_state) or (self.hold_time==0 and self.state=='trajectory')
-
-    def _test_leave_target(self, time_in_state):
-        '''
-        Test if the cursor is outside the center target
-        '''
-        cursor_pos = self.plant.get_endpoint_pos()
-        d = np.linalg.norm(cursor_pos - self.target.get_position())
-        return d > (self.target_radius - self.cursor_radius) or super()._test_leave_target(time_in_state)
-
-    #### STATE FUNCTIONS ####
     def setup_start_wait(self):
         if self.calc_trial_num() == 0:
             # Instantiate the targets here so they don't show up in any states that might come before "wait" 
@@ -543,8 +580,7 @@ class ScreenTargetTracking(TargetTracking, Window):
                 self.add_model(model)
 
         self.target.hide()
-        self.trajectory.hide()
-        # self.in_end_state = False      
+        self.trajectory.hide()   
 
     def setup_screen_reset(self):
         # Hide target and trajectory
@@ -555,6 +591,52 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.bar.hide()
         self.bar.reset()
 
+    def setup_start_tracking_in(self):
+        # Revert to settable trait
+        self.limit1d = self.original_limit1d
+        # Cue successful tracking
+        self.target.cue_trial_end_success()
+
+    def setup_start_tracking_out(self):
+        # Reset target color
+        self.target.reset()
+
+    def setup_while_tracking(self):
+        # Add disturbance
+        cursor_pos = self.plant.get_endpoint_pos()
+        if self.disturbance_trial == True:
+            if self.velocity_control:
+                # TODO check manualcontrolmixin for how to implement velocity control
+                self.vel_offset = (cursor_pos + self.disturbance_path[self.frame_index])*1/self.fps
+            else: 
+                # position control
+                self.pos_offset = self.disturbance_path[self.frame_index]
+
+        # Move target and trajectory to next frame so it appears to be moving
+        self.update_frame()
+
+        # Check if the trial is over and there are no more target frames to display
+        if self.frame_index+self.lookahead >= np.shape(self.targs)[0]:
+            self.trial_timed_out = True
+
+    #### TEST FUNCTIONS ####
+    def _test_enter_target(self, time_in_state):
+        '''
+        Test if the cursor is inside the center target 
+        '''
+        cursor_pos = self.plant.get_endpoint_pos()
+        d = np.linalg.norm(cursor_pos - self.target.get_position())
+        return d <= (self.target_radius - self.cursor_radius) or super()._test_enter_target(time_in_state) or (self.hold_time==0 and self.state=='trajectory')
+
+    def _test_leave_target(self, time_in_state):
+        '''
+        Test if the cursor is outside the center target
+        '''
+        cursor_pos = self.plant.get_endpoint_pos()
+        d = np.linalg.norm(cursor_pos - self.target.get_position())
+        return d > (self.target_radius - self.cursor_radius) or super()._test_leave_target(time_in_state)
+
+    #### STATE FUNCTIONS ####
     def _start_wait(self):
         super()._start_wait()
         self.setup_start_wait()
@@ -570,7 +652,6 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def _while_wait_retry(self):
         super()._while_wait_retry()
-        # # Add disturbance
 
     def _start_trajectory(self):
         super()._start_trajectory()
@@ -587,7 +668,6 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def _while_trajectory(self):
         super()._while_trajectory()
-        # # Add disturbance
 
     def _start_hold(self):
         super()._start_hold()
@@ -598,71 +678,52 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def _while_hold(self):
         super()._while_hold()
-        # # Add disturbance
 
+    def _start_tracking_in_ramp(self):
+        super()._start_tracking_in_ramp()
+        self.setup_start_tracking_in()
+
+        print('START TRACKING RAMP', self.ramp_counter[self.frame_index])
+        self.sync_event('CURSOR_ENTER_TARGET', self.ramp_counter[self.frame_index]) # TODO test when there is only a ramp down
+
+    def _while_tracking_in_ramp(self):
+        super()._while_tracking_in_ramp()
+        self.setup_while_tracking()
+        
     def _start_tracking_in(self):
         super()._start_tracking_in()
-        # print('START TRACKING')
+        self.setup_start_tracking_in()
+        print('START TRACKING')
         self.sync_event('CURSOR_ENTER_TARGET')
-        # Revert to settable trait
-        self.limit1d = self.original_limit1d
-        # Cue successful tracking
-        self.target.cue_trial_end_success()
 
     def _while_tracking_in(self):
         super()._while_tracking_in()
-    
-        # Add disturbance
-        cursor_pos = self.plant.get_endpoint_pos()
-        if self.disturbance_trial == True:
-            if self.velocity_control:
-                # TODO check manualcontrolmixin for how to implement velocity control
-                self.vel_offset = (cursor_pos + self.disturbance_path[self.frame_index])*1/self.fps
-            else: 
-                # position control
-                self.pos_offset = self.disturbance_path[self.frame_index]
-
-        # Move target and trajectory to next frame so it appears to be moving
-        self.update_frame()
-
-        # Check if the trial is over and there are no more target frames to display
-        if self.frame_index+self.lookahead >= np.shape(self.targs)[0]:
-            self.trial_timed_out = True
+        self.setup_while_tracking()
             
+    def _start_tracking_out_ramp(self):
+        super()._start_tracking_out_ramp()
+        self.setup_start_tracking_out()
+        print('STOP TRACKING RAMP', self.ramp_counter[self.frame_index])
+        self.sync_event('CURSOR_LEAVE_TARGET', self.ramp_counter[self.frame_index])
+
+    def _while_tracking_out_ramp(self):
+        super()._while_tracking_out_ramp()
+        self.setup_while_tracking()
 
     def _start_tracking_out(self):
         super()._start_tracking_out()
-        # print('STOP TRACKING')
+        self.setup_start_tracking_out()
+        print('STOP TRACKING')
         self.sync_event('CURSOR_LEAVE_TARGET')
-        # Reset target color
-        self.target.reset()
 
     def _while_tracking_out(self):
         super()._while_tracking_out()
-
-        # Add disturbance
-        cursor_pos = self.plant.get_endpoint_pos()
-        if self.disturbance_trial == True:
-            if self.velocity_control:
-                # TODO check manualcontrolmixin for how to implement velocity control
-                self.vel_offset = (cursor_pos + self.disturbance_path[self.frame_index])*1/self.fps
-            else: 
-                # position control
-                self.pos_offset = self.disturbance_path[self.frame_index]
-
-        # Move target and trajectory to next frame so it appears to be moving
-        self.update_frame()
-
-        # Check if the trial is over and there are no more target frames to display
-        if self.frame_index+self.lookahead >= np.shape(self.targs)[0]:
-            self.trial_timed_out = True
+        self.setup_while_tracking()
 
     def _start_timeout_penalty(self):
         super()._start_timeout_penalty()
         # print('START TIMEOUT')
         self.sync_event('TIMEOUT_PENALTY')
-
-        # self.in_end_state = True
         self.setup_screen_reset()
 
         # skip to next generated trial using same freq set
@@ -670,7 +731,6 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def _while_timeout_penalty(self):
         super()._while_timeout_penalty()
-        # # Add disturbance
 
     def _end_timeout_penalty(self):
         super()._end_timeout_penalty()
@@ -680,8 +740,6 @@ class ScreenTargetTracking(TargetTracking, Window):
         super()._start_hold_penalty()
         # print('START HOLD TIMEOUT')
         self.sync_event('HOLD_PENALTY')
-
-        # self.in_end_state = True
         self.setup_screen_reset()
 
         # skip to next generated trial using same freq set
@@ -689,7 +747,6 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def _while_hold_penalty(self):
         super()._while_hold_penalty()
-        # # Add disturbance
 
     def _end_hold_penalty(self):
         super()._end_hold_penalty()
@@ -700,7 +757,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         super()._start_tracking_out_penalty()
         # print('START TRACKING TIMEOUT')
         self.sync_event('OTHER_PENALTY')
-        # self.in_end_state = True
+
         # Cue failed trial
         self.target.cue_trial_end_failure()
 
@@ -709,7 +766,6 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def _while_tracking_out_penalty(self):
         super()._while_tracking_out_penalty()
-        # # Add disturbance
 
     def _end_tracking_out_penalty(self):
         super()._end_tracking_out_penalty()
@@ -721,7 +777,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         super()._start_reward()
         # print('REWARD')
         self.sync_event('REWARD')
-        # self.in_end_state = True
+
         # Cue successful trial
         self.target.cue_trial_end_success()
         self.reward_frame_index = 0
@@ -731,7 +787,6 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def _while_reward(self):
         super()._while_reward()
-        # # Add disturbance
 
     def _end_reward(self):
         super()._end_reward()
@@ -943,7 +998,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         Returns
         -------
         idx : [nblocks*ntrials x 1] array of trial indices
-        pts : [nblocks*ntrials x 1] array of 3D target coordinates
+        targs : [nblocks*ntrials x 1] array of 3D target coordinates
         disturbance : boolean
         dis_trajectory : [nblocks*ntrials x 1] array of 3D disturbance coordinates
         '''
@@ -954,13 +1009,13 @@ class ScreenTargetTracking(TargetTracking, Window):
                 num_trials=ntrials, time_length=time_length, seed=seed, sample_rate=sample_rate, base_period=base_period, ramp=ramp, ramp_down=ramp_down, num_primes=num_primes
                 )
             for trial_id in range(ntrials):
-                pts = []
+                targs = []
                 ref_trajectory = np.zeros((int((time_length+ramp+ramp_down)*sample_rate),3))
                 dis_trajectory = ref_trajectory.copy()
                 ref_trajectory[:,2] = trials['ref'][trial_id]
                 dis_trajectory[:,2] = trials['dis'][trial_id] # scale will determine lower limit of target size for perfect tracking
-                pts.append(ref_trajectory)
-                yield idx, pts, disturbance, dis_trajectory, sample_rate
+                targs.append(ref_trajectory)
+                yield idx, targs, disturbance, dis_trajectory, sample_rate, ramp, ramp_down
                 idx += 1
 
     @staticmethod
@@ -979,13 +1034,13 @@ class ScreenTargetTracking(TargetTracking, Window):
                 #     plt.figure(); plt.plot(trials['times'][trial_id],trials['ref'][trial_id])
                 #     plt.plot(trials['times'][trial_id],trials['dis'][trial_id])
                 #     plt.show()
-                pts = []
+                targs = []
                 ref_trajectory = np.zeros((int((time_length+ramp)*sample_rate),3))
                 dis_trajectory = ref_trajectory.copy()
                 ref_trajectory[:,2] = trials['ref'][trial_id]
                 dis_trajectory[:,2] = trials['dis'][trial_id] # scale will determine lower limit of target size for perfect tracking
-                pts.append(ref_trajectory)
-                yield idx, pts, disturbance, dis_trajectory, sample_rate
+                targs.append(ref_trajectory)
+                yield idx, targs, disturbance, dis_trajectory, sample_rate, ramp, ramp
                 idx += 1
     
     @staticmethod
