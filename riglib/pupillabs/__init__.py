@@ -14,8 +14,8 @@ class System(DataSourceSystem):
     '''
     
     '''
-    dtype = np.dtype((float, (22,)))
-    update_freq = 200
+    dtype = np.dtype((float, (30,)))
+    update_freq = 120
     
     def __init__(self, ip="128.95.215.191", port="50020", confidence_threshold=0.0):
         '''
@@ -96,10 +96,18 @@ class System(DataSourceSystem):
         """
         read in a batch of eye data and retun x, y on surface & pupil diameters for each eye
         """
-        coords = np.full((22,), np.nan)
+        gaze = np.full((6,), np.nan)
+        pupil = np.full((6,), np.nan)
 
-        while np.count_nonzero(np.isnan(coords)) > 0:
+        binocular_gaze = np.full((6,), np.nan)
+        left_eye_gaze = np.full((6,), np.nan)
+        right_eye_gaze = np.full((6,), np.nan)
+        left_pupil = np.full((3,), np.nan)
+        right_pupil = np.full((3,), np.nan)
+
+        while np.any(np.isnan(gaze)) or np.any(np.isnan(pupil)):
             if not self.sub.poll(0) == zmq.POLLIN:
+                time.sleep(0.001)  # sleep for 1 ms to avoid busy waiting
                 continue
 
             topic, payload = self.sub.recv_multipart(flags=zmq.NOBLOCK)
@@ -108,34 +116,54 @@ class System(DataSourceSystem):
             if message["topic"].startswith("surfaces"):
                 self.mapper.update_homography(message["img_to_surf_trans"])
 
-            elif message["topic"].startswith("gaze.3d.01") and message["confidence"] >= self.confidence_threshold:
-                coords[:3] = message["gaze_point_3d"]
-                coords[3:5] = message["norm_pos"]
+            if message["topic"] == "gaze.3d.01." and message["confidence"] >= self.confidence_threshold:
+                    
+                    binocular_gaze[:2] = message["norm_pos"]
+                    binocular_gaze[2:5] = message["gaze_point_3d"]
 
+                    if self.mapper is not None:
+                        mapped_gaze = self.mapper.gaze_to_surface(message["norm_pos"])
+                        if mapped_gaze is not None:
+                            binocular_gaze[:2] = np.array(mapped_gaze.norm_x, mapped_gaze.norm_y)
+
+                    binocular_gaze[5] = message["timestamp"]
+
+            if message["topic"] == "gaze.3d.1." and message["confidence"] >= self.confidence_threshold:
+                left_eye_gaze[:2] = message["norm_pos"]
+                left_eye_gaze[2:5] = message["gaze_point_3d"]
                 if self.mapper is not None:
                     mapped_gaze = self.mapper.gaze_to_surface(message["norm_pos"])
                     if mapped_gaze is not None:
-                        coords[3:5] = np.array(mapped_gaze.norm_x, mapped_gaze.norm_y)
+                        left_eye_gaze[:2] = np.array(mapped_gaze.norm_x, mapped_gaze.norm_y)
+                left_eye_gaze[5] = message["timestamp"]
 
-                coords[5] = message["timestamp"]
+            elif message["topic"] == "gaze.3d.0." and message["confidence"] >= self.confidence_threshold:
+                right_eye_gaze[:2] = message["norm_pos"]
+                right_eye_gaze[2:5] = message["gaze_point_3d"]
+                if self.mapper is not None:
+                    mapped_gaze = self.mapper.gaze_to_surface(message["norm_pos"])
+                    if mapped_gaze is not None:
+                        right_eye_gaze[:2] = np.array(mapped_gaze.norm_x, mapped_gaze.norm_y)
+                right_eye_gaze[5] = message["timestamp"]
 
-            elif message["topic"].startswith("gaze.3d.0") and message["confidence"] >= self.confidence_threshold:
-                coords[6:9] = message["gaze_point_3d"]
-                coords[9:11] = message["norm_pos"]
+            if message["topic"] == "pupil.1.2d" and message["confidence"] >= self.confidence_threshold:
+                left_pupil[:2] = message["norm_pos"]
+                left_pupil[2] = float(message["diameter"]) # pupil 1 diamter, left eye, unit: pixel
+            
+            elif message["topic"] == "pupil.0.2d" and message["confidence"] >= self.confidence_threshold:
+                right_pupil[:2] = message["norm_pos"] 
+                right_pupil[2] = float(message["diameter"]) # pupil 0 diamter, right eye, unit: pixel
 
-            elif message["topic"].startswith("gaze.3d.1") and message["confidence"] >= self.confidence_threshold:
-                coords[11:14] = message["gaze_point_3d"]
-                coords[14:16] = message["norm_pos"]
+            if np.all(~np.isnan(binocular_gaze)):
+                gaze = binocular_gaze
+            elif np.all(~np.isnan(left_eye_gaze)):
+                gaze = left_eye_gaze
+            elif np.all(~np.isnan(right_eye_gaze)):
+                gaze = right_eye_gaze
 
-            elif topic.startswith(b"pupil.0.2d") and message["confidence"] >= self.confidence_threshold:
-                coords[16:18] = message["norm_pos"]
-                coords[18] = float(message["diameter"]) # pupil 0 diamter, right eye, unit: pixel
-            elif topic.startswith(b"pupil.1.2d") and message["confidence"] >= self.confidence_threshold:
-                coords[19:21] = message["norm_pos"] 
-                coords[21] = float(message["diameter"]) # pupil 1 diamter, left eye, unit: pixel
+            pupil = np.hstack([left_pupil, right_pupil])
 
-            time.sleep(0.001)  # sleep for 1 ms to avoid busy waiting
-
+        coords = np.hstack([gaze, binocular_gaze, left_eye_gaze, right_eye_gaze, left_pupil, right_pupil])
         coords = np.expand_dims(coords, axis=0)
         return coords
 

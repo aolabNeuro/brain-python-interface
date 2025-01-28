@@ -210,7 +210,6 @@ class WindowVR(Window):
         far = 1024
         if self.stereo_mode == 'mirror':
             glFrontFace(GL_CW);  # Switch to clockwise winding for mirrored objects
-        return render.Renderer(self.window_size, self.fov, near, far)
         return shadow_map.ShadowMapper(self.window_size, self.fov, near, far)
     
     def draw_world(self):

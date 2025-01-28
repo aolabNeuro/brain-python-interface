@@ -321,7 +321,7 @@ class PupilLabStreaming(traits.HasTraits):
         self.eye_pos = np.zeros((8,))*np.nan
 
     def init(self):
-        self.add_dtype('eye', 'f8', (22,))
+        self.add_dtype('eye', 'f8', (30,))
         super().init()
 
     def run(self):
@@ -346,7 +346,7 @@ class PupilLabStreaming(traits.HasTraits):
     def _update_eye_pos(self):
         eye_pos = self.eye_data.get() # This is (n,11) array of new values since we last checked
         if eye_pos.ndim < 2 or eye_pos.size == 0:
-            eye_pos = np.zeros((22,))*np.nan
+            eye_pos = np.zeros((30,))*np.nan
         else:
             eye_pos = eye_pos[-1,:] # the most recent position
         self.eye_pos = eye_pos

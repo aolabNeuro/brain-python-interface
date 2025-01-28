@@ -39,6 +39,7 @@ class TestPupillabs(unittest.TestCase):
         from riglib import source
         motiondata = source.DataSource(NoSurfaceTracking)
         motiondata.start()
+        time.sleep(2)
         
         # Count packet rate
         count = 0
