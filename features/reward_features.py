@@ -10,6 +10,7 @@ from riglib.audio import AudioPlayer
 from built_in_tasks.target_graphics import TextTarget, VirtualRectangularTarget
 import numpy as np
 import serial, glob
+import aopy
 
 ###### CONSTANTS
 sec_per_min = 60
@@ -294,14 +295,14 @@ class TrackingRewards(traits.HasTraits):
 
 class ScoreRewards(traits.HasTraits):
     '''
-    Add a "score" to the task that awards points based on target acquisition speed. 
+    Add a "score" to the task that awards points based on movement error in 2D. 
     The score is displayed after each reward and on the web GUI. The running score also gets
     saved as a value in the task data called 'reward_score'.
 
     Note:
         Only works with target acquisition tasks.
     '''
-    score_display_location = traits.Tuple((10, 0, 10), desc="Location to display the score (in cm)")
+    score_display_location = traits.Tuple((0, 0, 0), desc="Location to display the score (in cm)")
     score_display_height = traits.Float(1, desc="Height of the score display (in cm)")
     score_display_color = traits.Tuple((1, 1, 1, 1), desc="Color of the score display")
     score_timed_state = traits.String("target", desc="State to display the score after")
@@ -315,19 +316,20 @@ class ScoreRewards(traits.HasTraits):
         super().init()
         self.task_data['reward_score'] = 0
 
+
     def _start_reward(self):
         if hasattr(super(), '_start_reward'):
             super()._start_reward()
-        timed_state = None
-        idx = -1
-        while timed_state is None and -idx-1 < len(self.state_log):
-            if self.state_log[idx][0] == self.score_timed_state:
-                timed_state = self.state_log[-1][1] - self.state_log[idx][1]
-            idx -= 1
-        if timed_state is None or timed_state == 0.:
-            score = 0.
-        else:
-            score = 10*int(10./timed_state)
+
+        move_error = aopy.analysis.behavior.compute_movement_error(np.array(self.cursor_traj)[:,[0,2]], self.target_location[[0,2]])
+        avg_error = np.mean(abs(move_error))
+        score = int(100 - min(100, avg_error*20))
+
+        # import matplotlib.pyplot as plt
+        # plt.figure()
+        # plt.plot(move_error)        
+        # plt.show()
+
         self.reportstats['Score'] += score
         self.score_display = TextTarget(str(score), height=self.score_display_height, 
                                         color=self.score_display_color)
@@ -339,6 +341,30 @@ class ScoreRewards(traits.HasTraits):
         if hasattr(super(), '_end_reward'):
             super()._end_reward()
         self.remove_model(self.score_display.model)
+
+class TimedScoreRewards(ScoreRewards):
+    '''
+    Add a "score" to the task that awards points based on target acquisition speed.
+    '''
+    def _start_reward(self):
+       if hasattr(super(), '_start_reward'):
+           super()._start_reward()
+       timed_state = None
+       idx = -1
+       while timed_state is None and -idx-1 < len(self.state_log):
+           if self.state_log[idx][0] == self.score_timed_state:
+               timed_state = self.state_log[-1][1] - self.state_log[idx][1]
+           idx -= 1
+       if timed_state is None or timed_state == 0.:
+           score = 0.
+       else:
+           score = 10*int(10./timed_state)
+       self.reportstats['Score'] += score
+       self.score_display = TextTarget(str(score), height=self.score_display_height, 
+                                       color=self.score_display_color)
+       self.score_display.move_to_position(self.score_display_location)
+       self.add_model(self.score_display.model)
+       self.task_data['reward_score'] += score
 
 """"" BELOW THIS IS ALL THE OLD CODE ASSOCIATED WITH REWARD FEATURES"""
 

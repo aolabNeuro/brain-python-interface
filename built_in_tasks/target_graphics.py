@@ -261,7 +261,7 @@ class TextTarget():
         self._pickle_init()
 
     def _pickle_init(self):
-        self.model = Text(self.size, self.text, color=self.color, justify='right', 
+        self.model = Text(self.size, self.text, color=self.color, justify='left', 
                           font_size=28)
         self.graphics_models = [self.model]
         self.model.translate(*self.position)

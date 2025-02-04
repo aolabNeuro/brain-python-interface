@@ -50,6 +50,7 @@ class TargetCapture(Sequence):
     tries = 0 # Helper variable to keep track of the number of failed attempts at a given trial.
 
     sequence_generators = []
+    cursor_traj = []
 
     reward_time = traits.Float(.5, desc="Length of reward dispensation")
     hold_time = traits.Float(.2, desc="Length of hold required at targets before next target appears")
@@ -345,6 +346,9 @@ class ScreenTargetCapture(TargetCapture, Window):
         # Update the trial index
         self.task_data['trial'] = self.calc_trial_num()
 
+        # Update cursor trajectory 
+        self.cursor_traj.append(self.plant.get_endpoint_pos().copy())
+
         super()._cycle()
 
     def move_effector(self):
@@ -411,6 +415,7 @@ class ScreenTargetCapture(TargetCapture, Window):
             target.show()
             self.sync_event('TARGET_ON', self.gen_indices[self.target_index])
         self.target_location = self.targs[self.target_index] # save for BMILoop
+        self.cursor_traj.clear()
 
     def _start_hold(self):
         super()._start_hold()
