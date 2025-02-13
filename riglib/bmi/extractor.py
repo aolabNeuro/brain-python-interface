@@ -440,15 +440,11 @@ class rms_emg(object):
         lfp_power : np.ndarray of shape (n_channels * n_features, 1)
             Multi-band power estimates for each channel, for each band specified when the feature extractor was instantiated.
         '''
-        print(int(self.win_len * self.fs))
-        print(cont_samples.shape[1])
         assert int(self.win_len * self.fs) == cont_samples.shape[1]
 
         emg_rms = np.zeros([1,cont_samples.shape[0],])
         for i,row in enumerate(cont_samples):
             emg_rms[0,i] = np.sqrt(np.sum([i ** 2 for i in row])/cont_samples.shape[0])
-
-        print('emg thang')
         return emg_rms.T
 
     def __call__(self, start_time, *args, **kwargs):

@@ -778,9 +778,6 @@ class Decoder(object):
         kwargs: dict
             Mostly for kwargs function call compatibility
         """
-        if np.any(neural_obs > 1000):
-            print('observations have counts >> 1000 ')
-
         if np.any(assist_level) > 0 and 'x_assist' not in kwargs:
             raise ValueError("Assist cannot be used if the forcing term is not specified!")
 
@@ -853,8 +850,6 @@ class Decoder(object):
         '''
         output = []
         n_obs = neural_obs.shape[1]
-        print('decode')
-        print(n_obs)
         for k in range(n_obs):
             self.predict(neural_obs[:,k], **kwargs)
             output.append(self.filt.get_mean())
@@ -1283,10 +1278,6 @@ class BMILoop(object):
         # Save the "neural features" (e.g., spike counts vector) to HDF file
         
         for key, val in list(feature_data.items()):
-            print('boop1')
-            print(np.shape(val))
-            print('boop2')
-            print(np.shape(self.task_data[key]))
             self.task_data[key] = val
 
         # Determine the target_state and save to file
@@ -1310,14 +1301,8 @@ class BMILoop(object):
 
         # Run the decoder
         if self.state not in self.static_states:
-            print('move_plant_issues')
-            print(self.extractor.feature_type)
-            
             neural_features = feature_data[self.extractor.feature_type]
-
             tmp = self.call_decoder(neural_features, target_state, **kwargs)
-            print(np.shape(tmp))
-            print(np.shape(self.task_data['internal_decoder_state']))
             self.task_data['internal_decoder_state'] = tmp
 
         # Drive the plant to the decoded state, if permitted by the constraints of the plant
