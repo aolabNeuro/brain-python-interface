@@ -97,12 +97,12 @@ human_sync_params_arduino = copy.copy(hdf_sync_params)
 human_sync_params_arduino.update(dict(
     sync_protocol = 'human_arduino',
     sync_protocol_version = 17,    
-    baudrate = 57600,
+    baudrate = 115200,
     sync_pulse_width = 0.003,
-    event_sync_mask = 0x1000, # For now just send the sync pulse on the first digital channel
-    event_sync_data_shift = 13,
+    event_sync_mask = 0x400, # For now just send the sync pulse on the first digital channel
+    event_sync_data_shift = 11,
     event_sync_dch = list(range(16,24)),
-    screen_sync_pin = 12,
+    screen_sync_pin = 10,
     screen_sync_dch = 65,
     screen_measure_dch = [67],
     screen_measure_ach = [68],
