@@ -371,7 +371,7 @@ for freq in range(start, end, step):
 class rms_emg(object):
     '''compute RMS for emg per Si Jia code'''
 
-    feature_type = 'emg_rms'
+    feature_type = 'emg_amplitude'
 
     def __init__(self, source, channels=[], win_len=0.2, fs=2048, **kwargs):
         '''
@@ -409,7 +409,7 @@ class rms_emg(object):
         extractor_kwargs['channels'] = self.channels
         extractor_kwargs['fs']       = self.fs
         
-        self.feature_dtype = ('emg_rms', 'f8', (len(channels),1))
+        self.feature_dtype = ('emg_amplitude', 'f8', (len(channels),1))
 
     def get_cont_samples(self, *args, **kwargs):
         '''
@@ -442,10 +442,10 @@ class rms_emg(object):
         '''
         assert int(self.win_len * self.fs) == cont_samples.shape[1]
 
-        emg_rms = np.zeros([1,cont_samples.shape[0],])
+        emg_amplitude = np.zeros([1,cont_samples.shape[0],])
         for i,row in enumerate(cont_samples):
-            emg_rms[0,i] = np.sqrt(np.sum([i ** 2 for i in row])/cont_samples.shape[0])
-        return emg_rms.T
+            emg_amplitude[0,i] = np.sqrt(np.sum([i ** 2 for i in row])/cont_samples.shape[0])
+        return emg_amplitude.T
 
     def __call__(self, start_time, *args, **kwargs):
         '''
@@ -463,9 +463,9 @@ class rms_emg(object):
             Extracted features to be saved in the task.         
         '''
         cont_samples = self.get_cont_samples(*args, **kwargs)  # dims of channels x time
-        emg_rms = self.extract_features(cont_samples)
+        emg_amplitude = self.extract_features(cont_samples)
 
-        return dict(emg_rms=emg_rms)
+        return dict(emg_amplitude=emg_amplitude)
 
 
 class LFPMTMPowerExtractor(object):
