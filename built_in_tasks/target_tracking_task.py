@@ -640,7 +640,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     def _start_wait(self):
         super()._start_wait()
         self.setup_start_wait()
-        print('WAIT')
+        # print('WAIT')
 
     def _while_wait(self):
         super()._while_wait()
