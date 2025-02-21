@@ -265,17 +265,15 @@ class TrackingRewards(traits.HasTraits):
             self.reward.off()
             super().cleanup(database, saveid, **kwargs)
 
-        def _start_tracking_in(self):
-            super()._start_tracking_in()
+        def setup_start_tracking_in(self):
             self.trigger_reward = False
             self.reward.off()
             self.reward_start_frame = self.frame_index + self.tracking_reward_interval*self.fps # frame to start first reward
             self.reward_stop_frame = self.reward_start_frame + self.tracking_reward_time*self.fps # frame to stop first reward
             # print('START TRACKING', self.reward_start_frame, self.reward_stop_frame)
 
-        def _while_tracking_in(self):
-            super()._while_tracking_in()
-            # Give reward for tracking in
+        def setup_while_tracking_in(self):
+           # Give reward for tracking in
             if self.frame_index >= self.reward_start_frame and self.trigger_reward==False:
                 self.trigger_reward = True
                 self.reward_stop_frame = self.frame_index + self.tracking_reward_time*self.fps # frame to stop current reward
@@ -287,8 +285,28 @@ class TrackingRewards(traits.HasTraits):
                 self.reward.off()
                 # print('REWARD OFF', self.frame_index/self.fps)
 
+        def _start_tracking_in(self):
+            super()._start_tracking_in()
+            self.setup_start_tracking_in()
+
+        def _start_tracking_in_ramp(self):
+            super()._start_tracking_in()
+            self.setup_start_tracking_in()
+
+        def _while_tracking_in(self):
+            super()._while_tracking_in()
+            self.setup_while_tracking_in()
+
+        def _while_tracking_in_ramp(self):
+            super()._while_tracking_in()
+            self.setup_while_tracking_in()
+
         def _start_tracking_out(self):
             super()._start_tracking_out()
+            self.reward.off()
+        
+        def _start_tracking_out_ramp(self):
+            super()._start_tracking_out_ramp()
             self.reward.off()
 
 
