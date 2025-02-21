@@ -168,7 +168,7 @@ class ArduinoSync(NIDAQSync):
         super(HDFSync, self).__init__(*args, **kwargs)
         self.sync_every_cycle = True
         self.sync_params = arduino_sync_params
-        self.sync_gpio = TeensyGPIO(self.sync_gpio_port)
+        self.sync_gpio = TeensyGPIO(self.sync_gpio_port, baudrate=self.sync_params['baudrate'])
 
 
 class ScreenSync(traits.HasTraits):
