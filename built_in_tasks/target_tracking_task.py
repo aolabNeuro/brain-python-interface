@@ -640,7 +640,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     def _start_wait(self):
         super()._start_wait()
         self.setup_start_wait()
-        print('WAIT')
+        # print('WAIT')
 
     def _while_wait(self):
         super()._while_wait()
@@ -682,9 +682,8 @@ class ScreenTargetTracking(TargetTracking, Window):
     def _start_tracking_in_ramp(self):
         super()._start_tracking_in_ramp()
         self.setup_start_tracking_in()
-
-        print('START TRACKING RAMP', self.ramp_counter[self.frame_index])
-        self.sync_event('CURSOR_ENTER_TARGET', self.ramp_counter[self.frame_index]) # TODO test when there is only a ramp down
+        # print('START TRACKING RAMP', self.ramp_counter[self.frame_index])
+        self.sync_event('CURSOR_ENTER_TARGET', self.ramp_counter[self.frame_index])
 
     def _while_tracking_in_ramp(self):
         super()._while_tracking_in_ramp()
@@ -693,7 +692,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     def _start_tracking_in(self):
         super()._start_tracking_in()
         self.setup_start_tracking_in()
-        print('START TRACKING')
+        # print('START TRACKING')
         self.sync_event('CURSOR_ENTER_TARGET')
 
     def _while_tracking_in(self):
@@ -703,7 +702,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     def _start_tracking_out_ramp(self):
         super()._start_tracking_out_ramp()
         self.setup_start_tracking_out()
-        print('STOP TRACKING RAMP', self.ramp_counter[self.frame_index])
+        # print('STOP TRACKING RAMP', self.ramp_counter[self.frame_index])
         self.sync_event('CURSOR_LEAVE_TARGET', self.ramp_counter[self.frame_index])
 
     def _while_tracking_out_ramp(self):
@@ -713,7 +712,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     def _start_tracking_out(self):
         super()._start_tracking_out()
         self.setup_start_tracking_out()
-        print('STOP TRACKING')
+        # print('STOP TRACKING')
         self.sync_event('CURSOR_LEAVE_TARGET')
 
     def _while_tracking_out(self):
