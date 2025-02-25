@@ -56,7 +56,6 @@ class OnlineAnalysis(traits.HasTraits):
         Send basic experiment info to the online analysis server
         '''
         super().init()
-        print('Starting online analysis socket...')
         try:
             self.online_analysis_sock = socket.socket(
                 socket.AF_INET, # Internet
