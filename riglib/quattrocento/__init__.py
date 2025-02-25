@@ -17,9 +17,15 @@ class EMG(DataSourceSystem):
     '''
     update_freq = 2048.
     dtype = np.dtype('float')
+    emg_refresh_freq = 32
+    n_arrays = 1
 
     def __init__(self, *args, **kwargs):
-        self.qt = QuattroOtlight(host='128.95.215.191', refresh_freq=32)
+
+        # Configure channels based on how many 64-channel arrays are connected to the MULTI IN ports
+        channels = [16 * 8, 16 * 8 + 64 * self.n_arrays]
+        self.qt = QuattroOtlight(host='128.95.215.191', refresh_freq=self.emg_refresh_freq, 
+                                 emg_ch_range=channels, sample_freq=self.update_freq)
 
     def start(self):
         self.qt.setup()

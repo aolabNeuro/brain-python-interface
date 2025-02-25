@@ -11,6 +11,8 @@ class QuattBMI(CorticalBMI):
     BMI using quattrocento as the datasource.
     '''
 
+    n_emg_arrays = traits.Int(1, desc="Number of EMG arrays connected to the Quattrocento MULTI IN ports")
+
     def __init__(self, *args, **kwargs):
         '''
         This is a bit weird because normally only the readouts are streamed to BMI3D, but in this case
@@ -19,9 +21,10 @@ class QuattBMI(CorticalBMI):
         actually readouts.
         '''
         super().__init__(*args, **kwargs)
-        self.cortical_channels = np.arange(1,64+16+8+1) # 64 EMG + 16 AUX + 8 samples
+        self.cortical_channels = np.arange(1,64*self.n_emg_arrays+16+8+1) # 64*n_arrays EMG + 16 AUX + 8 samples
         quattrocento.EMG.subj = self.subject_name
         quattrocento.EMG.saveid = self.saveid
+        quattrocento.EMG.n_arrays = self.n_emg_arrays
 
         # These get read by CorticalData when initializing the extractor
         self._neural_src_type = source.MultiChanDataSource
@@ -37,7 +40,7 @@ class QuattBMI(CorticalBMI):
         try:
             super(CorticalData, self).run()
         finally:
-            time.sleep(5)
+            time.sleep(5) # let the buffer finish writing
             self.neurondata.stop()
 
     def cleanup(self, database, saveid, **kwargs):

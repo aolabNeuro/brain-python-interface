@@ -27,6 +27,8 @@ class SupplementaryHDF(object):
         else:
             self.send_to_sinks_dtype = sink_dtype
         self.supp_data = self.h5_file.create_table("/", "data", self.send_to_sinks_dtype, filters=compfilt)
+        self.supp_data.attrs['samplerate'] = source.update_freq
+        self.supp_data.attrs['channels'] = channels
 
     def add_data(self, data):
         self.supp_data.append(data)
