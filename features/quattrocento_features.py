@@ -3,7 +3,7 @@ import os
 import numpy as np
 from riglib.experiment import traits
 from riglib import quattrocento, source
-from features.neural_sys_features import CorticalBMI
+from features.neural_sys_features import CorticalBMI,CorticalData
 import traceback
 
 class QuattBMI(CorticalBMI):
@@ -29,6 +29,16 @@ class QuattBMI(CorticalBMI):
             send_data_to_sink_manager=True, 
             channels=self.cortical_channels)
         self._neural_src_system_type = quattrocento.EMG
+
+
+    def run(self):
+        self.neurondata.start()
+        time.sleep(1) # give the datasource time to start
+        try:
+            super(CorticalData, self).run()
+        finally:
+            time.sleep(5)
+            self.neurondata.stop()
 
     def cleanup(self, database, saveid, **kwargs):
         '''
