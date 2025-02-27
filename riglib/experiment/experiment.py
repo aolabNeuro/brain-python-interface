@@ -136,6 +136,8 @@ class Experiment(ThreadedFSM, traits.HasTraits, metaclass=ExperimentMeta):
 
     # Runtime settable traits
     session_length = traits.Float(0, desc="Time until task automatically stops. Length of 0 means no auto stop.")
+    num_rewarded_trials = traits.Float(0, desc="Number of succesful trials. Length of 0 means no auto stop for succesful trials.")
+
 
     # Initialization functions -----------------------------------------------
     @classmethod
@@ -165,6 +167,7 @@ class Experiment(ThreadedFSM, traits.HasTraits, metaclass=ExperimentMeta):
         ThreadedFSM.__init__(self)
         self.verbose = verbose
         self.task_start_time = self.get_time()
+        self.reward_count = 0
         self.saveid = kwargs['saveid'] if 'saveid' in kwargs else None
         self.reportstats = collections.OrderedDict()
         self.reportstats['State'] = None # State stat is automatically updated for all experiment classes
@@ -422,6 +425,8 @@ class Experiment(ThreadedFSM, traits.HasTraits, metaclass=ExperimentMeta):
         '''
         if self.session_length > 0 and (self.get_time() - self.task_start_time) > self.session_length:
             self.end_task()
+        if self.num_rewarded_trials > 0 and self.reward_count >= self.num_rewarded_trials:
+            self.end_task()
         return self.stop
 
     def _test_time_expired(self, ts):
@@ -626,6 +631,7 @@ class LogExperiment(Experiment):
         super().update_report_stats()
         n_rewards = self.calc_state_occurrences('reward')
         n_trials = max(1, self.calc_trial_num())
+        self.reward_count = n_rewards
         self.reportstats['Trial #'] = n_trials - 1
         self.reportstats['Success rate'] = "{} %".format(int(100*n_rewards/n_trials))
         self.reportstats['Success rate (10 trials)'] = "{} %".format(int(100*self.calc_events_per_trial("reward", 10)))
@@ -649,7 +655,6 @@ class LogExperiment(Experiment):
         else:
             database.save_log(saveid, report_stats, dbname=dbname)
         return True
-
     ##########################################################
     ##### Functions to calculate statistics from the log #####
     ##########################################################
