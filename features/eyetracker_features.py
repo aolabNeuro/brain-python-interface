@@ -284,6 +284,7 @@ class PupilLabStreaming(traits.HasTraits):
 
     surface_marker_size = traits.Float(2., desc="Size in cm of apriltag surface markers")
     surface_marker_count = traits.Int(0, desc="How many surface markers to draw")
+    eye_streaming_window = traits.Float(0.5, desc="Buffer window for accepting eye data in seconds")
     eye_labels = traits.Array(value=[
         'gaze_x', 'gaze_y', 'gaze_z', 
         'norm_x', 'norm_y', 
@@ -314,10 +315,10 @@ class PupilLabStreaming(traits.HasTraits):
             self.eye_data = source.DataSource(System)
         else:
             self.eye_data = source.DataSource(NoSurfaceTracking)
-        self.eye_pos = np.zeros((8,))*np.nan
+        self.eye_pos = np.zeros((7,))*np.nan
 
     def init(self):
-        self.add_dtype('eye', 'f8', (12,))
+        self.add_dtype('eye', 'f8', (7,))
         super().init()
 
     def run(self):
@@ -340,11 +341,21 @@ class PupilLabStreaming(traits.HasTraits):
         super()._start_None()
 
     def _update_eye_pos(self):
-        eye_pos = self.eye_data.get() # This is (n,11) array of new values since we last checked
+        eye_pos = self.eye_data.get() # This is (n,12) array of new values since we last checked
         if eye_pos.ndim < 2 or eye_pos.size == 0:
-            eye_pos = np.zeros((12,))*np.nan
+            eye_pos = np.zeros((7,))*np.nan
         else:
-            eye_pos = eye_pos[-1,:] # the most recent position
+            # Use the most recent non-nan data
+            eye_pos = np.full((7,), np.nan)
+            t = -1
+            buffer_len = int(self.eye_streaming_window * self.eye_data.source.sample_rate)
+            while np.any(np.isnan(eye_pos)) and t >= -buffer_len:
+
+                eye_pos = eye_pos[-1,:]
+                # select LE gaze x,y RE gaze x,y, ts, LE diam, RE diam
+                eye_pos = [eye_pos[0], eye_pos[1], eye_pos[6], eye_pos[7], eye_pos[5], eye_pos[12], eye_pos[16]]
+                t -= 1
+
         self.eye_pos = eye_pos
         self.task_data['eye'] = eye_pos
 

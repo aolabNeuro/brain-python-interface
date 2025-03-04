@@ -1,4 +1,3 @@
-import time
 import traceback
 import numpy as np
 import zmq
@@ -12,16 +11,15 @@ from riglib.source import DataSourceSystem
 
 class System(DataSourceSystem):
     '''
-    
+    System class for interfacing with Pupil Labs eye-tracking data without surface tracking.
+    System class for interfacing with Pupil Labs eye-tracking data.
     '''
-    dtype = np.dtype((float, (12,)))
-    update_freq = 120
+    update_freq = 250
     
     def __init__(self, ip="128.95.215.191", port="50020", confidence_threshold=0.0):
         '''
         For eye tracking, need Pupil Capture running in the background (after calibration in Pupil Capture)
         '''
-        # define a surface AOI
         
         # open a req port to talk to pupil
         self.ip = ip  # remote ip or localhost
@@ -94,51 +92,72 @@ class System(DataSourceSystem):
 
     def get(self):
         """
-        read in a batch of eye data and retun x, y on surface & pupil diameters for each eye
+        read in a batch of eye data and return x, y on surface & pupil diameters for each eye
         """
-        gaze = np.full((6,), np.nan)
-        left_pupil = np.full((3,), np.nan)
-        right_pupil = np.full((3,), np.nan)
-        coords = np.hstack([gaze, left_pupil, right_pupil])
 
-        while np.any(np.isnan(coords)):
-            if not self.sub.poll(0) == zmq.POLLIN:
-                time.sleep(0.001)  # sleep for 1 ms to avoid busy waiting
-                continue
-
+        # Read all waiting messages from the sub socket
+        payload_list, topic_list = [], []
+        while self.sub.poll(0) == zmq.POLLIN: 
             topic, payload = self.sub.recv_multipart(flags=zmq.NOBLOCK)
-            message = msgpack.loads(payload, raw=False)
+            payload_list.append(payload)
+            topic_list.append(topic)
+        
+        message_list = [msgpack.loads(p, raw=False) for p in payload_list]
 
-            if message["topic"].startswith("surfaces"):
+        # Process the messages
+        left_gaze = np.full((6,), np.nan)
+        right_gaze = np.full((6,), np.nan)
+        left_pupil = np.full((4,), np.nan)
+        right_pupil = np.full((4,), np.nan)
+        coords = np.hstack([left_gaze, right_gaze, left_pupil, right_pupil])
+        for message, topic in zip(message_list, topic_list):
+            if topic.startswith("surfaces"):
                 self.mapper.update_homography(message["img_to_surf_trans"])
 
-            if message["topic"].startswith("gaze.3d.") and message["confidence"] >= self.confidence_threshold:
+            if topic == "gaze.3d.1" and message["confidence"] >= self.confidence_threshold:
                     
-                    gaze[:2] = message["norm_pos"]
-                    gaze[2:5] = message["gaze_point_3d"]
+                    left_gaze[:2] = message["norm_pos"]
+                    left_gaze[2:5] = message["gaze_point_3d"]
 
                     if self.mapper is not None:
                         mapped_gaze = self.mapper.gaze_to_surface(message["norm_pos"])
                         if mapped_gaze is not None:
-                            gaze[:2] = np.array(mapped_gaze.norm_x, mapped_gaze.norm_y)
+                            left_gaze[:2] = np.array((mapped_gaze.norm_x, mapped_gaze.norm_y))
 
-                    gaze[5] = message["timestamp"]
+                    left_gaze[5] = message["timestamp"]
 
-            if message["topic"] == "pupil.1.2d" and message["confidence"] >= self.confidence_threshold:
+            elif topic == "gaze.3d.0" and message["confidence"] >= self.confidence_threshold:
+                    
+                    right_gaze[:2] = message["norm_pos"]
+                    right_gaze[2:5] = message["gaze_point_3d"]
+
+                    if self.mapper is not None:
+                        mapped_gaze = self.mapper.gaze_to_surface(message["norm_pos"])
+                        if mapped_gaze is not None:
+                            right_gaze[:2] = np.array((mapped_gaze.norm_x, mapped_gaze.norm_y))
+
+                    right_gaze[5] = message["timestamp"]
+
+            elif topic == "pupil.1.2d" and message["confidence"] >= self.confidence_threshold:
                 left_pupil[:2] = message["norm_pos"]
                 left_pupil[2] = float(message["diameter"]) # pupil 1 diamter, left eye, unit: pixel
+                left_pupil[3] = message["timestamp"]
             
-            elif message["topic"] == "pupil.0.2d" and message["confidence"] >= self.confidence_threshold:
+            elif topic == "pupil.0.2d" and message["confidence"] >= self.confidence_threshold:
                 right_pupil[:2] = message["norm_pos"] 
                 right_pupil[2] = float(message["diameter"]) # pupil 0 diamter, right eye, unit: pixel
+                right_pupil[3] = message["timestamp"]
 
-            coords = np.hstack([gaze, left_pupil, right_pupil])
+            coords = np.hstack([left_gaze, right_gaze, left_pupil, right_pupil])
             
         coords = np.expand_dims(coords, axis=0)
         return coords
 
     
 class NoSurfaceTracking(System):
+    '''
+    System class for interfacing with Pupil Labs eye-tracking data without surface tracking.
+    '''
 
     def __init__(self, ip="128.95.215.191", port="50020", confidence_threshold=0.0):
         '''
