@@ -82,8 +82,12 @@ class OnlineAnalysis(traits.HasTraits):
         for key, value in self.get_trait_values().items():
             try:
                 if key in self.object_trait_names:
+                    self._send_online_analysis_msg('param', key, None) # Skip objects
                     if key == 'decoder':
+                        self._send_online_analysis_msg('param', 'decoder_states', value.states)
                         self._send_online_analysis_msg('param', 'decoder_channels', value.channels)
+                        self._send_online_analysis_msg('param', 'decoder_bands', [(0,0)]) # TODO: How to get this?
+                        self._send_online_analysis_msg('param', 'decoder_feature_type', self.extractor.feature_type)
                 else:
                     self._send_online_analysis_msg('param', key, value)
             except:
@@ -121,6 +125,8 @@ class OnlineAnalysis(traits.HasTraits):
             self._send_online_analysis_msg('cursor', self.plant.get_endpoint_pos())
         if hasattr(self, 'eye_pos'):
             self._send_online_analysis_msg('eye_pos', self.eye_pos)
+        if hasattr(self, 'task_data'):
+            self._send_online_analysis_msg('task_data', self.task_data)
 
     def set_state(self, condition, **kwargs):
         '''
