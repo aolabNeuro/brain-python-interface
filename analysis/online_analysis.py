@@ -484,12 +484,12 @@ class BMIAnalysisWorker(AnalysisWorker):
 
     def handle_data(self, key, values):
         super().handle_data(key, values)
-        if key == 'task_data':
-            self.neural_feats = np.roll(self.neural_feats, -1, axis=0)
-            self.neural_feats[-1] = np.array(values[self.feature_type])
-
+        if key == 'decoder_state':
             self.decoder_states = np.roll(self.decoder_states, -1, axis=0)
-            self.decoder_states[-1] = np.array(values['decoder_state'])
+            self.decoder_states[-1] = np.array(values[0])
+        elif key == 'neural_features':
+            self.neural_feats = np.roll(self.neural_feats, -1, axis=0)
+            self.neural_feats[-1] = np.array(values[0])
 
     def draw(self):
         super().draw()
