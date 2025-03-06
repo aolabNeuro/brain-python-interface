@@ -33,16 +33,6 @@ class QuattBMI(CorticalBMI):
             channels=self.cortical_channels)
         self._neural_src_system_type = quattrocento.EMG
 
-
-    def run(self):
-        self.neurondata.start()
-        time.sleep(1) # give the datasource time to start
-        try:
-            super(CorticalData, self).run()
-        finally:
-            time.sleep(5) # let the buffer finish writing
-            self.neurondata.stop()
-
     def cleanup(self, database, saveid, **kwargs):
         '''
         Function to run at 'cleanup' time, after the FSM has finished executing. See riglib.experiment.Experiment.cleanup
