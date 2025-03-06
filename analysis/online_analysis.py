@@ -98,6 +98,7 @@ class AnalysisWorker(mp.Process):
         # Initialize figure
         self.fig = plt.figure(figsize=self.figsize)
         self.ax = self.fig.add_axes([0, 0.2, 1, 0.7])
+        self.ax.axis('off')
         experiment_name = self.task_params.get('experiment_name', 'None')
         te_id = self.task_params.get('te_id', 'None')
         self.fig.canvas.manager.set_window_title(f"{experiment_name} ({te_id}) - {self.__class__.__name__}")
@@ -463,9 +464,8 @@ class BMIAnalysisWorker(AnalysisWorker):
         self.channels = self.task_params['decoder_channels']
         self.states = self.task_params['decoder_states']
         self.bands = self.task_params['decoder_bands']
-        self.feature_type = self.task_params['decoder_feature_type']
         self.neural_feats = np.zeros((int(self.buffer_time*self.task_params['fps']), len(self.channels)*len(self.bands)))
-        self.decoder_states = np.zeros((int(self.buffer_time*self.task_params['fps']), 7))
+        self.decoder_states = np.zeros((int(self.buffer_time*self.task_params['fps']), len(self.states)))
 
         # Create feature axes  
         self.feat_ax = self.fig.add_axes([0.1, 0.06, 0.8, 0.4])
@@ -480,7 +480,7 @@ class BMIAnalysisWorker(AnalysisWorker):
         self.state_ax.set_xlim(-self.buffer_time, 0)
         self.state_ax.set_xlabel('Time (s)')
         self.state_ax.set_ylabel('Decoder state')
-        self.state_plots = self.diam_ax.plot(time, self.decoder_states)
+        self.state_plots = self.state_ax.plot(time, self.decoder_states)
 
     def handle_data(self, key, values):
         super().handle_data(key, values)
@@ -495,9 +495,11 @@ class BMIAnalysisWorker(AnalysisWorker):
         super().draw()
         time = np.arange(len(self.neural_feats)) * 1/(int(self.task_params['fps'])) - self.buffer_time
         for i, plot in enumerate(self.feat_plots):
-            plot.set_data(time, self.neural_feats[i])
+            plot.set_data(time, self.neural_feats[:,i])
+        self.feat_ax.set_ylim(np.min(self.neural_feats), np.max(self.neural_feats))
         for i, plot in enumerate(self.state_plots):
-            plot.set_data(time, self.decoder_states[i])
+            plot.set_data(time, self.decoder_states[:,i])
+        self.state_ax.set_ylim(np.min(self.decoder_states), np.max(self.decoder_states))
 
 class OnlineDataServer(threading.Thread):
     '''
