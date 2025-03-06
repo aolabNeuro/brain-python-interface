@@ -101,16 +101,9 @@ human_sync_params_arduino.update(dict(
     sync_pulse_width = 0.003,
     event_sync_mask = 0x400, # For now just send the sync pulse on the first digital channel
     event_sync_data_shift = 11,
-    event_sync_dch = [],
     screen_sync_pin = 10,
     screen_sync_dch = 0,
-    screen_measure_dch = [],
-    screen_measure_ach = [],
-    reward_measure_ach = [],
-    right_eye_ach = [],
-    left_eye_ach = [],
     recording_pin = 9,
-    recording_dch = [],
 ))
 
 # Rig-specific defaults
