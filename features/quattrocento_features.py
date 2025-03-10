@@ -10,7 +10,7 @@ class QuattBMI(CorticalBMI):
     '''
     BMI using quattrocento as the datasource.
     '''
-
+    quatt_sampling_rate = traits.Float(2048, desc="Sampling rate of the emg data")
     n_emg_arrays = traits.Int(1, desc="Number of EMG arrays connected to the Quattrocento MULTI IN ports")
 
     def __init__(self, *args, **kwargs):
@@ -25,6 +25,7 @@ class QuattBMI(CorticalBMI):
         quattrocento.EMG.subj = self.subject_name
         quattrocento.EMG.saveid = self.saveid
         quattrocento.EMG.n_arrays = self.n_emg_arrays
+        quattrocento.EMG.update_freq = self.quatt_sampling_rate
 
         # These get read by CorticalData when initializing the extractor
         self._neural_src_type = source.MultiChanDataSource
@@ -51,6 +52,13 @@ class QuattBMI(CorticalBMI):
                 database.save_data(filename, "emg", saveid, True, False, dbname=dbname)
         else:
             print('\n\nPlexon file not found properly! It will have to be manually linked!\n\n')
+
+        #Add metadata to the BMI3D file
+        h5file = tables.open_file(self.h5file.name, mode='a')
+        h5file.root.quatt_meta_data['n_emg_arrays'] = self.n_emg_arrays
+        h5file.root.quatt_meta_data['quatt_sampling_rate'] = self.quatt_sampling_rate
+        h5file.close()
+
         return super_result
 
     @property 
