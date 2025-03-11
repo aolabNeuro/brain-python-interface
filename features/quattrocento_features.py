@@ -53,12 +53,6 @@ class QuattBMI(CorticalBMI):
         else:
             print('\n\nPlexon file not found properly! It will have to be manually linked!\n\n')
 
-        #Add metadata to the BMI3D file
-        h5file = tables.open_file(self.h5file.name, mode='a')
-        h5file.root.quatt_meta_data['n_emg_arrays'] = self.n_emg_arrays
-        h5file.root.quatt_meta_data['quatt_sampling_rate'] = self.quatt_sampling_rate
-        h5file.close()
-
         return super_result
 
     @property 
