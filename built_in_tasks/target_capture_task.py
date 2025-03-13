@@ -100,6 +100,9 @@ class TargetCapture(Sequence):
     def _start_hold(self):
         '''Nothing generic to do.'''
         pass
+    def _start_center_hold(self):
+        '''Nothing generic to do.'''
+        pass
 
     def _while_hold(self):
         '''Nothing generic to do.'''
@@ -265,7 +268,21 @@ class TargetCapture(Sequence):
 class ScreenTargetCapture(TargetCapture, Window):
     """Concrete implementation of TargetCapture task where targets
     are acquired by "holding" a cursor in an on-screen target"""
-
+    status = dict(
+        wait = dict(start_trial="target"),
+        target = dict(enter_target="hold", timeout="timeout_penalty"),
+        hold = dict(leave_target="hold_penalty", hold_complete_center="hold2", hold_complete_periph='reward'),
+        hold2 = dict(leave_target="hold_penalty", hold2_complete="delay"),
+        delay = dict(leave_target="delay_penalty", delay_complete="leave_center"),
+        leave_center = dict(leave_target="targ_transition", hold3_complete="hold_penalty"),
+        targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target"),
+        timeout_penalty = dict(timeout_penalty_end="targ_transition", end_state=True),
+        hold_penalty = dict(hold_penalty_end="targ_transition", end_state=True),
+        delay_penalty = dict(delay_penalty_end="targ_transition", end_state=True),
+        reward = dict(reward_end="wait", stoppable=False, end_state=True)
+    )
+    hold2_time = traits.Float(.2, desc="How long after acquiring center target before peripheral target appears")
+    hold3_time = traits.Float(.2, desc="Must leave center target within this time after go cue.")
     limit2d = traits.Bool(True, desc="Limit cursor movement to 2D")
 
     sequence_generators = [
@@ -388,6 +405,59 @@ class ScreenTargetCapture(TargetCapture, Window):
         d = np.linalg.norm(cursor_pos - self.targs[self.target_index])
         rad = self.target_radius - self.cursor_radius
         return d > rad or super()._test_leave_target(ts)
+    
+    def _test_hold_complete_center(self, time_in_state):
+        '''
+        Test whether the target is held long enough to declare the
+        trial a success and target is center target
+
+        Possible options
+            - Target held for the minimum requred time (implemented here)
+            - Sensorized object moved by a certain amount
+            - Sensorized object moved to the required location
+            - Manually triggered by experimenter
+        '''
+        return self.target_index == 0 and time_in_state > self.hold_time
+    
+    def _test_hold_complete_periph(self, time_in_state):
+        '''
+        Test whether the target is held long enough to declare the
+        trial a success and target is center target
+
+        Possible options
+            - Target held for the minimum requred time (implemented here)
+            - Sensorized object moved by a certain amount
+            - Sensorized object moved to the required location
+            - Manually triggered by experimenter
+        '''
+        return self.target_index == 1 and time_in_state > self.hold_time
+    
+    def _test_hold2_complete(self, time_in_state):
+        '''
+        Test whether the target is held long enough to declare the
+        trial a success
+
+        Possible options
+            - Target held for the minimum requred time (implemented here)
+            - Sensorized object moved by a certain amount
+            - Sensorized object moved to the required location
+            - Manually triggered by experimenter
+        '''
+        return time_in_state > self.hold2_time
+    
+    def _test_hold3_complete(self, time_in_state):
+        '''
+        Test whether the target is held long enough to declare the
+        trial a success
+
+        Possible options
+            - Target held for the minimum requred time (implemented here)
+            - Sensorized object moved by a certain amount
+            - Sensorized object moved to the required location
+            - Manually triggered by experimenter
+        '''
+        return time_in_state > self.hold3_time
+    
 
     #### STATE FUNCTIONS ####
     def _start_wait(self):
@@ -415,6 +485,10 @@ class ScreenTargetCapture(TargetCapture, Window):
     def _start_hold(self):
         super()._start_hold()
         self.sync_event('CURSOR_ENTER_TARGET', self.gen_indices[self.target_index])
+
+    def _start_center_hold(self):
+        super()._start_center_hold()
+
 
     def _start_delay(self):
         super()._start_delay()
@@ -937,7 +1011,8 @@ class SequenceCapture(ScreenTargetCapture):
         else:
             hold_state = True
         return hold_state
-
+    
+    
     def _test_delay_complete(self, time_in_state):
         '''
         Test whether the delay period, when the cursor must stay in place
