@@ -184,6 +184,21 @@ class PenaltyAudioMulti(traits.HasTraits):
             super()._start_tracking_out_penalty()
         self.tracking_out_penalty_player.play()
 
+class ReadySetGoAudio(traits.HasTraits):
+    '''
+    Play ready set go audio cue after center hold complete. 
+    '''
+    ready_set_sound = "readysetgo.wav"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ready_set_player = AudioPlayer(self.ready_set_sound)
+    
+    def _ready_set(self):
+        if hasattr(super(), '_ready_set'):
+            super()._ready_set()
+        self.ready_set_player.play()
+
 class HoldCompleteRewards(traits.HasTraits):
     '''
     Trigger an extra reward (duration set by hold_reward_time) after successful holds
