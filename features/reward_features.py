@@ -198,6 +198,21 @@ class ReadySetGoAudio(traits.HasTraits):
         if hasattr(super(), '_ready_set'):
             super()._ready_set()
         self.ready_set_player.play()
+        
+    def _start_hold2(self):
+        if hasattr(super(), '_start_hold2'):
+            super()._start_hold2()
+        self.ready_set_player.play()
+
+    def _start_hold_penalty(self):
+        if hasattr(super(), '_start_hold_penalty'):
+            super()._start_hold_penalty()
+        self.ready_set_player.stop()
+    
+    def _start_delay_penalty(self):
+        if hasattr(super(), '_start_delay_penalty'):
+            super()._start_delay_penalty()
+        self.ready_set_player.stop()
 
 class HoldCompleteRewards(traits.HasTraits):
     '''

@@ -100,9 +100,7 @@ class TargetCapture(Sequence):
     def _start_hold(self):
         '''Nothing generic to do.'''
         pass
-    def _start_center_hold(self):
-        '''Nothing generic to do.'''
-        pass
+    
 
     def _while_hold(self):
         '''Nothing generic to do.'''
@@ -447,11 +445,11 @@ class ScreenTargetCapture(TargetCapture, Window):
     
     def _test_hold3_complete(self, time_in_state):
         '''
-        Test whether the target is held long enough to declare the
+        Test whether the target is exited before time is up held long enough to declare the
         trial a success
 
         Possible options
-            - Target held for the minimum requred time (implemented here)
+            - Target left before the minimum requred time (implemented here)
             - Sensorized object moved by a certain amount
             - Sensorized object moved to the required location
             - Manually triggered by experimenter
@@ -486,9 +484,16 @@ class ScreenTargetCapture(TargetCapture, Window):
         super()._start_hold()
         self.sync_event('CURSOR_ENTER_TARGET', self.gen_indices[self.target_index])
 
-    def _start_center_hold(self):
-        super()._start_center_hold()
+    def _start_hold2(self):
+        #super()._start_hold2()
+        #self.sync_event('CURSOR_LEAVE_TARGET', self.gen_indices[self.target_index])
 
+    def _start_leave_center(self):
+        #super()._start_leave_center()
+        # Hide the center target if it is visible
+        if self.target_index == 0:
+            self.targets[0].hide()
+            self.sync_event('TARGET_OFF', self.gen_indices[self.target_index])
 
     def _start_delay(self):
         super()._start_delay()
