@@ -3,7 +3,7 @@ Base tasks for generic point-to-point reaching
 '''
 import numpy as np
 from riglib.stereo_opengl.primitives import Cable, Sphere, Cube, Torus, Text
-from riglib.stereo_opengl.primitives import Cylinder, Plane, Sphere, Cube
+from riglib.stereo_opengl.primitives import Cylinder, Plane, Sphere, Cube, Rotated_Cube
 from riglib.stereo_opengl.models import FlatMesh, Group
 from riglib.stereo_opengl.textures import Texture, TexModel
 from riglib.stereo_opengl.render import stereo, Renderer
@@ -111,25 +111,45 @@ class RectangularTarget(object):
         self.center_offset = np.array([0, 0, self.target_width], dtype=np.float64) / 2
         corner_pos = self.position - self.center_offset
         self.cube.translate(*corner_pos)
+
     def move_to_position(self, new_pos):
         self.int_position = new_pos
         self.drive_to_new_pos()
 
+    def move_to_position_not_corner(self, new_pos):
+        self.int_position = new_pos
+        self.drive_to_new_pos_not_corner()
+
     def drive_to_new_pos(self):
         raise NotImplementedError
-
-
+    
+    def drive_to_new_pos_not_corner(self):
+        raise NotImplementedError
+        
 class VirtualRectangularTarget(RectangularTarget):
     def drive_to_new_pos(self):
         self.position = self.int_position
         corner_pos = self.position - self.center_offset
         self.cube.translate(*corner_pos, reset=True)
 
+    def drive_to_new_pos_not_corner(self):
+        self.position = self.int_position
+        self.cube.translate(*self.position, reset=True)
+        
     def hide(self):
         self.cube.detach()
 
     def show(self):
         self.cube.attach()
+
+    def rotate_xaxis(self, angle, reset=False):
+        self.cube.rotate_x(angle, reset=reset)
+
+    def rotate_yaxis(self, angle, reset=False):
+        self.cube.rotate_y(angle, reset=reset)
+
+    def rotate_zaxis(self, angle, reset=False):
+        self.cube.rotate_z(angle, reset=reset)
 
     def cue_trial_start(self):
         self.cube.color = RED

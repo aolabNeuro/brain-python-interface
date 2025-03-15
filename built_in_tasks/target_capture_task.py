@@ -3,7 +3,6 @@ A generic target capture task
 '''
 import numpy as np
 
-
 from riglib.experiment import traits, Sequence, FSMTable, StateTransitions
 from riglib.stereo_opengl import ik
 from riglib import plants
@@ -823,6 +822,127 @@ class ScreenReachAngle(ScreenTargetCapture):
                 pos = np.array([pts[0], 0, pts[1]])
                 yield [idx], [pos]
 
+class ScreenReachLine(ScreenTargetCapture):
+    '''
+    A modified task that requires the cursor to move in the right direction towards the target, 
+    without actually needing to arrive at the target. If the maximum angle is exceeded, a reach 
+    penalty is applied. No hold or delay period.
+
+    Only works for sequences with 1 target in a chain. 
+    '''
+
+    status = dict(
+        wait = dict(start_trial="target"),
+        target = dict(leave_bounds="reach_penalty", enter_target="hold", timeout="timeout_penalty"),
+        hold = dict(leave_target="hold_penalty", hold_complete="delay"),
+        delay = dict(leave_target="delay_penalty", delay_complete="targ_transition"),
+        targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target"),
+        timeout_penalty = dict(timeout_penalty_end="targ_transition", end_state=True),
+        hold_penalty = dict(hold_penalty_end="targ_transition", end_state=True),
+        delay_penalty = dict(delay_penalty_end="targ_transition", end_state=True),
+        reach_penalty = dict(delay_penalty_end="targ_transition", end_state=True),
+        reward = dict(reward_end="wait", stoppable=False, end_state=True)
+    )
+
+    sequence_generators = [
+        'out_2D', 'rand_target_chain_2D', 'rand_target_chain_3D', 'discrete_targets_2D',
+    ]
+
+    reach_penalty_time = traits.Float(1, desc="Length of penalty time for target hold error")
+    exclude_parent_traits = ['max_reach_angle','reach_fraction','start_radius']
+    bar_color = traits.OptionsList("white", *target_colors, desc="Color of the eye target", bmi3d_input_options=list(target_colors.keys()))
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # # Instantiate the targets
+        # instantiate_targets = kwargs.pop('instantiate_targets', True)
+        # if instantiate_targets:
+
+            
+    def _start_wait(self):
+        super()._start_wait()
+
+        # Delete bar because the shape of bar changes every trial
+        if hasattr(self, 'bar'):
+            for model in self.bar.graphics_models:
+                self.remove_model(model)
+            del self.bar
+
+    def _start_target(self):
+        super()._start_target()
+
+        # Define a reach start and reach target position whenever the target appears
+        self.reach_start = self.plant.get_endpoint_pos().copy()
+        self.reach_target = self.targs[self.target_index]
+  
+        # slope between the reach start position and target position
+        self.target_x = self.reach_target[0]
+        self.target_y = self.reach_target[2]
+        x0 = self.reach_start[0]
+        y0 = self.reach_start[2]
+        self.slope = (self.target_y-y0)/(self.target_x-x0)
+
+        if np.abs(self.slope) > 1000:
+            bar_angle = 90
+        else:
+            bar_angle = np.degrees(np.arctan(self.slope))
+        # self.bar = VirtualRotatedRectangularTarget(target_width=self.target_radius*2, target_height=100, 
+        #                                            target_color=target_colors[self.bar_color], 
+        #                                            angle=(0,-bar_angle,0),starting_pos=self.reach_start)
+        self.bar = VirtualRectangularTarget(target_width=self.target_radius*2, target_height=100, 
+                                                   target_color=target_colors[self.bar_color],starting_pos=[0,0,0])
+        for model in self.bar.graphics_models:
+            self.add_model(model)
+
+        self.bar.rotate_yaxis(-bar_angle, reset=True)
+        self.bar.move_to_position(self.reach_target)
+        
+        self.bar.show()
+
+    def _test_leave_bounds(self, ts):
+        '''
+        Check whether the cursor is within the boundary
+        '''
+
+        # distance between the reach start positon and the parallel line to the bounday that passes through the curent cursor position
+        current_pos = self.plant.get_endpoint_pos()
+        X = current_pos[0]
+        Y = current_pos[2]
+        distance = np.abs(self.target_x*self.slope - self.target_y + (Y-self.slope*X))/np.sqrt(self.slope**2+1)
+
+        return distance > (self.target_radius - self.cursor_radius)
+
+    def _start_timeout_penalty(self):
+        super()._start_timeout_penalty()
+        self.bar.hide()
+        self.bar.reset()
+
+    def _start_delay_penalty(self):
+        super()._start_delay_penalty()
+        self.bar.hide()
+        self.bar.reset()
+
+    def _start_hold_penalty(self):
+        super()._start_hold_penalty()
+        self.bar.hide()
+        self.bar.reset()
+
+    def _start_reach_penalty(self):
+        self.sync_event('OTHER_PENALTY')
+        self._increment_tries()
+        
+        # Hide targets
+        for target in self.targets:
+            target.hide()
+            target.reset()
+        self.bar.hide()
+
+    def _end_reach_penalty(self):
+        self.sync_event('TRIAL_END')
+
+    def _test_reach_penalty_end(self, ts):
+        return ts > self.reach_penalty_time
 
 class SequenceCapture(ScreenTargetCapture):
 

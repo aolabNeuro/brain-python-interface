@@ -8,7 +8,7 @@ from scipy.spatial.transform import Rotation as R
 from riglib.experiment import traits
 
 from .target_graphics import *
-from .target_capture_task import ScreenTargetCapture, ScreenReachAngle, SequenceCapture, HandConstrainedEyeCapture, ScreenTargetCapture_Saccade
+from .target_capture_task import ScreenTargetCapture, ScreenReachAngle, SequenceCapture, HandConstrainedEyeCapture, ScreenTargetCapture_Saccade, ScreenReachLine
 from .target_tracking_task import ScreenTargetTracking
 from riglib.stereo_opengl.window import WindowDispl2D
 
@@ -269,3 +269,8 @@ class SaccadeTask(ManualControlMixin, ScreenTargetCapture_Saccade):
     '''
     pass
 
+class ManualControlAreaConstraint(ManualControlMixin, ScreenReachLine):
+    '''
+    Adds an additional constraint that the direction of travel must be within a certain area
+    '''
+    pass
