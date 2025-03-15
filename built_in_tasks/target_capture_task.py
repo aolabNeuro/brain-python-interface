@@ -487,6 +487,7 @@ class ScreenTargetCapture(TargetCapture, Window):
     def _start_hold2(self):
         #super()._start_hold2()
         #self.sync_event('CURSOR_LEAVE_TARGET', self.gen_indices[self.target_index])
+        pass
 
     def _start_leave_center(self):
         #super()._start_leave_center()
