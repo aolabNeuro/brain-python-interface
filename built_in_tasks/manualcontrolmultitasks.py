@@ -9,6 +9,7 @@ from riglib.experiment import traits
 
 from .target_graphics import *
 from .target_capture_task import ScreenTargetCapture, ScreenReachAngle, SequenceCapture, HandConstrainedEyeCapture, ScreenTargetCapture_Saccade
+from .ready_set_go_centerout import ScreenTargetCapture_ReadySet
 from .target_tracking_task import ScreenTargetTracking
 from riglib.stereo_opengl.window import WindowDispl2D
 
@@ -280,3 +281,9 @@ class SaccadeTask(ManualControlMixin, ScreenTargetCapture_Saccade):
     '''
     pass
 
+class ReadySetGoTask(ManualControlMixin, ScreenTargetCapture_ReadySet):
+    '''
+    Center out task with ready set go auditory cues. Cues separated by 500 ms and participant is expected to move on final go cue. Additionally, participant must move out
+    of center circle (mustmv_time) parameter or there will be an error. 
+    '''
+    pass
