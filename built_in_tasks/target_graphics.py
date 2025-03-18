@@ -3,7 +3,7 @@ Base tasks for generic point-to-point reaching
 '''
 import numpy as np
 from riglib.stereo_opengl.primitives import Cable, Sphere, Cube, Torus, Text
-from riglib.stereo_opengl.primitives import Cylinder, Plane, Sphere, Cube, Rotated_Cube
+from riglib.stereo_opengl.primitives import Cylinder, Plane, Sphere, Cube #Rotated_Cube
 from riglib.stereo_opengl.models import FlatMesh, Group
 from riglib.stereo_opengl.textures import Texture, TexModel
 from riglib.stereo_opengl.render import stereo, Renderer
@@ -109,31 +109,97 @@ class RectangularTarget(object):
         self.graphics_models = [self.cube]
         #self.center_offset = np.array([self.target_width, 0, self.target_width], dtype=np.float64) / 2
         self.center_offset = np.array([0, 0, self.target_width], dtype=np.float64) / 2
-        corner_pos = self.position - self.center_offset
+        corner_pos = self.position #- self.center_offset
         self.cube.translate(*corner_pos)
 
     def move_to_position(self, new_pos):
         self.int_position = new_pos
         self.drive_to_new_pos()
 
-    def move_to_position_not_corner(self, new_pos):
-        self.int_position = new_pos
-        self.drive_to_new_pos_not_corner()
-
     def drive_to_new_pos(self):
         raise NotImplementedError
     
-    def drive_to_new_pos_not_corner(self):
-        raise NotImplementedError
         
 class VirtualRectangularTarget(RectangularTarget):
     def drive_to_new_pos(self):
         self.position = self.int_position
-        corner_pos = self.position - self.center_offset
+        corner_pos = self.position #- self.center_offset
         self.cube.translate(*corner_pos, reset=True)
+        
+    def hide(self):
+        self.cube.detach()
 
-    def drive_to_new_pos_not_corner(self):
+    def show(self):
+        self.cube.attach()
+
+    def rotate_xaxis(self, angle, reset=False):
+        self.cube.rotate_x(angle, reset=reset)
+
+    def rotate_yaxis(self, angle, reset=False):
+        self.cube.rotate_y(angle, reset=reset)
+
+    def rotate_zaxis(self, angle, reset=False):
+        self.cube.rotate_z(angle, reset=reset)
+
+    def cue_trial_start(self):
+        self.cube.color = RED
+        self.show()
+
+    def cue_trial_end_success(self):
+        self.cube.color = GREEN
+
+    def cue_trial_end_failure(self):
+        self.cube.color = YELLOW
+        self.hide()
+
+    def idle(self):
+        self.cube.color = RED
+        self.hide()
+
+    def pt_inside(self, pt):
+        '''
+        Test if a point is inside the target
+        '''
+        pos = self.cube.xfm.move + self.center_offset
+        # TODO this currently assumes that the cube doesn't rotate
+        # print (pt[0] - pos[0]), (pt[2] - pos[2])
+        return (np.abs(pt[0] - pos[0]) < self.target_width/2) and (np.abs(pt[2] - pos[2]) < self.target_height/2)
+
+    def reset(self):
+        self.cube.color = self.target_color
+
+    def get_position(self):
+        return self.cube.xfm.move
+
+class RectangularTarget2(object):
+    def __init__(self, target_width=4, target_height=4, target_color=(1, 0, 0, .5), starting_pos=np.zeros(3)):
+        self.target_width = target_width
+        self.target_height = target_height
+        self.target_color = target_color
+        self.position = starting_pos
+        self.int_position = starting_pos
+        self._pickle_init()
+
+    def _pickle_init(self):
+        self.cube = Cube(side_len=self.target_width,side_height=self.target_height,color=self.target_color)
+        self.graphics_models = [self.cube]
+        #self.center_offset = np.array([self.target_width, 0, self.target_width], dtype=np.float64) / 2
+        #self.center_offset = np.array([0, 0, self.target_width], dtype=np.float64) / 2
+        #corner_pos = self.position - self.center_offset
+        self.cube.translate(*self.position)
+
+    def move_to_position(self, new_pos):
+        self.int_position = new_pos
+        self.drive_to_new_pos()
+
+    def drive_to_new_pos(self):
+        raise NotImplementedError
+    
+        
+class VirtualRectangularTarget2(RectangularTarget):
+    def drive_to_new_pos(self):
         self.position = self.int_position
+        #corner_pos = self.position - self.center_offset
         self.cube.translate(*self.position, reset=True)
         
     def hide(self):

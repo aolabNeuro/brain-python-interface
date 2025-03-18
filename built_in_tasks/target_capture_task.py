@@ -883,21 +883,24 @@ class ScreenReachLine(ScreenTargetCapture):
         y0 = self.reach_start[2]
         self.slope = (self.target_y-y0)/(self.target_x-x0)
 
-        if np.abs(self.slope) > 1000:
-            bar_angle = 90
-        else:
-            bar_angle = np.degrees(np.arctan(self.slope))
-        # self.bar = VirtualRotatedRectangularTarget(target_width=self.target_radius*2, target_height=100, 
-        #                                            target_color=target_colors[self.bar_color], 
-        #                                            angle=(0,-bar_angle,0),starting_pos=self.reach_start)
-        self.bar = VirtualRectangularTarget(target_width=self.target_radius*2, target_height=100, 
+        # Convert the slope to the angle
+        bar_angle = np.degrees(np.arctan(self.slope))
+
+        self.bar = VirtualRectangularTarget(target_width=self.target_radius*2, target_height=50, 
                                                    target_color=target_colors[self.bar_color],starting_pos=[0,0,0])
         for model in self.bar.graphics_models:
             self.add_model(model)
 
+        # Rotate the rectangle
         self.bar.rotate_yaxis(-bar_angle, reset=True)
-        self.bar.move_to_position(self.reach_target)
+
+        # Compute offset because rotating the rectangle results in shifting the rectangle position
+        offset_rectangle = [-np.sin(np.radians(-bar_angle))*self.target_radius,0,-np.cos(np.radians(-bar_angle))*self.target_radius]
         
+        # Move the rectangle to the reach target, taking into account the offset
+        self.bar.move_to_position(self.reach_target + offset_rectangle)
+
+        # Show the rectangle
         self.bar.show()
 
     def _test_leave_bounds(self, ts):
