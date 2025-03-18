@@ -1,5 +1,9 @@
 from .target_capture_task import ScreenTargetCapture
-from traits import traits
+from riglib.experiment import traits
+import os
+from riglib.audio import AudioPlayer
+
+audio_path = os.path.join(os.path.dirname(__file__), '../riglib/audio')
 
 class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
 
@@ -25,6 +29,27 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
     prepbuff_time = traits.Float(.2, desc="How long after acquiring center target before peripheral target appears")
     mustmv_time = traits.Float(.2, desc="Must leave center target within this time after auditory go cue.")
     
+    files = [f for f in os.listdir(audio_path) if '.wav' in f]
+    ready_set_sound = traits.OptionsList(files, desc="File in riglib/audio to play on each reward")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ready_set_player = AudioPlayer(self.ready_set_sound)
+        
+    def _start_prepbuff(self):
+        if hasattr(super(), '_start_prepbuff'):
+            super()._start_prepbuff()
+        self.ready_set_player.play()
+    
+    def _start_hold_penalty(self):
+        if hasattr(super(), '_start_hold_penalty'):
+            super()._start_hold_penalty()
+        self.ready_set_player.stop()
+    
+    def _start_delay_penalty(self):
+        if hasattr(super(), '_start_delay_penalty'):
+            super()._start_delay_penalty()
+        self.ready_set_player.stop()
 
     ###Test Functions ###
     def _test_hold_complete_center(self, time_in_state):
