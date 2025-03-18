@@ -23,7 +23,7 @@ import socket
 
 def init_exp(base_class, feats, seq=None, **kwargs):
     hostname = socket.gethostname()
-    if hostname in ['pagaiisland2']:
+    if hostname in ['pagaiisland2', 'human-bmi']:
         os.environ['DISPLAY'] = ':0.1'
     Exp = experiment.make(base_class, feats=feats)
     if seq is not None:
@@ -37,8 +37,9 @@ class TestManualControlTasks(unittest.TestCase):
 
     def test_readysetgo(self):
         seq = ManualControl.centerout_2D()
-        exp = init_exp(ReadySetGoTask, [MouseControl, Window2D], seq, window_size=(1200,800), fullscreen=False)
-        exp.rotation = 'xzy'
+        exp = init_exp(ReadySetGoTask, [Optitrack, Window2D], seq, window_size=(1200,800), fullscreen=False)
+        exp.rotation = 'yzx'
+        exp.offset = [-20, -95, -2]
         exp.run()
 
 

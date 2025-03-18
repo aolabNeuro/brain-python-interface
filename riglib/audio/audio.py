@@ -13,3 +13,6 @@ class AudioPlayer():
 
     def play(self):
         self.effect.play()
+
+    def stop(self):
+        self.effect.stop()
