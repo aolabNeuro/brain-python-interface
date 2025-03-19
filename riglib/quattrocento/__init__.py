@@ -16,7 +16,7 @@ class EMG(DataSourceSystem):
     buffering neural data. Compatible with riglib.source.MultiChanDataSource
     '''
     update_freq = 2048.
-    dtype = np.dtype('float')
+    dtype = np.dtype('int16')
     emg_refresh_freq = 32
     n_arrays = 1
 
