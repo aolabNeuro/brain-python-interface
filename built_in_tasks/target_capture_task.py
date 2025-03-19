@@ -545,6 +545,23 @@ class ScreenTargetCapture(TargetCapture, Window):
                 yield [idx], [pos + origin]
 
     @staticmethod
+    def out_2D_select(nblocks=100, ntargets=8, distance=10, origin=(0,0,0), target_idx=[]):
+        '''
+        Generates a sequence of 2D (x and z) targets at a given distance from the origin, 
+        but lets you select which targets out of the total number you want to keep
+        '''
+        if type(target_idx) not in (list, tuple) or len(target_idx) == 0:
+            raise ValueError(f'Malformed target_idx selection "{target_idx}"! Input a list of [idx1, idx2, ...]')
+        gen = ScreenTargetCapture.out_2D(nblocks, ntargets, distance, origin)
+        while True:
+            try:
+                next_indices, next_targs = next(gen)
+                if next_indices[0] in target_idx:
+                    yield next_indices, next_targs # only yield the targets that match target_idx
+            except StopIteration:
+                break
+
+    @staticmethod
     def centerout_2D(nblocks=100, ntargets=8, distance=10, origin=(0,0,0)):
         '''
         Pairs of central targets at the origin and peripheral targets centered around the origin
@@ -845,7 +862,7 @@ class ScreenReachLine(ScreenTargetCapture):
     )
 
     sequence_generators = [
-        'out_2D', 'rand_target_chain_2D', 'rand_target_chain_3D', 'discrete_targets_2D',
+        'out_2D', 'out_2D_select','rand_target_chain_2D', 'rand_target_chain_3D', 'discrete_targets_2D',
     ]
 
     reach_penalty_time = traits.Float(1, desc="Length of penalty time for target hold error")
