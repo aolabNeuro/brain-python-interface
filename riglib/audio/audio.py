@@ -11,5 +11,11 @@ class AudioPlayer():
             pygame.mixer.init()
         self.effect = pygame.mixer.Sound(os.path.join(audio_path, filename))
 
+    def get_length(self):
+        return self.effect.get_length()
+
     def play(self):
         self.effect.play()
+
+    def stop(self):
+        self.effect.stop()

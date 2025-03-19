@@ -1,6 +1,6 @@
 import time
 from built_in_tasks.force_task import DiskMatching
-from built_in_tasks.manualcontrolmultitasks import TrackingTask, rotations, ManualControl, ScreenTargetTracking
+from built_in_tasks.manualcontrolmultitasks import TrackingTask, rotations, ManualControl, ScreenTargetTracking, ReadySetGoTask
 from built_in_tasks.othertasks import Conditions, LaserConditions, SweptLaserConditions
 from built_in_tasks.target_capture_task import ScreenTargetCapture
 from built_in_tasks.passivetasks import YouTube
@@ -23,7 +23,7 @@ import socket
 
 def init_exp(base_class, feats, seq=None, **kwargs):
     hostname = socket.gethostname()
-    if hostname in ['pagaiisland2']:
+    if hostname in ['pagaiisland2', 'human-bmi']:
         os.environ['DISPLAY'] = ':0.1'
     Exp = experiment.make(base_class, feats=feats)
     if seq is not None:
@@ -35,6 +35,15 @@ def init_exp(base_class, feats, seq=None, **kwargs):
 
 class TestManualControlTasks(unittest.TestCase):
 
+    def test_readysetgo(self):
+        seq = ManualControl.centerout_2D()
+        exp = init_exp(ReadySetGoTask, [Optitrack, Window2D], seq, window_size=(1200,800), fullscreen=False)
+        exp.rotation = 'yzx'
+        exp.offset = [-20, -95, -2]
+        exp.ready_set_sound = 'tones.wav'
+        exp.run()
+
+
     @unittest.skip("")
     def test_exp(self):
         seq = ManualControl.centerout_2D()
@@ -43,7 +52,7 @@ class TestManualControlTasks(unittest.TestCase):
         exp.stereo_mode = 'projection'
         exp.run()
 
-    # @unittest.skip("")
+    @unittest.skip("")
     def test_example_task(self):
         seq = ExampleSequenceTask.example_generator()
         print('Testing example task')
