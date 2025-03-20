@@ -107,7 +107,7 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
 
         if self.target_index == 0:
             #self.targets[0].hide()
-            self.sync_event('CENTER_TARGET_OFF', self.gen_indices[self.target_index])
+            self.sync_event('TARGET_OFF', self.gen_indices[self.target_index])
 
     def _start_hold_penalty(self):
         if hasattr(super(), '_start_hold_penalty'):
