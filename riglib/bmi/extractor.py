@@ -388,8 +388,6 @@ class rms_emg(object):
         -------
         rms extractor instance
         '''
-        #self.feature_dtype = ('emg_rms', 'f8', (len(channels)*len(bands), 1))
-
         self.source = source
         self.channels = channels
         if source is not None:
@@ -493,8 +491,6 @@ class LFPMTMPowerExtractor(object):
         -------
         LFPMTMPowerExtractor instance
         '''
-        #self.feature_dtype = ('lfp_power', 'f8', (len(channels)*len(bands), 1))
-
         self.source = source
         self.channels = channels
         self.bands = bands
@@ -528,13 +524,10 @@ class LFPMTMPowerExtractor(object):
         extractor_kwargs['fft_freqs']      = fft_freqs
         
         self.epsilon = 1e-9
-        #self.feature_dtype = ('lfp_power', 'f8', len(channels), 1)
-        self.feature_dtype = ('lfp_power', 'f8', len(channels))
-        '''
         if extractor_kwargs['no_mean']: #Used in lfp 1D control task
             self.feature_dtype = ('lfp_power', 'f8', (len(channels)*len(fft_freqs), 1))
         else:
-            self.feature_dtype = ('lfp_power', 'f8', (len(channels)*len(bands), 1))'''
+            self.feature_dtype = ('lfp_power', 'f8', (len(channels)*len(bands), 1))
 
     def get_cont_samples(self, *args, **kwargs):
         '''
@@ -595,11 +588,10 @@ class LFPMTMPowerExtractor(object):
         -------
         lfp_power : np.ndarray of shape (n_channels * n_features, 1)
             Multi-band power estimates for each channel, for each band specified when the feature extractor was instantiated.
-        
+        '''
         assert int(self.win_len * self.fs) == cont_samples.shape[1]
-
+        
         freqs, time, psd_est = aopy.analysis.calc_mt_tfr(cont_samples.T, *self.npk, self.fs, 1)
-        print('LFP thang')
         if ('no_mean' in self.extractor_kwargs) and (self.extractor_kwargs['no_mean'] is True):
             return psd_est.reshape(psd_est.shape[0]*psd_est.shape[1], 1)
         else:
@@ -608,15 +600,8 @@ class LFPMTMPowerExtractor(object):
             if lfp_power.ndim > 1:
                 return lfp_power.reshape(lfp_power.shape[0]*lfp_power.shape[1], 1)
             else:
-                return lfp_power.reshape(lfp_power.size, 1)'''
-        
-        emg_rms = np.zeros([cont_samples.shape[1],1])
-        for i,row in enumerate(cont_samples.T):
-            emg_rms[i,0] = np.sqrt(np.sum([i ** 2 for i in row])/cont_samples.shape[0])
-        lfp_power=emg_rms
-        
-        return lfp_power
-
+                return lfp_power.reshape(lfp_power.size, 1)
+                
     def __call__(self, start_time, *args, **kwargs):
         '''
         Parameters
