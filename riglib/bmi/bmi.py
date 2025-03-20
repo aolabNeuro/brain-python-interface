@@ -9,6 +9,9 @@ import datetime
 import copy
 import pickle
 
+log_path = os.path.join(os.path.dirname(__file__), '../../log')
+log_filename = os.path.join(log_path, "clda_log")
+
 class GaussianState(object):
     '''
     Class representing a multivariate Gaussian. Gaussians are
@@ -1354,11 +1357,10 @@ class BMILoop(object):
         Re-open the HDF file and save any extra task data kept in RAM
         '''
         super(BMILoop, self).cleanup_hdf()
-        log_file_path = os.path.join(os.getenv("HOME"), 'code/bmi3d/log/')
-        if not os.path.exists(log_file_path):
-            os.makedirs(log_file_path)
+        if not os.path.exists(log_path):
+            os.makedirs(log_path)
 
-        log_file = open(os.path.join(os.getenv("HOME"), 'code/bmi3d/log/clda_log'), 'w')
+        log_file = open(log_filename, 'w')
         log_file.write(str(self.state) + '\n')
         try:
             from . import clda
@@ -1391,7 +1393,7 @@ class BMILoop(object):
         -------
         None
         '''
-        log_file = open(os.path.expandvars('$HOME/code/bmi3d/log/clda_hdf_log'), 'w')
+        log_file = open(os.path.join(log_path,'clda_hdf_log'), 'w')
 
         compfilt = tables.Filters(complevel=5, complib="zlib", shuffle=True)
         if len(data) > 0:
