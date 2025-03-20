@@ -476,7 +476,7 @@ class LFPMTMPowerExtractor(object):
 
     feature_type = 'lfp_power'
 
-    def __init__(self, source, channels=[], bands=default_bands, win_len=0.2, NW=3, fs=2048, **kwargs):
+    def __init__(self, source, channels=[], bands=default_bands, win_len=0.2, NW=3, fs=1000, **kwargs):
         '''
         Constructor for LFPMTMPowerExtractor, which extracts LFP power using the multi-taper method
 
