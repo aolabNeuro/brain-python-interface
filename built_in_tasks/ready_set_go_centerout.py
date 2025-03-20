@@ -100,7 +100,7 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
     ### State Functions ###
     def _start_prepbuff(self):
 
-        self.sync_event('CUE', 1) #integer code 113
+        self.sync_event('CUE') #integer code 113
         self.ready_set_player.play()
 
     def _start_leave_center(self):
@@ -121,7 +121,7 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
 
     def _start_tooslow_penalty(self):
         self._increment_tries()
-        self.sync_event('OTHER_PENALTY', -1) #integer code 78
+        self.sync_event('OTHER_PENALTY') #integer code 78
         self.tooslow_penalty_player.play()
         self.ready_set_player.stop()
         # Hide targets
