@@ -22,15 +22,16 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
         targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target"),
         timeout_penalty = dict(timeout_penalty_end="targ_transition", end_state=True),
         hold_penalty = dict(hold_penalty_end="targ_transition", end_state=True),
-        tooslow_penalty = dict(hold_penalty_end="targ_transition", end_state=True),
+        tooslow_penalty = dict(tooslow_penalty_end="wait", end_state=True),
         delay_penalty = dict(delay_penalty_end="targ_transition", end_state=True),
         reward = dict(reward_end="wait", stoppable=False, end_state=True)
     )
 
-    #exclude_parent_traits = ['delay_time']
-
+    
+    wait_time = traits.Float(1., desc="Length of time in wait state (inter-trial interval)")
     prepbuff_time = traits.Float(.2, desc="How long after acquiring center target before peripheral target appears")
     mustmv_time = traits.Float(.2, desc="Must leave center target within this time after auditory go cue.")
+    tooslow_penalty_time = traits.Float(1, desc="Length of penalty time for too slow error")
     
     files = [f for f in os.listdir(audio_path) if '.wav' in f]
     ready_set_sound = traits.OptionsList(files, desc="File in riglib/audio to play on each reward")
@@ -41,11 +42,16 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
         super().__init__(*args, **kwargs)
         self.ready_set_player = AudioPlayer(self.ready_set_sound)
         self.tooslow_penalty_player = AudioPlayer(self.tooslow_penalty_sound)
-        # sound_time = self.ready_set_player.get_length()
-        # self.delay_time = 
-        # self.prepbuff_time = (sound_time + mustmv_time) - self.delay_time
 
     ###Test Functions ###
+
+    def _test_start_trial(self, time_in_state):
+        '''Start next trial automatically. You may want this to instead be
+            - a random delay
+            - require some initiation action
+        '''
+        return time_in_state > self.wait_time
+    
     def _test_hold_complete_center(self, time_in_state):
         '''
         Test whether the center target is held long enough to declare the
@@ -96,11 +102,14 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
             - Manually triggered by experimenter
         '''
         return time_in_state > self.mustmv_time
+    
+    def _test_tooslow_penalty_end(self, time_in_state):
+        return time_in_state > self.tooslow_penalty_time
 
     ### State Functions ###
     def _start_prepbuff(self):
 
-        self.sync_event('CUE') #integer code 113
+        self.sync_event('CUE') #integer code 112
         self.ready_set_player.play()
 
     def _start_leave_center(self):
@@ -121,14 +130,14 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
 
     def _start_tooslow_penalty(self):
         self._increment_tries()
-        self.sync_event('OTHER_PENALTY') #integer code 78
+        self.sync_event('OTHER_PENALTY') #integer code 79
         self.tooslow_penalty_player.play()
         self.ready_set_player.stop()
-        # Hide targets
+        # # Hide targets
         for target in self.targets:
             target.hide()
             target.reset()
     
     def _end_tooslow_penalty(self):
-        
         self.sync_event('TRIAL_END')
+       
