@@ -29,13 +29,13 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
 
     
     wait_time = traits.Float(1., desc="Length of time in wait state (inter-trial interval)")
-    prepbuff_time = traits.Float(.2, desc="How long after acquiring center target before peripheral target appears")
+    prepbuff_time = traits.Float(.2, desc="How long after completing center target hold before peripheral target appears")
     mustmv_time = traits.Float(.2, desc="Must leave center target within this time after auditory go cue.")
     tooslow_penalty_time = traits.Float(1, desc="Length of penalty time for too slow error")
     
     files = [f for f in os.listdir(audio_path) if '.wav' in f]
-    ready_set_sound = traits.OptionsList(files, desc="File in riglib/audio to play on each reward")
-    tooslow_penalty_sound = traits.OptionsList(files, desc="File in riglib/audio to play on each reward") #hold penalty is normally incorrect.wav
+    ready_set_sound = traits.OptionsList(files, desc="File in riglib/audio to play on each trial for the go cue")
+    tooslow_penalty_sound = traits.OptionsList(files, desc="File in riglib/audio to play on each must move penalty") #hold penalty is normally incorrect.wav
 
 
     def __init__(self, *args, **kwargs):
