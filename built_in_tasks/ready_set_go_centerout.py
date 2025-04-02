@@ -22,7 +22,7 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
         targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target"),
         timeout_penalty = dict(timeout_penalty_end="targ_transition", end_state=True),
         hold_penalty = dict(hold_penalty_end="targ_transition", end_state=True),
-        tooslow_penalty = dict(hold_penalty_end="targ_transition", end_state=True),
+        tooslow_penalty = dict(hold_penalty_end="wait", end_state=True),
         delay_penalty = dict(delay_penalty_end="targ_transition", end_state=True),
         reward = dict(reward_end="wait", stoppable=False, end_state=True)
     )
@@ -122,13 +122,14 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
     def _start_tooslow_penalty(self):
         self._increment_tries()
         self.sync_event('OTHER_PENALTY') #integer code 78
-        self.tooslow_penalty_player.play()
         self.ready_set_player.stop()
+        self.tooslow_penalty_player.play()
+        self.targets[self.target_index % 2].cue_trial_end_failure()
         # Hide targets
         for target in self.targets:
             target.hide()
             target.reset()
-    
+
     def _end_tooslow_penalty(self):
         
         self.sync_event('TRIAL_END')
