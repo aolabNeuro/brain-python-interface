@@ -22,7 +22,7 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
         targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target"),
         timeout_penalty = dict(timeout_penalty_end="targ_transition", end_state=True),
         hold_penalty = dict(hold_penalty_end="targ_transition", end_state=True),
-        tooslow_penalty = dict(hold_penalty_end="wait", end_state=True),
+        tooslow_penalty = dict(tooslow_penalty_end="wait", end_state=True),
         delay_penalty = dict(delay_penalty_end="targ_transition", end_state=True),
         reward = dict(reward_end="wait", stoppable=False, end_state=True)
     )
