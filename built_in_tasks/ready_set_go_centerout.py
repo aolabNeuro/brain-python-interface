@@ -30,7 +30,7 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
     wait_time = traits.Float(1., desc = 'Length of time in wait state (inter-trial interval)')
     prepbuff_time = traits.Float(.2, desc="How long after acquiring center target before peripheral target appears")
     mustmv_time = traits.Float(.2, desc="Must leave center target within this time after auditory go cue.")
-    tooslow_penalty_time = traits.Float(1, desc = 'Length of penalty time for too slow error')
+    tooslow_penalty_time = traits.Float(1., desc = 'Length of penalty time for too slow error')
 
     files = [f for f in os.listdir(audio_path) if '.wav' in f]
     ready_set_sound = traits.OptionsList(files, desc="File in riglib/audio to play on each reward")
@@ -131,13 +131,11 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
         self.sync_event('OTHER_PENALTY') #integer code 78
         self.ready_set_player.stop()
         self.tooslow_penalty_player.play()
-        self.targets[self.target_index % 2].cue_trial_end_failure
-        #self.targets[0].cue_trial_end_failure()
-        # Hide targets
+        self.targets[0].cue_trial_end_failure() #index to center target (first one in chain)
+        
+    def _end_tooslow_penalty(self):
+        # Hide targets. Do this in end state so that color change lasts length of too slow penalty 
         for target in self.targets:
             target.hide()
             target.reset()
-
-    def _end_tooslow_penalty(self):
-        
         self.sync_event('TRIAL_END')
