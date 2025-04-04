@@ -717,8 +717,12 @@ class ScreenTargetCapture(TargetCapture, Window):
         ntargets = 8
         corners = np.array([
             [corners[0], corners[2], corners[4]],
+            [corners[0], corners[3], corners[4]],
+            [corners[0], corners[2], corners[5]],
             [corners[0], corners[3], corners[5]],
             [corners[1], corners[2], corners[4]],
+            [corners[1], corners[3], corners[4]],
+            [corners[1], corners[2], corners[5]],
             [corners[1], corners[3], corners[5]]
         ])
         target_order = []
