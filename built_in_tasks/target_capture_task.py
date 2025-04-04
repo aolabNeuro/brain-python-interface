@@ -696,6 +696,46 @@ class ScreenTargetCapture(TargetCapture, Window):
             yield idx, pos
 
     @staticmethod
+    def corners_3D(nblocks=5, chain_length=1, corners=(-8,8,-4,4,-8,8)):
+        '''
+        Generates a sequence of targets at the 8 corners of the given box (-x, x, -y, y, -z, z)
+
+        Parameters
+        ----------
+        nblocks : 3-tuple
+            Number of blocks
+        chain_length : int
+            The number of targets in each chain before a reward is given
+        corners : 6-tuple
+            Location of the edges of the screen (-x, x, -y, y, -z, z)
+
+        Returns
+        -------
+        [nblocks*8 x 1] array of tuples containing trial indices and [1 x 3] target coordinates
+
+        '''
+        ntargets = 8
+        corners = np.array([
+            [corners[0], corners[2], corners[4]],
+            [corners[0], corners[3], corners[5]],
+            [corners[1], corners[2], corners[4]],
+            [corners[1], corners[3], corners[5]]
+        ])
+        target_order = []
+        rng = np.random.default_rng()
+        for _ in range(nblocks):
+            order = np.arange(ntargets) + 1 # target indices, starting from 1
+            rng.shuffle(order)
+            target_order = np.concatenate((target_order, order), axis=0)
+
+        # Spit out trials in groups of chain_length
+        ntrials = nblocks*8//chain_length
+        for t in range(ntrials):
+            idx = target_order[int(t*chain_length):int(t*chain_length+chain_length)]
+            pos = [corners[int(i-1),:] for i in idx]
+            yield idx, pos
+
+    @staticmethod
     def centerout_tabletop(nblocks=100, ntargets=8, distance=10, origin=(0,0,0)):
         '''
         Generates a sequence of 2D (x and y) targets at a given distance from the origin.
