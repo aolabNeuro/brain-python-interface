@@ -59,7 +59,7 @@ def run_experiment(subject_id, experimenter_id, project, session,
         if 'seq' in kwargs:
             kwargs['seq_params'] = kwargs['seq'].params
             kwargs['seq'] = kwargs['seq'].get()  ## retreive the database data on this end of the pipe
-        task_class = experiment.make(task.get(), feats=entry.feats.all())
+        task_class = task.get(entry.feats.all())
         params.trait_norm(task_class.class_traits())
         params = params.params
 
@@ -67,6 +67,8 @@ def run_experiment(subject_id, experimenter_id, project, session,
         # and not using the RPC as intended
         exp = TaskWrapper(params=params, target_class=task_class, websock=None, **kwargs)
         exp.target_constr()
+        while (exp.check_run_condition()):
+            time.sleep(0.1)
         exp.target_destr(0, '')
 
     except:

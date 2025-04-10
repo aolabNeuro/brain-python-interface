@@ -9,8 +9,12 @@ def test():
     experimenter = Experimenter.objects.all()[0]
     print('Experiment:', exp.name)
     print('Sequence:', seq.name)
-    feat_names = []
-    run_experiment(subject.id, experimenter.id, 'project', 'session', exp.id, feat_names, seq.id, session_length=10)
+    feat_names = ['optitrack']
+    params = {
+        'offset': [-20, -95, 0],
+        'session_length': 30, 
+    }
+    run_experiment(subject.id, experimenter.id, 'project', 'session', exp.id, feat_names, seq.id, **params)
 
 
 if __name__ == '__main__':
