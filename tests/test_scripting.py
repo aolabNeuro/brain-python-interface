@@ -14,7 +14,16 @@ def test():
         'offset': [-20, -95, 0],
         'session_length': 30, 
     }
-    run_experiment(subject.id, experimenter.id, 'project', 'session', exp.id, feat_names, seq.id, **params)
+
+    metadata = {
+        'experimenter': experimenter.name,
+        'subject': subject.name,
+        'project': 'project',
+        'session': 'session'
+    }
+
+    run_experiment(metadata['subject'], metadata['experimenter'], metadata['project'], metadata['session'], 
+                   exp.name, feat_names, seq.name, **params)
 
 
 if __name__ == '__main__':

@@ -10,8 +10,8 @@ from db.tracker.json_param import Parameters
 from .. import experiment
 from .task_wrapper import TaskWrapper
 
-def run_experiment(subject_id, experimenter_id, project, session, 
-                     task_id, feat_names, seq_id=None, task_desc=None, **kwargs):
+def run_experiment(subject_name, experimenter_name, project, session, 
+                     task_name, feat_names, seq_name=None, task_desc=None, **kwargs):
     '''
     Run a task with the given database IDs and parameters. Just like running an experiment in the GUI,
     the task is added to the database. This is a blocking call.
@@ -20,9 +20,9 @@ def run_experiment(subject_id, experimenter_id, project, session,
     if hostname in ['pagaiisland2', 'human-bmi']:
         os.environ['DISPLAY'] = ':0.1'
 
-    task =  Task.objects.get(pk=task_id)
-    subject = Subject.objects.get(pk=subject_id)
-    experimenter = Experimenter.objects.get(pk=experimenter_id)
+    task =  Task.objects.get(name=task_name)
+    subject = Subject.objects.get(name=subject_name)
+    experimenter = Experimenter.objects.get(name=experimenter_name)
 
     entry = TaskEntry.objects.create(rig_name=hostname, subject_id=subject.id, task_id=task.id, experimenter_id=experimenter.id,
         project=project, session=session)
@@ -43,7 +43,7 @@ def run_experiment(subject_id, experimenter_id, project, session,
 
     # Save the target sequence to the database and link to the task entry, if the task type uses target sequences
     if issubclass(task.get(feats=feat_names), experiment.Sequence):
-        seq = Sequence.objects.get(pk=seq_id)
+        seq = Sequence.objects.get(name=seq_name)
         entry.sequence = seq
         kwargs['seq'] = seq
 
