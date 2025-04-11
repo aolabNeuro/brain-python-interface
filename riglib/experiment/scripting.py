@@ -55,22 +55,23 @@ def run_experiment(subject_name, experimenter_name, project, session,
     kwargs['saveid'] = entry.id
 
     # Start the task FSM and tracker
-    try:
-        if 'seq' in kwargs:
-            kwargs['seq_params'] = kwargs['seq'].params
-            kwargs['seq'] = kwargs['seq'].get()  ## retreive the database data on this end of the pipe
-        task_class = task.get(entry.feats.all())
-        params.trait_norm(task_class.class_traits())
-        params = params.params
+    if 'seq' in kwargs:
+        kwargs['seq_params'] = kwargs['seq'].params
+        kwargs['seq'] = kwargs['seq'].get()  ## retreive the database data on this end of the pipe
+    task_class = task.get(entry.feats.all())
+    params.trait_norm(task_class.class_traits())
+    params = params.params
 
-        # For now we are running the task in the same process as the tracker
-        # and not using the RPC as intended
-        exp = TaskWrapper(params=params, target_class=task_class, websock=None, **kwargs)
-        exp.target_constr()
+    # For now we are running the task in the same process as the tracker
+    # and not using the RPC as intended
+    exp = TaskWrapper(params=params, target_class=task_class, websock=None, **kwargs)
+    exp.target_constr()
+
+    try:
         while (exp.check_run_condition()):
             time.sleep(0.1)
-        exp.target_destr(0, '')
-
     except:
         print("Error starting task:", kwargs)
         traceback.print_exc()
+    finally:
+        exp.target_destr(0, '')
