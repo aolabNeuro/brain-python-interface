@@ -43,7 +43,9 @@ Report.prototype.activate = function() {
     //var on_windows = window.navigator.userAgent.indexOf("Windows") > 0;
     if (!this.ws) {  // && !on_windows) { some websocket issues on windows..
         // Create a new JS WebSocket object
-        this.ws = new WebSocket("ws://"+hostname.split(":")[0]+":8001/connect");
+        var host = hostname.split(":")[0]
+        var port = Number(hostname.split(":")[1]) + 1
+        this.ws = new WebSocket("ws://"+host+":"+port+"/connect");
 
         this.ws.onmessage = function(evt) {
             debug(evt.data);

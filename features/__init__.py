@@ -8,7 +8,7 @@ from features.laser_features import QwalorLaser, MultiQwalorLaser, SwitchedQwalo
 from features.quattrocento_features import QuattBMI
 from riglib.stereo_opengl.window import WindowWithExperimenterDisplay, Window2D
 from riglib.stereo_opengl.openxr import WindowVR
-from .generator_features import Autostart, AdaptiveGenerator, IgnoreCorrectness, PoissonWait, RandomDelay, Progressbar_fixation
+from .generator_features import Autostart, RandomDelay, AdaptiveGenerator, IgnoreCorrectness, PoissonWait, Progressbar_fixation, HideLeftTrajectory
 from .peripheral_device_features import Button, Joystick, DualJoystick, Joystick_plus_TouchSensor, KeyboardControl, MouseControl, ForceControl
 from .reward_features import RewardSystem, TTLReward, JuiceLogging, PelletReward, JackpotRewards, ProgressBar, TrackingRewards, RewardAudio, PenaltyAudio, ScoreRewards
 from .eyetracker_features import EyeData, CalibratedEyeData, PupilLabStreaming, SimulatedEyeData, FixationStart, EyeConstrained, EyeCalibration, EyeStreaming
@@ -91,7 +91,8 @@ built_in_features = dict(
     eye_calibration=EyeCalibration, 
     force_sensor=ForceControl,
     show_fixation_progress=Progressbar_fixation,
-    clda_kfrml=CLDA_KFRML_IntendedVelocity
+    clda_kfrml=CLDA_KFRML_IntendedVelocity,
+    hide_left_trajectory=HideLeftTrajectory,
 )
 
 # >>> features.built_in_features['autostart'].__module__

@@ -151,7 +151,8 @@ class TaskWrapper(RPCProcess):
             try:
                 # get object representing function calls to the remote database
                 # returns the result of db.tracker.dbq.rpc_handler
-                database = xmlrpc.client.ServerProxy("http://localhost:8000/RPC2/", allow_none=True)
+                port = int(os.environ['BMI3D_PORT'])
+                database = xmlrpc.client.ServerProxy(f"http://localhost:{port}/RPC2/", allow_none=True)
                 # from tracker import dbq as database
                 cleanup_successful = self.target.cleanup(database, self.saveid, subject=self.subj)
                 database.cleanup(self.saveid)

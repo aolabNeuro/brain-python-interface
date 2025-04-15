@@ -71,7 +71,8 @@ class Server(mp.Process):
         import asyncio
         asyncio.set_event_loop(asyncio.new_event_loop())
 
-        application.listen(8001)
+        port = int(os.environ['BMI3D_PORT'])
+        application.listen(port+1)
         self.ioloop = tornado.ioloop.IOLoop.current()
         self.ioloop.add_handler(self._pipe, self._send, self.ioloop.READ)
         self.ioloop.add_handler(self._outp, self._stdout, self.ioloop.READ)
