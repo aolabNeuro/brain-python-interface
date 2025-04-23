@@ -3,12 +3,15 @@ import traceback
 import numpy as np
 import os
 import socket
+os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
 
 from db.tracker.models import TaskEntry, Feature, Sequence, Task, Subject, Experimenter
 from db.tracker.json_param import Parameters
+from db.tracker.tasktrack import Track
+from db.boot_django import boot_django
+boot_django()
 
 from .. import experiment
-from .task_wrapper import TaskWrapper
 
 def run_experiment(subject_name, experimenter_name, project, session, 
                      task_name, feat_names, seq_name=None, task_desc=None, **kwargs):
@@ -61,17 +64,19 @@ def run_experiment(subject_name, experimenter_name, project, session,
     task_class = task.get(entry.feats.all())
     params.trait_norm(task_class.class_traits())
     params = params.params
+    kwargs['params'] = params
 
-    # For now we are running the task in the same process as the tracker
-    # and not using the RPC as intended
-    exp = TaskWrapper(params=params, target_class=task_class, websock=None, **kwargs)
-    exp.target_constr()
+    # Use the singleton tasktracker object to start the task
+    tracker = Track.get_instance()
+    tracker.runtask(base_class=task_class, cli=True, **kwargs)
 
     try:
-        while (exp.check_run_condition()):
+        while tracker.get_status() == "running":
             time.sleep(0.1)
+    except KeyboardInterrupt:
+        print("Keyboard interrupt")
+        tracker.stop()
     except:
-        print("Error starting task:", kwargs)
+        print("Error in task:", repr(task_class), kwargs)
         traceback.print_exc()
-    finally:
-        exp.target_destr(0, '')
+        tracker.reset()
