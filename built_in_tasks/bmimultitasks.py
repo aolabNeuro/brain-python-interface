@@ -16,6 +16,7 @@ from riglib.stereo_opengl.window import WindowDispl2D
 from .target_capture_task import ScreenReachAngle, ScreenTargetCapture
 from features.bmi_task_features import LinearlyDecreasingAssist
 from .target_graphics import target_colors
+from .target_tracking_task import ScreenTargetTracking
 
 np.set_printoptions(suppress=False)
 
@@ -393,5 +394,12 @@ class BMIControlMulti(BMIControlMultiMixin, ScreenTargetCapture):
 class BMIControlMultiDirectionConstraint(BMIControlMultiMixin, ScreenReachAngle):
     '''
     Adds an additional constraint that the direction of travel must be within a certain angle
+    '''
+    pass
+
+
+class BMIControlMulti_ScreenTargetTracking(BMIControlMultiMixin, ScreenTargetTracking):
+    '''
+    BMI control for target tracking task
     '''
     pass
