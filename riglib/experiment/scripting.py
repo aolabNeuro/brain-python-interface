@@ -20,6 +20,11 @@ def run_experiment(subject_name, experimenter_name, project, session,
     Run a task with the given database IDs and parameters. Just like running an experiment in the GUI,
     the task is added to the database. This is a blocking call.
     '''
+    tracker = Track.get_instance()
+    if tracker.task_proxy is not None:
+        print("Task is running, cannot start new task")
+        return
+    
     hostname = socket.gethostname()
     if hostname in ['pagaiisland2', 'human-bmi']:
         os.environ['DISPLAY'] = ':0.1'
@@ -68,11 +73,11 @@ def run_experiment(subject_name, experimenter_name, project, session,
     try:
         while (tracker.proc is not None) and (tracker.proc.is_alive()):
             time.sleep(0.1)
-        tracker.reset()
     except KeyboardInterrupt:
         print("Keyboard interrupt")
         tracker.stoptask()
     except:
         print("Error in task:", tracker.get_status())
         traceback.print_exc()
+    finally:
         tracker.reset()

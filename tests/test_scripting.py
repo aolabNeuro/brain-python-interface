@@ -9,7 +9,7 @@ def test():
     experimenter = Experimenter.objects.all()[0]
     print('Experiment:', exp.name)
     print('Sequence:', seq.name)
-    feat_names = ['optitrack']
+    feat_names = []
     params = {
         'offset': [-20, -95, 0],
         'session_length': 10, 
@@ -22,8 +22,6 @@ def test():
         'session': 'session'
     }
 
-    run_experiment(metadata['subject'], metadata['experimenter'], metadata['project'], metadata['session'], 
-                   exp.name, feat_names, seq.name, save=False, **params)
     run_experiment(metadata['subject'], metadata['experimenter'], metadata['project'], metadata['session'], 
                    exp.name, feat_names, seq.name, save=False, **params)
 
