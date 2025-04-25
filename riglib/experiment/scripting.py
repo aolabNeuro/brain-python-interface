@@ -41,8 +41,10 @@ def run_experiment(subject_name, experimenter_name, project, session,
     params = Parameters.from_dict(params)
     print('params:', params.to_json())
     entry.params = params.to_json()
+    feats = Feature.getall(feat_names)
 
-    kwargs = dict(subj=entry.subject.id, subject_name=subject.name)
+    kwargs = dict(subj=entry.subject.id, subject_name=subject_name, base_class=task.get(),
+            feats=feats, params=params)
 
     # Save the target sequence to the database and link to the task entry, if the task type uses target sequences
     if issubclass(task.get(feats=feat_names), experiment.Sequence):
@@ -58,17 +60,10 @@ def run_experiment(subject_name, experimenter_name, project, session,
     kwargs['saveid'] = entry.id
 
     # Start the task FSM and tracker
-    if 'seq' in kwargs:
-        kwargs['seq_params'] = kwargs['seq'].params
-        kwargs['seq'] = kwargs['seq'].get()  ## retreive the database data on this end of the pipe
-    task_class = task.get(entry.feats.all())
-    params.trait_norm(task_class.class_traits())
-    params = params.params
-    kwargs['params'] = params
 
     # Use the singleton tasktracker object to start the task
     tracker = Track.get_instance()
-    tracker.runtask(base_class=task_class, cli=True, **kwargs)
+    tracker.runtask(cli=True, **kwargs)
 
     try:
         while tracker.get_status() == "running":
@@ -77,6 +72,6 @@ def run_experiment(subject_name, experimenter_name, project, session,
         print("Keyboard interrupt")
         tracker.stop()
     except:
-        print("Error in task:", repr(task_class), kwargs)
+        print("Error in task:", tracker.get_status())
         traceback.print_exc()
         tracker.reset()
