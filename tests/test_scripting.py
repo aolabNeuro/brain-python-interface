@@ -12,7 +12,7 @@ def test():
     feat_names = ['optitrack']
     params = {
         'offset': [-20, -95, 0],
-        'session_length': 30, 
+        'session_length': 10, 
     }
 
     metadata = {
@@ -23,8 +23,9 @@ def test():
     }
 
     run_experiment(metadata['subject'], metadata['experimenter'], metadata['project'], metadata['session'], 
-                   exp.name, feat_names, seq.name, **params)
-
+                   exp.name, feat_names, seq.name, save=False, **params)
+    run_experiment(metadata['subject'], metadata['experimenter'], metadata['project'], metadata['session'], 
+                   exp.name, feat_names, seq.name, save=False, **params)
 
 if __name__ == '__main__':
     test()

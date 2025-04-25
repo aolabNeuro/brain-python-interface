@@ -14,7 +14,8 @@ boot_django()
 from .. import experiment
 
 def run_experiment(subject_name, experimenter_name, project, session, 
-                     task_name, feat_names, seq_name=None, task_desc=None, **kwargs):
+                   task_name, feat_names, seq_name=None, task_desc=None, save=True,
+                   **kwargs):
     '''
     Run a task with the given database IDs and parameters. Just like running an experiment in the GUI,
     the task is added to the database. This is a blocking call.
@@ -53,24 +54,24 @@ def run_experiment(subject_name, experimenter_name, project, session,
         kwargs['seq'] = seq
 
     # Save the task entry to database
-    entry.sw_version = 'script'
-    entry.save()
+    if save:
+        entry.sw_version = 'script'
+        entry.save()
 
-    # Give the entry ID to the runtask as a kwarg so that files can be linked after the task is done
-    kwargs['saveid'] = entry.id
-
-    # Start the task FSM and tracker
+        # Give the entry ID to the runtask as a kwarg so that files can be linked after the task is done
+        kwargs['saveid'] = entry.id
 
     # Use the singleton tasktracker object to start the task
     tracker = Track.get_instance()
     tracker.runtask(cli=True, **kwargs)
 
     try:
-        while tracker.get_status() == "running":
+        while (tracker.proc is not None) and (tracker.proc.is_alive()):
             time.sleep(0.1)
+        tracker.reset()
     except KeyboardInterrupt:
         print("Keyboard interrupt")
-        tracker.stop()
+        tracker.stoptask()
     except:
         print("Error in task:", tracker.get_status())
         traceback.print_exc()
