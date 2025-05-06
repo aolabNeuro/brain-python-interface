@@ -101,7 +101,7 @@ class Plant(object):
     '''
     hdf_attrs = []
     def __init__(self, *args, **kwargs):
-        pass
+        self.position = np.zeros(0)
 
     def drive(self, decoder):
         '''
@@ -160,8 +160,32 @@ class Plant(object):
         '''
         pass
 
+    def draw(self):
+        pass
+
+    def set_color(self, color):
+        pass
+
+    def set_bounds(self, bounds):
+        pass
+
+    def set_cursor_radius(self, radius):
+        pass
+
+    def get_endpoint_pos(self):
+        return self.get_intrinsic_coordinates()
+
+    def set_endpoint_pos(self, pt, **kwargs):
+        self.set_intrinsic_coordinates(pt)
+
     def init_decoder(self, decoder):
         decoder['q'] = self.get_intrinsic_coordinates()
+
+    def set_intrinsic_coordinates(self, pt):
+        self.position = pt
+
+    def get_intrinsic_coordinates(self):
+        return self.position
 
 
 class AsynchronousPlant(Plant):
@@ -218,13 +242,6 @@ class CursorPlant(Plant):
         self.cursor_radius = radius
         self.cursor = Sphere(radius=radius, color=self.cursor_color)
         self.graphics_models = [self.cursor]
-
-    def get_endpoint_pos(self):
-        return self.position
-
-    def set_endpoint_pos(self, pt, **kwargs):
-        self.set_intrinsic_coordinates(pt)
-        self.draw()
 
     def get_intrinsic_coordinates(self):
         return self.position
@@ -337,6 +354,15 @@ class AuditoryCursor(Plant):
         sound = pygame.sndarray.make_sound(self.buf_ext)
         sound.play()
 
+    def set_intrinsic_coordinates(self, pt):
+        self.freq = np.linalg.norm(pt*100)
+        if self.freq > self.max_freq:
+            self.freq = self.max_freq
+        elif self.freq < self.min_freq:
+            self.freq = self.min_freq
+
+    def draw(self):
+        self.play_freq()
 
     def get_intrinsic_coordinates(self):
         return self.freq
