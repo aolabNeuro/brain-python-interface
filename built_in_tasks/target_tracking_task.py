@@ -89,10 +89,10 @@ class TargetTracking(Sequence):
         self.repeat_freq_set = False
         self.gen_index = -1
 
-        if self.velocity_control:
-            print('VELOCITY CONTROL')
-        else:
-            print('POSITION CONTROL') # default is position control - see manualcontrolmixin
+        #if self.velocity_control:
+        #    print('VELOCITY CONTROL')
+        #else:
+        #    print('POSITION CONTROL') # default is position control - see manualcontrolmixin
         self.pos_offset = [0,0,0]
         self.vel_offset = [0,0,0]
 
@@ -478,7 +478,6 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.add_dtype('current_target_validate', 'f8', (3,))
         super().init()
         self.plant.set_endpoint_pos(np.array(self.starting_pos))
-
     def _cycle(self):
         '''
         Calls any update functions necessary and redraws screen
