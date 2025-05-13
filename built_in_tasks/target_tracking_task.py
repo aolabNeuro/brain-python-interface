@@ -604,12 +604,12 @@ class ScreenTargetTracking(TargetTracking, Window):
         # Add disturbance
         cursor_pos = self.plant.get_endpoint_pos()
         if self.disturbance_trial == True:
-            if self.velocity_control:
-                # TODO check manualcontrolmixin for how to implement velocity control
-                self.vel_offset = (cursor_pos + self.disturbance_path[self.frame_index])*1/self.fps
-            else: 
+            #if self.velocity_control:
+            #    # TODO check manualcontrolmixin for how to implement velocity control
+            #    self.vel_offset = (cursor_pos + self.disturbance_path[self.frame_index])*1/self.fps
+            #else: 
                 # position control
-                self.pos_offset = self.disturbance_path[self.frame_index]
+            self.pos_offset = self.disturbance_path[self.frame_index]
 
         # Move target and trajectory to next frame so it appears to be moving
         self.update_frame()
