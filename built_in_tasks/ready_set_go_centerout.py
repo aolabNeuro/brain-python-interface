@@ -32,17 +32,20 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
     prepbuff_time = traits.Float(.2, desc="How long after completing center target hold before peripheral target appears")
     mustmv_time = traits.Float(.2, desc="Must leave center target within this time after auditory go cue.")
     tooslow_penalty_time = traits.Float(1, desc="Length of penalty time for too slow error")
-    
     files = [f for f in os.listdir(audio_path) if '.wav' in f]
     ready_set_sound = traits.OptionsList(files, desc="File in riglib/audio to play on each trial for the go cue")
     tooslow_penalty_sound = traits.OptionsList(files, desc="File in riglib/audio to play on each must move penalty") #hold penalty is normally incorrect.wav
-
-
+    
+    
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.ready_set_player = AudioPlayer(self.ready_set_sound)
         self.tooslow_penalty_player = AudioPlayer(self.tooslow_penalty_sound)
 
+        #self.readyset_length = self.ready_set_player.get_length() #new
+
+        #self.prepbuff_time = self.readyset_length - self.delay_time #new
+        #print(self.prepbuff_time) #new
     ###Test Functions ###
 
     def _test_start_trial(self, time_in_state):
@@ -108,15 +111,14 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
 
     ### State Functions ###
     def _start_prepbuff(self):
-
         self.sync_event('CUE') #integer code 112
         self.ready_set_player.play()
 
     def _start_leave_center(self):
-
-        if self.target_index == 0:
-            #self.targets[0].hide()
-            self.sync_event('TARGET_OFF', self.gen_indices[self.target_index])
+        pass
+        # if self.target_index == 0:   # hide center target 
+        #     #self.targets[0].hide() 
+        #     self.sync_event('TARGET_OFF', self.gen_indices[self.target_index])
 
     def _start_hold_penalty(self):
         if hasattr(super(), '_start_hold_penalty'):
