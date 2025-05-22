@@ -37,7 +37,13 @@ rotations = dict(
 )
 
 exp_rotations = dict(
-    none = np.identity(4),
+    none = np.identity(4), # vertical workspace
+    horizontal_workspace = np.array(
+        [[0, 1, 0, 0], 
+        [1, 0, 0, 0], 
+        [0, 0, 1, 0], 
+        [0, 0, 0, 1]]
+    ),    
     about_x_90 = np.array(
         [[1, 0, 0, 0], 
         [0, 0, 1, 0], 
