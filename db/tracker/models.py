@@ -14,7 +14,6 @@ import numpy as np
 import importlib
 import subprocess
 import traceback
-import imp
 import tables
 import tempfile
 import shutil
