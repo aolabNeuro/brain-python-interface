@@ -1,25 +1,13 @@
 '''
 A generic target tracking task
 '''
-from __future__ import barry_as_FLUFL
-from multiprocessing.connection import wait
 import numpy as np
-import time
-import os
-import math
-import traceback
-import random
-from collections import OrderedDict
 
-from riglib.experiment import traits, Sequence, FSMTable, StateTransitions
-from riglib.stereo_opengl import ik
+from riglib.experiment import traits, Sequence
 from riglib import plants
 
 from riglib.stereo_opengl.window import Window
-from robot import trajectory
 from .target_graphics import *
-
-import matplotlib.pyplot as plt
 
 ## Plants
 # List of possible "plants" that a subject could control either during manual or brain control
