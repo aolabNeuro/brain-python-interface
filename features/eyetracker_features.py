@@ -8,7 +8,7 @@ from riglib import calibrations
 from riglib.experiment import traits
 from riglib.gpio import ArduinoGPIO
 from riglib.oculomatic import oculomatic
-# from riglib.pupillabs import utils
+from riglib.pupillabs import utils
 from built_in_tasks.target_graphics import *
 from built_in_tasks.target_capture_task import ScreenTargetCapture
 from riglib.stereo_opengl.primitives import AprilTag
