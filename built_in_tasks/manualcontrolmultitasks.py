@@ -36,6 +36,16 @@ rotations = dict(
     xyz = np.identity(4),
 )
 
+baseline_rotations = dict(
+    none = np.identity(4), # vertical workspace
+    horizontal_workspace = np.array(
+        [[1, 0, 0, 0], 
+        [0, 0, 1, 0], 
+        [0, 1, 0, 0], 
+        [0, 0, 0, 1]]
+    ),    
+)
+
 exp_rotations = dict(
     none = np.identity(4),
     about_x_90 = np.array(
@@ -99,7 +109,8 @@ class ManualControlMixin(traits.HasTraits):
     random_rewards = traits.Bool(False, desc="Add randomness to reward")
     rotation = traits.OptionsList(*rotations, desc="Rotation to transform raw to bmi3d coordinates", bmi3d_input_options=list(rotations.keys()))
     scale = traits.Float(1.0, desc="Scale factor to transform raw to bmi3d coordinates")
-    exp_rotation = traits.OptionsList(*exp_rotations, desc="Experimental rotation to manipulate the mapping to screen coordinates", bmi3d_input_options=list(exp_rotations.keys()))
+    baseline_rotation = traits.OptionsList(*baseline_rotations, desc="Rotation to define the mapping between bmi3d coordinates and baseline workspace", bmi3d_input_options=list(baseline_rotations.keys()))
+    exp_rotation = traits.OptionsList(*exp_rotations, desc="Experimental rotation to manipulate the mapping between baseline workspace and screen coordinates", bmi3d_input_options=list(exp_rotations.keys()))
     pertubation_rotation = traits.Float(0.0, desc="Experimental rotation about bmi3d y-axis in degrees") # this is perturbation_rotation_y
     perturbation_rotation_z = traits.Float(0.0, desc="Experimental rotation about bmi3d z-axis in degrees")
     perturbation_rotation_x = traits.Float(0.0, desc="Experimental rotation about bmi3d x-axis in degrees")
@@ -158,7 +169,7 @@ class ManualControlMixin(traits.HasTraits):
             [0, 0, 0, 1]]
         )
         old = np.concatenate((np.reshape(coords, -1), [1])) # manual input (3,) plus offset term
-        new = np.linalg.multi_dot((old, offset, scale, rotations[self.rotation], exp_rotations[self.exp_rotation])) # screen coords (3,) plus offset term
+        new = np.linalg.multi_dot((old, offset, scale, rotations[self.rotation], baseline_rotations[self.baseline_rotation], exp_rotations[self.exp_rotation])) # screen coords (3,) plus offset term
         pertubation_rot = R.from_euler('y', self.pertubation_rotation, degrees=True) # this is perturb_rot_y
         perturb_rot_z = R.from_euler('z', self.perturbation_rotation_z, degrees=True)
         perturb_rot_x = R.from_euler('x', self.perturbation_rotation_x, degrees=True)
