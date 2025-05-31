@@ -35,14 +35,14 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
     files = [f for f in os.listdir(audio_path) if '.wav' in f]
     ready_set_sound = traits.OptionsList(files, desc="File in riglib/audio to play on each trial for the go cue")
     tooslow_penalty_sound = traits.OptionsList(files, desc="File in riglib/audio to play on each must move penalty") #hold penalty is normally incorrect.wav
-    
+    shadow_periph_radius = traits.Float(0.5, desc = 'additional radius for peripheral target')
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.ready_set_player = AudioPlayer(self.ready_set_sound)
         self.tooslow_penalty_player = AudioPlayer(self.tooslow_penalty_sound)
 
-        #self.readyset_length = self.ready_set_player.get_length() #new
+        #self.readyset_length = self.ready_set_player.get_length() #new to reduce number of features
 
         #self.prepbuff_time = self.readyset_length - self.delay_time #new
         #print(self.prepbuff_time) #new
@@ -108,11 +108,16 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
     
     def _test_tooslow_penalty_end(self, time_in_state):
         return time_in_state > self.tooslow_penalty_time
+    
+    def update_report_stats(self): #add holds completed metric to report stats
+        super().update_report_stats()
+        self.reportstats['Holds Completed'] = self.calc_state_occurrences('prepbuff')
+        #self.reportstats['Pseudo Reward'] 
 
     ### State Functions ###
     def _start_prepbuff(self):
         self.sync_event('CUE') #integer code 112
-        self.ready_set_player.play()
+        self.ready_set_player.play() 
 
     def _start_leave_center(self):
         pass
