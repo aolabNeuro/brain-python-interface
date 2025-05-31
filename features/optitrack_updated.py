@@ -2,7 +2,7 @@
 Features for the Optitrack motiontracker - Updated for new NatNet SDK
 '''
 from riglib.experiment import traits
-from riglib.optitrack_client_update_natnet import optitrack_client_update
+from riglib.optitrack_client_update_natnet import optitrack_client_updated
 from datetime import datetime
 import time
 import numpy as np
