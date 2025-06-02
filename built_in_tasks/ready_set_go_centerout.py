@@ -112,7 +112,7 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
     
     def update_report_stats(self): #add holds completed metric to report stats
         super().update_report_stats()
-        self.reportstats['Holds Completed'] = self.calc_state_occurrences('leave_center')
+        self.reportstats['Audio Completed'] = self.calc_state_occurrences('leave_center') #count if delay state completed
         self.reportstats['Pseudo Reward'] = self.pseudo_reward + self.reward_count
 
     ### State Functions ###
