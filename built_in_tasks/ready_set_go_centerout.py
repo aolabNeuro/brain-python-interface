@@ -1,6 +1,7 @@
 from .target_capture_task import ScreenTargetCapture
 from riglib.experiment import traits
 import os
+import numpy as np
 from riglib.audio import AudioPlayer
 
 audio_path = os.path.join(os.path.dirname(__file__), '../riglib/audio')
@@ -41,7 +42,7 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
         super().__init__(*args, **kwargs)
         self.ready_set_player = AudioPlayer(self.ready_set_sound)
         self.tooslow_penalty_player = AudioPlayer(self.tooslow_penalty_sound)
-
+        self.pseudo_reward = 0
         #self.readyset_length = self.ready_set_player.get_length() #new to reduce number of features
 
         #self.prepbuff_time = self.readyset_length - self.delay_time #new
@@ -111,8 +112,8 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
     
     def update_report_stats(self): #add holds completed metric to report stats
         super().update_report_stats()
-        self.reportstats['Holds Completed'] = self.calc_state_occurrences('prepbuff')
-        #self.reportstats['Pseudo Reward'] 
+        self.reportstats['Holds Completed'] = self.calc_state_occurrences('leave_center')
+        self.reportstats['Pseudo Reward'] = self.pseudo_reward + self.reward_count
 
     ### State Functions ###
     def _start_prepbuff(self):
@@ -121,11 +122,12 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
 
     def _start_leave_center(self):
         pass
-        # if self.target_index == 0:   # hide center target 
-        #     #self.targets[0].hide() 
+        #if self.target_index == 0:   # hide center target 
+            #self.targets[0].hide() 
         #     self.sync_event('TARGET_OFF', self.gen_indices[self.target_index])
 
     def _start_hold_penalty(self):
+        self.pseudo_success() #run before increment trials to prevent reseting of trial index 
         if hasattr(super(), '_start_hold_penalty'):
             super()._start_hold_penalty()
         self.ready_set_player.stop()
@@ -134,6 +136,10 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
         if hasattr(super(), '_start_delay_penalty'):
             super()._start_delay_penalty()
         self.ready_set_player.stop()
+    
+    def _start_timeout_penalty(self):
+        self.pseudo_success() #run before increment trials to prevent reseting of trial index
+        super()._start_timeout_penalty()
 
     def _start_tooslow_penalty(self):
         self._increment_tries()
@@ -147,4 +153,12 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
     
     def _end_tooslow_penalty(self):
         self.sync_event('TRIAL_END')
+    
+    def pseudo_success(self): #function to measure almost success
+        if self.target_index == 1: #if peripheral target is displayed 
+            target_buffer_dist = self.target_radius + self.shadow_periph_radius #combined radius 
+            dist_from_targ = np.linalg.norm(self.plant.get_endpoint_pos() - self.targs[self.target_index]) #vector difference
+            if dist_from_targ <= target_buffer_dist:
+                self.pseudo_reward += 1 #increment if cursor position is less than the shadow radius plus radius 
+                
        
