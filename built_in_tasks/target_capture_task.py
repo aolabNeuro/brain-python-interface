@@ -2,16 +2,13 @@
 A generic target capture task
 '''
 import numpy as np
+import random
 
-
-from riglib.experiment import traits, Sequence, FSMTable, StateTransitions
-from riglib.stereo_opengl import ik
+from riglib.experiment import traits, Sequence
 from riglib import plants
 
 from riglib.stereo_opengl.window import Window
 from .target_graphics import *
-import random
-import ast
 
 ## Plants
 # List of possible "plants" that a subject could control either during manual or brain control

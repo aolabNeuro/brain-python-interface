@@ -11,7 +11,6 @@ from .target_graphics import *
 from .target_capture_task import ScreenTargetCapture, ScreenReachAngle, SequenceCapture, HandConstrainedEyeCapture, ScreenTargetCapture_Saccade
 from .ready_set_go_centerout import ScreenTargetCapture_ReadySet
 from .target_tracking_task import ScreenTargetTracking
-from riglib.stereo_opengl.window import WindowDispl2D
 
 
 rotations = dict(
