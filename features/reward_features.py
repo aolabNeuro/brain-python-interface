@@ -200,7 +200,7 @@ class HoldCompleteRewards(traits.HasTraits):
 
 class JackpotRewards(traits.HasTraits):
     '''
-    Every trials_for_jackpot trials, double reward is administered
+    Every trials_for_jackpot trials, double reward is administered. Not for consecutive success trials (see ConsecutiveJackpot)
     '''
 
     trials_for_jackpot = traits.Int(5, desc="How many successful trials before a jackpot is delivered")
@@ -213,7 +213,47 @@ class JackpotRewards(traits.HasTraits):
         else:
             return True
 
+class ConsecutiveJackpot(traits.HasTraits):
 
+    '''
+    Extra reward if a string of consecutive rewards equal to jackstring variable
+    '''
+    jackstring = traits.Int(5, desc = "How many consecutive successful trials before jackpot reward")
+    jack_multiply = traits.Float(2.0, desc = "The amount by which the reward time should be multipled (default = 2)")
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.jack_count = 0 #initialize
+        
+    #reset following each penalty. If task has extra penalty states, can add into _start function for that task as well. 
+    def _start_hold_penalty(self):
+        super()._start_hold_penalty()
+        self.jack_count = 0
+
+    def _start_delay_penalty(self):
+        super()._start_delay_penalty()
+        self.jack_count = 0
+    
+    def _start_timeout_penalty(self):
+        super()._start_timeout_penalty()
+        self.jack_count = 0 
+
+    def _start_reward(self):
+        super()._start_reward()
+        self.jack_count += 1 #add one for each rewarded trial
+
+    def _end_reward(self):
+        super()._end_reward()
+        if self.jack_count == self.jackstring: #check if sequence goal met
+            self.jack_count = 0 #reset
+
+    def _test_reward_end(self, ts): 
+        if self.jack_count == self.jackstring: 
+            return ts > self.jack_multiply*self.reward_time 
+        elif self.reportstats['Reward #'] % self.trials_per_reward == 0:
+            return ts > self.reward_time
+        else:
+            return True
+        
 class ProgressBar(traits.HasTraits):
     '''
     Adds a graphical progress bar for the tracking task which fills up when the cursor is
