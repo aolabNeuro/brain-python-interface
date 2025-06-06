@@ -4,6 +4,7 @@ Features for the eyetracker system
 
 import tempfile
 import numpy as np
+import tables
 from riglib import calibrations
 from riglib.experiment import traits
 from riglib.gpio import ArduinoGPIO
@@ -133,9 +134,7 @@ class EyeStreaming(traits.HasTraits):
     '''
 
     keyboard_control = traits.Bool(False, desc="Whether to replace eye control with keyboard control")
-    eye_labels = traits.Array(value=['le_x', 'le_y', 're_x', 're_y', 'le_diam', 're_diam'], desc="Description of eye data columns")
-
-    hidden_traits = ['eye_labels']
+    eye_labels = ['le_x', 'le_y', 're_x', 're_y', 'le_diam', 're_diam']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -148,8 +147,10 @@ class EyeStreaming(traits.HasTraits):
             from riglib import source
             from riglib.oculomatic import System
             self.eye_data = source.DataSource(System)
+            from riglib import sink
+            sink_manager = sink.SinkManager.get_instance()
+            sink_manager.register(self.eye_data) # register to the sink so it can save data
             self.eye_pos = np.zeros((6,))*np.nan
-
 
     def init(self):
         if self.keyboard_control:
@@ -189,6 +190,12 @@ class EyeStreaming(traits.HasTraits):
         self._update_eye_pos()
         super()._cycle()
 
+    def cleanup_hdf(self):
+        super().cleanup_hdf()
+        if hasattr(self, "h5file"):
+            h5file = tables.open_file(self.h5file.name, mode='a')
+            h5file.root.attrs['eye_labels'] = self.eye_labels
+            h5file.close()
 
 class EyeConstrained(ScreenTargetCapture):
     '''
@@ -284,18 +291,12 @@ class PupilLabStreaming(traits.HasTraits):
 
     surface_marker_size = traits.Float(2., desc="Size in cm of apriltag surface markers")
     surface_marker_count = traits.Int(0, desc="How many surface markers to draw")
-    eye_labels = traits.Array(value=[
-        'gaze_x', 'gaze_y', 'gaze_z', 
-        'norm_x', 'norm_y', 
-        'timestamp', 
-        're_x', 're_y', 
-        're_diam', 
-        'le_x', 'le_y', 
-        'le_diam'
-        ], 
-        desc="Description of eye data columns")
-
-    hidden_traits = ['eye_labels']
+    eye_labels = ['le_x', 'le_y', 'le_3d_x', 'le_3d_y', 'le_3d_z', 'le_timestamp', 'le_confidence',
+                  're_x', 're_y', 're_3d_x', 're_3d_y', 're_3d_z', 're_timestamp', 're_confidence',
+                  'gaze_x', 'gaze_y', 'gaze_3d_x', 'gaze_3d_y', 'gaze_3d_z', 'gaze_timestamp', 'gaze_confidence',
+                  'surface_timestamp',
+                  'le_2d_x', 'le_2d_y', 'le_diam', 'le_diam_timestamp', 'le_diam_confidence',
+                  're_2d_x', 're_2d_y', 're_diam', 're_diam_timestamp', 're_diam_confidence']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -315,9 +316,18 @@ class PupilLabStreaming(traits.HasTraits):
         else:
             self.eye_data = source.DataSource(NoSurfaceTracking)
         self.eye_pos = np.zeros((8,))*np.nan
+        
+        # Register to the sink
+        from riglib import sink
+        sink_manager = sink.SinkManager.get_instance()
+        sink_manager.register(self.eye_data)
 
     def init(self):
-        self.add_dtype('eye', 'f8', (12,))
+        self.eye_pos = np.zeros((6,))*np.nan
+        self.eye_mask = np.zeros((32,), dtype=bool)
+        self.eye_mask[np.isin(self.eye_labels, 
+            ['le_x', 'le_y', 're_x', 're_y', 'le_diam', 're_diam'])] = True
+        self.add_dtype('eye', 'f8', (6,))
         super().init()
 
     def run(self):
@@ -340,17 +350,36 @@ class PupilLabStreaming(traits.HasTraits):
         super()._start_None()
 
     def _update_eye_pos(self):
-        eye_pos = self.eye_data.get() # This is (n,11) array of new values since we last checked
+        '''
+        Set self.eye_pos to the most recent non-empty left and right eye positions and diameters.
+        '''
+        self.task_data['eye'][:] = np.nan  # reset eye data
+        eye_pos = self.eye_data.get()  # (n,32)
         if eye_pos.ndim < 2 or eye_pos.size == 0:
-            eye_pos = np.zeros((12,))*np.nan
-        else:
-            eye_pos = eye_pos[-1,:] # the most recent position
-        self.eye_pos = eye_pos
-        self.task_data['eye'] = eye_pos
+            return
+
+        eye_pos = eye_pos[:, self.eye_mask]  # (n,6)
+        if not np.any(~np.isnan(eye_pos)):
+            return
+
+        for idx in range(eye_pos.shape[1]):
+            col = eye_pos[:, idx]
+            not_nan = ~np.isnan(col)
+            if np.any(not_nan):
+                val = col[not_nan][-1]
+                self.eye_pos[idx] = val
+                self.task_data['eye'][idx] = val
 
     def _cycle(self):
         self._update_eye_pos()
         super()._cycle()
+
+    def cleanup_hdf(self):
+        super().cleanup_hdf()
+        if hasattr(self, "h5file"):
+            h5file = tables.open_file(self.h5file.name, mode='a')
+            h5file.root.attrs['eye_labels'] = self.eye_labels
+            h5file.close()
 
 '''
 Old code not currently used in aolab
