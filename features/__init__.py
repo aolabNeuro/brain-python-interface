@@ -6,6 +6,7 @@ task/experiment by multiple inheritance.
 from features.debug_features import Profiler, OnlineAnalysis
 from features.laser_features import QwalorLaser, MultiQwalorLaser, SwitchedQwalorLaser, LaserState
 from features.quattrocento_features import QuattBMI
+from features.optitrack_features_update import OptiTrackBMI
 from riglib.stereo_opengl.window import WindowWithExperimenterDisplay, Window2D
 from riglib.stereo_opengl.openxr import WindowVR
 from .generator_features import Autostart, AdaptiveGenerator, IgnoreCorrectness, PoissonWait, RandomDelay, Progressbar_fixation
@@ -13,8 +14,7 @@ from .peripheral_device_features import Button, Joystick, DualJoystick, Joystick
 from .reward_features import RewardSystem, TTLReward, JuiceLogging, PelletReward, JackpotRewards, ProgressBar, TrackingRewards, RewardAudio, PenaltyAudio, ScoreRewards
 from .eyetracker_features import EyeData, CalibratedEyeData, PupilLabStreaming, SimulatedEyeData, FixationStart, EyeConstrained, EyeCalibration, EyeStreaming
 from .phasespace_features import MotionData, MotionSimulate, MotionAutoAlign
-#from .optitrack_features import Optitrack, SpheresToCylinders
-from .optitrack_bmi_features_updated import Optitrack, SpheresToCylinders
+from .optitrack_features import Optitrack, SpheresToCylinders
 from .plexon_features import PlexonBMI, RelayPlexon, RelayPlexByte
 from .hdf_features import SaveHDF
 from .video_recording_features import SingleChannelVideo, E3Video

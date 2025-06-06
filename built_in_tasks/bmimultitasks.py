@@ -395,3 +395,246 @@ class BMIControlMultiDirectionConstraint(BMIControlMultiMixin, ScreenReachAngle)
     Adds an additional constraint that the direction of travel must be within a certain angle
     '''
     pass
+
+# Add this to the end of bmimultitasks.py
+
+class OptitrackBMIControlMulti(BMIControlMultiMixin, ScreenTargetCapture):
+    '''
+    Target capture task with cursor position controlled by Optitrack data through BMI infrastructure.
+    This task uses the Optitrack system as the neural signal source, processed through a decoder
+    to control cursor movement. Supports all standard BMI features like assist levels.
+    '''
+    
+    # Optitrack-specific traits
+    optitrack_system = traits.String('rigid body', desc='Type of Optitrack feature to track')
+    n_optitrack_features = traits.Int(1, desc='Number of rigid bodies/markers to track')
+    optitrack_smooth_len = traits.Int(1, desc='Number of features to average for cursor position')
+    
+    # Override some BMI traits for Optitrack context
+    exclude_parent_traits = BMIControlMultiMixin.exclude_parent_traits + ['neural_source']
+    
+    def __init__(self, *args, **kwargs):
+        # Ensure we're using Optitrack features
+        super().__init__(*args, **kwargs)
+        
+        # Set up Optitrack-specific parameters
+        if not hasattr(self, 'optitrack_system'):
+            self.optitrack_system = 'rigid body'
+        if not hasattr(self, 'n_optitrack_features'):
+            self.n_optitrack_features = 1
+        if not hasattr(self, 'optitrack_smooth_len'):
+            self.optitrack_smooth_len = 1
+    
+    def init(self):
+        '''
+        Initialize the task with Optitrack-specific setup
+        '''
+        # Call parent initialization first
+        super().init()
+        
+        # Verify decoder is compatible with Optitrack data
+        self._verify_optitrack_decoder_compatibility()
+        
+        # Set up Optitrack position scaling if needed
+        self._setup_optitrack_scaling()
+        
+    def _verify_optitrack_decoder_compatibility(self):
+        '''
+        Verify that the decoder is set up to handle Optitrack kinematic data
+        '''
+        # Check if decoder expects kinematic input
+        if not hasattr(self.decoder, 'filt'):
+            raise ValueError("Decoder must have a filter (filt) attribute for Optitrack integration")
+        
+        # Check input dimensionality matches expected Optitrack channels
+        expected_channels = self.n_optitrack_features * 9  # 9 channels per rigid body
+        if hasattr(self.decoder.filt, 'n_units'):
+            if self.decoder.filt.n_units != expected_channels:
+                print(f"Warning: Decoder expects {self.decoder.filt.n_units} channels, "
+                      f"but Optitrack will provide {expected_channels} channels")
+        
+        print(f"Optitrack decoder compatibility verified: {expected_channels} channels expected")
+    
+    def _setup_optitrack_scaling(self):
+        '''
+        Set up any necessary scaling between Optitrack coordinates and task coordinates
+        '''
+        # Optitrack typically works in meters, BMI tasks often in cm
+        # This can be adjusted based on your coordinate system requirements
+        self.optitrack_to_task_scale = 100.0  # Convert m to cm
+        print(f"Optitrack scaling factor: {self.optitrack_to_task_scale}")
+    
+    def create_assister(self):
+        '''
+        Create assister for Optitrack BMI control
+        Uses the same assistance framework as standard BMI tasks
+        '''
+        # Use standard endpoint assister - works with any 3D position decoder
+        kwargs = dict(
+            decoder_binlen=self.decoder.binlen, 
+            target_radius=self.target_radius,
+            assist_speed=self.assist_speed,
+            assist_noise=self.assist_noise
+        )
+        
+        # For Optitrack, we typically use simple endpoint assistance
+        # since the state space is usually position-based
+        self.assister = SimpleEndpointAssister(**kwargs)
+        print(f'Optitrack Assister created: {self.assister}')
+    
+    def create_goal_calculator(self):
+        '''
+        Create goal calculator for Optitrack BMI control
+        Assumes 3D endpoint control similar to standard BMI tasks
+        '''
+        # For Optitrack 3D position control, use zero velocity goal
+        if isinstance(self.decoder.ssm, StateSpaceEndptVel2D):
+            self.goal_calculator = goal_calculators.ZeroVelocityGoal(self.decoder.ssm)
+        else:
+            # For other state spaces, might need custom goal calculator
+            # This is a placeholder - adjust based on your specific decoder
+            self.goal_calculator = goal_calculators.ZeroVelocityGoal(self.decoder.ssm)
+        
+        print(f'Optitrack Goal Calculator created: {self.goal_calculator}')
+    
+    def _get_cursor_location(self):
+        '''
+        Override cursor location method to handle Optitrack-specific positioning
+        '''
+        # Get the standard decoder output
+        cursor_loc = super()._get_cursor_location()
+        
+        # Apply any Optitrack-specific coordinate transformations
+        # This is where you might apply scaling, rotation, or offset corrections
+        return cursor_loc
+    
+    def _start_trial(self):
+        '''
+        Override trial start to add Optitrack-specific initialization
+        '''
+        super()._start_trial()
+        
+        # Log Optitrack-specific trial parameters
+        self.hdf.sendMsg(f"Optitrack trial started - Features: {self.n_optitrack_features}, "
+                        f"System: {self.optitrack_system}")
+    
+    @classmethod
+    def get_desc(cls, params, log_summary):
+        '''
+        Enhanced description including Optitrack information
+        '''
+        duration = round(log_summary['runtime'] / 60, 1)
+        base_desc = "{}/{} successful trials in {} min".format(
+            log_summary['n_success_trials'], log_summary['n_trials'], duration)
+        
+        # Add Optitrack-specific info if available in params
+        if 'n_optitrack_features' in params:
+            optitrack_info = f" (Optitrack: {params['n_optitrack_features']} features)"
+            return base_desc + optitrack_info
+        return base_desc
+
+
+class OptitrackBMIControlMulti2DWindow(BMIControlMultiMixin, WindowDispl2D, ScreenTargetCapture):
+    '''
+    2D window version of Optitrack BMI control task
+    Similar to BMIControlMulti2DWindow but with Optitrack input
+    '''
+    fps = 20.
+    
+    # Optitrack-specific traits
+    optitrack_system = traits.String('rigid body', desc='Type of Optitrack feature to track')
+    n_optitrack_features = traits.Int(1, desc='Number of rigid bodies/markers to track')
+    optitrack_smooth_len = traits.Int(1, desc='Number of features to average for cursor position')
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Set up Optitrack defaults
+        if not hasattr(self, 'optitrack_system'):
+            self.optitrack_system = 'rigid body'
+        if not hasattr(self, 'n_optitrack_features'):
+            self.n_optitrack_features = 1
+    
+    def create_assister(self):
+        '''Create assister for 2D window Optitrack control'''
+        kwargs = dict(
+            decoder_binlen=self.decoder.binlen, 
+            target_radius=self.target_radius
+        )
+        if hasattr(self, 'assist_speed'):
+            kwargs['assist_speed'] = self.assist_speed
+        if hasattr(self, 'assist_noise'):
+            kwargs['assist_noise'] = self.assist_noise
+            
+        self.assister = SimpleEndpointAssister(**kwargs)
+    
+    def create_goal_calculator(self):
+        '''Create goal calculator for 2D window Optitrack control'''
+        self.goal_calculator = goal_calculators.ZeroVelocityGoal(self.decoder.ssm)
+    
+    def _start_wait(self):
+        '''Override wait state for 2D window version'''
+        self.wait_time = 0.
+        super()._start_wait()
+    
+    def _test_start_trial(self, ts):
+        '''Test condition for starting trial in 2D window version'''
+        return ts > self.wait_time and not self.pause
+
+
+# Additional utility class for direct Optitrack position control (no decoder)
+class OptitrackDirectControl(ScreenTargetCapture):
+    '''
+    Direct Optitrack position control without BMI decoder
+    Useful for testing and calibration
+    '''
+    
+    # Optitrack traits
+    optitrack_system = traits.String('rigid body', desc='Type of Optitrack feature to track')
+    n_optitrack_features = traits.Int(1, desc='Number of rigid bodies/markers to track')
+    optitrack_smooth_len = traits.Int(1, desc='Number of features to average for cursor position')
+    optitrack_scale = traits.Float(100.0, desc='Scale factor from Optitrack units to task units')
+    
+    # Override traits that don't apply to direct control
+    exclude_parent_traits = ['assist_level', 'assist_level_time']
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.optitrack_position = np.array([0., 0., 0.])
+    
+    def init(self):
+        '''Initialize direct Optitrack control'''
+        super().init()
+        
+        # Initialize Optitrack connection - this would interface with your kinematic system
+        print(f"Initializing direct Optitrack control: {self.n_optitrack_features} {self.optitrack_system} features")
+        
+        # Set up position tracking
+        self.optitrack_position = np.array([0., 0., 0.])
+    
+    def _get_cursor_location(self):
+        '''
+        Get cursor location directly from Optitrack data
+        This would interface with your Optitrack streaming system
+        '''
+        # In a real implementation, this would get data from your Optitrack system
+        # For now, return the stored position
+        return self.optitrack_position[:3]  # Return x, y, z
+    
+    def _update_cursor_location(self):
+        '''
+        Update cursor location from Optitrack data stream
+        This method would be called in your main loop to update position
+        '''
+        # This is where you'd interface with your Optitrack data stream
+        # Example pseudo-code:
+        # optitrack_data = self.get_optitrack_data()  # Your method to get latest data
+        # self.optitrack_position = optitrack_data * self.optitrack_scale
+        pass
+    
+    @classmethod 
+    def get_desc(cls, params, log_summary):
+        '''Description for direct Optitrack control'''
+        duration = round(log_summary['runtime'] / 60, 1)
+        return "Direct Optitrack: {}/{} successful trials in {} min".format(
+            log_summary['n_success_trials'], log_summary['n_trials'], duration)

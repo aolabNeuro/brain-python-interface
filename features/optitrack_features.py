@@ -13,9 +13,9 @@ from riglib.stereo_opengl.primitives import Cylinder, Sphere
 ########################################################################################################
 # Optitrack datasources
 ########################################################################################################
-class Optitrack_updated(traits.HasTraits):
-    '''
-    Enable reading of raw motiontracker data from New Optitrack system
+class Optitrack(traits.HasTraits):
+    '''SpheresToCylinders
+    Enable reading of raw motiontracker data from Optitrack system
     Requires the natnet library from https://github.com/leoscholl/python_natnet
     To be used as a feature with the ManualControl task for the time being. However,
     ideally this would be implemented as a decoder :)
