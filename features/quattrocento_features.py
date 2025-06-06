@@ -30,7 +30,7 @@ class QuattBMI(CorticalBMI):
         # These get read by CorticalData when initializing the extractor
         self._neural_src_type = source.MultiChanDataSource
         self._neural_src_kwargs = dict(
-            send_data_to_sink_manager=True, 
+            send_data_to_sink_manager=True,
             channels=self.cortical_channels)
         self._neural_src_system_type = quattrocento.EMG
 

@@ -6,7 +6,8 @@ task/experiment by multiple inheritance.
 from features.debug_features import Profiler, OnlineAnalysis
 from features.laser_features import QwalorLaser, MultiQwalorLaser, SwitchedQwalorLaser, LaserState
 from features.quattrocento_features import QuattBMI
-from features.optitrack_features_update import OptiTrackBMI
+#from features.optitrack_features_5 import OptiTrackData
+from features.optitrack_features_5 import OptiTrackBMI
 from riglib.stereo_opengl.window import WindowWithExperimenterDisplay, Window2D
 from riglib.stereo_opengl.openxr import WindowVR
 from .generator_features import Autostart, AdaptiveGenerator, IgnoreCorrectness, PoissonWait, RandomDelay, Progressbar_fixation
@@ -73,6 +74,7 @@ built_in_features = dict(
     ecube_bmi = EcubeBMI,
     ecube_start = RecordECube,
     quatt_bmi = QuattBMI,
+    optitrack_bmi = OptiTrackBMI,
     qwalor_laser = QwalorLaser,
     multi_qwalor_laser = MultiQwalorLaser,
     switched_qwalor_laser = SwitchedQwalorLaser,

@@ -2,24 +2,31 @@
 Example usage of OptiTrack features with BMI3D
 
 This script demonstrates how to use the OptiTrack features for:
-1. Basic data streaming (OptiTrackData)
+1. Basic data streaming (OptiTrackFeature)
 2. BMI integration with decoders (OptiTrackBMI)
 """
 
 from riglib.experiment import Experiment
-from features.optitrack_features_update_2 import OptiTrackData, OptiTrackBMI
+from features.optitrack_features_5 import OptiTrackFeature, OptiTrackBMI, OptiTrackData  # OptiTrackData is alias
+from features.optitrack_features_5 import DEFAULT_OPTITRACK_SERVER_IP, DEFAULT_OPTITRACK_CLIENT_IP
 from riglib.bmi.bmi import Decoder
 import time
 
+
+# Centralized network configuration - modify these for your setup
+OPTITRACK_SERVER_IP = DEFAULT_OPTITRACK_SERVER_IP  # Change to your Motive server IP
+OPTITRACK_CLIENT_IP = DEFAULT_OPTITRACK_CLIENT_IP  # Change to your Ubuntu machine IP
+
+
 # Example 1: Basic OptiTrack data streaming
-class OptiTrackStreamingTask(Experiment, OptiTrackData):
+class OptiTrackStreamingTask(Experiment, OptiTrackFeature):
     """
     Simple task that streams OptiTrack data without BMI integration
     """
     
     # Configure OptiTrack settings
-    optitrack_server_ip = "128.95.215.191"  # Replace with your Motive server IP
-    optitrack_client_ip = "128.95.215.213"  # Replace with your Ubuntu machine IP
+    optitrack_server_ip = OPTITRACK_SERVER_IP
+    optitrack_client_ip = OPTITRACK_CLIENT_IP
     optitrack_use_multicast = False
     optitrack_update_freq = 120.0
     
@@ -64,6 +71,52 @@ class OptiTrackStreamingTask(Experiment, OptiTrackData):
         return True
 
 
+# Alternative using the alias (backward compatibility)
+class OptiTrackStreamingTaskAlias(Experiment, OptiTrackData):
+    """
+    Same as above but using the OptiTrackData alias for backward compatibility
+    """
+    
+    # Configure OptiTrack settings
+    optitrack_server_ip = OPTITRACK_SERVER_IP
+    optitrack_client_ip = OPTITRACK_CLIENT_IP
+    optitrack_use_multicast = False
+    optitrack_update_freq = 120.0
+    
+    # Enable data saving
+    register_with_sink_manager = True
+    send_data_to_sink_manager = True
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.trial_duration = 10.0
+    
+    def _start_wait(self):
+        print("Starting OptiTrack data collection (using alias)...")
+        return True
+    
+    def _test_start_trial(self, ts):
+        return ts > 1.0
+    
+    def _start_trial(self):
+        print("Trial started - collecting OptiTrack data")
+        return True
+    
+    def _test_end_trial(self, ts):
+        return ts > self.trial_duration
+    
+    def _end_trial(self):
+        print("Trial ended")
+        return True
+    
+    def _test_end_wait(self, ts):
+        return ts > 1.0
+    
+    def _end_wait(self):
+        print("Task completed")
+        return True
+
+
 # Example 2: OptiTrack BMI integration
 class OptiTrackBMITask(Experiment, OptiTrackBMI):
     """
@@ -71,8 +124,8 @@ class OptiTrackBMITask(Experiment, OptiTrackBMI):
     """
     
     # Configure OptiTrack settings
-    optitrack_server_ip = "192.168.1.100"  # Replace with your Motive server IP
-    optitrack_client_ip = "192.168.1.101"  # Replace with your Ubuntu machine IP
+    optitrack_server_ip = OPTITRACK_SERVER_IP
+    optitrack_client_ip = OPTITRACK_CLIENT_IP
     optitrack_use_multicast = False
     optitrack_update_freq = 120.0
     
@@ -145,18 +198,19 @@ class OptiTrackBMITask(Experiment, OptiTrackBMI):
 
 
 # Example 3: Testing OptiTrack connection
-def test_optitrack_connection(server_ip="128.95.215.191", client_ip="128.95.215.213"):
+def test_optitrack_connection(server_ip=OPTITRACK_SERVER_IP, client_ip=OPTITRACK_CLIENT_IP):
     """
     Test OptiTrack connection without full BMI3D integration
     """
-    from riglib.optitrack_client_update.optitrack_system import OptiTrackData
+    # Import the system class directly to avoid confusion
+    from riglib.optitrack_client_update.optitrack_system_5 import OptiTrackData as OptiTrackSystemData
     
     print(f"Testing OptiTrack connection...")
     print(f"Server IP: {server_ip}")
     print(f"Client IP: {client_ip}")
     
-    # Create OptiTrack data source
-    optitrack = OptiTrackData(
+    # Create OptiTrack data source using system class
+    optitrack = OptiTrackSystemData(
         server_ip=server_ip,
         client_ip=client_ip,
         use_multicast=False,
@@ -209,8 +263,8 @@ if __name__ == "__main__":
     
     # Replace these IPs with your actual network configuration
     test_optitrack_connection(
-        server_ip="128.95.215.191",  # Your Motive server IP
-        client_ip="128.95.215.213"   # Your Ubuntu machine IP
+        server_ip=OPTITRACK_SERVER_IP,  # Your Motive server IP
+        client_ip=OPTITRACK_CLIENT_IP   # Your Ubuntu machine IP
     )
     
     print("\n" + "=" * 50)

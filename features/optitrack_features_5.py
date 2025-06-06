@@ -4,9 +4,13 @@ import numpy as np
 from riglib.experiment import traits
 from riglib import source
 from features.neural_sys_features import CorticalBMI, CorticalData
-import riglib.optitrack_client_update.optitrack_system
+import riglib.optitrack_client_update.optitrack_system_5 as optitrack_system  # Fix: import correct version
 import traceback
 
+
+# Centralized IP configuration
+DEFAULT_OPTITRACK_SERVER_IP = "128.95.215.191"
+DEFAULT_OPTITRACK_CLIENT_IP = "128.95.215.213"
 
 class OptiTrackBMI(CorticalBMI):
     """
@@ -15,8 +19,8 @@ class OptiTrackBMI(CorticalBMI):
     """
     
     # OptiTrack configuration traits
-    optitrack_server_ip = traits.String("128.95.215.191", desc="IP address of OptiTrack/Motive server")
-    optitrack_client_ip = traits.String("128.95.215.213", desc="IP address of this client machine")
+    optitrack_server_ip = traits.String(DEFAULT_OPTITRACK_SERVER_IP, desc="IP address of OptiTrack/Motive server")
+    optitrack_client_ip = traits.String(DEFAULT_OPTITRACK_CLIENT_IP, desc="IP address of this client machine")
     optitrack_use_multicast = traits.Bool(False, desc="Use multicast streaming (vs unicast)")
     optitrack_update_freq = traits.Float(120.0, desc="Expected OptiTrack frame rate (Hz)")
     optitrack_buffer_size = traits.Int(1000, desc="Size of data buffer")
@@ -27,21 +31,17 @@ class OptiTrackBMI(CorticalBMI):
         """
         super().__init__(*args, **kwargs)
         
-        # Set up OptiTrack-specific parameters
-        optitrack_system.OptiTrackData.server_ip = self.optitrack_server_ip
-        optitrack_system.OptiTrackData.client_ip = self.optitrack_client_ip
-        optitrack_system.OptiTrackData.use_multicast = self.optitrack_use_multicast
-        optitrack_system.OptiTrackData.update_freq = self.optitrack_update_freq
-        optitrack_system.OptiTrackData.buffer_size = self.optitrack_buffer_size
-        optitrack_system.OptiTrackData.subj = getattr(self, 'subject_name', 'unknown')
-        optitrack_system.OptiTrackData.saveid = getattr(self, 'saveid', 0)
-        
         # Estimate initial channel count (will be updated when streaming starts)
         # This is a rough estimate - actual count depends on tracked objects
         estimated_rigid_bodies = 10  # Estimate for typical setup
         estimated_skeleton_rbs = 20   # Estimate for skeleton rigid bodies
         estimated_channels = (estimated_rigid_bodies + estimated_skeleton_rbs) * 3
         self.cortical_channels = np.arange(1, estimated_channels + 1)
+        
+        # CRITICAL FIX: Set class variables like Quattrocento does
+        optitrack_system.OptiTrackData.subj = self.subject_name
+        optitrack_system.OptiTrackData.saveid = self.saveid
+        optitrack_system.OptiTrackData.update_freq = self.optitrack_update_freq
         
         # Set up neural source parameters for CorticalData initialization
         self._neural_src_type = source.MultiChanDataSource
@@ -54,6 +54,7 @@ class OptiTrackBMI(CorticalBMI):
             send_data_to_sink_manager=True,
             channels=self.cortical_channels
         )
+        # Use the system class directly, not the feature class
         self._neural_src_system_type = optitrack_system.OptiTrackData
     
     def init(self):
@@ -82,15 +83,22 @@ class OptiTrackBMI(CorticalBMI):
         dbname = kwargs.get('dbname', 'default')
         subject_name = getattr(self, 'subject_name', 'unknown')
         
-        # Create filename following BMI3D conventions
-        filename = f'/var/tmp/tmp_OptiTrack_{subject_name}_{saveid}.hdf'
+        # CRITICAL FIX: Use correct filename pattern that matches sink manager output
+        # str(optitrack_system.OptiTrackData()) returns "OptiTrackData"
+        filename = f'/var/tmp/tmp_{str(optitrack_system.OptiTrackData())}_{subject_name}_{saveid}.hdf'
         
         print(f"Saving OptiTrack data {filename} to database {dbname}")
         
         try:
+            # Check if file exists before trying to save
+            if not os.path.exists(filename):
+                print(f"Warning: OptiTrack data file {filename} does not exist!")
+                print("This may indicate data was not properly written by sink manager")
+                return super_result
+            
             if saveid is not None:
                 if dbname == 'default':
-                    database.save_data(filename, "optitrack", saveid, True, False)
+                    database.save_data(filename, "optitrack", saveid, True, False)  # Match Quattrocento: overwrite=True
                 else:
                     database.save_data(filename, "optitrack", saveid, True, False, dbname=dbname)
                 print(f"Successfully saved OptiTrack data to database")
@@ -108,14 +116,15 @@ class OptiTrackBMI(CorticalBMI):
         return optitrack_system
 
 
-class OptiTrackData(CorticalData):
+class OptiTrackFeature(CorticalData):
     """
-    Feature for streaming OptiTrack motion capture data without BMI/decoder integration
+    Feature for streaming OptiTrack motion capture data without BMI/decoder integration.
+    Renamed from OptiTrackData to avoid naming conflicts with the system class.
     """
     
     # OptiTrack configuration traits
-    optitrack_server_ip = traits.String("127.0.0.1", desc="IP address of OptiTrack/Motive server")
-    optitrack_client_ip = traits.String("127.0.0.1", desc="IP address of this client machine") 
+    optitrack_server_ip = traits.String(DEFAULT_OPTITRACK_SERVER_IP, desc="IP address of OptiTrack/Motive server")
+    optitrack_client_ip = traits.String(DEFAULT_OPTITRACK_CLIENT_IP, desc="IP address of this client machine") 
     optitrack_use_multicast = traits.Bool(False, desc="Use multicast streaming (vs unicast)")
     optitrack_update_freq = traits.Float(120.0, desc="Expected OptiTrack frame rate (Hz)")
     optitrack_buffer_size = traits.Int(1000, desc="Size of data buffer")
@@ -129,18 +138,19 @@ class OptiTrackData(CorticalData):
         """
         super().__init__(*args, **kwargs)
         
-        # Set up OptiTrack-specific parameters
-        optitrack_system.OptiTrackData.server_ip = self.optitrack_server_ip
-        optitrack_system.OptiTrackData.client_ip = self.optitrack_client_ip
-        optitrack_system.OptiTrackData.use_multicast = self.optitrack_use_multicast
-        optitrack_system.OptiTrackData.update_freq = self.optitrack_update_freq
-        optitrack_system.OptiTrackData.buffer_size = self.optitrack_buffer_size
-        
         # Estimate channel count (will be updated when streaming starts)
         estimated_rigid_bodies = 10
         estimated_skeleton_rbs = 20
         estimated_channels = (estimated_rigid_bodies + estimated_skeleton_rbs) * 3
         self.cortical_channels = np.arange(1, estimated_channels + 1)
+        
+        # CRITICAL FIX: Set class variables for sink manager
+        # Note: Only set if we have subject/saveid info (may not be available in all cases)
+        if hasattr(self, 'subject_name'):
+            optitrack_system.OptiTrackData.subj = self.subject_name
+        if hasattr(self, 'saveid'):
+            optitrack_system.OptiTrackData.saveid = self.saveid
+        optitrack_system.OptiTrackData.update_freq = self.optitrack_update_freq
     
     def init(self):
         """
@@ -157,7 +167,7 @@ class OptiTrackData(CorticalData):
             channels=self.cortical_channels
         )
         
-        # Create the data source
+        # Create the data source using the system class
         self.neurondata = source.MultiChanDataSource(optitrack_system.OptiTrackData, **kwargs)
         
         # Register with sink manager if requested
@@ -166,8 +176,15 @@ class OptiTrackData(CorticalData):
             sink_manager = sink.SinkManager.get_instance()
             sink_manager.register(self.neurondata)
         
-        # Call parent init
+        # Call parent init - Fix: call Experiment.init() instead of CorticalData.init()
         super(CorticalData, self).init()  # Skip CorticalData.init() to avoid sys_module error
+        
+        # Update channel count after initialization
+        if hasattr(self.neurondata, 'source') and hasattr(self.neurondata.source, 'total_channels'):
+            actual_channels = self.neurondata.source.total_channels
+            if actual_channels > 0:
+                self.cortical_channels = np.arange(1, actual_channels + 1)
+                print(f"Updated OptiTrack channels to {actual_channels} based on tracked objects")
     
     def cleanup(self, database, saveid, **kwargs):
         """
@@ -179,15 +196,21 @@ class OptiTrackData(CorticalData):
         dbname = kwargs.get('dbname', 'default')
         subject_name = getattr(self, 'subject_name', 'unknown')
         
-        # Create filename
-        filename = f'/var/tmp/tmp_OptiTrack_{subject_name}_{saveid}.hdf'
+        # CRITICAL FIX: Use correct filename pattern
+        filename = f'/var/tmp/tmp_{str(optitrack_system.OptiTrackData())}_{subject_name}_{saveid}.hdf'
         
         print(f"Saving OptiTrack data {filename} to database {dbname}")
         
         try:
+            # Check if file exists before trying to save
+            if not os.path.exists(filename):
+                print(f"Warning: OptiTrack data file {filename} does not exist!")
+                print("This may indicate data was not properly written by sink manager")
+                return
+            
             if saveid is not None:
                 if dbname == 'default':
-                    database.save_data(filename, "optitrack", saveid, True, False)
+                    database.save_data(filename, "optitrack", saveid, True, False)  # Match Quattrocento pattern
                 else:
                     database.save_data(filename, "optitrack", saveid, True, False, dbname=dbname)
                 print(f"Successfully saved OptiTrack data to database")
@@ -201,3 +224,7 @@ class OptiTrackData(CorticalData):
     def sys_module(self):
         """Return the OptiTrack system module"""
         return optitrack_system
+
+
+# Backward compatibility alias
+OptiTrackData = OptiTrackFeature

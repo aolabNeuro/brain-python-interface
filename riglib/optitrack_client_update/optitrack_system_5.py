@@ -7,37 +7,37 @@ import numpy as np
 import time
 import threading
 from collections import deque
-from riglib.optitrack_client_update import NatNetClient
+from riglib.optitrack_client_update.NatNetClient import NatNetClient
 import traceback
 
+
+# Centralized IP configuration
+DEFAULT_OPTITRACK_SERVER_IP = "128.95.215.191"
+DEFAULT_OPTITRACK_CLIENT_IP = "128.95.215.213"
+
+"""
+Simplified OptiTrack system class that follows the same pattern as Quattrocento
+Remove manual HDF5 handling and rely on sink manager
+"""
 
 class OptiTrackData(object):
     """
     Data source for OptiTrack motion capture system using NatNet SDK
     Streams rigid body and skeleton position data at specified frame rate
     """
-    def __init__(self, server_ip="128.95.215.191", client_ip="128.95.215.213", 
+    
+    # Class variables for sink manager (like Quattrocento)
+    subj = None
+    saveid = None
+    
+    update_freq = 120.0  # Default update frequency - BMI3D expects this as class attribute
+    dtype = np.dtype(np.float32) # bmi3d expects this to have an itemsize attribute
+    
+    def __init__(self, server_ip=DEFAULT_OPTITRACK_SERVER_IP, client_ip=DEFAULT_OPTITRACK_CLIENT_IP, 
                  use_multicast=False, update_freq=120.0, buffer_size=1000,
                  send_data_to_sink_manager=False, channels=None, **kwargs):
         """
         Initialize OptiTrack data source
-        
-        Parameters:
-        -----------
-        server_ip : str
-            IP address of the OptiTrack/Motive server
-        client_ip : str  
-            IP address of this client machine
-        use_multicast : bool
-            Whether to use multicast streaming
-        update_freq : float
-            Expected frame rate (Hz)
-        buffer_size : int
-            Size of data buffer
-        send_data_to_sink_manager : bool
-            Whether to register with sink manager
-        channels : list
-            List of channel indices (for compatibility with BMI3D)
         """
         self.server_ip = server_ip
         self.client_ip = client_ip
@@ -60,14 +60,16 @@ class OptiTrackData(object):
         self.streaming_client = None
         
         # Data tracking
-        self.rigid_bodies = {}  # {id: {'name': str, 'position': [x,y,z], 'rotation': [qx,qy,qz,qw]}}
-        self.skeletons = {}     # {id: {'name': str, 'rigid_bodies': {rb_id: position}}}
+        self.rigid_bodies = {}
+        self.skeletons = {}
         self.frame_number = 0
         self.last_timestamp = 0
         
-        # Channel mapping - will be populated when data descriptions are received
-        self.channel_map = {}  # Maps channel index to (data_type, object_id, component)
+        # Channel mapping
+        self.channel_map = {}
         self.total_channels = 0
+        
+        # REMOVED: All HDF5-related code - let sink manager handle it
         
     def _frame_callback(self, data_dict):
         """Callback function called for each new frame from OptiTrack"""
@@ -145,15 +147,16 @@ class OptiTrackData(object):
         # Update channels list if not provided
         if not self.channels:
             self.channels = list(range(self.total_channels))
-    
     def start(self):
         """Start the OptiTrack data streaming"""
         if self.running:
             return
         
         try:
+            # REMOVED: HDF5 setup - sink manager handles this
+            
             # Initialize NatNet client
-            self.streaming_client = NatNetClient
+            self.streaming_client = NatNetClient()
             self.streaming_client.set_client_address(self.client_ip)
             self.streaming_client.set_server_address(self.server_ip)
             self.streaming_client.set_use_multicast(self.use_multicast)
@@ -162,7 +165,7 @@ class OptiTrackData(object):
             self.streaming_client.new_frame_with_data_listener = self._frame_callback
             
             # Start streaming
-            is_running = self.streaming_client.run('d')  # 'd' for datastream
+            is_running = self.streaming_client.run('d')
             if not is_running:
                 raise Exception("Could not start OptiTrack streaming client")
             
@@ -171,7 +174,7 @@ class OptiTrackData(object):
             if not self.streaming_client.connected():
                 raise Exception("Could not connect to OptiTrack server")
             
-            # Request data descriptions to get object info
+            # Request data descriptions
             self.streaming_client.send_request(
                 self.streaming_client.command_socket, 
                 self.streaming_client.NAT_REQUEST_MODELDEF, 
@@ -203,6 +206,7 @@ class OptiTrackData(object):
                 pass
             self.streaming_client = None
         
+        # REMOVED: Manual HDF5 writing - sink manager handles this
         print("OptiTrack streaming stopped")
     
     def get_new_data(self):
@@ -222,7 +226,7 @@ class OptiTrackData(object):
             if len(data_list) == 0:
                 return np.array([]), np.array([])
             
-            # Stack data - each row is a sample, each column is a channel
+            # Stack data
             data_array = np.vstack(data_list) if len(data_list) > 1 else data_list[0].reshape(1, -1)
             timestamp_array = np.array(timestamp_list)
             
@@ -232,10 +236,10 @@ class OptiTrackData(object):
         """Alternative interface for getting data"""
         return self.get_new_data()
     
-    @property
-    def dtype(self):
-        """Data type for compatibility with BMI3D"""
-        return np.float32
+#    @property
+#    def dtype(self):
+#        """Data type for compatibility with BMI3D"""
+#        return np.float32
     
     def __str__(self):
-        return f"OptiTrack_{self.server_ip.replace('.', '_')}"
+        return f"OptiTrackData"  # Simplified, matches Quattrocento pattern
