@@ -3,6 +3,7 @@ Features for the eyetracker system
 '''
 
 import tempfile
+import time
 import numpy as np
 import tables
 from riglib import calibrations
@@ -194,7 +195,7 @@ class EyeStreaming(traits.HasTraits):
         super().cleanup_hdf()
         if hasattr(self, "h5file"):
             h5file = tables.open_file(self.h5file.name, mode='a')
-            h5file.root.attrs['eye_labels'] = self.eye_labels
+            h5file.root.task.attrs['eye_labels'] = self.eye_labels
             h5file.close()
 
 class EyeConstrained(ScreenTargetCapture):
@@ -291,12 +292,11 @@ class PupilLabStreaming(traits.HasTraits):
 
     surface_marker_size = traits.Float(2., desc="Size in cm of apriltag surface markers")
     surface_marker_count = traits.Int(0, desc="How many surface markers to draw")
-    eye_labels = ['le_x', 'le_y', 'le_3d_x', 'le_3d_y', 'le_3d_z', 'le_timestamp', 'le_confidence',
-                  're_x', 're_y', 're_3d_x', 're_3d_y', 're_3d_z', 're_timestamp', 're_confidence',
-                  'gaze_x', 'gaze_y', 'gaze_3d_x', 'gaze_3d_y', 'gaze_3d_z', 'gaze_timestamp', 'gaze_confidence',
+    eye_labels = ['gaze_x', 'gaze_y', 'gaze_3d_x', 'gaze_3d_y', 'gaze_3d_z', 'gaze_timestamp', 'gaze_confidence', 'eye_id',
                   'surface_timestamp',
                   'le_2d_x', 'le_2d_y', 'le_diam', 'le_diam_timestamp', 'le_diam_confidence',
                   're_2d_x', 're_2d_y', 're_diam', 're_diam_timestamp', 're_diam_confidence']
+    eye_mask_labels = ['gaze_x', 'gaze_y', 'gaze_timestamp', 'gaze_confidence', 'le_diam', 're_diam']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -323,10 +323,11 @@ class PupilLabStreaming(traits.HasTraits):
         sink_manager.register(self.eye_data)
 
     def init(self):
+        # TTODO: use confidence to remove bad data
         self.eye_pos = np.zeros((6,))*np.nan
-        self.eye_mask = np.zeros((32,), dtype=bool)
+        self.eye_mask = np.zeros((len(self.eye_labels),), dtype=bool)
         self.eye_mask[np.isin(self.eye_labels, 
-            ['le_x', 'le_y', 're_x', 're_y', 'le_diam', 're_diam'])] = True
+            self.eye_mask_labels)] = True
         self.add_dtype('eye', 'f8', (6,))
         super().init()
 
@@ -368,7 +369,7 @@ class PupilLabStreaming(traits.HasTraits):
             if np.any(not_nan):
                 val = col[not_nan][-1]
                 self.eye_pos[idx] = val
-                self.task_data['eye'][idx] = val
+                self.task_data['eye'][0][idx] = val
 
     def _cycle(self):
         self._update_eye_pos()
@@ -378,7 +379,8 @@ class PupilLabStreaming(traits.HasTraits):
         super().cleanup_hdf()
         if hasattr(self, "h5file"):
             h5file = tables.open_file(self.h5file.name, mode='a')
-            h5file.root.attrs['eye_labels'] = self.eye_labels
+            h5file.root.task.attrs['eye_labels'] = self.eye_labels
+            h5file.root.task.attrs['eye_mask_labels'] = self.eye_mask_labels
             h5file.close()
 
 '''

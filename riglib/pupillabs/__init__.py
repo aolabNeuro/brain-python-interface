@@ -14,7 +14,7 @@ class System(DataSourceSystem):
     '''
     Pupil-labs system for reading gaze and pupil data from Pupil Capture.
     '''
-    dtype = np.dtype((float, (32,)))
+    dtype = np.dtype((float, (19,)))
     update_freq = 250
     name = 'pupillabs'
     
@@ -94,13 +94,14 @@ class System(DataSourceSystem):
         """
         read in a batch of eye data and retun x, y on surface & pupil diameters for each eye
         """
-        gaze_left = np.full((7,), np.nan)
-        gaze_right = np.full((7,), np.nan)
-        gaze_binocular = np.full((7,), np.nan)
+        gaze = np.full((8,), np.nan)
         surface = [np.nan]
         pupil_left = np.full((5,), np.nan)
         pupil_right = np.full((5,), np.nan)
 
+        t0 = time.perf_counter()
+
+        # read all messages in the queue
         while self.sub.poll(0) == zmq.POLLIN:
 
             topic, payload = self.sub.recv_multipart(flags=zmq.NOBLOCK)
@@ -110,44 +111,20 @@ class System(DataSourceSystem):
                 self.mapper.update_homography(message["img_to_surf_trans"])
                 surface = float(message["timestamp"]) - self.offset
 
-            if message["topic"] == "gaze.3d.01":
+            if message["topic"].startswith("gaze.3d"):
                     
-                    gaze_binocular[:2] = message["norm_pos"]
-                    gaze_binocular[2:5] = message["gaze_point_3d"]
+                    gaze[:2] = message["norm_pos"]
+                    gaze[2:5] = message["gaze_point_3d"]
 
                     if self.mapper is not None:
                         mapped_gaze = self.mapper.gaze_to_surface(message["norm_pos"])
                         if mapped_gaze is not None:
-                            gaze_binocular[:2] = np.array(mapped_gaze.norm_x, mapped_gaze.norm_y)
+                            gaze[:2] = np.array(mapped_gaze.norm_x, mapped_gaze.norm_y)
 
-                    gaze_binocular[5] = float(message["timestamp"]) - self.offset
-                    gaze_binocular[6] = message["confidence"]
-
-            elif message["topic"] == "gaze.3d.1":
-                    
-                    gaze_left[:2] = message["norm_pos"]
-                    gaze_left[2:5] = message["gaze_point_3d"]
-
-                    if self.mapper is not None:
-                        mapped_gaze = self.mapper.gaze_to_surface(message["norm_pos"])
-                        if mapped_gaze is not None:
-                            gaze_left[:2] = np.array(mapped_gaze.norm_x, mapped_gaze.norm_y)
-
-                    gaze_left[5] = float(message["timestamp"]) - self.offset
-                    gaze_left[6] = message["confidence"]
-
-            elif message["topic"] == "gaze.3d.0":
-                    
-                    gaze_right[:2] = message["norm_pos"]
-                    gaze_right[2:5] = message["gaze_point_3d"]
-
-                    if self.mapper is not None:
-                        mapped_gaze = self.mapper.gaze_to_surface(message["norm_pos"])
-                        if mapped_gaze is not None:
-                            gaze_right[:2] = np.array(mapped_gaze.norm_x, mapped_gaze.norm_y)
-
-                    gaze_right[5] = float(message["timestamp"]) - self.offset
-                    gaze_right[6] = message["confidence"]
+                    gaze[5] = float(message["timestamp"]) - self.offset
+                    gaze[6] = message["confidence"]
+                    eye = message["topic"].split('.')[-2]
+                    gaze[7] = -1 if eye == '01' else eye # save the topic name to recover which eye(s) were used
 
             if message["topic"] == "pupil.1.2d":
                 pupil_left[:2] = message["norm_pos"]
@@ -161,8 +138,13 @@ class System(DataSourceSystem):
                 pupil_right[3] = float(message["timestamp"]) - self.offset
                 pupil_right[4] = message["confidence"]
 
-        coords = np.hstack([gaze_left, gaze_right, gaze_binocular, surface, pupil_left, pupil_right]) 
+        coords = np.hstack([gaze, surface, pupil_left, pupil_right]) 
         coords = np.expand_dims(coords, axis=0)
+
+        # Sleep for the remainder of the update period
+        while time.perf_counter() - t0 < 1.0 / self.update_freq:
+            time.sleep(0.0001)
+
         return coords
 
     
