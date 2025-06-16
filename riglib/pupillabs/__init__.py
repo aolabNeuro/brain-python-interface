@@ -119,7 +119,7 @@ class System(DataSourceSystem):
                     if self.mapper is not None:
                         mapped_gaze = self.mapper.gaze_to_surface(message["norm_pos"])
                         if mapped_gaze is not None:
-                            gaze[:2] = np.array(mapped_gaze.norm_x, mapped_gaze.norm_y)
+                            gaze[:2] = np.array([mapped_gaze.norm_x, mapped_gaze.norm_y])
 
                     gaze[5] = float(message["timestamp"]) - self.offset
                     gaze[6] = message["confidence"]
