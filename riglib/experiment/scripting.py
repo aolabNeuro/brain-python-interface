@@ -55,6 +55,8 @@ def run_experiment(subject_name, experimenter_name, project, session,
     # Save the target sequence to the database and link to the task entry, if the task type uses target sequences
     if issubclass(task.get(feats=feat_names), experiment.Sequence):
         seq = Sequence.objects.get(name=seq_name)
+        if seq is None:
+            raise ValueError(f"Sequence '{seq_name}' not found in database")
         entry.sequence = seq
         kwargs['seq'] = seq
 
@@ -65,6 +67,8 @@ def run_experiment(subject_name, experimenter_name, project, session,
 
         # Give the entry ID to the runtask as a kwarg so that files can be linked after the task is done
         kwargs['saveid'] = entry.id
+    else:
+        entry.delete()
 
     # Use the singleton tasktracker object to start the task
     tracker = Track.get_instance()

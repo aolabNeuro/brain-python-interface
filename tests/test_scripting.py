@@ -23,7 +23,7 @@ def test():
     }
 
     run_experiment(metadata['subject'], metadata['experimenter'], metadata['project'], metadata['session'], 
-                   exp.name, feat_names, seq.name, save=False, **params)
+                   exp.name, feat_names, seq.name, task_desc='test', save=True, **params)
 
 if __name__ == '__main__':
     test()
