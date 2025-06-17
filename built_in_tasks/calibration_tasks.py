@@ -59,15 +59,16 @@ class CalibrateHMD(WindowVR, Sequence):
         n = {"subject": "start_plugin", "name": "HMD3DChoreographyPlugin", "args": {}}
         print(self.send_recv_notification(n))
 
-        # start caliration routine with params. This will make pupil start sampeling pupil data.
-        # the eye-translations have to be in mm, these here are default values from Unity XR
-        n = {
-            "subject": "calibration.should_start",
-            "translation_eye0": [30., 0.0, 0.0],
-            "translation_eye1": [-30., 0.0, 0.0],
-            "record": True,
-        }
-        print(self.send_recv_notification(n))
+        if self.saveid is not None:
+            # start caliration routine with params. This will make pupil start sampeling pupil data.
+            # the eye-translations have to be in mm, these here are default values from Unity XR
+            n = {
+                "subject": "calibration.should_start",
+                "translation_eye0": [30., 0.0, 0.0],
+                "translation_eye1": [-30., 0.0, 0.0],
+                "record": True,
+            }
+            print(self.send_recv_notification(n))
         self.ref_data = []
 
     # pupil-labs convenience functions
@@ -143,6 +144,8 @@ class CalibrateHMD(WindowVR, Sequence):
             self.ref_data.append(datum0)
 
     def _end_target_calibrate(self):
+        if self.saveid is None:
+            return
         # Send ref data to Pupil Capture/Service:
         # This notification can be sent once at the end or multiple times.
         # During one calibraiton all new data will be appended.
@@ -162,6 +165,10 @@ class CalibrateHMD(WindowVR, Sequence):
         self.sync_event('PAUSE_END')
 
     def _start_None(self):
+        if hasattr(super(), '_start_None'):
+            super()._start_None()
+        if self.saveid is None:
+            return
         # stop calibration
         # Pupil will correlate pupil and ref data based on timestamps,
         # compute the gaze mapping params, and start a new gaze mapper.
