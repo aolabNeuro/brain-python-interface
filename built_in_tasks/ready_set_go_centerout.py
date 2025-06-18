@@ -37,7 +37,8 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
     ready_set_sound = traits.OptionsList(files, desc="File in riglib/audio to play on each trial for the go cue")
     tooslow_penalty_sound = traits.OptionsList(files, desc="File in riglib/audio to play on each must move penalty") #hold penalty is normally incorrect.wav
     shadow_periph_radius = traits.Float(0.5, desc = 'additional radius for peripheral target')
-    
+    periph_hold = traits.Float(0.2, desc = "Hold time for peripheral target")
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.ready_set_player = AudioPlayer(self.ready_set_sound)
@@ -80,7 +81,7 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
             - Sensorized object moved to the required location
             - Manually triggered by experimenter
         '''
-        return self.target_index == 1 and time_in_state > self.hold_time
+        return self.target_index == 1 and time_in_state > self.periph_hold
     
     def _test_prepbuff_complete(self, time_in_state):
         '''
