@@ -387,7 +387,7 @@ class ScreenTargetCapture(TargetCapture, Window):
         if self.target_index == 0: #If first target, cursor should be immersed 
             rad = self.target_radius - self.cursor_radius
         if self.target_index > 0: 
-            rad = self.target_radius - self.cursor_radius + leniency*self.cursor_radius
+            rad = self.target_radius - self.cursor_radius + self.leniency*self.cursor_radius
         return d > rad or super()._test_leave_target(ts)
 
     #### STATE FUNCTIONS ####
