@@ -1660,7 +1660,7 @@ class NatNetClient:
 
             offset_tmp, mocap_data = self.__unpack_mocap_data( data[offset:], packet_size, major, minor )
             offset += offset_tmp
-            print("MoCap Frame: %d\n"%(mocap_data.prefix_data.frame_number))
+            #print("MoCap Frame: %d\n"%(mocap_data.prefix_data.frame_number))
             # get a string version of the data for output
             if print_level >= 1:
                 mocap_data_str=mocap_data.get_as_string()
@@ -1886,3 +1886,11 @@ class NatNetClient:
             self.command_thread.join()
         if self.data_thread.is_alive():
             self.data_thread.join()
+
+def print_configuration(natnet_client):
+    natnet_client.refresh_configuration()
+    print("Connection Configuration:")
+    print("  Client:          %s"% natnet_client.local_ip_address)
+    print("  Server:          %s"% natnet_client.server_ip_address)
+    print("  Command Port:    %d"% natnet_client.command_port)
+    print("  Data Port:       %d"% natnet_client.data_port)

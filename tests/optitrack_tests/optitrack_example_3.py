@@ -36,7 +36,7 @@ class OptiTrackStreamingTask(Experiment, OptiTrackFeature):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.trial_duration = 10.0  # seconds
+        self.trial_duration = 1.0  # seconds
     
     def _start_wait(self):
         """Wait state at beginning of trial"""
@@ -89,7 +89,7 @@ class OptiTrackStreamingTaskAlias(Experiment, OptiTrackData):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.trial_duration = 10.0
+        self.trial_duration = 1.0
     
     def _start_wait(self):
         print("Starting OptiTrack data collection (using alias)...")
@@ -135,7 +135,7 @@ class OptiTrackBMITask(Experiment, OptiTrackBMI):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.trial_duration = 10.0
+        self.trial_duration = 1.0
         self.decoded_output = None
     
     def _start_wait(self):
@@ -223,10 +223,10 @@ def test_optitrack_connection(server_ip=OPTITRACK_SERVER_IP, client_ip=OPTITRACK
         optitrack.start()
         
         # Collect data for 10 seconds
-        print("Collecting data for 10 seconds...")
+        print("Collecting data for 1 seconds...")
         start_time = time.time()
         
-        while time.time() - start_time < 10.0:
+        while time.time() - start_time < 1.0:
             data, timestamps = optitrack.get_new_data()
             
             if len(data) > 0:
@@ -240,7 +240,7 @@ def test_optitrack_connection(server_ip=OPTITRACK_SERVER_IP, client_ip=OPTITRACK
                     latest_sample = data[-1, :]
                     print(f"  Latest sample: {latest_sample[:min(6, len(latest_sample))]}")
             
-            time.sleep(0.1)  # Check every 100ms
+            time.sleep(0.5)  # Check every 100ms
         
         print("Test completed successfully!")
         
