@@ -6,8 +6,7 @@ import numpy as np
 from riglib.experiment import traits, Sequence
 from riglib.stereo_opengl.openxr import WindowVR
 from riglib.stereo_opengl.window import Window
-from .target_graphics import *
-
+from riglib.stereo_opengl.primitives import CalibrationSphere
 import zmq, msgpack, time
 
 class CalibrateHMD(WindowVR, Sequence):
@@ -31,12 +30,11 @@ class CalibrateHMD(WindowVR, Sequence):
     calibration_time = traits.Float(0.7, desc="Duration in seconds of each target calibration")
     calibration_samples_per_target = traits.Int(30, desc="Number of samples to collect for each target during calibration")
     startup_time = traits.Float(5.0, desc="Time to wait before starting first trial")
-    target_color = traits.OptionsList("white", *target_colors, desc="Color of the targets", bmi3d_input_options=list(target_colors.keys()))
-    target_radius = traits.Float(0.5, desc="Radius of the targets in cm")
+    target_radius = traits.Float(1, desc="Radius of the targets in cm")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.target = VirtualCircularTarget(target_radius=self.target_radius, target_color=target_colors[self.target_color])
+        self.target = CalibrationSphere(target_radius=self.target_radius)
         for model in self.target.graphics_models:
             self.add_model(model)
         self.calibration_cycle_step = (self.calibration_time * self.fps) // self.calibration_samples_per_target
@@ -135,7 +133,8 @@ class CalibrateHMD(WindowVR, Sequence):
 
     def _start_target(self):
         self.sync_event('TARGET_ON', 0xd)
-        self.target.move_to_position(self.target_location)
+        self.target.translate(*self.target_location, reset=True)
+        self.target.look_at(self.camera_position[[0, 2, 1]])  # x, z, y
         self.target.show()
 
     def _while_target_calibrate(self):

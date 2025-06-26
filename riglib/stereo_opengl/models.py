@@ -118,6 +118,33 @@ class Model(object):
         while self in self.parent.models:
             self.parent.models.remove(self)
 
+    def look_at(self, target):
+        """
+        Rotates the model so its local +z axis points toward the target coordinate.
+
+        Parameters
+        ----------
+        target : array-like
+            The (x, y, z) world coordinate to look at.
+        up : array-like
+            The up direction (default: (0, 1, 0)).
+        """
+        # Current position in world space
+        pos = np.array(self.xfm.move)
+        target = np.array(target)
+        direction = target - pos
+        if np.linalg.norm(direction) == 0:
+            return self  # No rotation needed
+
+        direction = direction / np.linalg.norm(direction)
+        # Local +z axis in model space
+        local_z = np.array([0, 0, 1])
+        # Compute quaternion to rotate +z to direction
+        q = self.xfm.rotate.rotate_vecs(local_z, direction)
+        self.xfm.rotate = q
+        self._recache_xfm()
+        return self
+
 
 class Group(Model):
     def __init__(self, models=()):
