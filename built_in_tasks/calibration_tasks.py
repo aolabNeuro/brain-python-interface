@@ -34,9 +34,8 @@ class CalibrateHMD(WindowVR, Sequence):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.target = CalibrationSphere(target_radius=self.target_radius)
-        for model in self.target.graphics_models:
-            self.add_model(model)
+        self.target = CalibrationSphere(radius=self.target_radius)
+        self.add_model(self.target)
         self.calibration_cycle_step = (self.calibration_time * self.fps) // self.calibration_samples_per_target
         
     def init(self):
@@ -128,14 +127,14 @@ class CalibrateHMD(WindowVR, Sequence):
     ### STATE FUNCTIONS ###
     def _start_wait(self):
         self.sync_event('TARGET_OFF')
-        self.target.hide()
+        self.target.detach()
         super()._start_wait()
 
     def _start_target(self):
         self.sync_event('TARGET_ON', 0xd)
         self.target.translate(*self.target_location, reset=True)
-        self.target.look_at(self.camera_position[[0, 2, 1]])  # x, z, y
-        self.target.show()
+        self.target.look_at(np.array(self.camera_position)[[0, 2, 1]])  # x, z, y
+        self.target.attach()
 
     def _while_target_calibrate(self):
         # get the current pupil time (pupil uses CLOCK_MONOTONIC with adjustable timebase).
@@ -167,7 +166,7 @@ class CalibrateHMD(WindowVR, Sequence):
 
     def _start_pause(self):
         self.sync_event('PAUSE_START')
-        self.target.hide()
+        self.target.detach()
 
     def _end_pause(self):
         self.sync_event('PAUSE_END')
@@ -232,4 +231,3 @@ class CalibrateHMD(WindowVR, Sequence):
         pos = pos[:,[0,2,1]] - np.array([0,3,0])
         for idx in range(len(pos)):
             yield idx, np.array(pos[idx])*size
-

@@ -297,7 +297,7 @@ class PupilLabStreaming(traits.HasTraits):
                   'surface_timestamp',
                   'le_2d_x', 'le_2d_y', 'le_diam', 'le_diam_timestamp', 'le_diam_confidence',
                   're_2d_x', 're_2d_y', 're_diam', 're_diam_timestamp', 're_diam_confidence']
-    eye_mask_labels = ['gaze_x', 'gaze_y', 'gaze_timestamp', 'gaze_confidence', 'le_diam', 're_diam']
+    eye_mask_labels = ['gaze_3d_x', 'gaze_3d_y', 'gaze_3d_z', 'gaze_confidence', 'le_diam', 're_diam']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -325,11 +325,11 @@ class PupilLabStreaming(traits.HasTraits):
 
     def init(self):
         # TTODO: use confidence to remove bad data
-        self.eye_pos = np.zeros((6,))*np.nan
+        self.eye_pos = np.zeros((len(self.eye_mask_labels),))*np.nan
         self.eye_mask = np.zeros((len(self.eye_labels),), dtype=bool)
         self.eye_mask[np.isin(self.eye_labels, 
             self.eye_mask_labels)] = True
-        self.add_dtype('eye', 'f8', (6,))
+        self.add_dtype('eye', 'f8', (len(self.eye_mask_labels),))
         super().init()
 
     def run(self):
@@ -356,21 +356,24 @@ class PupilLabStreaming(traits.HasTraits):
         Set self.eye_pos to the most recent non-empty left and right eye positions and diameters.
         '''
         self.task_data['eye'][:] = np.nan  # reset eye data
-        eye_pos = self.eye_data.get()  # (n,32)
+        eye_pos = self.eye_data.get()
         if eye_pos.ndim < 2 or eye_pos.size == 0:
             return
 
-        eye_pos = eye_pos[:, self.eye_mask]  # (n,6)
+        eye_pos = eye_pos[:, self.eye_mask]
         if not np.any(~np.isnan(eye_pos)):
             return
 
+        val = np.nan*np.zeros((len(self.eye_mask_labels),))
+        # Iterate over each eye position and find the last non-nan value
         for idx in range(eye_pos.shape[1]):
             col = eye_pos[:, idx]
             not_nan = ~np.isnan(col)
             if np.any(not_nan):
-                val = col[not_nan][-1]
-                self.eye_pos[idx] = val
-                self.task_data['eye'][0][idx] = val
+                val[idx] = col[not_nan][-1]
+
+        self.eye_pos = val
+        self.task_data['eye'][0] = val
 
     def _cycle(self):
         self._update_eye_pos()
@@ -390,12 +393,10 @@ class EyeCursor(traits.HasTraits):
     '''
     eye_cursor_color = traits.OptionsList("green", *target_colors, desc="Color of the eye cursor", bmi3d_input_options=list(target_colors.keys()))
     eye_cursor_radius = traits.Float(0.5, desc="Radius of the eye cursor in cm")
-    eye_cursor_bounds = traits.Tuple((-10., 10., -10., 10., -10., 10.), desc='(x min, x max, y min, y max, z min, z max)')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.eye_plant = plants.CursorPlant()
-        self.eye_plant.set_bounds(np.array(self.eye_cursor_bounds))
         self.eye_plant.set_color(target_colors[self.eye_cursor_color])
         self.eye_plant.set_cursor_radius(self.eye_cursor_radius)
         for model in self.eye_plant.graphics_models:
@@ -408,8 +409,20 @@ class EyeCursor(traits.HasTraits):
 
     def _cycle(self):
         super()._cycle()
-        self.eye_plant.set_endpoint_pos([self.eye_pos[0], 0, self.eye_pos[1]])  # Use the first two values of eye_pos for cursor position
-
+        if np.any(np.isnan(self.eye_pos[:3])):
+            return
+        x, y, z = self.eye_pos[:3]*0.1  # Convert from mm to cm
+        y = -y  # Invert y-axis
+        xyz = np.array([x, y, z, 1])  # Convert to x, z, y format
+        if not hasattr(self, 'modelview'):
+            print('skip')
+            return
+        modelview = self.modelview.copy()
+        modelview[0,3] = 0  # Set x translation to 0
+        # modelview[3,3] *= -1  # Invert z-axis translation
+        xyz = modelview @ xyz  # Apply modelview transformation
+        self.eye_plant.set_endpoint_pos(xyz[[0,2,1]])
+        print(f"Eye cursor position: {self.eye_plant.get_endpoint_pos()}")  # Debugging output
 '''
 Old code not currently used in aolab
 '''
