@@ -15,6 +15,7 @@ from built_in_tasks.target_graphics import *
 from built_in_tasks.target_capture_task import ScreenTargetCapture
 from riglib.stereo_opengl.primitives import AprilTag
 from .peripheral_device_features import *
+from riglib import plants
 
 import aopy
 import glob
@@ -382,6 +383,32 @@ class PupilLabStreaming(traits.HasTraits):
             h5file.root.task.attrs['eye_labels'] = self.eye_labels
             h5file.root.task.attrs['eye_mask_labels'] = self.eye_mask_labels
             h5file.close()
+
+class EyeCursor(traits.HasTraits):
+    '''
+    Adds a virtual eye cursor to the task, which can be used to visualize eye positions.
+    '''
+    eye_cursor_color = traits.OptionsList("green", *target_colors, desc="Color of the eye cursor", bmi3d_input_options=list(target_colors.keys()))
+    eye_cursor_radius = traits.Float(0.5, desc="Radius of the eye cursor in cm")
+    eye_cursor_bounds = traits.Tuple((-10., 10., -10., 10., -10., 10.), desc='(x min, x max, y min, y max, z min, z max)')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.eye_plant = plants.CursorPlant()
+        self.eye_plant.set_bounds(np.array(self.eye_cursor_bounds))
+        self.eye_plant.set_color(target_colors[self.eye_cursor_color])
+        self.eye_plant.set_cursor_radius(self.eye_cursor_radius)
+        for model in self.eye_plant.graphics_models:
+            self.add_model(model)
+
+    def init(self):
+        self.add_dtype('eye_cursor', 'f8', (2,))
+        super().init()
+        self.plant.set_endpoint_pos(np.array(self.starting_pos))
+
+    def _cycle(self):
+        super()._cycle()
+        self.eye_plant.set_endpoint_pos([self.eye_pos[0], 0, self.eye_pos[1]])  # Use the first two values of eye_pos for cursor position
 
 '''
 Old code not currently used in aolab
