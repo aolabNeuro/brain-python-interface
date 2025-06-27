@@ -308,7 +308,7 @@ class AuditoryCursor(Plant):
     '''
     hdf_attrs = [('aud_cursor_freq', 'f8', (1,))]
 
-    def __init__(self, min_freq, max_freq, sound_duration=0.1):
+    def __init__(self, min_freq, max_freq, duration=0.1):
         self.min_freq = min_freq
         self.max_freq = max_freq
         self.bits = 16
@@ -317,7 +317,6 @@ class AuditoryCursor(Plant):
         pygame.mixer.pre_init(44100, -self.bits, 2)
         pygame.init()
 
-        duration = 0.1  # in seconds
         self.sample_rate = 44100
         self.n_samples = int(round(duration*self.sample_rate))
         self.max_sample = 2**(self.bits - 1) - 1
@@ -355,7 +354,7 @@ class AuditoryCursor(Plant):
         sound.play()
 
     def set_intrinsic_coordinates(self, pt):
-        self.freq = np.linalg.norm(pt*100)
+        self.freq = np.linalg.norm(pt)
         if self.freq > self.max_freq:
             self.freq = self.max_freq
         elif self.freq < self.min_freq:

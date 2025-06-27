@@ -20,13 +20,11 @@ shoulder_anchor = np.array([2., 0., -15])
 chain_kwargs = dict(link_radii=.6, joint_radii=0.6, joint_colors=(181/256., 116/256., 96/256., 1), link_colors=(181/256., 116/256., 96/256., 1))
 chain_20_20_endpt = plants.EndptControlled2LArm(link_lengths=[20, 20], base_loc=shoulder_anchor, **chain_kwargs)
 chain_20_20 = plants.RobotArmGen2D(link_lengths=[20, 20], base_loc=shoulder_anchor, **chain_kwargs)
-audio = plants.AuditoryCursor(100,800)
 
 plantlist = dict(
     cursor=cursor,
     chain_20_20=chain_20_20,
     chain_20_20_endpt=chain_20_20_endpt,
-    audio=audio,
 )
 
 class TargetCapture(Sequence):
