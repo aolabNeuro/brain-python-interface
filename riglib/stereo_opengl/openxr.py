@@ -48,6 +48,8 @@ class WindowVR(Window):
     hidden_traits = ['fps', 'window_size', 'screen_dist']
 
     def init(self):
+        self.exp_position_perturbation = np.zeros((3,))
+        self.exp_rotation_perturbation = Quaternion(1,0,0,0)
         self.add_dtype('view_pose_position', 'f8', (2,3))
         self.add_dtype('view_pose_rotation', 'f8', (2,4))
         self.add_dtype('modelview', 'f8', (2,4,4))
@@ -243,7 +245,7 @@ class WindowVR(Window):
                     view.pose.orientation.y,
                     view.pose.orientation.z,
                 ])
-            xfm = Transform(move=position, rotate=Quaternion(*rotation)) 
+            xfm = Transform(move=position+self.exp_position_perturbation, rotate=Quaternion(*rotation)*self.exp_rotation_perturbation) 
             self.modelview = xfm.to_mat(reverse=True)
 
             # Optionally mirror the view along the y-axis
