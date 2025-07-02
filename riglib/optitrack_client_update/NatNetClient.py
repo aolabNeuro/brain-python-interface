@@ -1592,6 +1592,8 @@ class NatNetClient:
                     self.send_keep_alive(in_socket, self.server_ip_address, self.command_port)
         return 0
 
+
+
     def __data_thread_function( self, in_socket, stop, gprint_level):
         message_id_dict={}
         data=bytearray(0)
@@ -1823,6 +1825,99 @@ class NatNetClient:
     def get_server_version(self):
         return self.__server_version
 
+
+    def read_single_frame(self, in_socket, print_level=0):
+        """
+        Extract a single data frame from the socket.
+        
+        Args:
+            in_socket: The socket to read from
+            print_level: Print level for debugging (default: 0)
+        
+        Returns:
+            bool: True if frame was successfully processed, False otherwise
+        """
+        data = bytearray(0)
+        recv_buffer_size = 64 #* 1024
+        max_retries = 2
+        
+        for attempt in range(max_retries):
+            print('attempt ' + str(attempt))
+            try:
+                print('whoop!')
+                data, addr = in_socket.recvfrom(recv_buffer_size)
+                print('boop!')
+                break  # Successfully received data, exit retry loop
+                
+            except socket.error as msg:
+                print("ERROR: data socket access error occurred (attempt %d/%d):\n  %s" % (attempt + 1, max_retries, msg))
+                if attempt == max_retries - 1:  # Last attempt failed
+                    return False
+                continue
+                
+            except socket.herror:
+                print("ERROR: data socket access herror occurred (attempt %d/%d)" % (attempt + 1, max_retries))
+                if attempt == max_retries - 1:
+                    return False
+                continue
+                
+            except socket.gaierror:
+                print("ERROR: data socket access gaierror occurred (attempt %d/%d)" % (attempt + 1, max_retries))
+                if attempt == max_retries - 1:
+                    return False
+                continue
+                
+            except socket.timeout:
+                print("ERROR: data socket access timeout occurred (attempt %d/%d). Server not responding" % (attempt + 1, max_retries))
+                if attempt == max_retries - 1:
+                    return False
+                continue
+        
+        # Check if we received any data
+        if len(data) == 0:
+            print("ERROR: No data available")
+            return False
+        
+        # Process the received data
+        try:
+            message_id = get_message_id(data)
+            
+            # Apply print level logic for frame data
+            current_print_level = print_level
+            if message_id == self.NAT_FRAMEOFDATA and print_level > 0:
+                current_print_level = 1
+            
+            # Process the message
+            processed_message_id = self.__process_message(data, current_print_level)
+            
+            return True  # Successfully processed frame
+            
+        except Exception as e:
+            print("ERROR: Failed to process message data: %s" % str(e))
+            return False
+
+    def reload_data(self):
+        print_level = getattr(self, 'print_level', 0)
+        print('Print level ' + str(print_level))
+        success = self.read_single_frame(self.data_socket, print_level)
+        return 1 if success else 0
+
+    def open_data_socket_no_threading(self):
+        result = self.__create_data_socket( self.data_port )
+        if result is None :
+            print( "Could not open data channel" )
+            return False
+        
+        return result
+    
+    def open_command_socket_no_threading(self):
+        # Create the command socket
+        result = self.__create_command_socket()
+        if result is None :
+            print( "Could not open command channel" )
+            return False
+        return result
+
     def run( self, thread_option):
 
         # Create the data socket
@@ -1882,9 +1977,9 @@ class NatNetClient:
         self.command_socket.close()
         self.data_socket.close()
         # attempt to join the threads back.
-        if self.command_thread.is_alive():
+        if self.command_thread and self.command_thread.is_alive():
             self.command_thread.join()
-        if self.data_thread.is_alive():
+        if self.data_thread and self.data_thread.is_alive():
             self.data_thread.join()
 
 def print_configuration(natnet_client):

@@ -7,7 +7,7 @@ from features.debug_features import Profiler, OnlineAnalysis
 from features.laser_features import QwalorLaser, MultiQwalorLaser, SwitchedQwalorLaser, LaserState
 from features.quattrocento_features import QuattBMI
 #from features.optitrack_features_5 import OptiTrackData
-from features.optitrack_features_5 import OptiTrackBMI
+from features.optitrack_features_new import OptiTrackBMI
 from riglib.stereo_opengl.window import WindowWithExperimenterDisplay, Window2D
 from riglib.stereo_opengl.openxr import WindowVR
 from .generator_features import Autostart, AdaptiveGenerator, IgnoreCorrectness, PoissonWait, RandomDelay, Progressbar_fixation

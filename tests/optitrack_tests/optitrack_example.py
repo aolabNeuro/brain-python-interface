@@ -15,24 +15,11 @@ class TestOptiTrackStreaming(unittest.TestCase):
     def test_direct(self):
         opt = OptitrackStreamingClient()
         opt.setup()
-        print(opt.streaming_client.connected())
+        print('Data socket: ' + str(opt.streaming_client.data_port))
                 # check sockets
-        print(opt.streaming_client.command_socket)
-'''            ret_value = False
-        elif self.data_socket ==None:
-            ret_value = False
-        # check versions
-        elif self.get_application_name() == "Not Set":
-            ret_value = False
-        elif (self.__server_version[0] == 0) and\
-            (self.__server_version[1] == 0) and\
-            (self.__server_version[2] == 0) and\
-            (self.__server_version[3] == 0):
-            ret_value = False
-        return ret_value'''
-        #opt.start(opt.optionsDict)
-        #time.sleep(STREAMING_DURATION)
-        #opt.stop()
+        print('Command socket: ' + str(opt.streaming_client.command_port))
+        opt.read_frame()
+        opt.stop()
 
 if __name__ == '__main__':
     unittest.main()
