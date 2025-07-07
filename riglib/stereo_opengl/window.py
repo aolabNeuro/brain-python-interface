@@ -108,6 +108,8 @@ class Window(LogExperiment):
 
         #up vector is always (0,0,1), why would I ever need to roll the camera?!
         self.set_eye((0, 0, 0), (0,0))
+        self.exp_position_perturbation = np.zeros((3,))
+        self.exp_rotation_perturbation = Quaternion(1,0,0,0)
         self.modelview = np.eye(4)
         self.modelview[:3,-1] = [0,0,-self.screen_dist]
         self.renderer = self._get_renderer()
@@ -162,7 +164,9 @@ class Window(LogExperiment):
 
     def draw_world(self):
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-        self.renderer.draw(self.world, modelview=self.modelview)
+        xfm = Transform(move=self.exp_position_perturbation, rotate=self.exp_rotation_perturbation) 
+        perturbation = xfm.to_mat(reverse=True)
+        self.renderer.draw(self.world, modelview=np.dot(perturbation,self.modelview))
         pygame.display.flip()
         self.renderer.draw_done()
 

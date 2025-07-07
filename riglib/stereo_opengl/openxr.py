@@ -48,8 +48,6 @@ class WindowVR(Window):
     hidden_traits = ['fps', 'window_size', 'screen_dist']
 
     def init(self):
-        self.exp_position_perturbation = np.zeros((3,))
-        self.exp_rotation_perturbation = Quaternion(1,0,0,0)
         self.add_dtype('view_pose_position', 'f8', (2,3))
         self.add_dtype('view_pose_rotation', 'f8', (2,4))
         self.add_dtype('modelview', 'f8', (2,4,4))
@@ -203,6 +201,8 @@ class WindowVR(Window):
         self.world = Group(self.models)
         self.world.init()
         self.set_eye((0,0,0), (0,0))
+        self.exp_position_perturbation = np.zeros((3,))
+        self.exp_rotation_perturbation = Quaternion(1,0,0,0)
         self.xr_frame_generator = context.frame_loop()
         self.xr_context = context
         print("Initialized OpenXR window")

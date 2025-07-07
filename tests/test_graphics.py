@@ -39,7 +39,7 @@ moon = Sphere(radius=0.5, color=[0.25,0.25,0.75,0.5])
 planet = Sphere(3, color=[0.75,0.25,0.25,0.75])
 orbit_radius = 4
 orbit_speed = 1
-wobble_radius = 0
+wobble_radius = 2
 wobble_speed = 0.5
 #TexSphere = type("TexSphere", (Sphere, TexModel), {})
 #TexPlane = type("TexPlane", (Plane, TexModel), {})
@@ -100,10 +100,14 @@ class Test2(Window):
         x = wobble_radius * np.cos(ts * wobble_speed)
         y = wobble_radius * np.sin(ts * wobble_speed)
 
-        xfm = Transform(move=[x,0,-self.screen_dist])
-        xfm.rotate_x(np.radians(y))
-        xfm.rotate_y(np.radians(x))
-        self.modelview = xfm.to_mat()
+        # xfm = Transform(move=[x,0,-self.screen_dist])
+        # xfm.rotate_x(np.radians(x))
+        # xfm.rotate_y(np.radians(y))
+        # self.modelview = xfm.to_mat()
+
+        self.exp_rotation_perturbation = Quaternion.from_axisangle((1,0,0), np.radians(x)) * Quaternion.from_axisangle((0,1,0), np.radians(y))
+        self.exp_position_perturbation = np.array([x, 0, 0])
+
 
         if ts > 2 and self.count<len(pos_list):
             # reward_text.translate(*pos_list[self.count])
