@@ -51,8 +51,12 @@ class OptitrackStreamingClient():
         print('Data port ' + str(self.streaming_client.data_port))
 
         self.streaming_client.data_socket = self.streaming_client.open_data_socket_no_threading()
+        print('Data socket: ' + str(self.streaming_client.data_socket))
         self.streaming_client.command_socket = self.streaming_client.open_command_socket_no_threading()
+        print('Command socket: ' + str(self.streaming_client.command_socket))
 
+        self.streaming_client.data_function(self.streaming_client.command_socket)
+        print('')
         self.streaming_client.send_request(
             self.streaming_client.command_socket, 
             self.streaming_client.NAT_CONNECT, 
@@ -61,6 +65,8 @@ class OptitrackStreamingClient():
         )
         # what am I missing here? i need to reset the version info correctly here 
         #to connect properly
+
+        
         if self.streaming_client.connected() is False:
                 print("ERROR: Could not connect properly.  Check that Motive streaming is on.")
                 try:
