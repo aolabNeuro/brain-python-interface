@@ -1636,6 +1636,45 @@ class NatNetClient:
                 data=bytearray(0)
 
         return 0
+    
+    def data_function( self, in_socket):
+        message_id_dict={}
+        data=bytearray(0)
+        # 64k buffer size
+        recv_buffer_size=64*1024
+
+        # Block for input
+        try:
+            print('About to request data')
+            data, addr = in_socket.recvfrom(recv_buffer_size )
+            print('succesfully requested data')
+        except socket.error as msg:
+            print("ERROR: data socket access error occurred:\n  %s" %msg)
+            return 1
+        except  socket.herror:
+            print("ERROR: data socket access herror occurred")
+            #return 2
+        except  socket.gaierror:
+            print("ERROR: data socket access gaierror occurred")
+            #return 3
+        except  socket.timeout:
+            #if self.use_multicast:
+            print("ERROR: data socket access timeout occurred. Server not responding")
+            #return 4
+        if len( data ) > 0 :
+            #peek ahead at message_id
+            message_id = get_message_id(data)   
+            tmp_str="mi_%1.1d"%message_id
+            if tmp_str not in message_id_dict:
+                message_id_dict[tmp_str]=0
+            message_id_dict[tmp_str] += 1
+            
+            print_level = 0
+
+            message_id = self.__process_message( data , print_level)
+            data=bytearray(0)
+
+        return 0
 
     def __process_message( self, data : bytes, print_level=0):
         #return message ID
