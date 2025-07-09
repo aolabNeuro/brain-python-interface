@@ -45,76 +45,19 @@ class OptitrackStreamingClient():
         # Configure the streaming client to call our rigid body handler on the emulator to send data out.
         self.streaming_client.new_frame_listener = receive_new_frame
         self.streaming_client.rigid_body_listener = receive_rigid_body_frame
-
-    def setup(self, optionsDict=optionsDict):
-        # Create the data socket
-        print('Data port ' + str(self.streaming_client.data_port))
-
-        self.streaming_client.data_socket = self.streaming_client.open_data_socket_no_threading()
-        print('Data socket: ' + str(self.streaming_client.data_socket))
-        self.streaming_client.command_socket = self.streaming_client.open_command_socket_no_threading()
-        print('Command socket: ' + str(self.streaming_client.command_socket))
-
-        self.streaming_client.data_function(self.streaming_client.command_socket)
-        print('')
-        self.streaming_client.send_request(
-            self.streaming_client.command_socket, 
-            self.streaming_client.NAT_CONNECT, 
-            "",  
-            (self.streaming_client.server_ip_address, self.streaming_client.command_port)
-        )
-        # what am I missing here? i need to reset the version info correctly here 
-        #to connect properly
-
-        
-        if self.streaming_client.connected() is False:
-                print("ERROR: Could not connect properly.  Check that Motive streaming is on.")
-                try:
-                    sys.exit(2)
-                except SystemExit:
-                    print("...")
-                finally:
-                    print("exiting")
-
-
         
     def start(self, optionsDict=optionsDict):
-        #print instructions
-        print("NatNet Python Client 4.2\n")
-        #stream_choice = input("Please select d for datastream, c for command stream, or any other key to quit: ")
-        optionsDict["stream_type"] = 'd'
-
-        # Start up the streaming client now that the callbacks are set up.
-        # This will run perpetually, and operate on a separate thread.
-        '''is_running = self.streaming_client.run(optionsDict["stream_type"])
-        #if not is_running:
-            print("ERROR: Could not start streaming client.")
-            try:
-                sys.exit(1)
-            except SystemExit:
-                print("...")
-            finally:
-                print("exiting")'''
-
-
-
+        print('Starting optirackstreaming client...')
+        self.streaming_client.connect_no_threading()
+        print("succesfully connected to optitrack")
 
     def stop(self):
         # Stop the streaming client
         self.streaming_client.shutdown()
         print("Streaming client stopped.")
 
-    def read_frame(self):
-        '''boop = self.streaming_client.reload_data()
-        if boop==0:
-            print('successfully reloaded the data maybe?')'''
-        try:
-            data, addr = self.streaming_client.data_socket.recvfrom(20000)
-            print(f"Received {len(data)} bytes from {addr}")
-            return data
-        except socket.timeout:
-            print("No data received")
-            return None
+    def get(self):
+        return self.streaming_client.request_frame_data()
 
     
 

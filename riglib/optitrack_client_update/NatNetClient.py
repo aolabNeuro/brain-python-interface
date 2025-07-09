@@ -1957,6 +1957,101 @@ class NatNetClient:
             return False
         return result
 
+
+    def connect_no_threading(self):
+        self.data_socket = self.__create_data_socket( self.data_port )
+        if self.data_socket is None :
+            print( "Could not open data channel" )
+            return False
+        
+        self.command_socket = self.__create_command_socket()
+        if self.command_socket is None :
+            print( "Could not open command channel" )
+            return False
+        
+        #Set timeouts for both sockets to avoid hanging
+        self.command_socket.settimeout(5.0)
+        self.data_socket.settimeout(1.0)
+
+        #send the connection request
+        self.send_request(self.command_socket, self.NAT_CONNECT, "", 
+                          (self.server_ip_address, self.command_port))
+        
+        #Wait for connection response
+        response_received = False
+        max_attempts = 10
+
+        for attempt in range(max_attempts):
+            try:
+                response_data, addr = self.command_socket.recvfrom(1024)
+                if len(response_data)>0:
+                    message_id = self.__process_message(response_data,1)
+                    print(f"Received response with message ID: {message_id}")
+                    if  message_id in [self.NAT_RESPONSE, 5, self.NAT_FRAMEOFDATA]:
+                        response_received = True
+                        break
+
+            except socket.timeout:
+                if attempt< max_attempts - 1:
+                    time.sleep(0.1)
+                    continue
+                else:
+                    print("connection timeout")
+                    return False
+            except Exception as e:
+                print(f"Connection error: {e}")
+                return False
+            
+        if not response_received:
+            print("No response from the server")
+            return False
+        
+        self.is_connected = True
+
+        print("Connection established succesfully")
+        return True
+
+
+    def request_frame_data(self, timeout = 1.0):
+        if not self.is_connected:
+            print("Client is not connected")
+            return False
+        try: 
+            original_timeout = self.command_socket.gettimeout()
+            self.command_socket.settimeout(timeout)
+
+            data, addr = self.command_socket.recvfrom(64*1024)
+
+            self.command_socket.settimeout(original_timeout)
+
+            if len(data)>0:
+                message_id = self.__process_message(data,1)
+                if message_id == self.NAT_FRAMEOFDATA:
+                    return self.__extract_frame_data(data)
+            else:
+                return None
+        except socket.timeout:
+            return None
+        except Exception as e:
+            print(f"Error receiving frame data: {e}")
+            return None
+        
+    def __extract_frame_data(self, data):
+        try:
+
+            major = self.get_major()
+            minor = self.get_minor()
+            offset = 4  # Skip the first 4 bytes (message ID and packet size)
+
+            packet_size = int.from_bytes( data[2:4], byteorder='little',  signed=True )
+
+            offset_tmp, mocap_data = self.__unpack_mocap_data(data[offset:], packet_size, major, minor)
+            return mocap_data
+        except Exception as e:
+            print(f"Error extracting frame data: {e}")
+            return None
+        
+
     def run( self, thread_option):
 
         # Create the data socket

@@ -1,5 +1,3 @@
-# test file for new optitrack integration
-
 import time
 from riglib import source
 from riglib.optitrack_client_update.PythonSample import OptitrackStreamingClient
@@ -14,11 +12,17 @@ class TestOptiTrackStreaming(unittest.TestCase):
     #@unittest.
     def test_direct(self):
         opt = OptitrackStreamingClient()
-        opt.setup()
-        print('Data socket: ' + str(opt.streaming_client.data_port))
-                # check sockets
-        print('Command socket: ' + str(opt.streaming_client.command_port))
-        opt.read_frame()
+        print('Starting optitrack streaming client...')
+        opt.start()
+        print("Successfully connected to OptiTrack, requesting Frame")
+        frame = opt.get()
+        if frame is None:
+            print('No data recieved')
+        else:
+            print('Received frame data:')
+            if hasattr(frame, 'rigid_body_data'):
+                print('Rigid Body Data:', frame.rigid_body_data.get_rigid_body_count())
+            print(np.shape(frame))
         opt.stop()
 
 if __name__ == '__main__':
