@@ -297,7 +297,7 @@ class PupilLabStreaming(traits.HasTraits):
                   'surface_timestamp',
                   'le_2d_x', 'le_2d_y', 'le_diam', 'le_diam_timestamp', 'le_diam_confidence',
                   're_2d_x', 're_2d_y', 're_diam', 're_diam_timestamp', 're_diam_confidence']
-    eye_mask_labels = ['gaze_3d_x', 'gaze_3d_y', 'gaze_3d_z', 'gaze_confidence', 'le_diam', 're_diam']
+    eye_mask_labels = ['gaze_x', 'gaze_y', 'gaze_3d_z', 'gaze_confidence', 'le_diam', 're_diam']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -411,8 +411,9 @@ class EyeCursor(traits.HasTraits):
         super()._cycle()
         if np.any(np.isnan(self.eye_pos[:3])):
             return
-        x, y, z = self.eye_pos[:3]*0.1  # Convert from mm to cm
-        y = -y  # Invert y-axis
+        x, y, z = (self.eye_pos[:3] - 0.5) * 100  # Convert from mm to cm
+        z = 0
+        # y = -y  # Invert y-axis
         xyz = np.array([x, y, z, 1])  # Convert to x, z, y format
         if not hasattr(self, 'modelview'):
             print('skip')
@@ -420,7 +421,7 @@ class EyeCursor(traits.HasTraits):
         modelview = self.modelview.copy()
         modelview[0,3] = 0  # Set x translation to 0
         # modelview[3,3] *= -1  # Invert z-axis translation
-        xyz = modelview @ xyz  # Apply modelview transformation
+        # xyz = modelview @ xyz  # Apply modelview transformation
         self.eye_plant.set_endpoint_pos(xyz[[0,2,1]])
         print(f"Eye cursor position: {self.eye_plant.get_endpoint_pos()}")  # Debugging output
 '''
