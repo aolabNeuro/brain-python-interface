@@ -1,25 +1,13 @@
 '''
 A generic target tracking task
 '''
-from __future__ import barry_as_FLUFL
-from multiprocessing.connection import wait
 import numpy as np
-import time
-import os
-import math
-import traceback
-import random
-from collections import OrderedDict
 
-from riglib.experiment import traits, Sequence, FSMTable, StateTransitions
-from riglib.stereo_opengl import ik
+from riglib.experiment import traits, Sequence
 from riglib import plants
 
 from riglib.stereo_opengl.window import Window
-from robot import trajectory
 from .target_graphics import *
-
-import matplotlib.pyplot as plt
 
 ## Plants
 # List of possible "plants" that a subject could control either during manual or brain control
@@ -640,7 +628,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     def _start_wait(self):
         super()._start_wait()
         self.setup_start_wait()
-        print('WAIT')
+        # print('WAIT')
 
     def _while_wait(self):
         super()._while_wait()
@@ -682,9 +670,8 @@ class ScreenTargetTracking(TargetTracking, Window):
     def _start_tracking_in_ramp(self):
         super()._start_tracking_in_ramp()
         self.setup_start_tracking_in()
-
-        print('START TRACKING RAMP', self.ramp_counter[self.frame_index])
-        self.sync_event('CURSOR_ENTER_TARGET', self.ramp_counter[self.frame_index]) # TODO test when there is only a ramp down
+        # print('START TRACKING RAMP', self.ramp_counter[self.frame_index])
+        self.sync_event('CURSOR_ENTER_TARGET', self.ramp_counter[self.frame_index])
 
     def _while_tracking_in_ramp(self):
         super()._while_tracking_in_ramp()
@@ -693,7 +680,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     def _start_tracking_in(self):
         super()._start_tracking_in()
         self.setup_start_tracking_in()
-        print('START TRACKING')
+        # print('START TRACKING')
         self.sync_event('CURSOR_ENTER_TARGET')
 
     def _while_tracking_in(self):
@@ -703,7 +690,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     def _start_tracking_out_ramp(self):
         super()._start_tracking_out_ramp()
         self.setup_start_tracking_out()
-        print('STOP TRACKING RAMP', self.ramp_counter[self.frame_index])
+        # print('STOP TRACKING RAMP', self.ramp_counter[self.frame_index])
         self.sync_event('CURSOR_LEAVE_TARGET', self.ramp_counter[self.frame_index])
 
     def _while_tracking_out_ramp(self):
@@ -713,7 +700,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     def _start_tracking_out(self):
         super()._start_tracking_out()
         self.setup_start_tracking_out()
-        print('STOP TRACKING')
+        # print('STOP TRACKING')
         self.sync_event('CURSOR_LEAVE_TARGET')
 
     def _while_tracking_out(self):

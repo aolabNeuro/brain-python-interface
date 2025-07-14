@@ -98,6 +98,7 @@ class AnalysisWorker(mp.Process):
         # Initialize figure
         self.fig = plt.figure(figsize=self.figsize)
         self.ax = self.fig.add_axes([0, 0.2, 1, 0.7])
+        self.ax.axis('off')
         experiment_name = self.task_params.get('experiment_name', 'None')
         te_id = self.task_params.get('te_id', 'None')
         self.fig.canvas.manager.set_window_title(f"{experiment_name} ({te_id}) - {self.__class__.__name__}")
@@ -449,6 +450,57 @@ class ERPAnalysisWorker(AnalysisWorker):
         plt.figure(self.fig)
         aopy.visualization.savefig(self.figure_dir, filename, transparent=False)
 
+class BMIAnalysisWorker(AnalysisWorker):
+    '''
+    Plots neural features and decoder state data from experiments that have a decoder. 
+    '''
+   
+    def __init__(self, task_params, data_queue, buffer_time=10, **kwargs):
+        super().__init__(task_params, data_queue, **kwargs)
+        self.buffer_time = buffer_time
+
+    def init(self):
+        super().init()
+        self.channels = self.task_params['decoder_channels']
+        self.states = self.task_params['decoder_states']
+        self.bands = self.task_params['decoder_bands']
+        self.neural_feats = np.zeros((int(self.buffer_time*self.task_params['fps']), len(self.channels)*len(self.bands)))
+        self.decoder_states = np.zeros((int(self.buffer_time*self.task_params['fps']), len(self.states)))
+
+        # Create feature axes  
+        self.feat_ax = self.fig.add_axes([0.1, 0.06, 0.8, 0.4])
+        self.feat_ax.set_xlim(-self.buffer_time, 0)
+        self.feat_ax.set_xlabel('Time (s)')
+        self.feat_ax.set_ylabel('Neural features')
+        time = np.arange(len(self.neural_feats)) * 1/(int(self.task_params['fps'])) - self.buffer_time
+        self.feat_plots = self.feat_ax.plot(time, self.neural_feats)
+
+        # Create state axes
+        self.state_ax = self.fig.add_axes([0.1, 0.56, 0.8, 0.4])
+        self.state_ax.set_xlim(-self.buffer_time, 0)
+        self.state_ax.set_xlabel('Time (s)')
+        self.state_ax.set_ylabel('Decoder state')
+        self.state_plots = self.state_ax.plot(time, self.decoder_states)
+
+    def handle_data(self, key, values):
+        super().handle_data(key, values)
+        if key == 'decoder_state':
+            self.decoder_states = np.roll(self.decoder_states, -1, axis=0)
+            self.decoder_states[-1] = np.array(values[0])
+        elif key == 'neural_features':
+            self.neural_feats = np.roll(self.neural_feats, -1, axis=0)
+            self.neural_feats[-1] = np.array(values[0])
+
+    def draw(self):
+        super().draw()
+        time = np.arange(len(self.neural_feats)) * 1/(int(self.task_params['fps'])) - self.buffer_time
+        for i, plot in enumerate(self.feat_plots):
+            plot.set_data(time, self.neural_feats[:,i])
+        self.feat_ax.set_ylim(np.min(self.neural_feats), np.max(self.neural_feats))
+        for i, plot in enumerate(self.state_plots):
+            plot.set_data(time, self.decoder_states[:,i])
+        self.state_ax.set_ylim(np.min(self.decoder_states), np.max(self.decoder_states))
+
 class OnlineDataServer(threading.Thread):
     '''
     Interface for accumulating and analyzing BMI3D data in real-time.
@@ -519,10 +571,15 @@ class OnlineDataServer(threading.Thread):
         data_queue = mp.Queue()
         self.analysis_workers.append((BehaviorAnalysisWorker(self.task_params, data_queue), data_queue))
 
-        # Is there an ECoG array?
+        # Is there ecube neural data?
         if 'record_headstage' in self.task_params and self.task_params['record_headstage']:
             data_queue = mp.Queue()
             self.analysis_workers.append((ERPAnalysisWorker(self.task_params, data_queue), data_queue))
+
+        # Is this a BMI task?
+        if 'decoder' in self.task_params:
+            data_queue = mp.Queue()
+            self.analysis_workers.append((BMIAnalysisWorker(self.task_params, data_queue), data_queue))
 
         # Start all the workers
         for worker, _ in self.analysis_workers:

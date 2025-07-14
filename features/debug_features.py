@@ -60,6 +60,7 @@ class OnlineAnalysis(traits.HasTraits):
             self.online_analysis_sock = socket.socket(
                 socket.AF_INET, # Internet
                 socket.SOCK_DGRAM) # UDP
+            self.online_analysis_sock.setblocking
             self._send_online_analysis_msg('init', False) # Just a test message
         except:
             print('Could not connect to socket')
@@ -82,8 +83,11 @@ class OnlineAnalysis(traits.HasTraits):
         for key, value in self.get_trait_values().items():
             try:
                 if key in self.object_trait_names:
+                    self._send_online_analysis_msg('param', key, None) # Skip objects
                     if key == 'decoder':
-                        self._send_online_analysis_msg('param', 'decoder_channels', value.channels)
+                        self._send_online_analysis_msg('param', 'decoder_channels', value.channels.flatten().tolist())
+                        self._send_online_analysis_msg('param', 'decoder_states', value.states)
+                        self._send_online_analysis_msg('param', 'decoder_bands', [(0,0)]) # TODO: How to get this?
                 else:
                     self._send_online_analysis_msg('param', key, value)
             except:
@@ -121,6 +125,10 @@ class OnlineAnalysis(traits.HasTraits):
             self._send_online_analysis_msg('cursor', self.plant.get_endpoint_pos())
         if hasattr(self, 'eye_pos'):
             self._send_online_analysis_msg('eye_pos', self.eye_pos)
+        if hasattr(self, 'task_data') and 'decoder_state' in self.task_data.dtype.names:
+            self._send_online_analysis_msg('decoder_state', self.task_data['decoder_state'].flatten().tolist())
+        if hasattr(self, 'task_data') and hasattr(self, 'extractor') and self.extractor.feature_type in self.task_data.dtype.names:
+            self._send_online_analysis_msg('neural_features', self.task_data[self.extractor.feature_type].flatten().tolist())
 
     def set_state(self, condition, **kwargs):
         '''

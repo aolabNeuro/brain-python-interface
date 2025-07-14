@@ -736,8 +736,6 @@ TaskEntry.prototype.run = function(save, exec) {
         this.report.destroy();
     }
     this.report = new Report(task_interface.trigger.bind(this));
-    this.report.activate();
-    this.report.set_mode("running");
     this.files.hide();
     this.disable();
 
@@ -762,6 +760,8 @@ TaskEntry.prototype.run = function(save, exec) {
             if (info.status == "running") {
                 this.new_row(info);
                 this.start_button_pressed = true;
+                this.report.activate();
+                this.report.set_mode("running");            
             } else if (info.status == "completed") {
                 this.new_row(info);
                 this.tr.removeClass("running active error testing")

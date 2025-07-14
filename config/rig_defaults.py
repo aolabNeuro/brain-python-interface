@@ -97,20 +97,13 @@ human_sync_params_arduino = copy.copy(hdf_sync_params)
 human_sync_params_arduino.update(dict(
     sync_protocol = 'human_arduino',
     sync_protocol_version = 17,    
-    baudrate = 57600,
+    baudrate = 115200,
     sync_pulse_width = 0.003,
-    event_sync_mask = 0x1000, # For now just send the sync pulse on the first digital channel
-    event_sync_data_shift = 13,
-    event_sync_dch = list(range(16,24)),
-    screen_sync_pin = 12,
-    screen_sync_dch = 65,
-    screen_measure_dch = [67],
-    screen_measure_ach = [68],
-    reward_measure_ach = [69],
-    right_eye_ach = [70, 71],
-    left_eye_ach = [72, 73],
+    event_sync_mask = 0x400, # For now just send the sync pulse on the first digital channel
+    event_sync_data_shift = 11,
+    screen_sync_pin = 10,
+    screen_sync_dch = 0,
     recording_pin = 9,
-    recording_dch = 74,
 ))
 
 # Rig-specific defaults
@@ -141,7 +134,7 @@ elif hostname == 'human-bmi':
     optitrack_address = '128.95.215.191'
     optitrack_save_path = "D:\optitrack_data"
     optitrack_sync_dch = 53 # 0-index
-    window_size = (1920, 1200)
+    window_size = (1920, 1080)
     screen_dist = 80
     screen_half_height = 16
     default_db = 'human'

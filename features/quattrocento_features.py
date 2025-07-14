@@ -3,13 +3,15 @@ import os
 import numpy as np
 from riglib.experiment import traits
 from riglib import quattrocento, source
-from features.neural_sys_features import CorticalBMI
+from features.neural_sys_features import CorticalBMI,CorticalData
 import traceback
 
 class QuattBMI(CorticalBMI):
     '''
     BMI using quattrocento as the datasource.
     '''
+    quatt_sampling_rate = traits.Float(2048, desc="Sampling rate of the emg data")
+    n_emg_arrays = traits.Int(1, desc="Number of EMG arrays connected to the Quattrocento MULTI IN ports")
 
     def __init__(self, *args, **kwargs):
         '''
@@ -19,9 +21,11 @@ class QuattBMI(CorticalBMI):
         actually readouts.
         '''
         super().__init__(*args, **kwargs)
-        self.cortical_channels = np.arange(1,64+16+8+1) # 64 EMG + 16 AUX + 8 samples
+        self.cortical_channels = np.arange(1,64*self.n_emg_arrays+16+8+1) # 64*n_arrays EMG + 16 AUX + 8 samples
         quattrocento.EMG.subj = self.subject_name
         quattrocento.EMG.saveid = self.saveid
+        quattrocento.EMG.n_arrays = self.n_emg_arrays
+        quattrocento.EMG.update_freq = self.quatt_sampling_rate
 
         # These get read by CorticalData when initializing the extractor
         self._neural_src_type = source.MultiChanDataSource
@@ -48,6 +52,7 @@ class QuattBMI(CorticalBMI):
                 database.save_data(filename, "emg", saveid, True, False, dbname=dbname)
         else:
             print('\n\nPlexon file not found properly! It will have to be manually linked!\n\n')
+
         return super_result
 
     @property 
