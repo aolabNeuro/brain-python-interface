@@ -145,8 +145,8 @@ class CalibrateHMD(WindowVR, Sequence):
 
             # translate the target position into camera coordinates
             loc = self.target_location[[0, 2, 1]] - self.camera_position  # x, z, y
-            # aspect_ratio = self.window_size[0] / self.window_size[1]
-            # loc[1] /= aspect_ratio
+            aspect_ratio = self.window_size[0] / self.window_size[1]
+            loc[1] /= aspect_ratio
             datum0 = {"mm_pos": (loc[0]*10, loc[1]*10, loc[2]*10), "timestamp": t}
             self.ref_data.append(datum0)
 

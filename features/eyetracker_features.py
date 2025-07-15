@@ -14,6 +14,7 @@ from riglib.pupillabs import utils
 from built_in_tasks.target_graphics import *
 from built_in_tasks.target_capture_task import ScreenTargetCapture
 from riglib.stereo_opengl.primitives import AprilTag
+from riglib.stereo_opengl.xfm import Quaternion
 from .peripheral_device_features import *
 from riglib import plants
 
@@ -297,7 +298,7 @@ class PupilLabStreaming(traits.HasTraits):
                   'surface_timestamp',
                   'le_2d_x', 'le_2d_y', 'le_diam', 'le_diam_timestamp', 'le_diam_confidence',
                   're_2d_x', 're_2d_y', 're_diam', 're_diam_timestamp', 're_diam_confidence']
-    eye_mask_labels = ['gaze_x', 'gaze_y', 'gaze_3d_z', 'gaze_confidence', 'le_diam', 're_diam']
+    eye_mask_labels = ['gaze_x', 'gaze_y', 'gaze_3d_x', 'gaze_3d_y', 'gaze_3d_z', 'gaze_confidence', 'le_diam', 're_diam']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -406,13 +407,32 @@ class EyeCursor(traits.HasTraits):
         self.add_dtype('eye_cursor', 'f8', (2,))
         super().init()
         self.plant.set_endpoint_pos(np.array(self.starting_pos))
+        self.cylinder = Cylinder(height=100, radius=0.25)
+        self.add_model(self.cylinder)
 
     def _cycle(self):
         super()._cycle()
         if np.any(np.isnan(self.eye_pos[:3])):
             return
-        x, y, z = (self.eye_pos[:3] - 0.5) * 100  # Convert from mm to cm
+        
+        # 2D:
+        # eye pos needs to be 2d gaze
+        # x, y, z = (self.eye_pos[:3] - 0.5) * 100  # Convert from mm to cm
+        # z = 0
+        # xyz = np.array([x, y, z, 1])  # Convert to x, z, y format
+        # if not hasattr(self, 'modelview'):
+        #     print('skip')
+        #     return
+        # modelview = self.modelview.copy()
+        # modelview[0,3] = 0  # Set x translation to 0
+        # self.eye_plant.set_endpoint_pos(xyz[[0,2,1]])
+
+        # 3D:
+        x, y, z = (self.eye_pos[:3] - 0.5) * 50  # Convert from mm to cm
         z = 0
+        aspect_ratio = self.window_size[0] / self.window_size[1]
+        y /= aspect_ratio
+
         # y = -y  # Invert y-axis
         xyz = np.array([x, y, z, 1])  # Convert to x, z, y format
         if not hasattr(self, 'modelview'):
@@ -424,6 +444,25 @@ class EyeCursor(traits.HasTraits):
         # xyz = modelview @ xyz  # Apply modelview transformation
         self.eye_plant.set_endpoint_pos(xyz[[0,2,1]])
         print(f"Eye cursor position: {self.eye_plant.get_endpoint_pos()}")  # Debugging output
+
+        x, y, z = (self.eye_pos[3:6])  # Convert from mm to cm
+        y = -y  # Invert y-axis
+        xyz = np.array([x, z, y])  # Convert to x, z, y format
+        magnitude = np.linalg.norm(xyz)
+        norm = xyz / magnitude if magnitude > 0 else np.zeros_like(xyz)
+
+        # draw a cylinder from the camera in this direction
+        cylinder_start = np.array(self.camera_position)[[0, 2, 1]]
+    
+        self.cylinder.rotate_x(90, reset=True)
+        self.cylinder.translate(0, 0, 0, reset=True)
+        # self.cylinder.rotate_x(norm[0])
+        # self.cylinder.rotate_y(norm[1])
+        # self.cylinder.rotate_z(norm[2])
+
+        self.cylinder.translate(*cylinder_start, reset=True)
+        print(f"Eye cylinder position: {np.round(norm,2)}")  # Debugging output
+
 '''
 Old code not currently used in aolab
 '''
