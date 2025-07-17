@@ -409,6 +409,8 @@ class EyeCursor(traits.HasTraits):
         self.plant.set_endpoint_pos(np.array(self.starting_pos))
         self.cylinder = Cylinder(height=100, radius=0.25)
         self.add_model(self.cylinder)
+        self.cube = Cube(side_len=1.5, color=(1,0,0,0.75))
+        self.add_model(self.cube)
 
     def _cycle(self):
         super()._cycle()
@@ -467,6 +469,11 @@ class EyeCursor(traits.HasTraits):
 
         self.cylinder.translate(*cylinder_start, reset=True)
         print(f"Eye cylinder position: {np.round(norm,2)}")  # Debugging output
+
+
+        # Directly draw a cube at the xyz position
+        self.cube.translate(*cylinder_start, reset=True)
+        self.cube.translate(*xyz/10, reset=False)  # Move the cube to the eye position
 
 '''
 Old code not currently used in aolab
