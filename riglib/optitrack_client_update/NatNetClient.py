@@ -2025,7 +2025,7 @@ class NatNetClient:
             self.command_socket.settimeout(original_timeout)
 
             if len(data)>0:
-                message_id = self.__process_message(data,1)
+                message_id = self.__process_message(data,0)
                 if message_id == self.NAT_FRAMEOFDATA:
                     return self.__extract_frame_data(data)
             else:
