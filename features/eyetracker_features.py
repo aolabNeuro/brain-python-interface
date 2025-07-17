@@ -427,7 +427,7 @@ class EyeCursor(traits.HasTraits):
         # modelview[0,3] = 0  # Set x translation to 0
         # self.eye_plant.set_endpoint_pos(xyz[[0,2,1]])
 
-        # 3D:
+        # 2D:
         x, y, z = (self.eye_pos[:3] - 0.5) * 50  # Convert from mm to cm
         z = 0
         aspect_ratio = self.window_size[0] / self.window_size[1]
@@ -445,20 +445,25 @@ class EyeCursor(traits.HasTraits):
         self.eye_plant.set_endpoint_pos(xyz[[0,2,1]])
         print(f"Eye cursor position: {self.eye_plant.get_endpoint_pos()}")  # Debugging output
 
-        x, y, z = (self.eye_pos[3:6])  # Convert from mm to cm
+        # 3D
+        x, y, z = (self.eye_pos[2:5])
         y = -y  # Invert y-axis
         xyz = np.array([x, z, y])  # Convert to x, z, y format
+        # xyz = np.array([-0.2, 1, -0.2])
         magnitude = np.linalg.norm(xyz)
         norm = xyz / magnitude if magnitude > 0 else np.zeros_like(xyz)
+
 
         # draw a cylinder from the camera in this direction
         cylinder_start = np.array(self.camera_position)[[0, 2, 1]]
     
-        self.cylinder.rotate_x(90, reset=True)
+        self.cylinder.rotate_x(90, reset=True)  # Reset rotation to identity
         self.cylinder.translate(0, 0, 0, reset=True)
-        # self.cylinder.rotate_x(norm[0])
-        # self.cylinder.rotate_y(norm[1])
-        # self.cylinder.rotate_z(norm[2])
+        theta_x = np.arctan2(norm[2], norm[1]) # tan(theta_x) = z/y
+        theta_z = -np.arctan2(norm[0], norm[1]) # x/y
+        print(f"theta_x: {np.degrees(theta_x)}, theta_z: {np.degrees(theta_z)}")  # Debugging output
+        self.cylinder.rotate_x(np.degrees(theta_x))
+        self.cylinder.rotate_z(np.degrees(theta_z))
 
         self.cylinder.translate(*cylinder_start, reset=True)
         print(f"Eye cylinder position: {np.round(norm,2)}")  # Debugging output
