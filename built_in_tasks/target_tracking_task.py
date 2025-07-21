@@ -926,7 +926,100 @@ class ScreenTargetTracking(TargetTracking, Window):
         return trials, trial_order
 
     @staticmethod
-    def generate_trajectory(primes, base_period, ramp = .0):
+    def generate_2D_trajectories(num_trials=2, time_length=20, seed=40, sample_rate=120, base_period=20, ramp=0, ramp_down=0, num_primes=8):
+        '''
+        Sets up variables and uses prime numbers to call the above functions and generate trajectories in both x & y 
+        ramp is time length for preparatory lines
+        '''
+        np.random.seed(seed)
+        hz = sample_rate # Hz -- sampling rate
+        dt = 1/hz # sec -- sampling period
+
+        T0 = base_period # sec -- base period
+        w0 = 1./T0 # Hz -- base frequency
+
+        r = ramp # "ramp up" duration (see sum_of_sines_ramp)
+        rd = ramp_down # "ramp down" duration (see sum_of_sines_ramp)
+        P = time_length/T0 # number of periods in signal
+        T = P*T0+r+rd # sec -- signal duration
+        dw = 1./T # Hz -- frequency resolution
+        W = 1./dt/2 # Hz -- signal bandwidth
+
+        full_primes = np.asarray([2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97, 
+            101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151, 157, 163, 167, 173, 179, 181, 191, 193, 197, 199])
+    
+        xprimes = full_primes[:num_primes:2]
+        yprimes = full_primes[1:num_primes:2]
+
+        f_x = xprimes*w0 # stimulated frequencies
+        f_y = yprimes*w0
+
+        a_x = 1/(1+np.arange(f_x.size)) # amplitude
+        a_y = 1/(1+np.arange(f_y.size))
+
+        # phase offset
+        o_x = np.random.rand(num_trials, f_x.size)
+        o_xdis = o_x*0.8 
+
+        o_y = np.random.rand(num_trials, f_y.size)
+        o_ydis = o_y*0.8 
+
+        t = np.arange(0,T,dt) # time samplesseed
+        w = np.arange(0,W,dw) # frequency samples
+
+        N = t.size # = T/dt -- number of samples
+        
+        # create trials dictionary with x & y 
+        trials = dict(
+            id=np.arange(num_trials), 
+            times=np.tile(t,(num_trials,1)), 
+            ref_x=np.zeros((num_trials,N)), 
+            dis_x=np.zeros((num_trials,N)),
+            ref_y=np.zeros((num_trials,N)), 
+            dis_y=np.zeros((num_trials,N))
+            )
+
+        # randomize order of first two trials to provide random starting point
+        order = np.random.choice([0,1])
+        if order == 0:
+            trial_order = [(1,'E','O'),(1,'O','E')]
+        elif order == 1:
+            trial_order = [(1,'O','E'),(1,'E','O')]
+
+        # generate reference and disturbance trajectories for all trials
+        for trial_id, (num_reps,ref_ind,dis_ind) in enumerate(trial_order*int(num_trials/2)):   
+            if ref_ind == 'E': 
+                sines_r = np.arange(len(xprimes))[0::2] # use even indices
+            elif ref_ind == 'O': 
+                sines_r = np.arange(len(xprimes))[1::2] # use odd indices
+            else:
+                sines_r = np.arange(len(xprimes))
+            if dis_ind == 'E':
+                sines_d = np.arange(len(xprimes))[0::2]
+            elif dis_ind == 'O':
+                sines_d = np.arange(len(xprimes))[1::2]
+            else:
+                sines_d = np.arange(len(xprimes))
+            
+            # generate X-dimension 
+            refx_traj, ref_Ax = ScreenTargetTracking.calc_sum_of_sines_ramp(t, r, rd, f_x[sines_r], a_x[sines_r], o_x[trial_id][sines_r])
+            disx_traj, dis_Ax = ScreenTargetTracking.calc_sum_of_sines_ramp(t,r,rd, f_x[sines_d], a_x[sines_d], o_xdis[trial_id][sines_d])
+            # generate Y-dimension 
+            refy_traj, ref_Ay = ScreenTargetTracking.calc_sum_of_sines_ramp(t, r, rd, f_y[sines_r], a_y[sines_r], o_y[trial_id][sines_r])
+            disy_traj, dis_Ay = ScreenTargetTracking.calc_sum_of_sines_ramp(t, r, rd, f_y[sines_d], a_y[sines_d], o_ydis[trial_id][sines_d])
+            
+            # normalized trajectories
+            trials['ref_x'][trial_id] = refx_traj/ref_Ax   # previously, denominator was np.sum(a_ref)
+            trials['dis_x'][trial_id] = disx_traj/dis_Ax   # previously, denominator was np.sum(a_dis)
+            trials['ref_y'][trial_id] = refy_traj/ref_Ay   # previously, denominator was np.sum(a_ref)
+            trials['dis_y'][trial_id] = disy_traj/dis_Ay   # previously, denominator was np.sum(a_dis)
+            
+            # print(trial_order, ref_A, dis_A)
+        
+        return trials, trial_order
+
+    @staticmethod
+    def generate_trajectory(primes, base_period, ramp = 0.0, rd = 0.0):
         '''
         Sets up variables and uses prime numbers to call the above functions and generate then trajectories
         ramp is time length for preparatory lines
@@ -953,13 +1046,13 @@ class ScreenTargetTracking(TargetTracking, Window):
         N = t.size # = T/dt -- number of samples
 
         #trajectory = ScreenTargetTracking.calc_sum_of_sines_ramp(t, r, f, a, o/(2*np.pi))
-        trajectory = ScreenTargetTracking.calc_sum_of_sines_ramp(t, r, f, a, o)
+        trajectory = ScreenTargetTracking.calc_sum_of_sines_ramp(t, r, rd, f, a, o)
         normalized_trajectory = trajectory/np.sum(a)
         return normalized_trajectory
     
     ### Generator functions ####
     @staticmethod
-    def tracking_target_chain(nblocks=1, ntrials=2, time_length=20, ramp=0, ramp_down=0, num_primes=8, seed=40, sample_rate=120, disturbance=True, boundaries=(-10,10,-10,10)):
+    def tracking_target_chain(nblocks=1, ntrials=2, time_length=20, ramp=0, ramp_down=0, num_primes=8, seed=40, sample_rate=120, dimensions = 1, disturbance=True, boundaries=(-10,10,-10,10)):
         '''
         Generates a sequence of 1D (z axis) target trajectories
 
@@ -977,6 +1070,8 @@ class ScreenTargetTracking(TargetTracking, Window):
             The sample rate of the generated trajectories
         ramp : float
             The length of ramp up into a trial in seconds
+        dimensions: int
+            Number of dimensions to generate trajectories for (1 or 2)
         disturbance : boolean
             Whether to add disturbance to the cursor (disturbance is generated regardless)
         boundaries: 4 element tuple
@@ -991,19 +1086,37 @@ class ScreenTargetTracking(TargetTracking, Window):
         '''
         idx = 0
         base_period = 20
-        for block_id in range(nblocks):                
-            trials, trial_order = ScreenTargetTracking.generate_trajectories(
-                num_trials=ntrials, time_length=time_length, seed=seed, sample_rate=sample_rate, base_period=base_period, ramp=ramp, ramp_down=ramp_down, num_primes=num_primes
-                )
+        for block_id in range(nblocks):     
+            if dimensions == 1:            
+                trials, trial_order = ScreenTargetTracking.generate_trajectories(
+                    num_trials=ntrials, time_length=time_length, seed=seed, sample_rate=sample_rate, base_period=base_period, ramp=ramp, ramp_down=ramp_down, num_primes=num_primes
+                    )
             for trial_id in range(ntrials):
                 targs = []
                 ref_trajectory = np.zeros((int((time_length+ramp+ramp_down)*sample_rate),3))
                 dis_trajectory = ref_trajectory.copy()
-                ref_trajectory[:,2] = trials['ref'][trial_id]
+                ref_trajectory[:,2] = trials['ref'][trial_id] 
                 dis_trajectory[:,2] = trials['dis'][trial_id] # scale will determine lower limit of target size for perfect tracking
                 targs.append(ref_trajectory)
                 yield idx, targs, disturbance, dis_trajectory, sample_rate, ramp, ramp_down
                 idx += 1
+
+            if dimensions == 2: 
+                trials, trial_order = ScreenTargetTracking.generate_2D_trajectories(
+                    num_trials=ntrials, time_length=time_length, seed=seed, sample_rate=sample_rate, base_period=base_period, ramp=ramp, ramp_down=ramp_down, num_primes=num_primes
+                    )
+                for trial_id in range(ntrials):
+                    targs = []
+                    ref_trajectory = np.zeros((int((time_length+ramp+ramp_down)*sample_rate),3))
+                    dis_trajectory = ref_trajectory.copy()
+                    ref_trajectory[:,2] = trials['ref_x'][trial_id] #y is out of the screen, x is left and right and z is up and down 
+                    ref_trajectory[:,0] = trials['ref_y'][trial_id]
+
+                    dis_trajectory[:,2] = trials['dis_x'][trial_id]
+                    dis_trajectory[:,0] = trials['dis_y'][trial_id] 
+                    targs.append(ref_trajectory)
+                    yield idx, targs, disturbance, dis_trajectory, sample_rate, ramp, ramp_down
+                    idx += 1
 
     @staticmethod
     def tracking_target_debug(nblocks=1, ntrials=2, time_length=20, seed=40, sample_rate=60, ramp=0, disturbance=True, boundaries=(-10,10,-10,10)):
