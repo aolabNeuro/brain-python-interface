@@ -407,7 +407,7 @@ class EyeCursor(traits.HasTraits):
         self.add_dtype('eye_cursor', 'f8', (2,))
         super().init()
         self.plant.set_endpoint_pos(np.array(self.starting_pos))
-        self.cylinder = Cylinder(height=100, radius=0.25)
+        self.cylinder = Cylinder(height=50, radius=0.25)
         self.add_model(self.cylinder)
         self.cube = Cube(side_len=1.5, color=(1,0,0,0.75))
         self.add_model(self.cube)
@@ -457,19 +457,20 @@ class EyeCursor(traits.HasTraits):
 
 
         # draw a cylinder from the camera in this direction
+        self.cylinder.translate(*cylinder_start, reset=True)
         cylinder_start = np.array(self.camera_position)[[0, 2, 1]]
-    
         self.cylinder.rotate_x(90, reset=True)  # Reset rotation to identity
+        w, i, j, k = self.camera_orientation
+        camera_rotation = Quaternion(-w, i, j, k) # TODO: convert from xyz to xyz
+        self.cylinder.rotate(camera_rotation, reset=False)  # Apply camera rotation
+        
+        # Apply eye rotation
         self.cylinder.translate(0, 0, 0, reset=True)
         theta_x = np.arctan2(norm[2], norm[1]) # tan(theta_x) = z/y
         theta_z = -np.arctan2(norm[0], norm[1]) # x/y
         print(f"theta_x: {np.degrees(theta_x)}, theta_z: {np.degrees(theta_z)}")  # Debugging output
         self.cylinder.rotate_x(np.degrees(theta_x))
         self.cylinder.rotate_z(np.degrees(theta_z))
-
-        self.cylinder.translate(*cylinder_start, reset=True)
-        print(f"Eye cylinder position: {np.round(norm,2)}")  # Debugging output
-
 
         # Directly draw a cube at the xyz position
         self.cube.translate(*cylinder_start, reset=True)

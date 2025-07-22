@@ -25,6 +25,10 @@ class Quaternion(object):
     
     def conj(self):
         return Quaternion(self.w, *(-self.vec))
+    
+    def inv(self):
+        self = self.norm()
+        return self.conj()
 
     @property
     def H(self):
@@ -200,6 +204,13 @@ class Transform(object):
             self.move[:] = x,y,z
         else:
             self.move += x,y,z
+        return self
+
+    def rotate_q(self, q, reset=False):
+        if reset:
+            self.rotate = q
+        else:
+            self.rotate = (q * self.rotate).norm()
         return self
 
     def rotate_x(self, rad, reset=False):

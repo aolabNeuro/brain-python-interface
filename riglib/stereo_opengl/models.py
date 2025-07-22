@@ -62,6 +62,21 @@ class Model(object):
         self.allocated = True
         return allocated
 
+    def rotate(self, q, reset=False):
+        '''
+        Rotate the model by a quaternion q
+
+        Parameters
+        ----------
+        q: Quaternion
+            The quaternion to rotate the model by
+        reset: bool, optional, default=False
+            If true, the new rotation replaces the old one. If false, it is added on.
+        '''
+        self.xfm.rotate_q(q, reset=reset)
+        self._recache_xfm()
+        return self
+
     def rotate_x(self, deg, reset=False):
         self.xfm.rotate_x(np.radians(deg), reset=reset)
         self._recache_xfm()
