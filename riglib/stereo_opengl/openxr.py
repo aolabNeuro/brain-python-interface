@@ -234,19 +234,18 @@ class WindowVR(Window):
                     view.pose.position[1]*100 + self.camera_offset[1],
                     view.pose.position[2]*100 + self.camera_offset[2],
                 ]) # Not sure why this needs to be negated, something to do with the handedness of the coordinate system??
-                self.camera_position = position + np.array([1,0,0])*self.iod*(view_index-0.5)
-                print(self.camera_position)
+                self.camera_position = tuple(position + np.array([1,0,0])*self.iod*(view_index-0.5))
             if self.fixed_camera_orientation:
                 rotation = self.camera_orientation
             else:
                 rotation = np.array([
-                    -view.pose.orientation.w, # Also not sure why I need to negate the w component
+                    view.pose.orientation.w,
                     view.pose.orientation.x,
                     view.pose.orientation.y,
                     view.pose.orientation.z,
                 ])
                 self.camera_orientation = tuple(rotation)
-            xfm = Transform(move=position, rotate=Quaternion(*rotation)) 
+            xfm = Transform(move=position, rotate=Quaternion(*rotation).conj()) # not sure why conj
             self.modelview = xfm.to_mat(reverse=True)
 
             # Optionally mirror the view along the y-axis

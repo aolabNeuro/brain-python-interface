@@ -457,24 +457,35 @@ class EyeCursor(traits.HasTraits):
 
 
         # draw a cylinder from the camera in this direction
-        self.cylinder.translate(*cylinder_start, reset=True)
         cylinder_start = np.array(self.camera_position)[[0, 2, 1]]
+        cylinder_start[0] *= -1
+        cylinder_start[2] *= -1
+        self.cylinder.translate(*cylinder_start, reset=True)
         self.cylinder.rotate_x(90, reset=True)  # Reset rotation to identity
         w, i, j, k = self.camera_orientation
-        camera_rotation = Quaternion(-w, i, j, k) # TODO: convert from xyz to xyz
-        self.cylinder.rotate(camera_rotation, reset=False)  # Apply camera rotation
+        camera_rotation = Quaternion(w, i, j, k).conj().to_mat() # 4,4
+        rot = np.array([[1, 0, 0, 0],
+               [0, 0, 1, 0],
+               [0, 1, 0, 0],
+               [0, 0, 0, 1]])
+        camera_rotation = rot @ camera_rotation @ rot.T  # Apply the rotation to swap y and z axes
+        camera_q = Quaternion.from_mat(camera_rotation)
+        self.cylinder.rotate(camera_q, reset=False)  # Apply camera rotation
         
+        # TODO: rotation not quite right especially at large angles
+
         # Apply eye rotation
-        self.cylinder.translate(0, 0, 0, reset=True)
         theta_x = np.arctan2(norm[2], norm[1]) # tan(theta_x) = z/y
         theta_z = -np.arctan2(norm[0], norm[1]) # x/y
         print(f"theta_x: {np.degrees(theta_x)}, theta_z: {np.degrees(theta_z)}")  # Debugging output
         self.cylinder.rotate_x(np.degrees(theta_x))
         self.cylinder.rotate_z(np.degrees(theta_z))
+        # self.cylinder.detach()
 
         # Directly draw a cube at the xyz position
         self.cube.translate(*cylinder_start, reset=True)
-        self.cube.translate(*xyz/10, reset=False)  # Move the cube to the eye position
+        cube_pos = np.dot(camera_rotation[:3,:3], xyz/10)
+        self.cube.translate(*cube_pos, reset=False)  # Move the cube to the eye position
 
 '''
 Old code not currently used in aolab
