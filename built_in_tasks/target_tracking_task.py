@@ -1019,7 +1019,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         return trials, trial_order
 
     @staticmethod
-    def generate_trajectory(primes, base_period, ramp = 0.0, rd = 0.0):
+    def generate_trajectory(primes, base_period, ramp = 0.0):
         '''
         Sets up variables and uses prime numbers to call the above functions and generate then trajectories
         ramp is time length for preparatory lines
@@ -1046,7 +1046,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         N = t.size # = T/dt -- number of samples
 
         #trajectory = ScreenTargetTracking.calc_sum_of_sines_ramp(t, r, f, a, o/(2*np.pi))
-        trajectory = ScreenTargetTracking.calc_sum_of_sines_ramp(t, r, rd, f, a, o)
+        trajectory = ScreenTargetTracking.calc_sum_of_sines_ramp(t, r, f, a, o)
         normalized_trajectory = trajectory/np.sum(a)
         return normalized_trajectory
     
