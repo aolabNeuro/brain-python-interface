@@ -28,7 +28,8 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
         reward = dict(reward_end="wait", stoppable=False, end_state=True)
     )
 
-    
+    #the sum of the prepbuff & the delay time should be equal to the length of the ready_set_sound file 
+    # the delay time corresponds to the amount of time the peripheral target is displayed, and the prepbuff time then makes up the difference 
     wait_time = traits.Float(1., desc="Length of time in wait state (inter-trial interval)")
     prepbuff_time = traits.Float(.2, desc="How long after completing center target hold before peripheral target appears")
     mustmv_time = traits.Float(.2, desc="Must leave center target within this time after auditory go cue.")
@@ -44,10 +45,7 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
         self.ready_set_player = AudioPlayer(self.ready_set_sound)
         self.tooslow_penalty_player = AudioPlayer(self.tooslow_penalty_sound)
         self.pseudo_reward = 0
-        #self.readyset_length = self.ready_set_player.get_length() #new to reduce number of features
-
-        #self.prepbuff_time = self.readyset_length - self.delay_time #new
-        #print(self.prepbuff_time) #new
+        
     ###Test Functions ###
 
     def _test_start_trial(self, time_in_state):
@@ -85,14 +83,9 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
     
     def _test_prepbuff_complete(self, time_in_state):
         '''
-        Test whether the target is held long enough to declare the
-        trial a success
+        Test whether the center target is held long enough to transition from the prepbuff time to the delay state. 
+        The delay state will display the peripheral target so this state just requires a center hold.  
 
-        Possible options
-            - Target held for the minimum requred time (implemented here)
-            - Sensorized object moved by a certain amount
-            - Sensorized object moved to the required location
-            - Manually triggered by experimenter
         '''
         return time_in_state > self.prepbuff_time
     
@@ -122,11 +115,9 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
         self.ready_set_player.play() 
 
     def _start_leave_center(self):
-        pass
-        #if self.target_index == 0:   # hide center target 
-            #self.targets[0].hide() 
-        #     self.sync_event('TARGET_OFF', self.gen_indices[self.target_index])
-
+        self.sync_event('CURSOR_LEAVE_TARGET') #integer code 96
+    
+        
     def _start_hold_penalty(self):
         self.pseudo_success() #run before increment trials to prevent reseting of trial index 
         if hasattr(super(), '_start_hold_penalty'):
@@ -158,7 +149,7 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
     
     def pseudo_success(self): #function to measure almost success
         if self.target_index == 1: #if peripheral target is displayed 
-            target_buffer_dist = self.target_radius + self.shadow_periph_radius #combined radius 
+            target_buffer_dist = self.target_radius + self.shadow_periph_radius - self.cursor_radius #combined radius 
             dist_from_targ = np.linalg.norm(self.plant.get_endpoint_pos() - self.targs[self.target_index]) #vector difference
             if dist_from_targ <= target_buffer_dist:
                 self.pseudo_reward += 1 #increment if cursor position is less than the shadow radius plus radius 

@@ -92,7 +92,7 @@ built_in_features = dict(
     force_sensor=ForceControl,
     show_fixation_progress=Progressbar_fixation,
     clda_kfrml=CLDA_KFRML_IntendedVelocity,
-    Consecutive_Jackpot = ConsecutiveJackpot
+    consecutive_jackpot = ConsecutiveJackpot
 )
 
 # >>> features.built_in_features['autostart'].__module__
