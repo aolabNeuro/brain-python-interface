@@ -393,7 +393,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     limit1d = traits.Bool(True, desc="Limit cursor movement to 1D")
 
     sequence_generators = [
-        'tracking_target_chain', 'tracking_target_debug', 'tracking_target_training'
+        'tracking_target_chain', 'tracking_target_debug', 'tracking_target_training', 'generate_2D_trajectories'
     ]
 
     hidden_traits = ['cursor_color', 'trajectory_color', 'cursor_bounds', 'cursor_radius', 'plant_hide_rate', 'starting_pos']
@@ -524,7 +524,8 @@ class ScreenTargetTracking(TargetTracking, Window):
             self.plant.set_visibility(self.plant_visible)
 
     def update_frame(self):
-        self.target.move_to_position(np.array([0,0,self.targs[self.frame_index+self.lookahead][2]])) # xzy
+        #self.target.move_to_position(np.array([0,0,self.targs[self.frame_index+self.lookahead][2]])) # xzy
+        self.target.move_to_position(self.targs[self.frame_index+self.lookahead])
         self.trajectory.move_to_position(np.array([-self.frame_index/3,0,0])) # same update constant works for 60 and 120 hz
         self.target.show()
         self.trajectory.show()
@@ -565,7 +566,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.trajectory = VirtualCableTarget(target_radius=self.trajectory_radius, target_color=target_colors[self.trajectory_color], trajectory=next_trajectory)
 
         for model in self.trajectory.graphics_models:
-                self.add_model(model)
+            self.add_model(model)
 
         self.target.hide()
         self.trajectory.hide()   
@@ -644,7 +645,9 @@ class ScreenTargetTracking(TargetTracking, Window):
     def _start_trajectory(self):
         super()._start_trajectory()
         if self.frame_index == 0:
-            self.target.move_to_position(np.array([0,0,self.targs[self.frame_index+self.lookahead][2]])) # tablet screen x-axis ranges -19,19, center 0
+            #self.target.move_to_position(np.array([0,0,self.targs[self.frame_index+self.lookahead][2]])) # tablet screen x-axis ranges -19,19, center 0
+            self.target.move_to_position(self.targs[self.frame_index+self.lookahead]) # tablet screen x-axis ranges -19,19, center 0
+
             self.trajectory.move_to_position(np.array([0,0,0])) # tablet screen x-axis ranges 0,41.33333, center 22ish
             # print(self.target.get_position())
             # print(self.trajectory.get_position())
@@ -1091,15 +1094,15 @@ class ScreenTargetTracking(TargetTracking, Window):
                 trials, trial_order = ScreenTargetTracking.generate_trajectories(
                     num_trials=ntrials, time_length=time_length, seed=seed, sample_rate=sample_rate, base_period=base_period, ramp=ramp, ramp_down=ramp_down, num_primes=num_primes
                     )
-            for trial_id in range(ntrials):
-                targs = []
-                ref_trajectory = np.zeros((int((time_length+ramp+ramp_down)*sample_rate),3))
-                dis_trajectory = ref_trajectory.copy()
-                ref_trajectory[:,2] = trials['ref'][trial_id] 
-                dis_trajectory[:,2] = trials['dis'][trial_id] # scale will determine lower limit of target size for perfect tracking
-                targs.append(ref_trajectory)
-                yield idx, targs, disturbance, dis_trajectory, sample_rate, ramp, ramp_down
-                idx += 1
+                for trial_id in range(ntrials):
+                    targs = []
+                    ref_trajectory = np.zeros((int((time_length+ramp+ramp_down)*sample_rate),3))
+                    dis_trajectory = ref_trajectory.copy()
+                    ref_trajectory[:,2] = trials['ref'][trial_id] 
+                    dis_trajectory[:,2] = trials['dis'][trial_id] # scale will determine lower limit of target size for perfect tracking
+                    targs.append(ref_trajectory)
+                    yield idx, targs, disturbance, dis_trajectory, sample_rate, ramp, ramp_down
+                    idx += 1
 
             if dimensions == 2: 
                 trials, trial_order = ScreenTargetTracking.generate_2D_trajectories(
