@@ -51,6 +51,8 @@ class WindowVR(Window):
         self.add_dtype('view_pose_position', 'f8', (2,3))
         self.add_dtype('view_pose_rotation', 'f8', (2,4))
         self.add_dtype('modelview', 'f8', (2,4,4))
+        self.add_dtype('camera_position', 'f8', (3,))
+        self.add_dtype('camera_orientation', 'f8', (4,))
         super().init()
 
     def screen_init(self):
@@ -240,12 +242,12 @@ class WindowVR(Window):
             else:
                 rotation = np.array([
                     view.pose.orientation.w,
-                    view.pose.orientation.x,
-                    view.pose.orientation.y,
-                    view.pose.orientation.z,
-                ])
+                    -view.pose.orientation.x,
+                    -view.pose.orientation.y,
+                    -view.pose.orientation.z,
+                ]) # not sure why conj, again a handedness difference?
                 self.camera_orientation = tuple(rotation)
-            xfm = Transform(move=position, rotate=Quaternion(*rotation).conj()) # not sure why conj
+            xfm = Transform(move=position, rotate=Quaternion(*rotation)) 
             self.modelview = xfm.to_mat(reverse=True)
 
             # Optionally mirror the view along the y-axis
@@ -256,13 +258,18 @@ class WindowVR(Window):
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
             self.renderer.draw(self.world, p_matrix=projection, modelview=self.modelview)
         
-            # Save the pose data
+            # Save the per-eye pose data
             if hasattr(self, 'task_data'):
                 self.task_data['view_pose_position'][:,view_index,:] = position
                 self.task_data['view_pose_rotation'][:,view_index,:] = rotation
                 self.task_data['modelview'][:,view_index] = self.modelview
 
         self.renderer.draw_done()
+
+        # Save the cylopian pose data
+        if hasattr(self, 'task_data'):
+            self.task_data['camera_position'] = self.camera_position
+            self.task_data['camera_orientation'] = self.camera_orientation
 
     def _test_stop(self, ts):
         super_stop = super(Window, self)._test_stop(ts)

@@ -463,7 +463,7 @@ class EyeCursor(traits.HasTraits):
         self.cylinder.translate(*cylinder_start, reset=True)
         self.cylinder.rotate_x(90, reset=True)  # Reset rotation to identity
         w, i, j, k = self.camera_orientation
-        camera_rotation = Quaternion(w, i, j, k).conj().to_mat() # 4,4
+        camera_rotation = Quaternion(w, i, j, k).to_mat() # 4,4
         rot = np.array([[1, 0, 0, 0],
                [0, 0, 1, 0],
                [0, 1, 0, 0],
