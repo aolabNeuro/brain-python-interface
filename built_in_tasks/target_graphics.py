@@ -2,7 +2,7 @@
 Base tasks for generic point-to-point reaching
 '''
 import numpy as np
-from riglib.stereo_opengl.primitives import Cable, Sphere, Cube, Torus, Text
+from riglib.stereo_opengl.primitives import Cable, Snake, Sphere, Cube, Torus, Text
 from riglib.stereo_opengl.primitives import Cylinder, Plane, Sphere, Cube
 from riglib.stereo_opengl.models import FlatMesh, Group
 from riglib.stereo_opengl.textures import Texture, TexModel
@@ -175,7 +175,7 @@ class CableTarget(object):
         self._pickle_init()
 
     def _pickle_init(self):
-        self.cable = Cable(radius=self.target_radius,trajectory = self.trajectory, color=self.target_color)
+        self.cable = Cable(radius=self.target_radius, xyz=self.trajectory, color=self.target_color)
         self.graphics_models = [self.cable]
         self.cable.translate(*self.position)
 
@@ -226,6 +226,19 @@ class VirtualCableTarget(CableTarget):
 
     def get_position(self):
         return self.cable.xfm.move
+
+class VirtualSnakeTarget(VirtualCableTarget):
+
+    def _pickle_init(self):
+        self.cable = Snake(radius=self.target_radius, trajectory=self.trajectory, color=self.target_color)
+        self.graphics_models = [self.cable]
+        self.cable.translate(*self.position)
+
+    def update_mask(self, start_frame, end_frame):
+        '''
+        Update the texture mask of the snake target.
+        '''
+        self.cable.update_texture(start_frame, end_frame)
 
 class VirtualTorusTarget(VirtualCircularTarget):
 

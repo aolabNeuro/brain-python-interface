@@ -154,33 +154,72 @@ class Cylinder(TriMesh):
         super().__init__(total_pts, total_polys, tcoords=total_tcoords, normals=total_normals, **kwargs)
 
 class Cable(TriMesh):
-    def __init__(self,radius=.5, trajectory = np.array([np.sin(x) for x in range(60)]), segments=12,**kwargs):
-        self.trial_trajectory = trajectory
+    def __init__(self,radius=.5, xyz = np.array([np.sin(x) for x in range(60)]), segments=12,**kwargs):
+        self.xyz = xyz
+        if np.ndim(xyz) == 1:
+            self.xyz = np.array([[x,0,xyz[x]] for x in range(len(xyz))])           
         self.center_value = [0,0,0]
         self.radius = radius
         self.segments = segments
         self.update(**kwargs)
     
     def update(self, **kwargs):
-        theta = np.linspace(0, 2*np.pi, self.segments, endpoint=False)
-        unit = np.array([np.ones(self.segments),np.cos(theta) ,np.sin(theta)]).T
-        intial = np.array([[0,0,self.trial_trajectory[x]] for x in range(len(self.trial_trajectory))])
-        self.pts = (unit*[-30/1.36,self.radius,self.radius])+intial[0]
-        for i in range(1,len(intial)):
-            self.pts = np.vstack([self.pts, (unit*[(i-30)/3,self.radius,self.radius])+intial[i]])
+        theta = np.linspace(0, 2 * np.pi, self.segments, endpoint=False)
+        circle = np.stack([np.cos(theta), np.sin(theta)], axis=1)  # (segments, 2)
 
-        self.normals = np.vstack([unit*[1,1,0], unit*[1,1,0]])
-        self.polys = []
-        for i in range(self.segments-1):
-            for j in range(len(intial)-1): 
-                self.polys.append((i+j*self.segments, i+1+j*self.segments, i+self.segments+j*self.segments))
-                self.polys.append((i+self.segments+j*self.segments, i+1+j*self.segments, i+1+self.segments+j*self.segments))
+        pts = []
+        normals = []
+        tcoords = []
+        n_path = len(self.xyz)
 
-        tcoord = np.array([np.arange(self.segments), np.ones(self.segments)]).T
-        n = 1./self.segments
-        self.tcoord = np.vstack([tcoord*[n,1], tcoord*[n,0]])
-        super(Cable, self).__init__(self.pts, np.array(self.polys), 
-            tcoords=self.tcoord, normals=self.normals, **kwargs)
+        y_axis = np.array([0, 1, 0])  # fixed up direction
+
+        # Compute tangents along path
+        tangents = np.gradient(self.xyz, axis=0)
+        tangents = tangents / np.linalg.norm(tangents, axis=1, keepdims=True)
+
+        for i in range(n_path):
+            p = self.xyz[i]
+            t = tangents[i]
+
+            # Project tangent onto XZ plane to control ring orientation
+            t_xz = t - np.dot(t, y_axis) * y_axis  # remove Y component
+            if np.linalg.norm(t_xz) < 1e-6:
+                t_xz = np.array([1, 0, 0])  # fallback
+            else:
+                t_xz = t_xz / np.linalg.norm(t_xz)
+
+            # Use t_xz as forward direction in ring plane (angle 0)
+            b = t_xz  # X axis of ring
+            a = np.cross(y_axis, b)  # Z axis of ring
+
+            for j in range(self.segments):
+                cx, cy = circle[j]
+                offset = self.radius * (cx * b + cy * a)
+                pts.append(p + offset)
+                normals.append(offset / np.linalg.norm(offset))
+                tcoords.append([j / self.segments, i / (n_path - 1)])
+
+        self.pts = np.array(pts)
+        self.normals = np.array(normals)
+        self.tcoord = np.array(tcoords)
+
+        # Create triangle strips between rings
+        polys = []
+        for i in range(n_path - 1):
+            for j in range(self.segments):
+                i0 = i * self.segments + j
+                i1 = i * self.segments + (j + 1) % self.segments
+                i2 = (i + 1) * self.segments + j
+                i3 = (i + 1) * self.segments + (j + 1) % self.segments
+
+                polys.append((i0, i1, i2))
+                polys.append((i2, i1, i3))
+
+        self.polys = np.array(polys)
+
+        super().__init__(self.pts, self.polys, tcoords=self.tcoord,
+                        normals=self.normals, **kwargs)
 
 class Torus(TriMesh):
     '''
@@ -447,6 +486,42 @@ class AprilTag(TexPlane):
         super().__init__(size, size, color=[0,0,0,alpha], specular_color=[0,0,0,0], tex=apriltag)
         self.rotate_x(90)
         
+class Snake(Cable, TexModel):
+    '''
+    A Cable with a gradient texture applied along its length.
+    '''
+    def __init__(self, radius=.5, trajectory=np.array([np.sin(x) for x in range(100)]), segments=12, n_colors=1000, **kwargs):
+        self.trajectory = trajectory
+        self.n_colors = n_colors
+        color = kwargs.pop('color', [1, 1, 1, 1])  # Default color if not provided
+        self.color = color
+        tex = self.get_texture(0, len(trajectory), n_colors)
+        super().__init__(radius, trajectory, segments, tex=tex, color=[1, 0, 0, 1], **kwargs)
+        self.color = color  # Store the color for later use
+
+    def get_texture(self, start_frame, end_frame, n_colors):
+        mask = np.zeros(n_colors)
+        start_frame_idx = int(float(start_frame) / len(self.trajectory) * n_colors)
+        end_frame_idx = int(float(end_frame) / len(self.trajectory) * n_colors)
+        if start_frame_idx >= n_colors:
+            start_frame_idx = n_colors
+        if end_frame_idx >= n_colors:
+            end_frame_idx = n_colors
+        mask[start_frame_idx:end_frame_idx] = 1
+        mask = np.tile(mask, (4, 1)).T  # Repeat for RGBA
+        mask = self.color * mask  # Apply color
+        tex = Texture(mask.reshape((1, len(mask), 4))) # Reshape to (1, n_colors, 4)
+        return tex
+        
+    def update_texture(self, start_frame, end_frame):
+        '''
+        Update the texture of the snake based on the new trajectory.
+        '''
+        self.tex.delete()  # Delete the old texture
+        tex = self.get_texture(start_frame, end_frame, self.n_colors)
+        self.tex = tex
+        self.tex.init()
+
 ##### 2-D primitives #####
 
 class Shape2D(object):
