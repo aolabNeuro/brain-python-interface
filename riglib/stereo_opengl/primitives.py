@@ -172,7 +172,7 @@ class Cable(TriMesh):
         tcoords = []
         n_path = len(self.xyz)
 
-        y_axis = np.array([0, 1, 0])  # fixed up direction
+        a = np.array([0, 1, 0])  # fixed up direction
 
         # Compute tangents along path
         tangents = np.gradient(self.xyz, axis=0)
@@ -182,16 +182,12 @@ class Cable(TriMesh):
             p = self.xyz[i]
             t = tangents[i]
 
-            # Project tangent onto XZ plane to control ring orientation
-            t_xz = t - np.dot(t, y_axis) * y_axis  # remove Y component
-            if np.linalg.norm(t_xz) < 1e-6:
-                t_xz = np.array([1, 0, 0])  # fallback
+            # Ring orientation
+            b = np.cross(t, a)
+            if np.linalg.norm(b) < 1e-6:
+                b = np.array([0, 0, 1])  # fallback
             else:
-                t_xz = t_xz / np.linalg.norm(t_xz)
-
-            # Use t_xz as forward direction in ring plane (angle 0)
-            b = t_xz  # X axis of ring
-            a = np.cross(y_axis, b)  # Z axis of ring
+                b = b / np.linalg.norm(b)
 
             for j in range(self.segments):
                 cx, cy = circle[j]
@@ -496,7 +492,7 @@ class Snake(Cable, TexModel):
         color = kwargs.pop('color', [1, 1, 1, 1])  # Default color if not provided
         self.color = color
         tex = self.get_texture(0, len(trajectory), n_colors)
-        super().__init__(radius, trajectory, segments, tex=tex, color=[1, 0, 0, 1], **kwargs)
+        super().__init__(radius, trajectory, segments, tex=tex, color=[0, 0, 0, 1], **kwargs)
         self.color = color  # Store the color for later use
 
     def get_texture(self, start_frame, end_frame, n_colors):

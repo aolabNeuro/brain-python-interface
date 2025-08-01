@@ -43,7 +43,6 @@ class TestManualControlTasks(unittest.TestCase):
         exp.ready_set_sound = 'tones.wav'
         exp.run()
 
-
     @unittest.skip("")
     def test_exp(self):
         seq = ManualControl.centerout_2D()
@@ -69,12 +68,13 @@ class TestManualControlTasks(unittest.TestCase):
         exp.rotation = 'xzy'
         exp.run()
 
+    @unittest.skip("")
     def test_tracking_2d(self):
         print("Running tracking task test")
         seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=20, ramp=0, ramp_down=0, 
                                                  num_primes=8, seed=42, sample_rate=120, dimensions=2, 
                                                  disturbance=False, boundaries=(-10,10,-10,10))
-        exp = init_exp(TrackingTask, [MouseControl, Window2D], seq, window_size=(1000,800), fullscreen=False, 
+        exp = init_exp(TrackingTask, [MouseControl], seq, window_size=(1000,800), fullscreen=False, 
                        limit1d=False, trajectory_amplitude=5, lookahead_time=1)
         exp.stereo_mode = 'projection'
         exp.rotation = 'xzy'

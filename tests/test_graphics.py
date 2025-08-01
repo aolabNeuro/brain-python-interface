@@ -46,7 +46,7 @@ wobble_speed = 0.5
 reward_text = Text(7.5, "123", justify='right', color=[1,0,1,1])
 # center_out_gen = ScreenTargetCapture.centerout_2D(1)
 # center_out_positions = [pos[1] for _, pos in center_out_gen]
-cable = Snake(2, 2*np.sin(np.arange(100)/5))
+cable = Snake(0.5, 2*np.sin(np.arange(200)/2), color=(1,0,1,0.75)).translate(-15, 0, -10)
 center_out_gen = ScreenTargetCapture.centerout_tabletop(1)
 center_out_positions = [(pos[1][0], pos[1][1], -10) for _, pos in center_out_gen]
 center_out_targets = [
@@ -68,7 +68,6 @@ class Test2(Window):
         #arm4j.set_joint_pos([0,0,np.pi/2,np.pi/2])
         #arm4j.get_endpoint_pos()
         self.add_model(Grid(50))
-        self.add_model(cable)
         # self.add_model(moon)
         # self.add_model(planet)
         # self.add_model(arm4j)
@@ -83,11 +82,14 @@ class Test2(Window):
         #self.draw_world()
         for model in center_out_targets:
             self.add_model(model)
-        self.add_model(Sphere(radius=1, color=target_colors['purple']).translate(3,3,-10))
+        for model in center_out_targets:
+            self.add_model(model)
+        self.add_model(Sphere(radius=1, color=target_colors['purple']).translate(3,0,-10))
+        self.add_model(cable)
 
     def _while_draw(self):
         ts = time.time() - self.start_time
-        cable.update_texture(int(ts*10), len(cable.trajectory))
+        # cable.update_texture(int(ts*10), len(cable.trajectory))
         
         x = travel_radius * np.cos(ts * travel_speed)
         y = travel_radius * np.sin(ts * travel_speed)

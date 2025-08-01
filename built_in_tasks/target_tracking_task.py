@@ -393,7 +393,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     limit1d = traits.Bool(True, desc="Limit cursor movement to 1D")
 
     sequence_generators = [
-        'tracking_target_chain', 'tracking_target_debug', 'tracking_target_training', 'generate_2D_trajectories'
+        'tracking_target_chain', 'tracking_target_debug', 'tracking_target_training'
     ]
 
     hidden_traits = ['cursor_color', 'trajectory_color', 'cursor_bounds', 'cursor_radius', 'plant_hide_rate', 'starting_pos']
@@ -447,13 +447,14 @@ class ScreenTargetTracking(TargetTracking, Window):
         if instantiate_targets:
             # This is the center target being followed by the user
             self.target = VirtualCircularTarget(target_radius=self.target_radius, target_color=target_colors[self.target_color])
-
-            # This is the trajectory that spans the screen
-            self.trajectory = VirtualCableTarget(target_radius=self.trajectory_radius, target_color=target_colors[self.trajectory_color])
+            for model in self.target.graphics_models:
+                self.add_model(model)
 
             # This is the progress bar
             self.bar = VirtualRectangularTarget(target_width=1, target_height=0, target_color=(0., 1., 0., 0.75), starting_pos=[0,0,9])
             # print('INIT TRAJ')
+            for model in self.bar.graphics_models:
+                self.add_model(model)
 
         # Declare any plant attributes which must be saved to the HDF file at the _cycle rate
         for attr in self.plant.hdf_attrs:
@@ -526,7 +527,6 @@ class ScreenTargetTracking(TargetTracking, Window):
             self.plant.set_visibility(self.plant_visible)
 
     def update_frame(self):
-        #self.target.move_to_position(np.array([0,0,self.targs[self.frame_index+self.lookahead][2]])) # xzy
         self.target.move_to_position(self.targs[self.frame_index+self.lookahead])
         self.target.show()
         if self.trajectory_type == 'time':
@@ -538,19 +538,6 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.frame_index +=1
 
     def setup_start_wait(self):
-        if self.calc_trial_num() == 0:
-            # Instantiate the targets here so they don't show up in any states that might come before "wait" 
-            for model in self.target.graphics_models:
-                self.add_model(model)
-                self.target.hide()
-                
-            for model in self.trajectory.graphics_models:
-                self.add_model(model)
-                self.trajectory.hide()
-
-            for model in self.bar.graphics_models:
-                self.add_model(model)
-                self.bar.hide()
 
         # Allow 2d movement
         if not self.always_1d:

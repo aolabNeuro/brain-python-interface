@@ -36,7 +36,7 @@ target_colors = {
     "elephant":(0.5,0.5,0.5,0.5),
     "white": (1, 1, 1, 0.75),
     "black": (0, 0, 0, 0.75),
-    'invisible': (0, 0, 0, 0.0),
+    "invisible": (0, 0, 0, 0.0),
 }
 
 class CircularTarget(object): 
