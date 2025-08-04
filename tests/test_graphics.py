@@ -39,7 +39,7 @@ moon = Sphere(radius=0.5, color=[0.25,0.25,0.75,0.5])
 planet = Sphere(3, color=[0.75,0.25,0.25,0.75])
 orbit_radius = 4
 orbit_speed = 1
-wobble_radius = 0
+wobble_radius = 5
 wobble_speed = 0.5
 #TexSphere = type("TexSphere", (Sphere, TexModel), {})
 #TexPlane = type("TexPlane", (Plane, TexModel), {})
@@ -47,7 +47,7 @@ wobble_speed = 0.5
 # center_out_gen = ScreenTargetCapture.centerout_2D(1)
 # center_out_positions = [pos[1] for _, pos in center_out_gen]
 center_out_gen = ScreenTargetCapture.centerout_tabletop(1)
-center_out_positions = [(pos[1][0], pos[1][1], -10) for _, pos in center_out_gen]
+center_out_positions = [(pos[1][0], pos[1][1], 0) for _, pos in center_out_gen]
 center_out_targets = [
     Sphere(radius=2, color=target_colors['yellow']).translate(*pos)
     for pos in center_out_positions
@@ -67,8 +67,8 @@ class Test2(Window):
         #arm4j.set_joint_pos([0,0,np.pi/2,np.pi/2])
         #arm4j.get_endpoint_pos()
         self.add_model(Grid(50))
-        # self.add_model(moon)
-        # self.add_model(planet)
+        self.add_model(moon)
+        self.add_model(planet)
         # self.add_model(arm4j)
         #self.add_model(reward_text.translate(5,0,-5))
         # self.add_model(TexSphere(radius=3, specular_color=[1,1,1,1], tex=cloudy_tex()).translate(5,0,0))

@@ -5,9 +5,13 @@ from ..utils import look_at, orthographic, perspective
 import numpy as np
 
 class ShadowMapper(FBOrender):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, blur=False, fovea_radius=2, gaze_world=(0,0,0), kernel_size=13, **kwargs):
         super(ShadowMapper, self).__init__(*args, **kwargs)
         self.size = (1024, 1024)
+        self.blur_enabled = blur
+        self.fovea_radius_cm = fovea_radius
+        self.gaze_world = gaze_world
+        self.kernel_size = kernel_size
         
         # Create shadow map FBO
         self.shadow_map = FBO(["depth"], size=self.size)
@@ -29,6 +33,13 @@ class ShadowMapper(FBOrender):
         light_projection = perspective(75, 1, near_plane, far_plane)
         light_view = look_at(-50*np.array(self.light_direction[:3])/np.linalg.norm(self.light_direction[:3]), light_target, light_up)
         self.light_space_matrix = np.dot(light_projection, light_view)
+
+        # Blur pass setup
+        if self.blur_enabled:
+            self.blur_fbo = FBO(["color0"], size=self.size)
+            self.add_shader("blur_passthru", GL_VERTEX_SHADER, "boxblur.v.glsl")
+            self.add_shader("blur", GL_FRAGMENT_SHADER, "boxblur.f.glsl")
+            self.add_program("blur", ("blur_passthru", "blur"))
 
 
     def generate_shadow_map(self, root, **kwargs):
@@ -56,15 +67,29 @@ class ShadowMapper(FBOrender):
     
     def draw(self, root, **kwargs):
         # Generate shadow map
-        shadow_map, light_space_matrix = self.generate_shadow_map(
-            root, **kwargs
-        )
-        # self.draw_fsquad("none", tex=shadow_map)
-        # return
-        # super().draw(root, p_matrix=light_space_matrix, modelview=np.eye(4))
-        # return
-    
-        # Draw the scene with shadows
-        super().draw(root, light_space_matrix=light_space_matrix,
-                           shadow_map=shadow_map,
-                           **kwargs)
+        shadow_map, light_space_matrix = self.generate_shadow_map(root, **kwargs)
+
+        # Main scene render to FBO
+        if self.blur_enabled:
+            original_viewport = glGetIntegerv(GL_VIEWPORT)
+            glViewport(0, 0, self.size[0], self.size[1])
+            self.draw_to_fbo(self.blur_fbo, root, light_space_matrix=light_space_matrix,
+                             shadow_map=shadow_map, **kwargs)
+            glViewport(*original_viewport)
+
+            # Calculate gaze_uv and fovea_radius_uv
+            p_matrix = kwargs.get('p_matrix', self.projection)
+            modelview = kwargs.get('modelview', self.modelview)
+            gaze_uv = p_matrix @ modelview @ np.array(self.gaze_world + (1,))
+            gaze_uv = gaze_uv[:2] / gaze_uv[3]
+            u, v = ((gaze_uv + 1) / 2).astype(float)
+            gaze_uv = (float(u), float(v))
+            fovea_radius_uv = float(self.fovea_radius_cm / original_viewport[2])
+
+            # Blur pass
+            self.draw_fsquad("blur", tex=self.blur_fbo['color0'], gaze_uv=gaze_uv,
+                             fovea_radius=fovea_radius_uv, max_kernel=self.kernel_size, **kwargs)
+        else:
+            # Draw the scene with shadows directly
+            super().draw(root, light_space_matrix=light_space_matrix,
+                         shadow_map=shadow_map, **kwargs)
