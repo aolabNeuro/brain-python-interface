@@ -406,8 +406,8 @@ class QuattroOtlight:
         self.sample_freq = sample_freq
 
         self.sample_message_size = self.emg_channels + self.aux_channels + self.accessory_channels
-        self.sample_message_size_in_bytes = self.sample_message_size * 2 # two bytes per number
-        self.batch_size = self.sample_freq // self.refresh_freq
+        self.sample_message_size_in_bytes = int(self.sample_message_size * 2) # two bytes per number
+        self.batch_size = int(self.sample_freq // self.refresh_freq)
 
     def setup(self):
         server_addr = (self.host, self.port)
