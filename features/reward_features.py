@@ -214,7 +214,6 @@ class JackpotRewards(traits.HasTraits):
             return True
 
 class ConsecutiveJackpot(traits.HasTraits):
-
     '''
     Extra reward if a string of consecutive rewards equal to jackstring variable
     '''
@@ -223,8 +222,7 @@ class ConsecutiveJackpot(traits.HasTraits):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.jack_count = 0 #initialize
-        
-    #reset following each penalty. If task has extra penalty states, can add into _start function for that task as well. 
+    
     def _start_hold_penalty(self):
         super()._start_hold_penalty()
         self.jack_count = 0
@@ -254,6 +252,7 @@ class ConsecutiveJackpot(traits.HasTraits):
         else:
             return True
         
+
 class ProgressBar(traits.HasTraits):
     '''
     Adds a graphical progress bar for the tracking task which fills up when the cursor is

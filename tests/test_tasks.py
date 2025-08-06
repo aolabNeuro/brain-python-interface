@@ -38,8 +38,10 @@ class TestManualControlTasks(unittest.TestCase):
     def test_readysetgo(self):
         seq = ManualControl.centerout_2D()
         exp = init_exp(ReadySetGoTask, [MouseControl, Window2D], seq, window_size=(1200,800), fullscreen=False)
-        exp.rotation = 'xzy'
+        exp.rotation = 'yzx'
+        exp.offset = [-20, -95, -2]
         exp.ready_set_sound = 'tones.wav'
+        exp.tooslow_penalty_sound = 'buzzer.wav'
         exp.run()
 
 

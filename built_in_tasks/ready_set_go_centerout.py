@@ -1,6 +1,7 @@
 from .target_capture_task import ScreenTargetCapture
 from riglib.experiment import traits
 import os
+import numpy as np
 from riglib.audio import AudioPlayer
 
 audio_path = os.path.join(os.path.dirname(__file__), '../riglib/audio')
@@ -18,31 +19,42 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
         hold = dict(leave_target="hold_penalty", hold_complete_center="prepbuff", hold_complete_periph='reward'),
         prepbuff = dict(leave_target="hold_penalty", prepbuff_complete="delay"),
         delay = dict(leave_target="delay_penalty", delay_complete="leave_center"),
-        leave_center = dict(leave_target="targ_transition", mustmv_complete="hold_penalty"),
+        leave_center = dict(leave_target="targ_transition", mustmv_complete="tooslow_penalty"),
         targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target"),
         timeout_penalty = dict(timeout_penalty_end="targ_transition", end_state=True),
         hold_penalty = dict(hold_penalty_end="targ_transition", end_state=True),
+        tooslow_penalty = dict(tooslow_penalty_end="targ_transition", end_state=True),
         delay_penalty = dict(delay_penalty_end="targ_transition", end_state=True),
         reward = dict(reward_end="wait", stoppable=False, end_state=True)
     )
 
-    #exclude_parent_traits = ['delay_time']
-
-    prepbuff_time = traits.Float(.2, desc="How long after acquiring center target before peripheral target appears")
+    #the sum of the prepbuff & the delay time should be equal to the length of the ready_set_sound file 
+    # the delay time corresponds to the amount of time the peripheral target is displayed, and the prepbuff time then makes up the difference 
+    wait_time = traits.Float(1., desc="Length of time in wait state (inter-trial interval)")
+    prepbuff_time = traits.Float(.2, desc="How long after completing center target hold before peripheral target appears")
     mustmv_time = traits.Float(.2, desc="Must leave center target within this time after auditory go cue.")
-    
+    tooslow_penalty_time = traits.Float(1, desc="Length of penalty time for too slow error")
     files = [f for f in os.listdir(audio_path) if '.wav' in f]
-    ready_set_sound = traits.OptionsList(files, desc="File in riglib/audio to play on each reward")
-
+    ready_set_sound = traits.OptionsList(files, desc="File in riglib/audio to play on each trial for the go cue")
+    tooslow_penalty_sound = traits.OptionsList(files, desc="File in riglib/audio to play on each must move penalty") #hold penalty is normally incorrect.wav
+    shadow_periph_radius = traits.Float(0.5, desc = 'additional radius for peripheral target')
+    periph_hold = traits.Float(0.2, desc = "Hold time for peripheral target")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.ready_set_player = AudioPlayer(self.ready_set_sound)
-        # sound_time = self.ready_set_player.get_length()
-        # self.delay_time = 
-        # self.prepbuff_time = (sound_time + mustmv_time) - self.delay_time
-
+        self.tooslow_penalty_player = AudioPlayer(self.tooslow_penalty_sound)
+        self.pseudo_reward = 0
+        
     ###Test Functions ###
+
+    def _test_start_trial(self, time_in_state):
+        '''Start next trial automatically. You may want this to instead be
+            - a random delay
+            - require some initiation action
+        '''
+        return time_in_state > self.wait_time
+    
     def _test_hold_complete_center(self, time_in_state):
         '''
         Test whether the center target is held long enough to declare the
@@ -67,18 +79,13 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
             - Sensorized object moved to the required location
             - Manually triggered by experimenter
         '''
-        return self.target_index == 1 and time_in_state > self.hold_time
+        return self.target_index == 1 and time_in_state > self.periph_hold
     
     def _test_prepbuff_complete(self, time_in_state):
         '''
-        Test whether the target is held long enough to declare the
-        trial a success
+        Test whether the center target is held long enough to transition from the prepbuff time to the delay state. 
+        The delay state will display the peripheral target so this state just requires a center hold.  
 
-        Possible options
-            - Target held for the minimum requred time (implemented here)
-            - Sensorized object moved by a certain amount
-            - Sensorized object moved to the required location
-            - Manually triggered by experimenter
         '''
         return time_in_state > self.prepbuff_time
     
@@ -93,20 +100,26 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
             - Manually triggered by experimenter
         '''
         return time_in_state > self.mustmv_time
+    
+    def _test_tooslow_penalty_end(self, time_in_state):
+        return time_in_state > self.tooslow_penalty_time
+    
+    def update_report_stats(self): #add holds completed metric to report stats
+        super().update_report_stats()
+        self.reportstats['Audio Completed'] = self.calc_state_occurrences('leave_center') #count if delay state completed
+        self.reportstats['Pseudo Reward'] = self.pseudo_reward + self.reward_count
 
     ### State Functions ###
     def _start_prepbuff(self):
-
-        #self.sync_event('CURSOR_LEAVE_TARGET', self.gen_indices[self.target_index])
-        self.ready_set_player.play()
+        self.sync_event('CUE') #integer code 112
+        self.ready_set_player.play() 
 
     def _start_leave_center(self):
-
-        if self.target_index == 0:
-            #self.targets[0].hide()
-            self.sync_event('CENTER_TARGET_OFF', self.gen_indices[self.target_index])
-
+        self.sync_event('CURSOR_LEAVE_TARGET') #integer code 96
+    
+        
     def _start_hold_penalty(self):
+        self.pseudo_success() #run before increment trials to prevent reseting of trial index 
         if hasattr(super(), '_start_hold_penalty'):
             super()._start_hold_penalty()
         self.ready_set_player.stop()
@@ -115,3 +128,30 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
         if hasattr(super(), '_start_delay_penalty'):
             super()._start_delay_penalty()
         self.ready_set_player.stop()
+    
+    def _start_timeout_penalty(self):
+        self.pseudo_success() #run before increment trials to prevent reseting of trial index
+        super()._start_timeout_penalty()
+
+    def _start_tooslow_penalty(self):
+        self._increment_tries()
+        self.sync_event('OTHER_PENALTY') #integer code 79
+        self.tooslow_penalty_player.play()
+        self.ready_set_player.stop()
+        self.jack_count = 0
+        # # Hide targets
+        for target in self.targets:
+            target.hide()
+            target.reset()
+    
+    def _end_tooslow_penalty(self):
+        self.sync_event('TRIAL_END')
+    
+    def pseudo_success(self): #function to measure almost success
+        if self.target_index == 1: #if peripheral target is displayed 
+            target_buffer_dist = self.target_radius + self.shadow_periph_radius - self.cursor_radius #combined radius 
+            dist_from_targ = np.linalg.norm(self.plant.get_endpoint_pos() - self.targs[self.target_index]) #vector difference
+            if dist_from_targ <= target_buffer_dist:
+                self.pseudo_reward += 1 #increment if cursor position is less than the shadow radius plus radius 
+                
+       
