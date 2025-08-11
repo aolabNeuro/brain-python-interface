@@ -38,9 +38,9 @@ class WindowVR(Window):
     
     show_grid = traits.Bool(True, desc="Show a textured grid on the floor")
     grid_size = traits.Float(130, desc="Size of the grid in cm")
-    grid_position = traits.Tuple((0, 0, 40), desc="Position of the grid in cm. If you want the floor of the grid to be on the floor of the world, set the z component to (grid_size - camera_offset[2])")
-    camera_offset = traits.Tuple((0, 40., 90), desc="Offset virtual screen to the camera in cm")
-    camera_position = traits.Tuple((0, 0, 0), desc="Absolute position of the camera (x,y,z) in cm world coordinates. Only used if fixed_camera_position is True")
+    grid_position = traits.Tuple((0, 0, 0), desc="Position of the grid in cm. If you want the floor of the grid to be on the floor of the world, set the z component to (grid_size - camera_offset[2])")
+    camera_offset = traits.Tuple((0, -130, 40), desc="Offset virtual screen to the camera in cm")
+    camera_position = traits.Tuple((0, 0, -40), desc="Absolute position of the camera (x,y,z) in cm world coordinates. Only used if fixed_camera_position is True")
     camera_orientation = traits.Tuple((1, 0, 0, 0), desc="Orientation of the camera (w, x, y, z) as a quaternion. Only used if fixed_camera_orientation is True")
     fixed_camera_position = traits.Bool(False, desc="Fixed position of the camera")
     fixed_camera_orientation = traits.Bool(False, desc="Fixed orientation of the camera")
@@ -210,7 +210,6 @@ class WindowVR(Window):
         far = 1024
         if self.stereo_mode == 'mirror':
             glFrontFace(GL_CW);  # Switch to clockwise winding for mirrored objects
-        return render.Renderer(self.window_size, self.fov, near, far)
         return shadow_map.ShadowMapper(self.window_size, self.fov, near, far)
     
     def draw_world(self):

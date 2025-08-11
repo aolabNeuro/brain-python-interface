@@ -4,8 +4,14 @@ import time
 import numpy as np
 
 import os
+
+from riglib.pupillabs import utils
+from riglib.stereo_opengl.textures import Texture
 os.environ['DISPLAY'] = ':0'
 
+from riglib.stereo_opengl.environment import Grid
+from riglib.stereo_opengl.window import Window, Window2D, FPScontrol
+from riglib.stereo_opengl.primitives import AprilTag, Cylinder, Cube, Plane, Sphere, Cone, Text, TexSphere, TexCube, TexPlane
 from features.optitrack_features import SpheresToCylinders
 from riglib.stereo_opengl.window import Window, Window2D, FPScontrol, WindowSSAO
 from riglib.stereo_opengl.openxr import WindowVR
@@ -21,8 +27,8 @@ import time
 
 from riglib.stereo_opengl.ik import RobotArm
 
-from built_in_tasks.target_graphics import TextTarget
-
+from built_in_tasks.target_graphics import TextTarget, target_colors
+from built_in_tasks.target_capture_task import ScreenTargetCapture
 import pygame
 from OpenGL.GL import *
 
@@ -38,10 +44,19 @@ wobble_speed = 0.5
 #TexSphere = type("TexSphere", (Sphere, TexModel), {})
 #TexPlane = type("TexPlane", (Plane, TexModel), {})
 #reward_text = Text(7.5, "123", justify='right', color=[1,0,1,1])
+# center_out_gen = ScreenTargetCapture.centerout_2D(1)
+# center_out_positions = [pos[1] for _, pos in center_out_gen]
+center_out_gen = ScreenTargetCapture.centerout_tabletop(1)
+center_out_positions = [(pos[1][0], pos[1][1], -10) for _, pos in center_out_gen]
+center_out_targets = [
+    Sphere(radius=2, color=target_colors['yellow']).translate(*pos)
+    for pos in center_out_positions
+]
+center_out_targets[6].color = target_colors['cyan']
 
 pos_list = np.array([[0,0,0],[0,0,5]])
 
-class Test2(WindowVR, Window):
+class Test2(Window):
 
     def __init__(self, *args, **kwargs):
         self.count=0
@@ -51,19 +66,22 @@ class Test2(WindowVR, Window):
     def _start_draw(self):
         #arm4j.set_joint_pos([0,0,np.pi/2,np.pi/2])
         #arm4j.get_endpoint_pos()
-        self.add_model(Grid(100))
-        self.add_model(moon)
-        self.add_model(planet)
+        self.add_model(Grid(50))
+        # self.add_model(moon)
+        # self.add_model(planet)
         # self.add_model(arm4j)
         #self.add_model(reward_text.translate(5,0,-5))
         # self.add_model(TexSphere(radius=3, specular_color=[1,1,1,1], tex=cloudy_tex()).translate(5,0,0))
         # self.add_model(TexPlane(5,5, tex=cloudy_tex(), specular_color=(0.,0,0,1)).rotate_x(90))
         # self.add_model(TexPlane(5,5, specular_color=(0.,0,0,1), tex=cloudy_tex()).rotate_x(90))
-        reward_text = Text(7.5, "123", justify='right', color=[1,0,1,0.75])
-        self.add_model(reward_text)
+        # reward_text = Text(7.5, "123", justify='right', color=[1,0,1,0.75])
+        # self.add_model(reward_text)
         # self.add_model(TexPlane(4,4,color=[0,0,0,0.9], tex=cloudy_tex()).rotate_x(90).translate(0,0,-5))
         #self.screen_init()
         #self.draw_world()
+        for model in center_out_targets:
+            self.add_model(model)
+        self.add_model(Sphere(radius=1, color=target_colors['purple']).translate(3,3,-10))
 
     def _while_draw(self):
         ts = time.time() - self.start_time
@@ -102,7 +120,6 @@ class Test2(WindowVR, Window):
             print(f"OpenGL error after drawing: {error}")
 
 if __name__ == "__main__":
-    win = Test2(window_size=(1000, 800), fullscreen=False, stereo_mode='mirror',
-                screen_dist=50, screen_half_height=22.5, 
-                fixed_camera_position=True, fixed_camera_orientation=True)
+    win = Test2(window_size=(1000, 800), fullscreen=False, stereo_mode='projection',
+                screen_dist=50, screen_half_height=22.5)
     win.run()

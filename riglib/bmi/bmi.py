@@ -9,6 +9,9 @@ import datetime
 import copy
 import pickle
 
+log_path = os.path.join(os.path.dirname(__file__), '../../log')
+log_filename = os.path.join(log_path, "clda_log")
+
 class GaussianState(object):
     '''
     Class representing a multivariate Gaussian. Gaussians are
@@ -778,9 +781,6 @@ class Decoder(object):
         kwargs: dict
             Mostly for kwargs function call compatibility
         """
-        if np.any(neural_obs > 1000):
-            print('observations have counts >> 1000 ')
-
         if np.any(assist_level) > 0 and 'x_assist' not in kwargs:
             raise ValueError("Assist cannot be used if the forcing term is not specified!")
 
@@ -1279,6 +1279,7 @@ class BMILoop(object):
         feature_data = self.get_features()
 
         # Save the "neural features" (e.g., spike counts vector) to HDF file
+        
         for key, val in list(feature_data.items()):
             self.task_data[key] = val
 
@@ -1304,7 +1305,6 @@ class BMILoop(object):
         # Run the decoder
         if self.state not in self.static_states:
             neural_features = feature_data[self.extractor.feature_type]
-
             tmp = self.call_decoder(neural_features, target_state, **kwargs)
             self.task_data['internal_decoder_state'] = tmp
 
@@ -1357,7 +1357,10 @@ class BMILoop(object):
         Re-open the HDF file and save any extra task data kept in RAM
         '''
         super(BMILoop, self).cleanup_hdf()
-        log_file = open(os.path.join(os.getenv("HOME"), 'code/bmi3d/log/clda_log'), 'w')
+        if not os.path.exists(log_path):
+            os.makedirs(log_path)
+
+        log_file = open(log_filename, 'w')
         log_file.write(str(self.state) + '\n')
         try:
             from . import clda
@@ -1390,7 +1393,7 @@ class BMILoop(object):
         -------
         None
         '''
-        log_file = open(os.path.expandvars('$HOME/code/bmi3d/log/clda_hdf_log'), 'w')
+        log_file = open(os.path.join(log_path,'clda_hdf_log'), 'w')
 
         compfilt = tables.Filters(complevel=5, complib="zlib", shuffle=True)
         if len(data) > 0:
