@@ -15,7 +15,7 @@ import matplotlib.tri as mtri
 
 from .models import TriMesh
 from .textures import Texture, TexModel
-from OpenGL.GL import GL_NEAREST
+from OpenGL.GL import *
 from PIL import Image, ImageDraw, ImageFont
 import matplotlib.font_manager as fm
 
@@ -209,8 +209,8 @@ class Cable(TriMesh):
                 i2 = (i + 1) * self.segments + j
                 i3 = (i + 1) * self.segments + (j + 1) % self.segments
 
-                polys.append((i0, i1, i2))
-                polys.append((i2, i1, i3))
+                polys.append((i2, i1, i0))
+                polys.append((i3, i1, i2))
 
         self.polys = np.array(polys)
 
@@ -517,6 +517,11 @@ class Snake(Cable, TexModel):
         tex = self.get_texture(start_frame, end_frame, self.n_colors)
         self.tex = tex
         self.tex.init()
+
+    def draw(self, ctx):
+        glDisable(GL_DEPTH_TEST)
+        super().draw(ctx)
+        glEnable(GL_DEPTH_TEST)
 
 ##### 2-D primitives #####
 

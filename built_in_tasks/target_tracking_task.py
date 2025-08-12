@@ -528,13 +528,10 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def update_frame(self):
         self.target.move_to_position(self.targs[self.frame_index+self.lookahead])
-        self.target.show()
         if self.trajectory_type == 'time':
-            self.trajectory.move_to_position(np.array([-self.frame_index/3,0,0])) # same update constant works for 60 and 120 hz
-            self.trajectory.show()
+            self.trajectory.move_to_position(np.array([-self.frame_index,0,0])) # same update constant works for 60 and 120 hz
         elif self.trajectory_type == 'space':
             self.trajectory.update_mask(self.frame_index, self.frame_index+self.lookahead)
-            self.trajectory.show()
         self.frame_index +=1
 
     def setup_start_wait(self):
@@ -556,7 +553,7 @@ class ScreenTargetTracking(TargetTracking, Window):
             next_trajectory = np.array(np.squeeze(self.targs)[:,2])
             next_trajectory[:self.lookahead] = next_trajectory[self.lookahead]
             next_trajectory = np.vstack([
-                np.arange(len(next_trajectory))/3-self.lookahead/3, # x-axis is in cm, so divide by 3? to get time? idk
+                np.arange(len(next_trajectory))-self.lookahead, # x-axis is in cm, so divide by 3? to get time? idk
                 np.zeros(len(next_trajectory)), 
                 next_trajectory
             ]).T

@@ -37,6 +37,9 @@ class Model(object):
         # The orientation of the object, in the world frame
         self._xfm = self.xfm
         self.allocated = False
+
+        # Keep track of the model's size for rendering
+        self.bounding_radius = 0.0
     
     def __setattr__(self, attr, xfm):
         '''Checks if the xfm was changed, and recaches the _xfm which is sent to the shader'''
@@ -143,13 +146,18 @@ class Group(Model):
             model.init()
     
     def render_queue(self, xfm=np.eye(4), **kwargs):
-        for model in self.models:
+        def sort_key(obj):
+            pos = obj.xfm.move[1]
+            radius = obj.bounding_radius
+            dist = pos - radius
+            return -dist  # Negative for far-to-near sorting
+        sorted_models = sorted(self.models, key=sort_key)
+        for model in sorted_models:
             for out in model.render_queue(**kwargs):
                 yield out
     
     def draw(self, ctx, **kwargs):
-        sorted_models = sorted(self.models, key=lambda obj: -obj.xfm.move[1])
-        for model in sorted_models:
+        for model in self.models:
             model.draw(ctx, **kwargs)
     
     def __getitem__(self, idx):
@@ -190,6 +198,8 @@ class TriMesh(Model):
         self.polys = polys
         self.tcoords = tcoords
         self.normals = normals
+
+        self.bounding_radius = abs(np.min(self.verts[:, 1]))
     
     def init(self):
         allocated = super(TriMesh, self).init()

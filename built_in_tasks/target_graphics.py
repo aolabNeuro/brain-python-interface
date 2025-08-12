@@ -230,7 +230,7 @@ class VirtualCableTarget(CableTarget):
 class VirtualSnakeTarget(VirtualCableTarget):
 
     def _pickle_init(self):
-        self.trajectory = np.array(self.trajectory) + np.array([0, -10, 0]) # Hack to make sure the snake is always in front
+        self.trajectory = np.array(self.trajectory)
         self.cable = Snake(radius=self.target_radius, trajectory=self.trajectory, color=self.target_color)
         self.graphics_models = [self.cable]
         self.cable.translate(*self.position)
