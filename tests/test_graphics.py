@@ -16,7 +16,7 @@ from features.optitrack_features import SpheresToCylinders
 from riglib.stereo_opengl.window import Window, Window2D, FPScontrol, WindowSSAO
 from riglib.stereo_opengl.openxr import WindowVR
 from riglib.stereo_opengl.environment import Box, Grid
-from riglib.stereo_opengl.primitives import Cylinder, Cube, Plane, Sphere, Cone, Text, TexSphere, TexCube, TexPlane
+from riglib.stereo_opengl.primitives import Cylinder, Cube, Plane, Sphere, Cone, Text, TexSphere, TexCube, TexPlane, AprilTag, CalibrationSphere
 from riglib.stereo_opengl.models import FlatMesh, Group
 from riglib.stereo_opengl.render import ssao, stereo, Renderer
 from riglib.stereo_opengl.utils import cloudy_tex
@@ -53,6 +53,9 @@ center_out_targets = [
     for pos in center_out_positions
 ]
 center_out_targets[6].color = target_colors['cyan']
+apriltag = AprilTag(0, size=4)
+apriltag.translate(0, 0, -10)
+moon = CalibrationSphere(radius=2)
 
 pos_list = np.array([[0,0,0],[0,0,5]])
 
@@ -67,6 +70,8 @@ class Test2(Window):
         #arm4j.set_joint_pos([0,0,np.pi/2,np.pi/2])
         #arm4j.get_endpoint_pos()
         self.add_model(Grid(50))
+        self.add_model(apriltag)
+        self.add_model(moon)
         # self.add_model(moon)
         # self.add_model(planet)
         # self.add_model(arm4j)
@@ -95,6 +100,7 @@ class Test2(Window):
         z = orbit_radius * np.sin(ts * orbit_speed)
 
         moon.translate(x+pos[0],z+pos[1],pos[2],reset=True)
+        moon.look_at([0,-40,0])
         planet.translate(pos[0], pos[1], pos[2],reset=True)
 
         x = wobble_radius * np.cos(ts * wobble_speed)

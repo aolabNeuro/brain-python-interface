@@ -11,7 +11,7 @@ from riglib.stereo_opengl.openxr import WindowVR
 from .generator_features import Autostart, AdaptiveGenerator, IgnoreCorrectness, PoissonWait, RandomDelay, Progressbar_fixation
 from .peripheral_device_features import Button, Joystick, DualJoystick, Joystick_plus_TouchSensor, KeyboardControl, MouseControl, ForceControl
 from .reward_features import RewardSystem, TTLReward, JuiceLogging, PelletReward, JackpotRewards, ProgressBar, TrackingRewards, RewardAudio, PenaltyAudio, ScoreRewards, ConsecutiveJackpot
-from .eyetracker_features import EyeData, CalibratedEyeData, PupilLabStreaming, SimulatedEyeData, FixationStart, EyeConstrained, EyeCalibration, EyeStreaming
+from .eyetracker_features import EyeCursor, EyeData, CalibratedEyeData, PupilLabStreaming, SimulatedEyeData, FixationStart, EyeConstrained, EyeCalibration, EyeStreaming
 from .phasespace_features import MotionData, MotionSimulate, MotionAutoAlign
 from .optitrack_features import Optitrack, SpheresToCylinders
 from .plexon_features import PlexonBMI, RelayPlexon, RelayPlexByte
@@ -87,6 +87,7 @@ built_in_features = dict(
     neuropixel=RecordNeuropixels,
     eye_streaming=EyeStreaming,
     pupillab_streaming=PupilLabStreaming,
+    eye_cursor=EyeCursor,
     eye_constrained=EyeConstrained,
     eye_calibration=EyeCalibration, 
     force_sensor=ForceControl,

@@ -15,7 +15,7 @@ import matplotlib.tri as mtri
 
 from .models import TriMesh
 from .textures import Texture, TexModel
-from OpenGL.GL import GL_NEAREST
+from OpenGL.GL import GL_NEAREST, GL_REPEAT
 from PIL import Image, ImageDraw, ImageFont
 import matplotlib.font_manager as fm
 
@@ -237,10 +237,10 @@ class Torus(TriMesh):
         super(Torus, self).__init__(pts, np.array(polys), tcoords=tcoord, normals=normals, **kwargs)
 
 class Sphere(TriMesh):
-    def __init__(self, radius=1, segments=36, **kwargs):
+    def __init__(self, radius=1, segments=36, texture_mapping='spherical', **kwargs):
         self.radius = radius
         zvals = radius * np.cos(np.linspace(0, np.pi, num=segments))
-        circlevals = np.linspace(0, 2*pi, num=segments, endpoint=False)
+        circlevals = np.linspace(0, 2*np.pi, num=segments, endpoint=False)
 
         vertices = np.zeros(((len(zvals)-2) * len(circlevals), 3))
 
@@ -277,11 +277,22 @@ class Sphere(TriMesh):
         for i in range(segments-1):
             bottom[i+1,:] = (allpointinds[-1], lastcirc[i], lastcirc[i+1])
         triangles = np.vstack([triangles, bottom])
-        
         normals = vertices/radius
-        hcoord = np.arctan2(normals[:,1], normals[:,0])
-        vcoord = np.arctan2(normals[:,2], np.sqrt(vertices[:,0]**2 + vertices[:,1]**2))
-        tcoord = np.array([(hcoord+pi) / (2*pi), (vcoord+pi/2) / pi]).T
+        
+        if texture_mapping == 'spherical':
+            # Spherical coordinates for texture mapping
+            hcoord = np.arctan2(normals[:,1], normals[:,0])
+            vcoord = np.arctan2(normals[:,2], np.sqrt(vertices[:,0]**2 + vertices[:,1]**2))
+            tcoord = np.array([(hcoord+pi) / (2*pi), (vcoord+pi/2) / pi]).T
+
+        elif texture_mapping == 'planar':
+            # Planar texture coordinates
+            x, y, z = vertices[:,0], vertices[:,1], vertices[:,2]
+            u = 0.5 + x / (2 * radius)
+            v = 0.5 + y / (2 * radius)
+            tcoord = np.vstack([u, v]).T
+        else:
+            raise ValueError("Unsupported texture mapping type. Use 'spherical' or 'planar'.")
 
         super(Sphere, self).__init__(vertices, np.array(triangles), 
             tcoords=tcoord, normals=normals, **kwargs)
@@ -444,8 +455,23 @@ class AprilTag(TexPlane):
     def __init__(self, id, size, alpha=1, **kwargs):
         filepath = f"riglib/pupillabs/tag36h11/tag36_11_{id:05d}.png"
         apriltag = Texture(filepath, minfilter=GL_NEAREST, magfilter=GL_NEAREST)
-        super().__init__(size, size, color=[0,0,0,alpha], specular_color=[0,0,0,0], tex=apriltag)
+        super().__init__(size, size, color=[0,0,0,alpha], specular_color=[0,0,0,0], tex=apriltag, **kwargs)
         self.rotate_x(90)
+
+class CalibrationSphere(TexSphere):
+    '''
+    A calibration target used for eye tracking with Pupil Labs cameras.
+    '''
+
+    def __init__(self, radius, alpha=1, stop=False, **kwargs):
+        if stop:
+            filepath = f"riglib/pupillabs/calibration/v0.4_stop_marker.png"
+        else:
+            filepath = f"riglib/pupillabs/calibration/v0.4_calib_marker.png"
+        apriltag = Texture(filepath, wrap_x=GL_REPEAT, wrap_y=GL_REPEAT, )
+        super().__init__(radius, color=[0,0,0,alpha], specular_color=[0,0,0,0], tex=apriltag, 
+                         texture_mapping='planar', **kwargs)
+        self.rotate_x(90)  # Make the target face the camera
         
 ##### 2-D primitives #####
 
