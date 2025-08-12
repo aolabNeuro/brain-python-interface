@@ -880,6 +880,6 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
             if dist_from_targ <= target_buffer_dist:
                 self.pseudo_reward += 1 #increment if cursor position is less than the shadow radius plus radius 
 
-    def start_pause(self):
+    def _start_pause(self):
         super()._start_pause()
         self.ready_set_player.stop()
