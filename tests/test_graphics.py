@@ -11,7 +11,7 @@ os.environ['DISPLAY'] = ':0'
 
 from riglib.stereo_opengl.environment import Grid
 from riglib.stereo_opengl.window import Window, Window2D, FPScontrol
-from riglib.stereo_opengl.primitives import AprilTag, Cylinder, Cube, Plane, Sphere, Cone, Text, TexSphere, TexCube, TexPlane
+from riglib.stereo_opengl.primitives import AprilTag, Cylinder, Cube, Plane, Snake, Sphere, Cone, Text, Cable, TexSphere, TexCube, TexPlane
 from features.optitrack_features import SpheresToCylinders
 from riglib.stereo_opengl.window import Window, Window2D, FPScontrol, WindowSSAO
 from riglib.stereo_opengl.openxr import WindowVR
@@ -39,13 +39,14 @@ moon = Sphere(radius=0.5, color=[0.25,0.25,0.75,0.5])
 planet = Sphere(3, color=[0.75,0.25,0.25,0.75])
 orbit_radius = 4
 orbit_speed = 1
-wobble_radius = 0
+wobble_radius = 5
 wobble_speed = 0.5
 #TexSphere = type("TexSphere", (Sphere, TexModel), {})
 #TexPlane = type("TexPlane", (Plane, TexModel), {})
-#reward_text = Text(7.5, "123", justify='right', color=[1,0,1,1])
+reward_text = Text(7.5, "123", justify='right', color=[1,0,1,1])
 # center_out_gen = ScreenTargetCapture.centerout_2D(1)
 # center_out_positions = [pos[1] for _, pos in center_out_gen]
+cable = Snake(0.5, 2*np.sin(np.arange(200)/2), color=(1,0,1,0.75)).translate(-15, 0, -10)
 center_out_gen = ScreenTargetCapture.centerout_tabletop(1)
 center_out_positions = [(pos[1][0], pos[1][1], -10) for _, pos in center_out_gen]
 center_out_targets = [
@@ -75,16 +76,20 @@ class Test2(Window):
         # self.add_model(TexPlane(5,5, tex=cloudy_tex(), specular_color=(0.,0,0,1)).rotate_x(90))
         # self.add_model(TexPlane(5,5, specular_color=(0.,0,0,1), tex=cloudy_tex()).rotate_x(90))
         # reward_text = Text(7.5, "123", justify='right', color=[1,0,1,0.75])
-        # self.add_model(reward_text)
+        self.add_model(reward_text)
         # self.add_model(TexPlane(4,4,color=[0,0,0,0.9], tex=cloudy_tex()).rotate_x(90).translate(0,0,-5))
         #self.screen_init()
         #self.draw_world()
         for model in center_out_targets:
             self.add_model(model)
-        self.add_model(Sphere(radius=1, color=target_colors['purple']).translate(3,3,-10))
+        for model in center_out_targets:
+            self.add_model(model)
+        self.add_model(Sphere(radius=1, color=target_colors['purple']).translate(3,0,-10))
+        self.add_model(cable)
 
     def _while_draw(self):
         ts = time.time() - self.start_time
+        # cable.update_texture(int(ts*10), len(cable.trajectory))
         
         x = travel_radius * np.cos(ts * travel_speed)
         y = travel_radius * np.sin(ts * travel_speed)
