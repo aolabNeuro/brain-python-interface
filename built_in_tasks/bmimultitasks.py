@@ -14,7 +14,7 @@ from riglib.experiment.experiment import control_decorator
 
 from riglib.stereo_opengl.window import WindowDispl2D
 from .target_capture_task import ScreenTargetCapture
-from .target_capture_xt import ScreenReachAngle
+from .target_capture_task_xt import ScreenReachAngle
 from features.bmi_task_features import LinearlyDecreasingAssist
 from .target_graphics import target_colors
 
