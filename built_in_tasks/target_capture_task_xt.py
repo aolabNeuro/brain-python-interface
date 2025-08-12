@@ -879,3 +879,7 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
             dist_from_targ = np.linalg.norm(self.plant.get_endpoint_pos() - self.targs[self.target_index]) #vector difference
             if dist_from_targ <= target_buffer_dist:
                 self.pseudo_reward += 1 #increment if cursor position is less than the shadow radius plus radius 
+
+    def start_pause(self):
+        super()._start_pause()
+        self.ready_set_player.stop()
