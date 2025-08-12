@@ -23,12 +23,13 @@ class ScreenReachAngle(ScreenTargetCapture):
     '''
 
     status = dict(
-        wait = dict(start_trial="target"),
-        target = dict(reach_success="targ_transition", timeout="timeout_penalty", leave_bounds="reach_penalty"),
-        targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target"),
-        timeout_penalty = dict(timeout_penalty_end="targ_transition", end_state=True),
-        reach_penalty = dict(reach_penalty_end="targ_transition", end_state=True),
-        reward = dict(reward_end="wait", stoppable=False, end_state=True)
+        wait = dict(start_trial="target", start_pause="pause"),
+        target = dict(reach_success="targ_transition", timeout="timeout_penalty", leave_bounds="reach_penalty", start_pause="pause"),
+        targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target", start_pause="pause"),
+        timeout_penalty = dict(timeout_penalty_end="targ_transition", start_pause="pause", end_state=True),
+        reach_penalty = dict(reach_penalty_end="targ_transition", start_pause="pause", end_state=True),
+        reward = dict(reward_end="wait", start_pause="pause", stoppable=False, end_state=True),
+        pause = dict(end_pause="wait", end_state=True),
     )
 
     sequence_generators = [
@@ -140,17 +141,18 @@ class SequenceCapture(ScreenTargetCapture):
     '''
 
     status = dict(
-        wait = dict(start_trial="target"),
-        target = dict(enter_target="hold", timeout="timeout_penalty", show_additional_target='additional_target'),
-        additional_target = dict(enter_target="hold", timeout="timeout_penalty", enter_incorrect_target="incorrect_target_penalty"),
-        hold = dict(leave_target="hold_penalty", hold_complete="delay"),
-        delay = dict(leave_target="delay_penalty", delay_complete="targ_transition"),
-        targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target"),
-        timeout_penalty = dict(timeout_penalty_end="targ_transition", end_state=True),
-        hold_penalty = dict(hold_penalty_end="targ_transition", end_state=True),
-        delay_penalty = dict(delay_penalty_end="targ_transition", end_state=True),
-        incorrect_target_penalty = dict(incorrect_target_penalty_end="targ_transition", end_state=True),
-        reward = dict(reward_end="wait", stoppable=False, end_state=True)
+        wait = dict(start_trial="target", start_pause="pause"),
+        target = dict(enter_target="hold", timeout="timeout_penalty", show_additional_target='additional_target', start_pause="pause"),
+        additional_target = dict(enter_target="hold", timeout="timeout_penalty", enter_incorrect_target="incorrect_target_penalty", start_pause="pause"),
+        hold = dict(leave_target="hold_penalty", hold_complete="delay", start_pause="pause"),
+        delay = dict(leave_target="delay_penalty", delay_complete="targ_transition", start_pause="pause"),
+        targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target", start_pause="pause"),
+        timeout_penalty = dict(timeout_penalty_end="targ_transition", start_pause="pause", end_state=True),
+        hold_penalty = dict(hold_penalty_end="targ_transition", start_pause="pause", end_state=True),
+        delay_penalty = dict(delay_penalty_end="targ_transition", start_pause="pause", end_state=True),
+        incorrect_target_penalty = dict(incorrect_target_penalty_end="targ_transition", start_pause="pause", end_state=True),
+        reward = dict(reward_end="wait", start_pause="pause", stoppable=False, end_state=True),
+        pause = dict(end_pause="wait", end_state=True),
     )
 
     sequence_generators = ['out_2D_sequence','sequence_2D', 'centerout_2D_different_center']
@@ -397,17 +399,18 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
     fixation_radius_buffer = traits.Float(.5, desc="additional radius for eye target")
 
     status = dict(
-        wait = dict(start_trial="target"),
-        target = dict(leave_target2="hold_penalty",timeout="timeout_penalty",enter_target="hold"),
-        hold = dict(leave_target2="hold_penalty",leave_target="target", gaze_target="fixation"), # must hold an initial hand-target and eye-target
-        fixation = dict(leave_target="delay_penalty",hold_complete="delay", fixation_break="fixation_penalty"), # must hold an initial hand-target and eye-target to initiate a trial
-        delay = dict(leave_target="delay_penalty", delay_complete="targ_transition", fixation_break="fixation_penalty"),
-        targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target"),
-        timeout_penalty = dict(timeout_penalty_end="targ_transition", end_state=True),
-        hold_penalty = dict(hold_penalty_end="targ_transition", end_state=True),
-        delay_penalty = dict(delay_penalty_end="targ_transition", end_state=True),
-        fixation_penalty = dict(fixation_penalty_end="targ_transition",end_state=True),
-        reward = dict(reward_end="wait", stoppable=False, end_state=True)
+        wait = dict(start_trial="target", start_pause="pause"),
+        target = dict(leave_target2="hold_penalty",timeout="timeout_penalty",enter_target="hold", start_pause="pause"),
+        hold = dict(leave_target2="hold_penalty",leave_target="target", gaze_target="fixation", start_pause="pause"), # must hold an initial hand-target and eye-target
+        fixation = dict(leave_target="delay_penalty",hold_complete="delay", fixation_break="fixation_penalty", start_pause="pause"), # must hold an initial hand-target and eye-target to initiate a trial
+        delay = dict(leave_target="delay_penalty", delay_complete="targ_transition", fixation_break="fixation_penalty", start_pause="pause"),
+        targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target", start_pause="pause"),
+        timeout_penalty = dict(timeout_penalty_end="targ_transition", start_pause="pause", end_state=True),
+        hold_penalty = dict(hold_penalty_end="targ_transition", start_pause="pause", end_state=True),
+        delay_penalty = dict(delay_penalty_end="targ_transition", start_pause="pause", end_state=True),
+        fixation_penalty = dict(fixation_penalty_end="targ_transition", start_pause="pause", end_state=True),
+        reward = dict(reward_end="wait", start_pause="pause", stoppable=False, end_state=True),
+        pause = dict(end_pause="wait", end_state=True),
     )
  
     sequence_generators = ['row_target','sac_hand_2d']
@@ -736,21 +739,22 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
     '''
     
     status = dict(
-        wait = dict(start_trial="target"),
-        target = dict(enter_target="hold", timeout="timeout_penalty"),
-        hold = dict(leave_target="hold_penalty", hold_complete_center="prepbuff", hold_complete_periph='reward'),
-        prepbuff = dict(leave_target="hold_penalty", prepbuff_complete="delay"),
-        delay = dict(leave_target="delay_penalty", delay_complete="leave_center"),
-        leave_center = dict(leave_target="targ_transition", mustmv_complete="tooslow_penalty"),
-        targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target"),
-        timeout_penalty = dict(timeout_penalty_end="targ_transition", end_state=True),
-        hold_penalty = dict(hold_penalty_end="targ_transition", end_state=True),
-        tooslow_penalty = dict(tooslow_penalty_end="targ_transition", end_state=True),
-        delay_penalty = dict(delay_penalty_end="targ_transition", end_state=True),
-        reward = dict(reward_end="wait", stoppable=False, end_state=True)
+        wait = dict(start_trial="target", start_pause="pause"),
+        target = dict(enter_target="hold", timeout="timeout_penalty", start_pause="pause"),
+        hold = dict(leave_target="hold_penalty", hold_complete_center="prepbuff", hold_complete_periph="reward", start_pause="pause"),
+        prepbuff = dict(leave_target="hold_penalty", prepbuff_complete="delay", start_pause="pause"),
+        delay = dict(leave_target="delay_penalty", delay_complete="leave_center", start_pause="pause"),
+        leave_center = dict(leave_target="targ_transition", mustmv_complete="tooslow_penalty", start_pause="pause"),
+        targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target", start_pause="pause"),
+        timeout_penalty = dict(timeout_penalty_end="targ_transition", start_pause="pause", end_state=True),
+        hold_penalty = dict(hold_penalty_end="targ_transition", start_pause="pause", end_state=True),
+        tooslow_penalty = dict(tooslow_penalty_end="targ_transition", start_pause="pause", end_state=True),
+        delay_penalty = dict(delay_penalty_end="targ_transition", start_pause="pause", end_state=True),
+        reward = dict(reward_end="wait", start_pause="pause", stoppable=False, end_state=True),
+        pause = dict(end_pause="wait", end_state=True),
     )
 
-    #the sum of the prepbuff & the delay time should be equal to the length of the ready_set_sound file 
+    # the sum of the prepbuff & the delay time should be equal to the length of the ready_set_sound file 
     # the delay time corresponds to the amount of time the peripheral target is displayed, and the prepbuff time then makes up the difference 
     wait_time = traits.Float(1., desc="Length of time in wait state (inter-trial interval)")
     prepbuff_time = traits.Float(.2, desc="How long after completing center target hold before peripheral target appears")
