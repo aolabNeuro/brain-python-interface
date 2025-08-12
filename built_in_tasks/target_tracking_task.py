@@ -951,8 +951,8 @@ class ScreenTargetTracking(TargetTracking, Window):
         full_primes = np.asarray([2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97, 
             101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151, 157, 163, 167, 173, 179, 181, 191, 193, 197, 199])
     
-        xprimes = full_primes[:num_primes:2]
-        yprimes = full_primes[1:num_primes:2]
+        xprimes = full_primes[:num_primes:2] #even elements of full primes 
+        yprimes = full_primes[1:num_primes:2] #odd elements of full primes 
 
         f_x = xprimes*w0 # stimulated frequencies
         f_y = yprimes*w0
@@ -989,20 +989,54 @@ class ScreenTargetTracking(TargetTracking, Window):
         elif order == 1:
             trial_order = [(1,'O','E'),(1,'E','O')]
 
+        # generate pairing of elements 
+        first_set = [] #initialize empty first list
+        second_set = [] #initialize second list 
+        nele = len(xprimes) # number of elements in xprimes (and yprimes) 
+        #set up logic for final two elements 
+        if nele % 2: #if number of elements divided by 2 has remainder (ie if num of elements is odd)
+            ele2 = 0 
+        else:
+            ele2 = 1 #set up to be able to skip the last two elements 
+
+        for ele in range((nele//2) - ele2): #floor division to get half the length of elments 
+            left_side = ele
+            right_side = nele-1-ele 
+
+            if ele % 2 == 0: #remainder division for odds and evens 
+                first_set.extend([left_side, right_side])
+            else:
+                second_set.extend([left_side, right_side])
+            
+
+        if nele % 2 == 1: #if odd number of elements in xprime or yprime 
+            mid_ele = nele// 2 #grab element in middle 
+            second_set.append(mid_ele)
+        else:
+            mid1 = nele // 2 - 1
+            mid2 = nele // 2
+            first_set.append(mid1)
+            second_set.append(mid2)
+        
+
         # generate reference and disturbance trajectories for all trials
         for trial_id, (num_reps,ref_ind,dis_ind) in enumerate(trial_order*int(num_trials/2)):   
             if ref_ind == 'E': 
-                sines_r = np.arange(len(xprimes))[0::2] # use even indices
+                #sines_r = np.arange(len(xprimes))[0::2] # use even indices
+                sines_r = first_set
             elif ref_ind == 'O': 
-                sines_r = np.arange(len(xprimes))[1::2] # use odd indices
+                #sines_r = np.arange(len(xprimes))[1::2] # use odd indices
+                sines_r = second_set
             else:
                 sines_r = np.arange(len(xprimes))
             if dis_ind == 'E':
-                sines_d = np.arange(len(xprimes))[0::2]
+                #sines_d = np.arange(len(xprimes))[0::2]
+                sines_d = first_set
             elif dis_ind == 'O':
-                sines_d = np.arange(len(xprimes))[1::2]
+                #sines_d = np.arange(len(xprimes))[1::2]
+                sines_d = second_set
             else:
-                sines_d = np.arange(len(xprimes))
+                sines_d = np.arange(len(xprimes)) #every element in vector 
             
             # generate X-dimension 
             refx_traj, ref_Ax = ScreenTargetTracking.calc_sum_of_sines_ramp(t, r, rd, f_x[sines_r], a_x[sines_r], o_x[trial_id][sines_r])
