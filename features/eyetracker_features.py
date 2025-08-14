@@ -13,6 +13,7 @@ from riglib.oculomatic import oculomatic
 from riglib.pupillabs import utils
 from built_in_tasks.target_graphics import *
 from built_in_tasks.target_capture_task import ScreenTargetCapture
+from riglib.stereo_opengl.openxr import WindowVR
 from riglib.stereo_opengl.primitives import AprilTag
 from riglib.stereo_opengl.xfm import Quaternion
 from .peripheral_device_features import *
@@ -394,6 +395,7 @@ class EyeCursor(traits.HasTraits):
     '''
     eye_cursor_color = traits.OptionsList("green", *target_colors, desc="Color of the eye cursor", bmi3d_input_options=list(target_colors.keys()))
     eye_cursor_radius = traits.Float(0.5, desc="Radius of the eye cursor in cm")
+    eye_cursor_debug = traits.Bool(False, desc="Whether to show debug information for the eye cursor")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -407,10 +409,9 @@ class EyeCursor(traits.HasTraits):
         self.add_dtype('eye_cursor', 'f8', (2,))
         super().init()
         self.plant.set_endpoint_pos(np.array(self.starting_pos))
-        self.cylinder = Cylinder(height=50, radius=0.25)
-        self.add_model(self.cylinder)
-        self.cube = Cube(side_len=1.5, color=(1,0,0,0.75))
-        self.add_model(self.cube)
+        if self.eye_cursor_debug:
+            self.cylinder = Cylinder(height=50, radius=0.25)
+            self.add_model(self.cylinder)
 
     def _cycle(self):
         super()._cycle()
@@ -429,63 +430,63 @@ class EyeCursor(traits.HasTraits):
         # modelview[0,3] = 0  # Set x translation to 0
         # self.eye_plant.set_endpoint_pos(xyz[[0,2,1]])
 
-        # 2D:
-        x, y, z = (self.eye_pos[:3] - 0.5) * 50  # Convert from mm to cm
-        z = 0
-        aspect_ratio = self.window_size[0] / self.window_size[1]
-        y /= aspect_ratio
+        if not isinstance(self, WindowVR):
+            # 2D
+            x, y, z = (self.eye_pos[:3] - 0.5) * 50  # Convert from mm to cm
+            z = 0
+            aspect_ratio = self.window_size[0] / self.window_size[1]
+            y /= aspect_ratio
 
-        # y = -y  # Invert y-axis
-        xyz = np.array([x, y, z, 1])  # Convert to x, z, y format
-        if not hasattr(self, 'modelview'):
-            print('skip')
-            return
-        modelview = self.modelview.copy()
-        modelview[0,3] = 0  # Set x translation to 0
-        # modelview[3,3] *= -1  # Invert z-axis translation
-        # xyz = modelview @ xyz  # Apply modelview transformation
-        self.eye_plant.set_endpoint_pos(xyz[[0,2,1]])
-        print(f"Eye cursor position: {self.eye_plant.get_endpoint_pos()}")  # Debugging output
+            # y = -y  # Invert y-axis
+            xyz = np.array([x, y, z, 1])  # Convert to x, z, y format
+            if not hasattr(self, 'modelview'):
+                print('skip')
+                return
+            modelview = self.modelview.copy()
+            modelview[0,3] = 0  # Set x translation to 0
+            # modelview[3,3] *= -1  # Invert z-axis translation
+            # xyz = modelview @ xyz  # Apply modelview transformation
+            self.eye_plant.set_endpoint_pos(xyz[[0,2,1]])
 
-        # 3D
-        x, y, z = (self.eye_pos[2:5])
-        y = -y  # Invert y-axis
-        xyz = np.array([x, z, y])  # Convert to x, z, y format
-        # xyz = np.array([-0.2, 1, -0.2])
-        magnitude = np.linalg.norm(xyz)
-        norm = xyz / magnitude if magnitude > 0 else np.zeros_like(xyz)
+        else:
+            # 3D
+            x, y, z = (self.eye_pos[2:5])
+            y = -y  # Invert y-axis
+            xyz = np.array([x, z, y])  # Convert to x, z, y format
+            # xyz = np.array([-0.2, 1, -0.2])
+            magnitude = np.linalg.norm(xyz)
+            norm = xyz / magnitude if magnitude > 0 else np.zeros_like(xyz)
 
 
-        # draw a cylinder from the camera in this direction
-        cylinder_start = np.array(self.camera_position)[[0, 2, 1]]
-        cylinder_start[0] *= -1
-        cylinder_start[2] *= -1
-        self.cylinder.translate(*cylinder_start, reset=True)
-        self.cylinder.rotate_x(90, reset=True)  # Reset rotation to identity
-        w, i, j, k = self.camera_orientation
-        camera_rotation = Quaternion(w, i, j, k).to_mat() # 4,4
-        rot = np.array([[1, 0, 0, 0],
-               [0, 0, 1, 0],
-               [0, 1, 0, 0],
-               [0, 0, 0, 1]])
-        camera_rotation = rot @ camera_rotation @ rot.T  # Apply the rotation to swap y and z axes
-        camera_q = Quaternion.from_mat(camera_rotation)
-        self.cylinder.rotate(camera_q, reset=False)  # Apply camera rotation
-        
-        # TODO: rotation not quite right especially at large angles
+            # draw a cylinder from the camera in this direction
+            cylinder_start = np.array(self.camera_position)[[0, 2, 1]]
+            cylinder_start[0] *= -1
+            cylinder_start[2] *= -1
+            w, i, j, k = self.camera_orientation
+            camera_rotation = Quaternion(w, i, j, k).to_mat() # 4,4
+            rot = np.array([[1, 0, 0, 0],
+                [0, 0, 1, 0],
+                [0, 1, 0, 0],
+                [0, 0, 0, 1]])
+            camera_rotation = rot @ camera_rotation @ rot.T  # Apply the rotation to swap y and z axes
+            camera_q = Quaternion.from_mat(camera_rotation)
+            if self.eye_cursor_debug:
+                self.cylinder.translate(*cylinder_start, reset=True)
+                self.cylinder.rotate_x(90, reset=True)  # Reset rotation to identity
+                self.cylinder.rotate(camera_q, reset=False)  # Apply camera rotation
+            
+                # TODO: rotation not quite right especially at large angles
 
-        # Apply eye rotation
-        theta_x = np.arctan2(norm[2], norm[1]) # tan(theta_x) = z/y
-        theta_z = -np.arctan2(norm[0], norm[1]) # x/y
-        print(f"theta_x: {np.degrees(theta_x)}, theta_z: {np.degrees(theta_z)}")  # Debugging output
-        self.cylinder.rotate_x(np.degrees(theta_x))
-        self.cylinder.rotate_z(np.degrees(theta_z))
-        # self.cylinder.detach()
+                # Apply eye rotation
+                theta_x = np.arctan2(norm[2], norm[1]) # tan(theta_x) = z/y
+                theta_z = -np.arctan2(norm[0], norm[1]) # x/y
+                self.cylinder.rotate_x(np.degrees(theta_x))
+                self.cylinder.rotate_z(np.degrees(theta_z))
+                # self.cylinder.detach()
 
-        # Directly draw a cube at the xyz position
-        self.cube.translate(*cylinder_start, reset=True)
-        cube_pos = np.dot(camera_rotation[:3,:3], xyz/10)
-        self.cube.translate(*cube_pos, reset=False)  # Move the cube to the eye position
+            # Directly draw a cube at the xyz position
+            cube_pos = cylinder_start + np.dot(camera_rotation[:3,:3], xyz/10)
+            self.eye_plant.set_endpoint_pos(cube_pos)
 
 '''
 Old code not currently used in aolab
