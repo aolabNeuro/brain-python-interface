@@ -18,7 +18,7 @@ import pstats
 from riglib.stereo_opengl.window import Window, Window2D
 import unittest
 import numpy as np
-import matplotlib as plt
+import matplotlib.pyplot as plt
 import os
 import socket
 
@@ -72,7 +72,7 @@ class TestManualControlTasks(unittest.TestCase):
         # exp.lookahead_time = 1
         exp.run()
 
-    # @unittest.skip("")
+    @unittest.skip("")
     def test_tracking_2d(self):
         print("Running tracking task test")
         seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=20, ramp=1, ramp_down=1, 
@@ -170,9 +170,10 @@ class TestSeqGenerators(unittest.TestCase):
         seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=20, ramp=1, ramp_down=1, 
                                                  num_primes=10, seed=42, sample_rate=60, dimensions=2, 
                                                  disturbance=False, boundaries=(-10,10,-10,10))
-        trajectories = seq[1]
+        trajectories = [t[1][0] for t in seq]
         ft_len = np.arange(len(trajectories[0]))
         st_len = np.arange(len(trajectories[1]))
+        print(trajectories[0].shape, trajectories[1].shape)
         first_trial_x = np.fft.fft(trajectories[0][:,2])
         second_trial_x = np.fft.fft(trajectories[1][:,2])
         first_trial_y = np.fft.fft(trajectories[0][:,0])
@@ -186,6 +187,7 @@ class TestSeqGenerators(unittest.TestCase):
         axs[1,0].set_title("Second Trial X")
         axs[1,1].plot(st_len, np.abs(second_trial_y))
         axs[1,1].set_title("Second Trial Y")
+        plt.show()
 
 class TestYouTube(unittest.TestCase):
 
