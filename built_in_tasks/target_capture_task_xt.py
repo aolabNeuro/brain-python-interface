@@ -400,9 +400,9 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
 
     status = dict(
         wait = dict(start_trial="target", start_pause="pause"),
-        target = dict(leave_target2="hold_penalty",timeout="timeout_penalty",enter_target="hold", start_pause="pause"),
-        hold = dict(leave_target2="hold_penalty",leave_target="target", gaze_target="fixation", start_pause="pause"), # must hold an initial hand-target and eye-target
-        fixation = dict(leave_target="delay_penalty",hold_complete="delay", fixation_break="fixation_penalty", start_pause="pause"), # must hold an initial hand-target and eye-target to initiate a trial
+        target = dict(start_pause="pause", leave_target2="hold_penalty",timeout="timeout_penalty",enter_target="hold"),
+        hold = dict(start_pause="pause", leave_target2="hold_penalty",leave_target="target", gaze_target="fixation"), # must hold an initial hand-target and eye-target
+        fixation = dict(start_pause="pause", leave_target="delay_penalty",hold_complete="delay", fixation_break="fixation_penalty"), # must hold an initial hand-target and eye-target to initiate a trial
         delay = dict(leave_target="delay_penalty", delay_complete="targ_transition", fixation_break="fixation_penalty", start_pause="pause"),
         targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target", start_pause="pause"),
         timeout_penalty = dict(timeout_penalty_end="targ_transition", start_pause="pause", end_state=True),
@@ -615,6 +615,14 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
         for target in self.targets_hand:
             target.hide()
             target.reset()        
+
+    def _start_pause(self):
+        super()._start_pause()
+
+        # Hide targets
+        for target in self.targets_hand:
+            target.hide()
+            target.reset()
 
     # Generator functions
     @staticmethod
