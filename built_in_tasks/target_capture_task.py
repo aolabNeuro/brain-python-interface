@@ -284,6 +284,7 @@ class ScreenTargetCapture(TargetCapture, Window):
     cursor_color = traits.OptionsList("dark_purple", *target_colors, desc='Color of cursor endpoint', bmi3d_input_options=list(target_colors.keys()))
     cursor_bounds = traits.Tuple((-10., 10., -10., 10., -10., 10.), desc='(x min, x max, y min, y max, z min, z max)')
     starting_pos = traits.Tuple((5., 0., 5.), desc='Where to initialize the cursor') 
+    leniency = traits.Float(0, desc = 'How many cursor radii that the cursor can be outside the non-center target') #increments of cursor radius, set to 0 means cursor must be fully within target
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -383,7 +384,10 @@ class ScreenTargetCapture(TargetCapture, Window):
         '''
         cursor_pos = self.plant.get_endpoint_pos()
         d = np.linalg.norm(cursor_pos - self.targs[self.target_index])
-        rad = self.target_radius - self.cursor_radius
+        if self.target_index == 0: #If first target, cursor should be immersed 
+            rad = self.target_radius - self.cursor_radius
+        if self.target_index > 0: 
+            rad = self.target_radius - self.cursor_radius + self.leniency*self.cursor_radius
         return d > rad or super()._test_leave_target(ts)
 
     #### STATE FUNCTIONS ####
