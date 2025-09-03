@@ -38,10 +38,10 @@ class WindowVR(Window):
     
     show_grid = traits.Bool(True, desc="Show a textured grid on the floor")
     grid_size = traits.Float(130, desc="Size of the grid in cm")
-    grid_position = traits.Tuple((0, 0, 40), desc="Position of the grid in cm. If you want the floor of the grid to be on the floor of the world, set the z component to (grid_size - camera_offset[2])")
-    camera_offset = traits.Tuple((0, 40., 90), desc="Offset virtual screen to the camera in cm")
-    camera_position = traits.Tuple((0, 0, 0), desc="Absolute position of the camera (x,y,z) in cm world coordinates. Only used if fixed_camera_position is True")
-    camera_orientation = traits.Tuple((1, 0, 0, 0), desc="Orientation of the camera (w, x, y, z) as a quaternion. Only used if fixed_camera_orientation is True")
+    grid_position = traits.Tuple((0, 0, 0), desc="Position of the grid in cm. If you want the floor of the grid to be on the floor of the world, set the z component to (grid_size - camera_offset[2])")
+    camera_offset = traits.Tuple((0, -130, 40), desc="Offset virtual screen to the camera in cm")
+    camera_position = traits.Tuple((0.0, 0.0, -40.0), desc="Absolute position of the camera (x,y,z) in cm world coordinates. Only used if fixed_camera_position is True")
+    camera_orientation = traits.Tuple((1.0, 0.0, 0.0, 0.0), desc="Orientation of the camera (w, x, y, z) as a quaternion. Only used if fixed_camera_orientation is True")
     fixed_camera_position = traits.Bool(False, desc="Fixed position of the camera")
     fixed_camera_orientation = traits.Bool(False, desc="Fixed orientation of the camera")
 
@@ -51,6 +51,8 @@ class WindowVR(Window):
         self.add_dtype('view_pose_position', 'f8', (2,3))
         self.add_dtype('view_pose_rotation', 'f8', (2,4))
         self.add_dtype('modelview', 'f8', (2,4,4))
+        self.add_dtype('camera_position', 'f8', (3,))
+        self.add_dtype('camera_orientation', 'f8', (4,))
         super().init()
 
     def screen_init(self):
@@ -210,7 +212,6 @@ class WindowVR(Window):
         far = 1024
         if self.stereo_mode == 'mirror':
             glFrontFace(GL_CW);  # Switch to clockwise winding for mirrored objects
-        return render.Renderer(self.window_size, self.fov, near, far)
         return shadow_map.ShadowMapper(self.window_size, self.fov, near, far)
     
     def draw_world(self):
@@ -235,15 +236,17 @@ class WindowVR(Window):
                     view.pose.position[1]*100 + self.camera_offset[1],
                     view.pose.position[2]*100 + self.camera_offset[2],
                 ]) # Not sure why this needs to be negated, something to do with the handedness of the coordinate system??
+                self.camera_position = tuple(position + np.array([1,0,0])*self.iod*(view_index-0.5))
             if self.fixed_camera_orientation:
                 rotation = self.camera_orientation
             else:
                 rotation = np.array([
-                    -view.pose.orientation.w, # Also not sure why I need to negate the w component
-                    view.pose.orientation.x,
-                    view.pose.orientation.y,
-                    view.pose.orientation.z,
-                ])
+                    view.pose.orientation.w,
+                    -view.pose.orientation.x,
+                    -view.pose.orientation.y,
+                    -view.pose.orientation.z,
+                ]) # not sure why conj, again a handedness difference?
+                self.camera_orientation = tuple(rotation)
             xfm = Transform(move=position, rotate=Quaternion(*rotation)) 
             self.modelview = xfm.to_mat(reverse=True)
 
@@ -255,13 +258,18 @@ class WindowVR(Window):
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
             self.renderer.draw(self.world, p_matrix=projection, modelview=self.modelview)
         
-            # Save the pose data
+            # Save the per-eye pose data
             if hasattr(self, 'task_data'):
                 self.task_data['view_pose_position'][:,view_index,:] = position
                 self.task_data['view_pose_rotation'][:,view_index,:] = rotation
                 self.task_data['modelview'][:,view_index] = self.modelview
 
         self.renderer.draw_done()
+
+        # Save the cylopian pose data
+        if hasattr(self, 'task_data'):
+            self.task_data['camera_position'] = self.camera_position
+            self.task_data['camera_orientation'] = self.camera_orientation
 
     def _test_stop(self, ts):
         super_stop = super(Window, self)._test_stop(ts)

@@ -24,13 +24,14 @@ bmi_ssm_options = ['Endpt2D', 'Tentacle', 'Joint2L']
 class EndPostureFeedbackController(BMILoop, traits.HasTraits):
     ssm_type_options = bmi_ssm_options
     ssm_type = traits.OptionsList(*bmi_ssm_options, bmi3d_input_options=bmi_ssm_options)
+    decoder_update_rate = traits.Float(60, desc="Assist feedback rate (Hz)")
 
     def load_decoder(self):
         self.ssm = StateSpaceEndptVel2D()
         A, B, W = self.ssm.get_ssm_matrices()
         filt = MachineOnlyFilter(A, W)
         units = []
-        self.decoder = Decoder(filt, units, self.ssm, binlen=0.1)
+        self.decoder = Decoder(filt, units, self.ssm, binlen=1./self.decoder_update_rate)
         self.decoder.n_features = 1
 
     def create_feature_extractor(self):

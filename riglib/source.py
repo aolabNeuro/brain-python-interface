@@ -8,7 +8,10 @@ import traceback
 import multiprocessing as mp
 from multiprocessing import sharedctypes as shm
 
+import hdfwriter
 import numpy as np
+
+from riglib.hdfwriter import supp_hdf
 from .mp_proxy import FuncProxy, RPCProcess
 
 from . import sink
@@ -245,14 +248,10 @@ class MultiChanDataSource(mp.Process):
         self.last_read_idxs = np.zeros(self.n_chan, dtype='int')
         rawarray = shm.RawArray('c', self.n_chan * self.max_len * self.slice_size)
 
-
         self.data = np.frombuffer(rawarray, dtype).reshape((self.n_chan, self.max_len))
-
-        
 
         #self.fo2 = open('/storage/rawdata/test_rda_get.txt','w')
         #self.fo3 = open('/storage/rawdata/test_rda_run.txt','w')
-
 
         self.lock = mp.Lock()
         self.pipe, self._pipe = mp.Pipe()
@@ -268,27 +267,10 @@ class MultiChanDataSource(mp.Process):
             self.send_to_sinks_dtype = np.dtype([('chan'+str(chan), dtype) for chan in kwargs['channels']])
             self.next_send_idx = mp.Value('l', 0)
             self.wrap_flags = shm.RawArray('b', self.n_chan)  # zeros/Falses by default
-            self.supp_hdf_file = kwargs['supp_file']
-
-
 
     def register_supp_hdf(self):
-        try:
-            from ismore.brainamp import brainamp_hdf_writer
-        except:
-            from riglib.ismore import brainamp_hdf_writer
-        self.supp_hdf = brainamp_hdf_writer.BrainampData(self.supp_hdf_file, self.channels, self.send_to_sinks_dtype)
-
-
-    def verify_data_arrival(self):
-        try:
-            from ismore.brainamp.brainamp_features import verify_data_arrival
-        except:
-            from riglib.ismore.brainamp.brainamp_features import verify_data_arrival
-
+        self.supp_hdf = supp_hdf.SupplementaryHDF(self.channels, self.send_to_sinks_dtype, self.source)
         
-
-
     def start(self, *args, **kwargs):
         '''
         From Python's docs on the multiprocessing module:

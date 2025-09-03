@@ -62,6 +62,21 @@ class Model(object):
         self.allocated = True
         return allocated
 
+    def rotate(self, q, reset=False):
+        '''
+        Rotate the model by a quaternion q
+
+        Parameters
+        ----------
+        q: Quaternion
+            The quaternion to rotate the model by
+        reset: bool, optional, default=False
+            If true, the new rotation replaces the old one. If false, it is added on.
+        '''
+        self.xfm.rotate_q(q, reset=reset)
+        self._recache_xfm()
+        return self
+
     def rotate_x(self, deg, reset=False):
         self.xfm.rotate_x(np.radians(deg), reset=reset)
         self._recache_xfm()
@@ -99,7 +114,6 @@ class Model(object):
 
         Returns: None
         '''
-
         glUniformMatrix4fv(ctx.uniforms.xfm, 1, GL_TRUE, self._xfm.to_mat().astype(np.float32))
         glUniform4f(ctx.uniforms.basecolor, *kwargs.pop('color', self.color))
         glUniform4f(ctx.uniforms.spec_color, *kwargs.pop('specular_color', self.spec_color))
@@ -118,6 +132,33 @@ class Model(object):
         assert self.parent is not None
         while self in self.parent.models:
             self.parent.models.remove(self)
+
+    def look_at(self, target):
+        """
+        Rotates the model so its local +z axis points toward the target coordinate.
+
+        Parameters
+        ----------
+        target : array-like
+            The (x, y, z) world coordinate to look at.
+        up : array-like
+            The up direction (default: (0, 1, 0)).
+        """
+        # Current position in world space
+        pos = np.array(self.xfm.move)
+        target = np.array(target)
+        direction = target - pos
+        if np.linalg.norm(direction) == 0:
+            return self  # No rotation needed
+
+        direction = direction / np.linalg.norm(direction)
+        # Local +z axis in model space
+        local_z = np.array([0, 0, 1])
+        # Compute quaternion to rotate +z to direction
+        q = self.xfm.rotate.rotate_vecs(local_z, direction)
+        self.xfm.rotate = q
+        self._recache_xfm()
+        return self
 
 
 class Group(Model):

@@ -9,72 +9,9 @@ from riglib.experiment import traits
 
 from .target_graphics import *
 from .target_capture_task import ScreenTargetCapture, ScreenReachAngle, SequenceCapture, HandConstrainedEyeCapture, ScreenTargetCapture_Saccade
+from .ready_set_go_centerout import ScreenTargetCapture_ReadySet
 from .target_tracking_task import ScreenTargetTracking
-from riglib.stereo_opengl.window import WindowDispl2D
-
-
-rotations = dict(
-    yzx = np.array(    # names come from rows (optitrack), but screen coords come from columns:
-        [[0, 1, 0, 0], # x goes into second column (y-coordinate, coming out of screen)
-        [0, 0, 1, 0],  # y goes into third column (z-coordinate, up)
-        [1, 0, 0, 0],  # z goes into first column (x-coordinate, right)
-        [0, 0, 0, 1]]
-    ),
-    zyx = np.array(
-        [[0, 0, 1, 0], 
-        [0, 1, 0, 0], 
-        [1, 0, 0, 0], 
-        [0, 0, 0, 1]]
-    ),
-    xzy = np.array(
-        [[1, 0, 0, 0],
-        [0, 0, 1, 0], 
-        [0, 1, 0, 0], 
-        [0, 0, 0, 1]]
-    ),
-    xyz = np.identity(4),
-)
-
-exp_rotations = dict(
-    none = np.identity(4),
-    about_x_90 = np.array(
-        [[1, 0, 0, 0], 
-        [0, 0, 1, 0], 
-        [0, 1, 0, 0], 
-        [0, 0, 0, 1]]
-    ),
-    about_x_minus_90 = np.array(
-        [[1, 0, 0, 0], 
-        [0, 0, -1, 0], 
-        [0, 1, 0, 0], 
-        [0, 0, 0, 1]]
-    ),
-    oop_xy_45 = np.array(
-        [[ 0.707,  0.5  ,  0.5  , 0.],
-         [ 0.   ,  0.707, -0.707, 0.],
-         [-0.707,  0.5  ,  0.5  , 0.],
-         [ 0.,     0.   ,  0.,    1.]]
-    ),
-    oop_xy_minus_45 = np.array(
-        [[ 0.707,  0.5  , -0.5  , 0.],
-         [ 0.   ,  0.707,  0.707, 0.],
-         [ 0.707, -0.5  ,  0.5  , 0.],
-         [ 0.,     0.   ,  0.,    1.]]
-    ),
-    oop_xy_20 = np.array(
-        [[ 0.94 ,  0.117,  0.321, 0.],
-         [-0.   ,  0.94 , -0.342, 0.],
-         [-0.342,  0.321,  0.883, 0.],
-         [ 0.,     0.   ,  0.,    1.]]
-    ),
-    oop_xy_minus_20 = np.array(
-        [[ 0.94 ,  0.117, -0.321, 0.],
-         [-0.   ,  0.94 ,  0.342, 0.],
-         [ 0.342, -0.321,  0.883, 0.],
-         [ 0.,     0.   ,  0.,    1.]]
-    )
-    
-)
+from .rotation_matrices import *
 
 class ManualControlMixin(traits.HasTraits):
     '''Target capture task where the subject operates a joystick
@@ -87,7 +24,8 @@ class ManualControlMixin(traits.HasTraits):
     random_rewards = traits.Bool(False, desc="Add randomness to reward")
     rotation = traits.OptionsList(*rotations, desc="Rotation to transform raw to bmi3d coordinates", bmi3d_input_options=list(rotations.keys()))
     scale = traits.Float(1.0, desc="Scale factor to transform raw to bmi3d coordinates")
-    exp_rotation = traits.OptionsList(*exp_rotations, desc="Experimental rotation to manipulate the mapping to screen coordinates", bmi3d_input_options=list(exp_rotations.keys()))
+    baseline_rotation = traits.OptionsList(*baseline_rotations, desc="Rotation to define the mapping between bmi3d coordinates and baseline workspace", bmi3d_input_options=list(baseline_rotations.keys()))
+    exp_rotation = traits.OptionsList(*exp_rotations, desc="Experimental rotation to manipulate the mapping between baseline workspace and screen coordinates", bmi3d_input_options=list(exp_rotations.keys()))
     pertubation_rotation = traits.Float(0.0, desc="Experimental rotation about bmi3d y-axis in degrees") # this is perturbation_rotation_y
     perturbation_rotation_z = traits.Float(0.0, desc="Experimental rotation about bmi3d z-axis in degrees")
     perturbation_rotation_x = traits.Float(0.0, desc="Experimental rotation about bmi3d x-axis in degrees")
@@ -146,7 +84,7 @@ class ManualControlMixin(traits.HasTraits):
             [0, 0, 0, 1]]
         )
         old = np.concatenate((np.reshape(coords, -1), [1])) # manual input (3,) plus offset term
-        new = np.linalg.multi_dot((old, offset, scale, rotations[self.rotation], exp_rotations[self.exp_rotation])) # screen coords (3,) plus offset term
+        new = np.linalg.multi_dot((old, offset, scale, rotations[self.rotation], baseline_rotations[self.baseline_rotation], exp_rotations[self.exp_rotation])) # screen coords (3,) plus offset term
         pertubation_rot = R.from_euler('y', self.pertubation_rotation, degrees=True) # this is perturb_rot_y
         perturb_rot_z = R.from_euler('z', self.perturbation_rotation_z, degrees=True)
         perturb_rot_x = R.from_euler('x', self.perturbation_rotation_x, degrees=True)
@@ -269,3 +207,9 @@ class SaccadeTask(ManualControlMixin, ScreenTargetCapture_Saccade):
     '''
     pass
 
+class ReadySetGoTask(ManualControlMixin, ScreenTargetCapture_ReadySet):
+    '''
+    Center out task with ready set go auditory cues. Cues separated by 500 ms and participant is expected to move on final go cue. Additionally, participant must move out
+    of center circle (mustmv_time) parameter or there will be an error. 
+    '''
+    pass

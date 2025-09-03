@@ -23,6 +23,8 @@ class ExampleSequenceTask(Window, Sequence):
     # initial state
     state = "wait"
 
+    sequence_generators = ['example_generator']
+
     example_param = traits.Float(0.0, desc="Example parameter (units)")
     target_on_time = traits.Float(1.0, desc="Time to display target")
 
