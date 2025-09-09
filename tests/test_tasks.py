@@ -7,6 +7,7 @@ from built_in_tasks.passivetasks import YouTube
 from built_in_tasks.example_task import ExampleSequenceTask
 from features.generator_features import Autostart, HideLeftTrajectory
 from features.hdf_features import SaveHDF
+from features.touch_features import MouseEmulateTouch
 from riglib.stereo_opengl.environment import Grid
 from riglib.stereo_opengl.window import WindowDispl2D
 from riglib import experiment
@@ -67,7 +68,7 @@ class TestManualControlTasks(unittest.TestCase):
     def test_tracking(self):
         print("Running tracking task test")
         seq = TrackingTask.tracking_target_debug(nblocks=1, ntrials=6, time_length=5, seed=40, sample_rate=60, ramp=1) # sample_rate needs to match fps in ScreenTargetTracking
-        exp = init_exp(TrackingTask, [HideLeftTrajectory, Window2D, MouseControl], seq) # , window_size=(1000,800)
+        exp = init_exp(TrackingTask, [MouseEmulateTouch, Window2D, MouseControl], seq) # , window_size=(1000,800)
         exp.rotation = 'xzy'
         exp.run()
 
