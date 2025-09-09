@@ -449,11 +449,11 @@ class ScreenTargetTracking(TargetTracking, Window):
             # This is the trajectory that spans the screen
             self.trajectory = VirtualCableTarget(target_radius=self.trajectory_radius, target_color=target_colors[self.trajectory_color])
 
-            # This is the progress bar
+            # This is the optional progress bar (off by default)
             self.bar = VirtualRectangularTarget(target_width=1, target_height=0, target_color=(0., 1., 0., 0.75), starting_pos=[0,-15,9])
             # print('INIT TRAJ')
 
-            # This is a black cube that hides the "lookbehind" of trajectory
+            # This is a black cube that optionally hides the "lookbehind" of trajectory (off by default)
             self.box = VirtualRectangularTarget(target_width=20, target_height=10, target_color=(0, 0, 0, 1), starting_pos=[-10,-1,0])
             # target_width of RectangularTarget is total height, target_height is 1/2 of total width (from center to edge)
 

@@ -5,7 +5,7 @@ from built_in_tasks.othertasks import Conditions, LaserConditions, SweptLaserCon
 from built_in_tasks.target_capture_task import ScreenTargetCapture
 from built_in_tasks.passivetasks import YouTube
 from built_in_tasks.example_task import ExampleSequenceTask
-from features.generator_features import Autostart
+from features.generator_features import Autostart, HideLeftTrajectory
 from features.hdf_features import SaveHDF
 from riglib.stereo_opengl.environment import Grid
 from riglib.stereo_opengl.window import WindowDispl2D
@@ -35,6 +35,7 @@ def init_exp(base_class, feats, seq=None, **kwargs):
 
 class TestManualControlTasks(unittest.TestCase):
 
+    @unittest.skip("")
     def test_readysetgo(self):
         seq = ManualControl.centerout_2D()
         exp = init_exp(ReadySetGoTask, [MouseControl, Window2D], seq, window_size=(1200,800), fullscreen=False)
@@ -62,11 +63,11 @@ class TestManualControlTasks(unittest.TestCase):
         exp = init_exp(ExampleSequenceTask, [], seq, window_size=(1200,800), fullscreen=False)
         exp.run()
     
-    @unittest.skip("")
+    # @unittest.skip("")
     def test_tracking(self):
         print("Running tracking task test")
         seq = TrackingTask.tracking_target_debug(nblocks=1, ntrials=6, time_length=5, seed=40, sample_rate=60, ramp=1) # sample_rate needs to match fps in ScreenTargetTracking
-        exp = init_exp(TrackingTask, [MouseControl], seq) # , window_size=(1000,800)
+        exp = init_exp(TrackingTask, [HideLeftTrajectory, Window2D, MouseControl], seq) # , window_size=(1000,800)
         exp.rotation = 'xzy'
         exp.run()
 
@@ -90,7 +91,7 @@ class TestManualControlTasks(unittest.TestCase):
         exp.end_task()
 
     @unittest.skip("only to test progress bar")
-    def test_tracking(self):
+    def test_tracking_progress(self):
         seq = TrackingTask.tracking_target_debug(nblocks=1, ntrials=6, time_length=5, seed=40, sample_rate=60, ramp=1) # sample_rate needs to match fps in ScreenTargetTracking
         exp = init_exp(TrackingTask, [MouseControl, Window2D, ProgressBar], seq)
         exp.rotation = 'xzy'

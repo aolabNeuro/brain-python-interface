@@ -37,7 +37,7 @@ fi
 
 # Set display
 HOST=`hostname -s`
-if [ "$HOST" = "pagaiisland2" ] || [ "$HOST" = "siberut-bmi" ]; then
+if [ "$HOST" = "pagaiisland2" ] || [ "$HOST" = "siberut-bmi" ] || [ "$HOST" = "human-bmi" ]; then
     DISPLAY=':0.1'
     echo "Moving display to :0.1"
 elif [ "$HOST" = "booted-server" ]; then
