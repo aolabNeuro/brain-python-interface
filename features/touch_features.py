@@ -31,18 +31,26 @@ class MouseHistory():
     Pretend to be a data source
     '''
 
-    def __init__(self, window_size, screen_cm, start_pos, n_repeat_delay=3):
+    def __init__(self, window_size, screen_cm, start_pos, n_repeat_delay=3, init_frames=3):
         self.window_size = window_size
         self.screen_cm = screen_cm
         self.history = np.zeros((n_repeat_delay, 2))
         self.pos = [0., 0.]
         self.pos[0] = start_pos[0]
         self.pos[1] = start_pos[1]
+        self.init_frames = init_frames
 
     def get(self):
         pos = pygame.mouse.get_pos()
         self.pos[0] = (pos[0] / self.window_size[0] - 0.5) * self.screen_cm[0]
         self.pos[1] = -(pos[1] / self.window_size[1] - 0.5) * self.screen_cm[1] # pygame counts (0,0) as the top left
+        
+        # Have to ignore the first few positions because they can change when the screen is initializing
+        if self.init_frames > 0:
+            self.history[:] = self.pos
+            self.init_frames -= 1
+
+        # Save a buffer of previous positions and if they are all the same, then set pos to NaN
         self.history[:-1, :] = self.history[1:, :]
         self.history[-1, :] = self.pos
         if np.all(np.diff(self.history, axis=0) == 0):
