@@ -6,7 +6,7 @@ import os
 import subprocess
 from riglib.experiment import traits
 from riglib.experiment.experiment import control_decorator
-from riglib.audio import AudioPlayer
+from riglib.audio import AudioPlayer, ToneGenerator
 from built_in_tasks.target_graphics import TextTarget, VirtualRectangularTarget
 import numpy as np
 import serial, glob
@@ -357,6 +357,30 @@ class ScoreRewards(traits.HasTraits):
         if hasattr(super(), '_end_reward'):
             super()._end_reward()
         self.remove_model(self.score_display.model)
+
+class AudioFeedback3D(traits.HasTraits):
+    '''
+    Provide audio feedback based on 3D position of the cursor.
+    '''
+    def init(self, *args, **kwargs):
+        super().init(*args, **kwargs)
+        self.freq = 440
+        self.tone_gen = None
+
+    def _start_wait(self):
+        super()._start_wait()
+        if self.tone_gen is None:
+            self.tone_gen = ToneGenerator(freq=self.freq)
+            self.tone_gen.start()
+
+    def _cycle(self):
+        super()._cycle()
+        pos = self.plant.get_endpoint_pos()
+        # freq = 440 + 10*pos[0]
+        vol = np.abs(pos[0])/20.
+        if self.tone_gen is not None:
+            # self.tone_gen.change_freq(freq)
+            self.tone_gen.change_volume(vol)
 
 """"" BELOW THIS IS ALL THE OLD CODE ASSOCIATED WITH REWARD FEATURES"""
 

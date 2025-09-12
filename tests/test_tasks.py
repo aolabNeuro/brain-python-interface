@@ -12,7 +12,7 @@ from riglib.stereo_opengl.window import WindowDispl2D
 from riglib import experiment
 from features.peripheral_device_features import ForceControl, MouseControl
 from features.optitrack_features import OptitrackSimulate, Optitrack, SpheresToCylinders
-from features.reward_features import ProgressBar, ScoreRewards
+from features.reward_features import AudioFeedback3D, ProgressBar, ScoreRewards
 import cProfile
 import pstats
 from riglib.stereo_opengl.window import Window, Window2D
@@ -47,7 +47,7 @@ class TestManualControlTasks(unittest.TestCase):
 
     def test_exp(self):
         seq = ManualControl.centerout_2D()
-        exp = init_exp(ManualControl, [MouseControl, Window2D], seq, window_size=(1200,800), plant_type='audio',
+        exp = init_exp(ManualControl, [AudioFeedback3D, MouseControl, Window2D], seq, window_size=(1200,800),
                        fullscreen=False)
         exp.rotation = 'xzy'
         exp.stereo_mode = 'projection'
