@@ -6,6 +6,7 @@ if (typeof(require) !== 'undefined') {
           <legend>Report</legend>
           <div id="report_div">
             <input type="button" value="Update report" id="report_update" onclick="$.post('report', {}, function(info) {te.report.update(info['data']); debug(info);})"><br>
+            <input type="button" value="Save FPS Log" id="save_fps_log" onclick="te.report.save_fps_log()"><br>
             <table class="option" id="report_info">
             </table>
 
@@ -43,7 +44,9 @@ Report.prototype.activate = function() {
     //var on_windows = window.navigator.userAgent.indexOf("Windows") > 0;
     if (!this.ws) {  // && !on_windows) { some websocket issues on windows..
         // Create a new JS WebSocket object
-        this.ws = new WebSocket("ws://"+hostname.split(":")[0]+":8001/connect");
+        var host = hostname.split(":")[0]
+        var port = Number(hostname.split(":")[1]) + 1
+        this.ws = new WebSocket("ws://"+host+":"+port+"/connect");
 
         this.ws.onmessage = function(evt) {
             debug(evt.data);
@@ -52,6 +55,7 @@ Report.prototype.activate = function() {
         }.bind(this);
     }
 }
+Report.prototype.fps_log = [];
 
 Report.prototype.update = function(info) {
     // run the 'notify' callback every time this function is provided with info
@@ -92,8 +96,32 @@ Report.prototype.update = function(info) {
             if (info[stat])
                 this.boxes[stat].innerHTML = info[stat];
         }
+
+        for (var stat in this.boxes) {
+            if (info[stat]) {
+                this.boxes[stat].innerHTML = info[stat];
+                // Save FPS to log if it's present
+                if (stat.toLowerCase().includes("fps")) {
+                    this.fps_log.push(info[stat]);
+                }
+            }
+        }
     }
 }
+
+Report.prototype.save_fps_log = function() {
+    console.log("FPS log:", this.fps_log);
+
+    // download as a file
+    const blob = new Blob([this.fps_log.join("\n")], {type: "text/plain"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "fps_log.txt";
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
 Report.prototype.manual_update = function() {
     $.post('report', {}, function(info) {te.report.update(info['data']);});
 }

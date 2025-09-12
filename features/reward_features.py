@@ -62,13 +62,24 @@ class PelletReward(RewardSystem):
     '''
     Trigger pellet rewards.    
     '''
-    pellets_per_reward = traits.Int(1, desc='The number of pellets to dispense per reward.')      
+    pellets_per_reward = traits.Int(1, desc='The number of pellets to dispense per reward.') 
+    port_value = traits.Int(8000, desc='The port value to identify which tablet is running.')     
 
     def __init__(self, *args, **kwargs):
         from riglib.tablet_reward import RemoteReward
         super(RewardSystem, self).__init__(*args, **kwargs)
         self.reward = RemoteReward()
         self.reportstats['Reward #'] = 0
+        
+        if self.port_value == 8000:
+            self.ip_address = "192.168.0.100"
+        elif self.port_value == 9000:
+            self.ip_address = "192.168.0.200"
+        elif self.port_value== 7000:
+            self.ip_address = "192.168.0.170" # 300
+        else:
+            print('uh oh')
+            self.ip_address = "192.168.0.150"
 
     def _start_reward(self):
         if hasattr(super(RewardSystem, self), '_start_reward'):
@@ -77,7 +88,7 @@ class PelletReward(RewardSystem):
         
         if self.reportstats['Reward #'] % self.trials_per_reward == 0:
             for _ in range(self.pellets_per_reward): # call trigger num of pellets_per_reward time
-                self.reward.trigger()
+                self.reward.trigger(self.ip_address)
                 time.sleep(0.5) # wait for 0.5 seconds
 
     def _end_reward(self):
@@ -274,7 +285,7 @@ class ProgressBar(traits.HasTraits):
                 self.remove_model(model)
             del self.bar
 
-        self.bar = VirtualRectangularTarget(target_width=1.3, target_height=self.tracking_rate, target_color=(0., 1., 0., 0.75), starting_pos=[self.tracking_rate-self.bar_width,0,9])
+        self.bar = VirtualRectangularTarget(target_width=1.3, target_height=self.tracking_rate, target_color=(0., 1., 0., 0.75), starting_pos=[self.tracking_rate-self.bar_width,-15,9])
         for model in self.bar.graphics_models:
             self.add_model(model)
         self.bar.show()
@@ -290,7 +301,7 @@ class ProgressBar(traits.HasTraits):
         self.reward_frame_index += 1
         reward_numframe = self.reward_time*self.fps
         reward_amount = self.tracking_rate - self.reward_frame_index*self.tracking_rate/reward_numframe
-        self.bar = VirtualRectangularTarget(target_width=1.3, target_height=reward_amount, target_color=(0., 1., 0., 0.75), starting_pos=[reward_amount-self.bar_width,0,9])
+        self.bar = VirtualRectangularTarget(target_width=1.3, target_height=reward_amount, target_color=(0., 1., 0., 0.75), starting_pos=[reward_amount-self.bar_width,-15,9])
         for model in self.bar.graphics_models:
             self.add_model(model)
         self.bar.show()        

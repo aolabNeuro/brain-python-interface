@@ -449,9 +449,13 @@ class ScreenTargetTracking(TargetTracking, Window):
             # This is the trajectory that spans the screen
             self.trajectory = VirtualCableTarget(target_radius=self.trajectory_radius, target_color=target_colors[self.trajectory_color])
 
-            # This is the progress bar
-            self.bar = VirtualRectangularTarget(target_width=1, target_height=0, target_color=(0., 1., 0., 0.75), starting_pos=[0,0,9])
+            # This is the optional progress bar (off by default)
+            self.bar = VirtualRectangularTarget(target_width=1, target_height=0, target_color=(0., 1., 0., 0.75), starting_pos=[0,-15,9])
             # print('INIT TRAJ')
+
+            # This is a black cube that optionally hides the "lookbehind" of trajectory (off by default)
+            self.box = VirtualRectangularTarget(target_width=20, target_height=10, target_color=(0, 0, 0, 1), starting_pos=[-10,-1,0])
+            # target_width of RectangularTarget is total height, target_height is 1/2 of total width (from center to edge)
 
         # Declare any plant attributes which must be saved to the HDF file at the _cycle rate
         for attr in self.plant.hdf_attrs:
@@ -525,7 +529,7 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def update_frame(self):
         self.target.move_to_position(np.array([0,0,self.targs[self.frame_index+self.lookahead][2]])) # xzy
-        self.trajectory.move_to_position(np.array([-self.frame_index/3,0,0])) # same update constant works for 60 and 120 hz
+        self.trajectory.move_to_position(np.array([-self.frame_index/3,10,0])) # same update constant works for 60 and 120 hz
         self.target.show()
         self.trajectory.show()
         self.frame_index +=1
@@ -544,6 +548,10 @@ class ScreenTargetTracking(TargetTracking, Window):
             for model in self.bar.graphics_models:
                 self.add_model(model)
                 self.bar.hide()
+
+            for model in self.box.graphics_models:
+                self.add_model(model)
+                self.box.hide()
 
         # Allow 2d movement
         if not self.always_1d:
@@ -578,6 +586,8 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.trajectory.reset()
         self.bar.hide()
         self.bar.reset()
+        self.box.hide()
+        self.box.reset()
 
     def setup_start_tracking_in(self):
         # Revert to settable trait
@@ -622,7 +632,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         '''
         cursor_pos = self.plant.get_endpoint_pos()
         d = np.linalg.norm(cursor_pos - self.target.get_position())
-        return d > (self.target_radius - self.cursor_radius) or super()._test_leave_target(time_in_state)
+        return np.isnan(d) or d > (self.target_radius - self.cursor_radius) or super()._test_leave_target(time_in_state)
 
     #### STATE FUNCTIONS ####
     def _start_wait(self):
@@ -645,7 +655,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         super()._start_trajectory()
         if self.frame_index == 0:
             self.target.move_to_position(np.array([0,0,self.targs[self.frame_index+self.lookahead][2]])) # tablet screen x-axis ranges -19,19, center 0
-            self.trajectory.move_to_position(np.array([0,0,0])) # tablet screen x-axis ranges 0,41.33333, center 22ish
+            self.trajectory.move_to_position(np.array([0,10,0])) # tablet screen x-axis ranges 0,41.33333, center 22ish
             # print(self.target.get_position())
             # print(self.trajectory.get_position())
 
