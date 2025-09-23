@@ -705,7 +705,7 @@ class ScreenTargetCapture(TargetCapture, Window):
             # Generate the same target trial_streak times
             for itrial in range(num_same_trials):
                 yield idx+np.arange(chain_length), pts
-                idx += chain_length
+            idx += chain_length
 
     @staticmethod
     def rand_target_chain_3D(ntrials=100, chain_length=1, boundaries=(-12,12,-10,10,-12,12)):
