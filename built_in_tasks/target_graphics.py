@@ -122,14 +122,23 @@ class RectangularTarget(object):
 class VirtualRectangularTarget(RectangularTarget):
     def drive_to_new_pos(self):
         self.position = self.int_position
-        corner_pos = self.position - self.center_offset
+        corner_pos = self.position #- self.center_offset
         self.cube.translate(*corner_pos, reset=True)
-
+        
     def hide(self):
         self.cube.detach()
 
     def show(self):
         self.cube.attach()
+
+    def rotate_xaxis(self, angle, reset=False):
+        self.cube.rotate_x(angle, reset=reset)
+
+    def rotate_yaxis(self, angle, reset=False):
+        self.cube.rotate_y(angle, reset=reset)
+
+    def rotate_zaxis(self, angle, reset=False):
+        self.cube.rotate_z(angle, reset=reset)
 
     def cue_trial_start(self):
         self.cube.color = RED
