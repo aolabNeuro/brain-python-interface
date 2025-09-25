@@ -285,7 +285,7 @@ class ScreenTargetCapture(TargetCapture, Window):
     limit2d = traits.Bool(True, desc="Limit cursor movement to 2D")
 
     sequence_generators = [
-        'out_2D', 'centerout_2D', 'centeroutback_2D', 'centerout_2D_select', 'rand_target_chain_2D', 
+        'out_2D', 'out_2D_select','centerout_2D', 'centeroutback_2D', 'centerout_2D_select', 'rand_target_chain_2D', 'rand_same_target_chain_2D', 
         'rand_target_chain_3D', 'corners_2D', 'centerout_tabletop',
     ]
 
@@ -610,6 +610,23 @@ class ScreenTargetCapture(TargetCapture, Window):
                 break
 
     @staticmethod
+    def out_2D_select(nblocks=100, ntargets=8, distance=10, origin=(0,0,0), target_idx=[]):
+        '''
+        Generates a sequence of 2D (x and z) targets at a given distance from the origin, 
+        but lets you select which targets out of the total number you want to keep
+        '''
+        if type(target_idx) not in (list, tuple) or len(target_idx) == 0:
+            raise ValueError(f'Malformed target_idx selection "{target_idx}"! Input a list of [idx1, idx2, ...]')
+        gen = ScreenTargetCapture.out_2D(nblocks, ntargets, distance, origin)
+        while True:
+            try:
+                next_indices, next_targs = next(gen)
+                if next_indices[0] in target_idx:
+                    yield next_indices, next_targs # only yield the targets that match target_idx
+            except StopIteration:
+                break
+
+    @staticmethod
     def centeroutback_2D(nblocks=100, ntargets=8, distance=10, origin=(0,0,0)):
         '''
         Triplets of central targets, peripheral targets, and central targets
@@ -655,7 +672,41 @@ class ScreenTargetCapture(TargetCapture, Window):
             pts = pts+(boundaries[0], 0, boundaries[2])
             yield idx+np.arange(chain_length), pts
             idx += chain_length
-    
+
+    @staticmethod
+    def rand_same_target_chain_2D(nblocks=10, num_same_trials=10, chain_length=1, boundaries=(-12,12,-12,12)):
+        '''
+        Generates a sequence of 2D (x and z) target pairs. The same target appears num_same_trials times.
+
+        Parameters
+        ----------
+        nblocks : int
+            The number of different target positions
+        num_same_trials : int
+            The number of trials for the same target position shown in a row
+        chain_length : int
+            The number of targets in each chain
+        boundaries: 4 element Tuple
+            The limits of the allowed target locations (-x, x, -z, z)
+
+        Returns
+        -------
+        [ntrials x chain_length x 3] array of target coordinates
+        '''
+
+        rng = np.random.default_rng()
+        idx = 0
+        for iblock in range(nblocks):
+            # Choose a random sequence of points within the boundaries
+            pts = rng.uniform(size=(chain_length, 3))*((boundaries[1]-boundaries[0]),
+                0, (boundaries[3]-boundaries[2]))
+            pts = pts+(boundaries[0], 0, boundaries[2])
+
+            # Generate the same target trial_streak times
+            for itrial in range(num_same_trials):
+                yield idx+np.arange(chain_length), pts
+            idx += chain_length
+
     @staticmethod
     def rand_target_chain_3D(ntrials=100, chain_length=1, boundaries=(-12,12,-10,10,-12,12)):
         '''
