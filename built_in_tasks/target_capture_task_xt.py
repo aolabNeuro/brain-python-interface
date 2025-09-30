@@ -133,11 +133,8 @@ class ScreenReachAngle(ScreenTargetCapture):
 
 class ScreenReachLine(ScreenTargetCapture):
     '''
-    A modified task that requires the cursor to move in the right direction towards the target, 
-    without actually needing to arrive at the target. If the maximum angle is exceeded, a reach 
-    penalty is applied. No hold or delay period.
-
-    Only works for sequences with 1 target in a chain. 
+    A modified task that requires the cursor must be within the straight area between the initial cursor position and the target, 
+    Only works for sequences with 1 target in a chain (not tested for more than 2 chains). 
     '''
 
     status = dict(
@@ -145,7 +142,7 @@ class ScreenReachLine(ScreenTargetCapture):
         target = dict(leave_bounds="reach_penalty", enter_target="hold", timeout="timeout_penalty"),
         hold = dict(leave_target="hold_penalty", hold_complete="delay"),
         delay = dict(leave_target="delay_penalty", delay_complete="targ_transition"),
-        targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target"),
+        targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="wait"),
         timeout_penalty = dict(timeout_penalty_end="targ_transition", end_state=True),
         hold_penalty = dict(hold_penalty_end="targ_transition", end_state=True),
         delay_penalty = dict(delay_penalty_end="targ_transition", end_state=True),
