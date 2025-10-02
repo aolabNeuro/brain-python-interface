@@ -142,16 +142,16 @@ class ScreenReachLine(ScreenTargetCapture):
         target = dict(leave_bounds="reach_penalty", enter_target="hold", timeout="timeout_penalty"),
         hold = dict(leave_target="hold_penalty", hold_complete="delay"),
         delay = dict(leave_target="delay_penalty", delay_complete="targ_transition"),
-        targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="wait"),
-        timeout_penalty = dict(timeout_penalty_end="targ_transition", end_state=True),
-        hold_penalty = dict(hold_penalty_end="targ_transition", end_state=True),
-        delay_penalty = dict(delay_penalty_end="targ_transition", end_state=True),
-        reach_penalty = dict(delay_penalty_end="targ_transition", end_state=True),
+        targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target"),
+        timeout_penalty = dict(timeout_penalty_end="wait", end_state=True),
+        hold_penalty = dict(hold_penalty_end="wait", end_state=True),
+        delay_penalty = dict(delay_penalty_end="wait", end_state=True),
+        reach_penalty = dict(delay_penalty_end="wait", end_state=True),
         reward = dict(reward_end="wait", stoppable=False, end_state=True)
     )
 
     sequence_generators = [
-        'out_2D', 'out_2D_select','rand_target_chain_2D', 'rand_target_chain_3D', 'discrete_targets_2D',
+        'centerout_2D', 'centerout_2D_select','out_2D', 'out_2D_select','rand_target_chain_2D', 'rand_target_chain_3D', 'discrete_targets_2D',
     ]
 
     reach_penalty_time = traits.Float(1, desc="Length of penalty time for target hold error")
@@ -161,14 +161,15 @@ class ScreenReachLine(ScreenTargetCapture):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
+        self.penalty_index = 0
         # # Instantiate the targets
         # instantiate_targets = kwargs.pop('instantiate_targets', True)
         # if instantiate_targets:
 
             
     def _start_wait(self):
-        super()._start_wait()
+        if self.penalty_index == 0:
+            super()._start_wait() # skip _start_wait to make the same target appear even after penalty
 
         # Delete bar because the shape of bar changes every trial
         if hasattr(self, 'bar'):
@@ -176,9 +177,11 @@ class ScreenReachLine(ScreenTargetCapture):
                 self.remove_model(model)
             del self.bar
 
+        self.penalty_index = 0
+
     def _start_target(self):
         super()._start_target()
-
+        
         # Define a reach start and reach target position whenever the target appears
         self.reach_start = self.plant.get_endpoint_pos().copy()
         self.reach_target = self.targs[self.target_index]
@@ -223,25 +226,34 @@ class ScreenReachLine(ScreenTargetCapture):
 
         return distance > (self.bar_width/2 - self.cursor_radius)
 
+    def _start_targ_transition(self):
+        super()._start_targ_transition()
+        self.bar.hide()
+        self.bar.reset()
+
     def _start_timeout_penalty(self):
         super()._start_timeout_penalty()
         self.bar.hide()
         self.bar.reset()
+        self.penalty_index = 1
 
     def _start_delay_penalty(self):
         super()._start_delay_penalty()
         self.bar.hide()
         self.bar.reset()
+        self.penalty_index = 1
 
     def _start_hold_penalty(self):
         super()._start_hold_penalty()
         self.bar.hide()
         self.bar.reset()
+        self.penalty_index = 1
 
     def _start_reach_penalty(self):
         self.sync_event('OTHER_PENALTY')
         self._increment_tries()
-        
+        self.penalty_index = 1
+
         # Hide targets
         for target in self.targets:
             target.hide()
