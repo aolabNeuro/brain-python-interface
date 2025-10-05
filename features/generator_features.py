@@ -202,38 +202,6 @@ class TransparentDelayTarget(traits.HasTraits):
             target = self.targets[self.target_index % 2]
             target.sphere.color = self._old_target_color
 
-class StartTrialBelowSpeedThr(traits.HasTraits):
-    '''
-    The next trial doesn't start until the cursor speed is kept under the speed threshold for a certain duration
-    Please turn off the Autostart feature. Otherwise, it overwrites this feature and the next trial automatically starts 
-    '''
-
-    exclude_parent_traits = ['wait_time','rand_start']
-    speed_threshold = traits.Float(30, desc="Speed threshold in cm/s")
-    duration_under_speed_threshold = traits.Float(1, desc="The duration in second in which the speed must stay below the speed threshold")
-
-    def _start_wait(self):
-        
-        self.previous_cursor_pos = self.plant.get_endpoint_pos()
-        self.frames_under_speed_threshold = 0
-    
-        super()._start_wait()
-
-    def _test_start_trial(self, time_in_state):
-
-        self.current_cursor_pos = self.plant.get_endpoint_pos()
-
-        speed = np.linalg.norm(self.current_cursor_pos - self.previous_cursor_pos)*self.fps
-
-        if speed < self.speed_threshold:
-            self.frames_under_speed_threshold += 1
-        else:
-            self.frames_under_speed_threshold = 0
-
-        self.previous_cursor_pos = self.current_cursor_pos
-
-        return self.frames_under_speed_threshold/self.fps > self.duration_under_speed_threshold
-
 class PoissonWait(traits.HasTraits):
     '''
     Draw each trial's wait time from a poisson random distribution    
