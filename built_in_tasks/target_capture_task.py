@@ -62,19 +62,26 @@ class TargetCapture(Sequence):
     def init(self):
         self.trial_dtype = np.dtype([('trial', 'u4'), ('index', 'u4'), ('target', 'f8', (3,))])
         super().init()
+        self.penalty_index = 0
+        self.pause_index = 0
 
     def _start_wait(self):
-        # Call parent method to draw the next target capture sequence from the generator
-        super()._start_wait()
+        if self.penalty_index == 0 and self.pause_index == 0: # doesn't call parent method when the state comes from the penalty or pause state
+            # Call parent method to draw the next target capture sequence from the generator
+            super()._start_wait()
 
-        # number of times this sequence of targets has been attempted
-        self.tries = 0
+            # number of times this sequence of targets has been attempted
+            self.tries = 0
 
         # index of current target presented to subject
         self.target_index = -1
 
         # number of targets to be acquired in this trial
         self.chain_length = len(self.targs)
+
+        # Set index to 0 because the state may come from the penalty or pause state,
+        self.penalty_index = 0
+        self.pause_index = 0
 
     def _parse_next_trial(self):
         '''Check that the generator has the required data'''
@@ -145,6 +152,7 @@ class TargetCapture(Sequence):
 
     def _start_timeout_penalty(self):
         self._increment_tries()
+        self.penalty_index = 1
 
     def _while_timeout_penalty(self):
         '''Nothing generic to do.'''
@@ -156,6 +164,7 @@ class TargetCapture(Sequence):
 
     def _start_hold_penalty(self):
         self._increment_tries()
+        self.penalty_index = 1
 
     def _while_hold_penalty(self):
         '''Nothing generic to do.'''
@@ -167,6 +176,7 @@ class TargetCapture(Sequence):
 
     def _start_delay_penalty(self):
         self._increment_tries()
+        self.penalty_index = 1
 
     def _while_delay_penalty(self):
         '''Nothing generic to do.'''
@@ -189,8 +199,7 @@ class TargetCapture(Sequence):
         pass
 
     def _start_pause(self):
-        '''Nothing generic to do.'''
-        pass
+        self.pause_index = 1
 
     def _while_pause(self):
         '''Nothing generic to do.'''
