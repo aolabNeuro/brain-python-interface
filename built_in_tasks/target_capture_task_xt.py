@@ -160,6 +160,7 @@ class ScreenReachLine(ScreenTargetCapture):
     line_color = traits.OptionsList("white", *target_colors, desc="Color of the eye target", bmi3d_input_options=list(target_colors.keys()))
     line_width = traits.Float(3, desc="Line width where the cursor needs to stay")
     line_from_previous_target = traits.Bool(False, desc="Line is drew between the previous target and the pripheral target")
+    remove_line_for_the_first_target = traits.Bool(False, desc="Remove the line for the first target, which is usually the center target")
     #line_for_target_index = traits.List([0,1], desc="Line is drawn for specified target index")
 
     def __init__(self, *args, **kwargs):
@@ -221,7 +222,10 @@ class ScreenReachLine(ScreenTargetCapture):
         self.bar.move_to_position(self.reach_target + offset_rectangle)
 
         # Show the rectangle
-        self.bar.show()
+        if self.remove_line_for_the_first_target and self.target_index == 0:
+            self.bar.hide()
+        else:
+            self.bar.show()
 
     def _test_leave_bounds(self, ts):
         '''
@@ -234,7 +238,10 @@ class ScreenReachLine(ScreenTargetCapture):
         Y = current_pos[2]
         distance = np.abs(self.target_x*self.slope - self.target_y + (Y-self.slope*X))/np.sqrt(self.slope**2+1)
 
-        return distance > (self.line_width/2 - self.cursor_radius)
+        if self.remove_line_for_the_first_target and self.target_index == 0:
+            return False
+        else:
+            return distance > (self.line_width/2 - self.cursor_radius)
 
     def _start_targ_transition(self):
         super()._start_targ_transition()
