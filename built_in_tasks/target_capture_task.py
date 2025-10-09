@@ -34,9 +34,9 @@ class TargetCapture(Sequence):
         hold = dict(leave_target="hold_penalty", hold_complete="delay", start_pause="pause"),
         delay = dict(leave_target="delay_penalty", delay_complete="targ_transition", start_pause="pause"),
         targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target", start_pause="pause"),
-        timeout_penalty = dict(timeout_penalty_end="targ_transition", start_pause="pause", end_state=True),
-        hold_penalty = dict(hold_penalty_end="targ_transition", start_pause="pause", end_state=True),
-        delay_penalty = dict(delay_penalty_end="targ_transition", start_pause="pause", end_state=True),
+        timeout_penalty = dict(timeout_penalty_end="wait", start_pause="pause", end_state=True),
+        hold_penalty = dict(hold_penalty_end="wait", start_pause="pause", end_state=True),
+        delay_penalty = dict(delay_penalty_end="wait", start_pause="pause", end_state=True),
         reward = dict(reward_end="wait", start_pause="pause", stoppable=False, end_state=True),
         pause = dict(end_pause="wait", end_state=True),
     )
