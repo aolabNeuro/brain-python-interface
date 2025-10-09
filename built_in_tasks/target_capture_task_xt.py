@@ -172,6 +172,10 @@ class ScreenReachLine(ScreenTargetCapture):
         if self.penalty_index == 0 and self.pause_index == 0:
             super()._start_wait() # skip _start_wait to make the same target appear even after penalty
 
+        if self.tries==self.max_attempts: # The task goes to the next target after the number of reattempting is max attempts 
+            super()._start_wait()
+            self.tries = 0 # number of times this sequence of targets has been attempted
+            
         # Delete bar because the shape of bar changes every trial
         if hasattr(self, 'bar'):
             for model in self.bar.graphics_models:
