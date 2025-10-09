@@ -66,12 +66,15 @@ class TargetCapture(Sequence):
         self.pause_index = 0
 
     def _start_wait(self):
+        
         if self.penalty_index == 0 and self.pause_index == 0: # doesn't call parent method when the state comes from the penalty or pause state
             # Call parent method to draw the next target capture sequence from the generator
             super()._start_wait()
+            self.tries = 0 # number of times this sequence of targets has been attempted
 
-            # number of times this sequence of targets has been attempted
-            self.tries = 0
+        if self.tries==self.max_attempts: # The task goes to the next target after the number of reattempting is max attempts 
+            super()._start_wait()
+            self.tries = 0 # number of times this sequence of targets has been attempted
 
         # index of current target presented to subject
         self.target_index = -1
