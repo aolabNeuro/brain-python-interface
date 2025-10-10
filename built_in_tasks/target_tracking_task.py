@@ -959,8 +959,12 @@ class ScreenTargetTracking(TargetTracking, Window):
         f_x = xprimes*w0 # stimulated frequencies
         f_y = yprimes*w0
 
-        a_x = 1/(1+np.arange(f_x.size)) # amplitude
-        a_y = 1/(1+np.arange(f_y.size))
+        #a_x = 1/(1+np.arange(f_x.size)) # amplitude linear/reciprocal 
+        #a_y = 1/(1+np.arange(f_y.size))
+
+        k = 0.1 #decay rate
+        a_x = np.exp(-k*np.arange(f_x.size)) # amplitude exponential decay
+        a_y = np.exp(-k*np.arange(f_y.size))
 
         # phase offset
         o_x = np.random.rand(num_trials, f_x.size)
@@ -1019,8 +1023,11 @@ class ScreenTargetTracking(TargetTracking, Window):
             mid2 = nele // 2
             first_set.append(mid1)
             second_set.append(mid2)
-        
 
+        # #check with disturbance adn reference sharing primes 
+        # sines_r = np.arange(len(xprimes))
+        # sines_d = np.arange(len(xprimes))
+        
         # generate reference and disturbance trajectories for all trials
         for trial_id, (num_reps,ref_ind,dis_ind) in enumerate(trial_order*int(num_trials/2)):   
             if ref_ind == 'E': 
@@ -1148,11 +1155,11 @@ class ScreenTargetTracking(TargetTracking, Window):
                     targs = []
                     ref_trajectory = np.zeros((int((time_length+ramp+ramp_down)*sample_rate),3))
                     dis_trajectory = ref_trajectory.copy()
-                    ref_trajectory[:,2] = trials['ref_x'][trial_id] #y is out of the screen, x is left and right and z is up and down 
-                    ref_trajectory[:,0] = trials['ref_y'][trial_id]
+                    ref_trajectory[:,2] = trials['ref_y'][trial_id] #y is out of the screen, x is left and right and z is up and down 
+                    ref_trajectory[:,0] = trials['ref_x'][trial_id]
 
-                    dis_trajectory[:,2] = trials['dis_x'][trial_id]
-                    dis_trajectory[:,0] = trials['dis_y'][trial_id] 
+                    dis_trajectory[:,2] = trials['dis_y'][trial_id]
+                    dis_trajectory[:,0] = trials['dis_x'][trial_id] 
                     targs.append(ref_trajectory)
                     yield idx, targs, disturbance, dis_trajectory, sample_rate, ramp, ramp_down
                     idx += 1

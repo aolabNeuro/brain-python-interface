@@ -121,12 +121,12 @@ class TestManualControlTasks(unittest.TestCase):
 
 class TestSeqGenerators(unittest.TestCase):
 
-    # @unittest.skip("")
+    @unittest.skip("")
     def test_gen_ascending(self):
         seq = Conditions.gen_conditions(3, [1, 2], ascend=True)
         self.assertSequenceEqual(seq[0], [0, 0, 0, 1, 1, 1])
 
-    # @unittest.skip("")
+    @unittest.skip("")
     def test_gen_out_2D(self):
         seq = ScreenTargetCapture.out_2D(nblocks=1, )
         seq = list(seq)
@@ -144,11 +144,12 @@ class TestSeqGenerators(unittest.TestCase):
         self.assertAlmostEqual(loc[idx == 3, 0][0], 10)
         self.assertAlmostEqual(loc[idx == 3, 2][0], 0)
 
-    # @unittest.skip("")
+    @unittest.skip("")
     def test_dual_laser_wave(self):
         seq = LaserConditions.dual_laser_square_wave(duty_cycle_1=0.025, duty_cycle_2=0.025, phase_delay_2=0.1)
         print(seq[0])
 
+    @unittest.skip("")
     def test_swept_laser_pulse(self):
         seq = SweptLaserConditions.single_laser_pulse()
         print(seq[0])
@@ -165,28 +166,34 @@ class TestSeqGenerators(unittest.TestCase):
         print(loc)
         print("---------------corners")
 
-    # @unittest.skip("")
+    #@unittest.skip("")
     def test_tracking_2d(self):
-        seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=20, ramp=1, ramp_down=1, 
-                                                 num_primes=10, seed=42, sample_rate=60, dimensions=2, 
+        seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=20, ramp=0, ramp_down=0, 
+                                                 num_primes=12, seed=42, sample_rate=60, dimensions=2, 
                                                  disturbance=False, boundaries=(-10,10,-10,10))
         trajectories = [t[1][0] for t in seq]
-        ft_len = np.arange(len(trajectories[0]))
-        st_len = np.arange(len(trajectories[1]))
-        print(trajectories[0].shape, trajectories[1].shape)
-        first_trial_x = np.fft.fft(trajectories[0][:,2])
-        second_trial_x = np.fft.fft(trajectories[1][:,2])
-        first_trial_y = np.fft.fft(trajectories[0][:,0])
-        second_trial_y = np.fft.fft(trajectories[1][:,0])
-        fig, axs = plt.subplots(2,2, figsize = (10,8))
-        axs[0,0].plot(ft_len, np.abs(first_trial_x))
-        axs[0,0].set_title("First Trial X")
-        axs[0,1].plot(ft_len, np.abs(first_trial_y))
-        axs[0,1].set_title("First Trial Y")
-        axs[1,0].plot(st_len, np.abs(second_trial_x))
-        axs[1,0].set_title("Second Trial X")
-        axs[1,1].plot(st_len, np.abs(second_trial_y))
-        axs[1,1].set_title("Second Trial Y")
+        print("2D Test-------")
+        print(np.shape(trajectories))
+        print("2D Test-------")
+        fig, axs = plt.subplots(2,1, figsize=(10,8))
+        for idx, trial in enumerate(trajectories): 
+            ax = axs[idx]
+            trialx = np.fft.fft(trial[:,0])
+            trial_length = np.shape(trialx)[0]
+            freq = np.fft.fftfreq(trial_length, d=1./60)
+            non_neg_freq = freq[freq >= 0] #get positive frequencies 
+            non_neg_x = trialx[freq >= 0] / complex(trial_length, 0) #normalize 
+            non_neg_x[1:] = 2*non_neg_x[1:] #account for negative frequencies
+            trialy = np.fft.fft(trial[:,2])
+            non_neg_y = trialy[freq >= 0] / complex(trial_length, 0) #normalize 
+            non_neg_y[1:] = 2*non_neg_y[1:] #account for negative frequencies
+            ax.plot(non_neg_freq, np.abs(non_neg_x), 'o-', label = 'X')
+            ax.plot(non_neg_freq, np.abs(non_neg_y), 'o-', label = 'Y')
+            ax.set_title(f'Trial {idx}')
+            ax.set_xlim(0, 3)
+            ax.set_xlabel('Frequency (Hz)')
+        plt.legend()
+        plt.tight_layout()
         plt.show()
 
 class TestYouTube(unittest.TestCase):
