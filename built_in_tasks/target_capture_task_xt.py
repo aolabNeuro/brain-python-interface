@@ -983,6 +983,7 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
 
     def _start_leave_center(self):
         self.sync_event('CURSOR_LEAVE_TARGET') #integer code 96
+        self.targets[0].cue_fixation() #turn center target blue 
     
         
     def _start_hold_penalty(self):
