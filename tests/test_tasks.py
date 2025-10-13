@@ -11,6 +11,7 @@ from features.touch_features import MouseEmulateTouch
 from riglib.stereo_opengl.environment import Grid
 from riglib.stereo_opengl.window import WindowDispl2D
 from riglib import experiment
+from riglib import audio
 from features.peripheral_device_features import ForceControl, MouseControl
 from features.optitrack_features import OptitrackSimulate, Optitrack, SpheresToCylinders
 from features.reward_features import ProgressBar, ScoreRewards
@@ -36,14 +37,16 @@ def init_exp(base_class, feats, seq=None, **kwargs):
 
 class TestManualControlTasks(unittest.TestCase):
 
-    @unittest.skip("")
+    #@unittest.skip("")
     def test_readysetgo(self):
         seq = ManualControl.centerout_2D()
-        exp = init_exp(ReadySetGoTask, [MouseControl, Window2D], seq, window_size=(1200,800), fullscreen=False)
-        exp.rotation = 'yzx'
-        exp.offset = [-20, -95, -2]
-        exp.ready_set_sound = 'tones.wav'
-        exp.tooslow_penalty_sound = 'buzzer.wav'
+        exp = init_exp(ReadySetGoTask, [MouseControl, Window2D], seq, prepbuff_time = 0.2,
+                       delay_time = 0.8, mustmv_time = 0.4,ready_set_sound = 'tones.wav', 
+                       tooslow_penalty_sound = 'buzzer.wav', window_size=(1200,800), 
+                       fullscreen=False)
+        #exp.rotation = 'yzx'
+        exp.rotation = 'xzy'
+        #exp.offset = [-20, -95, -2]
         exp.run()
 
 
@@ -64,7 +67,7 @@ class TestManualControlTasks(unittest.TestCase):
         exp = init_exp(ExampleSequenceTask, [], seq, window_size=(1200,800), fullscreen=False)
         exp.run()
     
-    # @unittest.skip("")
+    @unittest.skip("")
     def test_tracking(self):
         print("Running tracking task test")
         seq = TrackingTask.tracking_target_debug(nblocks=1, ntrials=6, time_length=5, seed=40, sample_rate=60, ramp=1) # sample_rate needs to match fps in ScreenTargetTracking
@@ -131,11 +134,12 @@ class TestSeqGenerators(unittest.TestCase):
         self.assertAlmostEqual(loc[idx == 3, 0][0], 10)
         self.assertAlmostEqual(loc[idx == 3, 2][0], 0)
 
-    # @unittest.skip("")
+    @unittest.skip("")
     def test_dual_laser_wave(self):
         seq = LaserConditions.dual_laser_square_wave(duty_cycle_1=0.025, duty_cycle_2=0.025, phase_delay_2=0.1)
         print(seq[0])
 
+    @unittest.skip("")
     def test_swept_laser_pulse(self):
         seq = SweptLaserConditions.single_laser_pulse()
         print(seq[0])
