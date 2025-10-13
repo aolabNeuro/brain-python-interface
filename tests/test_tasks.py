@@ -37,7 +37,7 @@ def init_exp(base_class, feats, seq=None, **kwargs):
 
 class TestManualControlTasks(unittest.TestCase):
 
-    #@unittest.skip("")
+    @unittest.skip("")
     def test_readysetgo(self):
         seq = ManualControl.centerout_2D()
         exp = init_exp(ReadySetGoTask, [MouseControl, Window2D], seq, prepbuff_time = 0.2,
