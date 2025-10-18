@@ -337,3 +337,20 @@ class HideLeftTrajectory(traits.HasTraits):
         super()._start_trajectory()
         if self.frame_index == 0:
             self.box.show()
+
+class ReadysetMedley(traits.HasTraits):
+
+    '''
+    Allows for mulitple different prepbuff and delay times to be used within a single experiment.
+    Replaces the prepbuff_time and delay_time parameters with a list of possible values and correspondniig probabilities.
+    '''
+
+    exclude_parent_traits = ['prepbuff_time', 'delay_time']
+    delay_times = [0,0.1,0.2,0.4]
+    frac_times = [0.1,0.25,0.25,0.4]
+
+    def _start_wait(self):
+        '''
+        At the start of the 'wait' state, determine which prepbuff & delay_time to use
+        '''
+        
