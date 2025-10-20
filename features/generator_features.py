@@ -348,14 +348,16 @@ class ReadysetMedley(traits.HasTraits):
     exclude_parent_traits = ['prepbuff_time', 'delay_time']
     display_times = traits.List([0,0.1,0.2,0.4], desc = 'Possible peripheral target display times')
     frac_times = traits.List([0.1,0.25,0.25,0.4], desc = 'Proportion of each type of display time. Need to be equal length to delay_times and sum to 1') #should sum to 1.0 
-    assert(len(display_times) == len(frac_times)), "display_times and frac_times must be the same length"
 
     def _start_wait(self):
         '''
         At the start of the 'wait' state, determine which prepbuff & delay_time to use
         '''
-        self.delay_time = np.random.choice(self.display_times, p=self.frac_times, k = 1)[0]
+        assert(len(self.display_times[0]) == len(self.frac_times[0])), "display_times and frac_times must be the same length"
+        print(self.display_times[0])
+        self.delay_time = np.random.choice(list(self.display_times[0]), p = list(self.frac_times[0])) #access first element to avoid dimension error
         audio_length = 1.0 # length of the audio cue in seconds. need to automate this
         self.prepbuff_time = audio_length - self.delay_time
+        print(self.prepbuff_time)
         super()._start_wait()
 
