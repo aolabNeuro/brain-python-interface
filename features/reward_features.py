@@ -63,25 +63,30 @@ class RewardSystemPulse(RewardSystem):
     '''
     
     exclude_parent_traits = ['reward_time']
-    reward_duration = traits.Float(0.2, desc='Duration of reward for 1 pulse')
+    single_reward_duration = traits.Float(0.2, desc='Duration of reward for 1 pulse')
     inter_reward_interval = traits.Float(0.2, desc='interval of reward')
-    max_iterations = traits.Int(5, desc='the nubmer of iterations for reward pulse')
+    pulses_per_total_reward = traits.Int(5, desc='the nubmer of iterations for reward pulse')
         
-    def _test_reward_end(self, ts):
-        self.duration_per_iteration = self.reward_duration + self.inter_reward_interval
-        ts_within_iteration = ts % self.duration_per_iteration
+    def _start_reward(self):
+        super()._start_reward()
+        self.reward_start = self.get_time()
+        self.duration_per_single_reward = self.single_reward_duration + self.inter_reward_interval
+        self.total_reward_duration = self.pulses_per_total_reward * self.duration_per_single_reward
+
+    def _while_reward(self):
+        super()._while_reward()
+        time_in_reward = self.get_time() - self.reward_start
+        time_within_single_reward = time_in_reward % self.duration_per_single_reward
 
         if self.reportstats['Reward #'] % self.trials_per_reward == 0:
-            if ts > self.max_iterations*self.duration_per_iteration:
-                return True
+            if time_within_single_reward < self.single_reward_duration:
+                self.reward.on()
             else:
-                if ts_within_iteration < self.reward_duration:
-                    self.reward.on()
-                else:
-                    self.reward.off()
-        else:
-            return True
+                self.reward.off()
 
+    def _test_reward_end(self, ts):
+        return ts > self.total_reward_duration
+    
 audio_path = os.path.join(os.path.dirname(__file__), '../riglib/audio')
 
 class PelletReward(RewardSystem):
