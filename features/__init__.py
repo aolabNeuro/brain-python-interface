@@ -97,7 +97,7 @@ built_in_features = dict(
     hide_left_trajectory=HideLeftTrajectory,
     consecutive_jackpot=ConsecutiveJackpot,
     mouse_emulate_touch=MouseEmulateTouch,
-    start_trial_under_speed_thr=StartTrialBelowSpeedThr,
+    start_trial_below_speed_thr=StartTrialBelowSpeedThr,
     reward_system_pulse = RewardSystemPulse,
 )
 

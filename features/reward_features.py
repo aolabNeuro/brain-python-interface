@@ -59,6 +59,7 @@ class RewardSystem(traits.HasTraits):
 class RewardSystemPulse(RewardSystem):
     '''
     Give multiple reward defined by reward duration, inter-reward interval, and iterations
+    Please turn off other reward related features such as reward_system, consecutive_jackpot, and jackpot
     '''
     
     exclude_parent_traits = ['reward_time']
@@ -76,7 +77,7 @@ class RewardSystemPulse(RewardSystem):
             else:
                 if ts_within_iteration < self.reward_duration:
                     self.reward.on()
-                elif ts_within_iteration < self.duration_per_iteration:
+                else:
                     self.reward.off()
         else:
             return True
