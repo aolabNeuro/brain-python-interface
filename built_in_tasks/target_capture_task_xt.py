@@ -138,16 +138,17 @@ class ScreenReachLine(ScreenTargetCapture):
     '''
 
     status = dict(
-        wait = dict(start_trial="target"),
-        target = dict(leave_bounds="reach_penalty", enter_target="hold", timeout="timeout_penalty"),
-        hold = dict(leave_target="hold_penalty", hold_complete="delay"),
-        delay = dict(leave_target="delay_penalty", delay_complete="targ_transition"),
-        targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target"),
-        timeout_penalty = dict(timeout_penalty_end="wait", end_state=True),
-        hold_penalty = dict(hold_penalty_end="wait", end_state=True),
-        delay_penalty = dict(delay_penalty_end="wait", end_state=True),
-        reach_penalty = dict(delay_penalty_end="wait", end_state=True),
-        reward = dict(reward_end="wait", stoppable=False, end_state=True)
+        wait = dict(start_trial="target", start_pause="pause"),
+        target = dict(leave_bounds="reach_penalty", enter_target="hold", timeout="timeout_penalty", start_pause="pause"),
+        hold = dict(leave_target="hold_penalty", hold_complete="delay", start_pause="pause"),
+        delay = dict(leave_target="delay_penalty", delay_complete="targ_transition", start_pause="pause"),
+        targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target", start_pause="pause"),
+        timeout_penalty = dict(timeout_penalty_end="wait", start_pause="pause", end_state=True),
+        hold_penalty = dict(hold_penalty_end="wait", start_pause="pause", end_state=True),
+        delay_penalty = dict(delay_penalty_end="wait", start_pause="pause", end_state=True),
+        reach_penalty = dict(delay_penalty_end="wait", start_pause="pause", end_state=True),
+        reward = dict(reward_end="wait", start_pause="pause", stoppable=False, end_state=True),
+        pause = dict(end_pause="wait", end_state=True),
     )
 
     sequence_generators = [
@@ -156,21 +157,25 @@ class ScreenReachLine(ScreenTargetCapture):
 
     reach_penalty_time = traits.Float(1, desc="Length of penalty time for target hold error")
     exclude_parent_traits = ['max_reach_angle','reach_fraction','start_radius']
-    bar_color = traits.OptionsList("white", *target_colors, desc="Color of the eye target", bmi3d_input_options=list(target_colors.keys()))
-    bar_width = traits.Float(3, desc="Bar width where the cursor needs to stay")
+    line_color = traits.OptionsList("white", *target_colors, desc="Color of the eye target", bmi3d_input_options=list(target_colors.keys()))
+    line_width = traits.Float(3, desc="Line width where the cursor needs to stay")
+    line_from_previous_target = traits.Bool(False, desc="Line is drew between the previous target and the pripheral target")
+    remove_line_for_the_first_target = traits.Bool(False, desc="Remove the line for the first target, which is usually the center target")
+    #line_for_target_index = traits.List([0,1], desc="Line is drawn for specified target index")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.penalty_index = 0
-        # # Instantiate the targets
-        # instantiate_targets = kwargs.pop('instantiate_targets', True)
-        # if instantiate_targets:
-
-            
+        self.pause_index = 0
+          
     def _start_wait(self):
-        if self.penalty_index == 0:
+        if self.penalty_index == 0 and self.pause_index == 0:
             super()._start_wait() # skip _start_wait to make the same target appear even after penalty
 
+        if self.tries==self.max_attempts: # The task goes to the next target after the number of reattempting is max attempts 
+            super()._start_wait()
+            self.tries = 0 # number of times this sequence of targets has been attempted
+            
         # Delete bar because the shape of bar changes every trial
         if hasattr(self, 'bar'):
             for model in self.bar.graphics_models:
@@ -178,12 +183,22 @@ class ScreenReachLine(ScreenTargetCapture):
             del self.bar
 
         self.penalty_index = 0
+        self.pause_index = 0
+        self.target_index = -1
 
     def _start_target(self):
         super()._start_target()
         
         # Define a reach start and reach target position whenever the target appears
-        self.reach_start = self.plant.get_endpoint_pos().copy()
+        if self.target_index != 0:
+            if self.line_from_previous_target:
+                self.reach_start = self.targs[self.target_index-1] # Reach start position is defined as the previous target position
+            else:
+                self.reach_start = self.plant.get_endpoint_pos().copy() # Reach start position is defined as the initial cursor position
+
+        else:
+            self.reach_start = self.plant.get_endpoint_pos().copy()
+
         self.reach_target = self.targs[self.target_index]
   
         # slope between the reach start position and target position
@@ -196,8 +211,8 @@ class ScreenReachLine(ScreenTargetCapture):
         # Convert the slope to the angle
         bar_angle = np.degrees(np.arctan(self.slope))
 
-        self.bar = VirtualRectangularTarget(target_width=self.bar_width, target_height=50, 
-                                                   target_color=target_colors[self.bar_color],starting_pos=[0,0,0])
+        self.bar = VirtualRectangularTarget(target_width=self.line_width, target_height=50, 
+                                                   target_color=target_colors[self.line_color],starting_pos=[0,0,0])
         for model in self.bar.graphics_models:
             self.add_model(model)
 
@@ -205,13 +220,16 @@ class ScreenReachLine(ScreenTargetCapture):
         self.bar.rotate_yaxis(-bar_angle, reset=True)
 
         # Compute offset because rotating the rectangle results in shifting the rectangle position
-        offset_rectangle = [-np.sin(np.radians(-bar_angle))*self.bar_width/2,0,-np.cos(np.radians(-bar_angle))*self.bar_width/2]
+        offset_rectangle = [-np.sin(np.radians(-bar_angle))*self.line_width/2,0,-np.cos(np.radians(-bar_angle))*self.line_width/2]
         
         # Move the rectangle to the reach target, taking into account the offset
         self.bar.move_to_position(self.reach_target + offset_rectangle)
 
         # Show the rectangle
-        self.bar.show()
+        if self.remove_line_for_the_first_target and self.target_index == 0:
+            self.bar.hide()
+        else:
+            self.bar.show()
 
     def _test_leave_bounds(self, ts):
         '''
@@ -224,7 +242,10 @@ class ScreenReachLine(ScreenTargetCapture):
         Y = current_pos[2]
         distance = np.abs(self.target_x*self.slope - self.target_y + (Y-self.slope*X))/np.sqrt(self.slope**2+1)
 
-        return distance > (self.bar_width/2 - self.cursor_radius)
+        if self.remove_line_for_the_first_target and self.target_index == 0:
+            return False
+        else:
+            return distance > (self.line_width/2 - self.cursor_radius)
 
     def _start_targ_transition(self):
         super()._start_targ_transition()
@@ -259,9 +280,18 @@ class ScreenReachLine(ScreenTargetCapture):
             target.hide()
             target.reset()
         self.bar.hide()
+        self.bar.reset()
 
     def _end_reach_penalty(self):
         self.sync_event('TRIAL_END')
+
+    def _start_pause(self):
+        super()._start_pause()
+        self.pause_index = 1
+
+        if hasattr(self, 'bar'): # bacause bar attribute doen't exist in the wait state
+            self.bar.hide()
+            self.bar.reset()
 
     def _test_reach_penalty_end(self, ts):
         return ts > self.reach_penalty_time

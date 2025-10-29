@@ -56,6 +56,37 @@ class RewardSystem(traits.HasTraits):
         float_dur = float(duration)  # these parameters always end up being strings
         reward_sys.async_drain(float_dur)
 
+class RewardSystemPulse(RewardSystem):
+    '''
+    Give multiple reward defined by reward duration, inter-reward interval, and iterations
+    Please turn off other reward related features such as reward_system, consecutive_jackpot, and jackpot
+    '''
+    
+    exclude_parent_traits = ['reward_time']
+    single_reward_duration = traits.Float(0.2, desc='Duration of reward for 1 pulse')
+    inter_reward_interval = traits.Float(0.2, desc='interval of reward')
+    pulses_per_total_reward = traits.Int(5, desc='the nubmer of iterations for reward pulse')
+        
+    def _start_reward(self):
+        super()._start_reward()
+        self.reward_start = self.get_time()
+        self.duration_per_single_reward = self.single_reward_duration + self.inter_reward_interval
+        self.total_reward_duration = self.pulses_per_total_reward * self.duration_per_single_reward
+
+    def _while_reward(self):
+        super()._while_reward()
+        time_in_reward = self.get_time() - self.reward_start
+        time_within_single_reward = time_in_reward % self.duration_per_single_reward
+
+        if self.reportstats['Reward #'] % self.trials_per_reward == 0:
+            if time_within_single_reward < self.single_reward_duration:
+                self.reward.on()
+            else:
+                self.reward.off()
+
+    def _test_reward_end(self, ts):
+        return ts > self.total_reward_duration
+    
 audio_path = os.path.join(os.path.dirname(__file__), '../riglib/audio')
 
 class PelletReward(RewardSystem):
