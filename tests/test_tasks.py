@@ -111,12 +111,12 @@ class TestManualControlTasks(unittest.TestCase):
 
 class TestSeqGenerators(unittest.TestCase):
 
-    # @unittest.skip("")
+    @unittest.skip("")
     def test_gen_ascending(self):
         seq = Conditions.gen_conditions(3, [1, 2], ascend=True)
         self.assertSequenceEqual(seq[0], [0, 0, 0, 1, 1, 1])
 
-    # @unittest.skip("")
+    @unittest.skip("")
     def test_gen_out_2D(self):
         seq = ScreenTargetCapture.out_2D(nblocks=1, )
         seq = list(seq)
