@@ -337,3 +337,29 @@ class HideLeftTrajectory(traits.HasTraits):
         super()._start_trajectory()
         if self.frame_index == 0:
             self.box.show()
+
+class ReadysetMedley(traits.HasTraits):
+
+    '''
+    Allows for mulitple different prepbuff and delay times to be used within a single experiment.
+    Replaces the prepbuff_time and delay_time parameters with a list of possible values and correspondniig probabilities.
+    '''
+
+    exclude_parent_traits = ['prepbuff_time', 'delay_time']
+    display_times = traits.List([0,], desc = 'Possible peripheral target display times')
+    frac_times = traits.List([0.1,], desc = 'Proportion of each type of display time. Need to be equal length to delay_times and sum to 1') #should sum to 1.0 
+    
+    #def __init__(self, *args, **kwargs):
+        #super().__init__(*args, **kwargs)
+        #assert(len(self.display_times) == len(self.frac_times)) #can be here and task wont run if lenghts are different
+
+    def _start_wait(self):
+        '''
+        At the start of the 'wait' state, determine which prepbuff & delay_time to use
+        '''
+        #assert(len(self.display_times) == len(self.frac_times)), "display_times and frac_times must be the same length"
+        self.delay_time = np.random.choice((self.display_times), p = (self.frac_times)) 
+        audio_length = 1.0 # length of the audio cue in seconds. need to automate this
+        self.prepbuff_time = audio_length - self.delay_time
+        super()._start_wait()
+
