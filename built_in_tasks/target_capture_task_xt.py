@@ -1009,7 +1009,33 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
     ### State Functions ###
     def _start_prepbuff(self):
         self.sync_event('CUE') #integer code 112
+        self.prep_start_time = self.get_time()
+        self.audio_space = 0.5 #seconds between tones 
+        self.set_played = False
         self.ready_set_player.play() 
+
+    def _while_prepbuff(self):
+        self.time_in_prep = self.get_time() - self.prep_start_time
+        if self.time_in_prep >= self.audio_space and not self.set_played:
+            self.ready_set_player.play()
+            self.targets[0].cue_set_tone()
+            self.set_played = True
+            #print(self.time_in_prep)
+
+    def _while_delay(self):
+        super()._while_delay()
+        self.time_in_delay = self.get_time() - self.prep_start_time
+        if self.time_in_delay >= self.audio_space and not self.set_played:
+            self.ready_set_player.play()
+            self.targets[0].cue_set_tone()
+            self.set_played = True
+            #print(self.time_in_delay)
+    
+    def _end_delay(self):
+        super()._end_delay()
+        self.go_time = self.get_time() - self.prep_start_time
+        self.ready_set_player.play()
+        #print(self.go_time)
 
     def _start_leave_center(self):
         self.sync_event('CURSOR_LEAVE_TARGET') #integer code 96
