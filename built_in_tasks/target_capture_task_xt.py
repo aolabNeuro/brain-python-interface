@@ -9,7 +9,7 @@ import os
 from .target_graphics import *
 from .target_capture_task import ScreenTargetCapture
 from riglib.experiment import traits
-from riglib.audio import AudioPlayer
+from riglib.audio import AudioPlayer, TonePlayer
 
 audio_path = os.path.join(os.path.dirname(__file__), '../riglib/audio')        
 
@@ -936,10 +936,15 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
     tooslow_penalty_sound = traits.OptionsList(files, desc="File in riglib/audio to play on each must move penalty") #hold penalty is normally incorrect.wav
     shadow_periph_radius = traits.Float(0.5, desc = 'additional radius for peripheral target')
     periph_hold = traits.Float(0.2, desc = "Hold time for peripheral target")
+    readyset_freq = traits.Float(320, desc="Frequency of the ready-set tone")
+    go_freq = traits.Float(440, desc="Frequency of the go tone")
+    tone_duration = traits.Float(0.1, desc="Duration of the ready-set and go tones")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.ready_set_player = AudioPlayer(self.ready_set_sound)
+        self.readyset_tone = TonePlayer(frequency=self.readyset_freq, duration=self.tone_duration)
+        self.go_tone = TonePlayer(frequency=self.go_freq, duration=self.tone_duration)
         self.tooslow_penalty_player = AudioPlayer(self.tooslow_penalty_sound)
         self.pseudo_reward = 0
         
@@ -1012,29 +1017,35 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
         self.prep_start_time = self.get_time()
         self.audio_space = 0.5 #seconds between tones 
         self.set_played = False
-        self.ready_set_player.play() 
+        #self.ready_set_player.play() 
+        self.readyset_tone.play()
 
     def _while_prepbuff(self):
         self.time_in_prep = self.get_time() - self.prep_start_time
         if self.time_in_prep >= self.audio_space and not self.set_played:
-            self.ready_set_player.play()
+            self.readyset_tone.play()
+            #self.ready_set_player.play()
             self.targets[0].cue_set_tone()
             self.set_played = True
             #print(self.time_in_prep)
+            #self.sync_event('CUE')
 
     def _while_delay(self):
         super()._while_delay()
         self.time_in_delay = self.get_time() - self.prep_start_time
         if self.time_in_delay >= self.audio_space and not self.set_played:
-            self.ready_set_player.play()
+            #self.ready_set_player.play()
+            self.readyset_tone.play()
             self.targets[0].cue_set_tone()
             self.set_played = True
             #print(self.time_in_delay)
+            #self.sync_event('CUE')
     
     def _end_delay(self):
         super()._end_delay()
         self.go_time = self.get_time() - self.prep_start_time
-        self.ready_set_player.play()
+        #self.ready_set_player.play()
+        self.go_tone.play()
         #print(self.go_time)
 
     def _start_leave_center(self):
@@ -1047,11 +1058,15 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
         if hasattr(super(), '_start_hold_penalty'):
             super()._start_hold_penalty()
         self.ready_set_player.stop()
+        self.readyset_tone.stop()
+        self.go_tone.stop()
     
     def _start_delay_penalty(self):
         if hasattr(super(), '_start_delay_penalty'):
             super()._start_delay_penalty()
         self.ready_set_player.stop()
+        self.readyset_tone.stop()
+        self.go_tone.stop()
     
     def _start_timeout_penalty(self):
         self.pseudo_success() #run before increment trials to prevent reseting of trial index
@@ -1062,6 +1077,8 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
         self.sync_event('OTHER_PENALTY') #integer code 79
         self.tooslow_penalty_player.play()
         self.ready_set_player.stop()
+        self.readyset_tone.stop()
+        self.go_tone.stop()
         self.jack_count = 0
         # # Hide targets
         for target in self.targets:
@@ -1081,3 +1098,5 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
     def _start_pause(self):
         super()._start_pause()
         self.ready_set_player.stop()
+        self.readyset_tone.stop()
+        self.go_tone.stop()
