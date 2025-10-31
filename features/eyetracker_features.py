@@ -210,17 +210,18 @@ class EyeConstrained(ScreenTargetCapture):
     fixation_target_color = traits.OptionsList("cyan", *target_colors, desc="Color of the center target under fixation state", bmi3d_input_options=list(target_colors.keys()))
     
     status = dict(
-        wait = dict(start_trial="target"),
-        target = dict(timeout="timeout_penalty",gaze_target="fixation"),
-        fixation = dict(enter_target="hold", fixation_break="target"),
-        hold = dict(leave_target="hold_penalty", hold_complete="delay", fixation_break="fixation_penalty"),
-        delay = dict(leave_target="delay_penalty", delay_complete="targ_transition", fixation_break="fixation_penalty"),
-        targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target"),
-        timeout_penalty = dict(timeout_penalty_end="targ_transition", end_state=True),
-        hold_penalty = dict(hold_penalty_end="targ_transition", end_state=True),
-        delay_penalty = dict(delay_penalty_end="targ_transition", end_state=True),
-        fixation_penalty = dict(fixation_penalty_end="targ_transition",end_state=True),
-        reward = dict(reward_end="wait", stoppable=False, end_state=True)
+        wait = dict(start_trial="target", start_pause="pause"),
+        target = dict(timeout="timeout_penalty",gaze_target="fixation", start_pause="pause"),
+        fixation = dict(enter_target="hold", fixation_break="target", start_pause="pause"),
+        hold = dict(leave_target="hold_penalty", hold_complete="delay", fixation_break="fixation_penalty", start_pause="pause"),
+        delay = dict(leave_target="delay_penalty", delay_complete="targ_transition", fixation_break="fixation_penalty", start_pause="pause"),
+        targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target", start_pause="pause"),
+        timeout_penalty = dict(timeout_penalty_end="wait", start_pause="pause", end_state=True),
+        hold_penalty = dict(hold_penalty_end="wait", start_pause="pause", end_state=True),
+        delay_penalty = dict(delay_penalty_end="wait", start_pause="pause", end_state=True),
+        fixation_penalty = dict(fixation_penalty_end="wait", start_pause="pause", end_state=True),
+        reward = dict(reward_end="wait", start_pause="pause", stoppable=False, end_state=True),
+        pause = dict(end_pause="wait", end_state=True),
     )
  
     def _test_gaze_target(self,ts):
@@ -242,8 +243,6 @@ class EyeConstrained(ScreenTargetCapture):
         if self.target_index <= 0:   
             d = np.linalg.norm(self.calibrated_eye_pos)
             return (d > self.fixation_dist) or self.pause
-        else:
-            return self.pause
     
     def _test_fixation_penalty_end(self,ts):
         # d = np.linalg.norm(self.calibrated_eye_pos)
