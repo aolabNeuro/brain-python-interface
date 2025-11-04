@@ -47,11 +47,11 @@ class RemoteReward():
 
     def __init__(self):
 
-        self.hostName = "192.168.0.200"
+        self.hostName = "192.168.0.150"
         self.serverPort = 8080
       
-    def trigger(self, ip_address):
-        url = f"http://{ip_address}:{self.serverPort}"
+    def trigger(self, ip_address, port_value):
+        url = f"http://{ip_address}:{port_value}"
         print(url)
 
         thread = threading.Thread(target=send_request, args=(url))
