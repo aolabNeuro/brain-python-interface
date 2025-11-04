@@ -276,7 +276,8 @@ class EyeConstrained(ScreenTargetCapture):
     def _start_fixation_penalty(self):
         self._increment_tries()
         self.sync_event('FIXATION_PENALTY') 
-
+        self.penalty_index = 1
+        
         # Hide targets
         for target in self.targets:
             target.hide()
