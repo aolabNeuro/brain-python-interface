@@ -57,7 +57,6 @@ class RemoteReward():
         self.hostName = "192.168.0.150"
         self.serverPort = 8080
       
-    def trigger(self, ip_address, port_value): # set some default so the manual reward button works
-        url = f"http://{ip_address}:{port_value}"
-        # url = "http://192.168.0.200:9000"
+    def trigger(self, ip_address): # set some default so the manual reward button works
+        url = f"http://{ip_address}:{self.serverPort}"
         send_nonblocking_request(url)
