@@ -39,9 +39,16 @@ def open():
 
 def send_request(url):
     try:
-        requests.post(url, timeout=3)
-    except:
-        traceback.print_exc() 
+        response = requests.post(url, timeout=3)
+        print(f"Request to {url} completed with status code: {response.status_code}")
+    except requests.exceptions.RequestException as e:
+        print(f"Error sending request to {url}: {e}")
+
+def send_nonblocking_request(url):
+    thread = threading.Thread(target=send_request, args=(url,))
+    thread.daemon = True
+    thread.start()
+    print("Non-blocking POST request initiated")
 
 class RemoteReward():
 
@@ -50,10 +57,7 @@ class RemoteReward():
         self.hostName = "192.168.0.150"
         self.serverPort = 8080
       
-    def trigger(self, ip_address, port_value):
+    def trigger(self, ip_address, port_value): # set some default so the manual reward button works
         url = f"http://{ip_address}:{port_value}"
-        print(url)
-
-        thread = threading.Thread(target=send_request, args=(url))
-        thread.daemon = True
-        thread.start()
+        # url = "http://192.168.0.200:9000"
+        send_nonblocking_request(url)
