@@ -122,7 +122,12 @@ class PelletReward(RewardSystem):
         self.reportstats['Reward #'] += 1
         
         if self.reportstats['Reward #'] % self.trials_per_reward == 0:
+<<<<<<< 8005149be4e11667fe4a76d17510adbb17bce7c1
             self.reward.trigger(self.ip_address, self.pellet_dispense_time, self.pellets_per_reward) # triggers as many times as pellets_per_reward
+=======
+            for _ in range(self.pellets_per_reward): # call trigger num of pellets_per_reward time
+                self.reward.trigger(self.ip_address)
+>>>>>>> system triggers but only works for 1x reward
 
     def _end_reward(self):
         if hasattr(super(RewardSystem, self), '_end_reward'):
