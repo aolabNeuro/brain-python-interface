@@ -94,7 +94,9 @@ class PelletReward(RewardSystem):
     Trigger pellet rewards.    
     '''
     pellets_per_reward = traits.Int(1, desc='The number of pellets to dispense per reward.') 
-    port_value = traits.Int(8000, desc='The port value to identify which tablet is running.')     
+    port_value = traits.Int(8000, desc='The port value to identify which tablet is running.')
+
+    # TODO: exclude reward_time trait and replace it with 0.5s x pellets_per_reward
 
     def __init__(self, *args, **kwargs):
         from riglib.tablet_reward import RemoteReward
@@ -118,8 +120,8 @@ class PelletReward(RewardSystem):
         self.reportstats['Reward #'] += 1
         
         if self.reportstats['Reward #'] % self.trials_per_reward == 0:
-            for _ in range(self.pellets_per_reward): # call trigger num of pellets_per_reward time
-                self.reward.trigger(self.ip_address)
+            # for i in range(self.pellets_per_reward): # call trigger as many times as pellets_per_reward
+            self.reward.trigger(self.ip_address, self.pellets_per_reward)
 
     def _end_reward(self):
         if hasattr(super(RewardSystem, self), '_end_reward'):

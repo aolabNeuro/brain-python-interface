@@ -37,15 +37,17 @@ def open():
         import builtins
         traceback.print_exc()
 
-def send_request(url):
-    try:
-        response = requests.post(url, timeout=3)
-        print(f"Request to {url} completed with status code: {response.status_code}")
-    except requests.exceptions.RequestException as e:
-        print(f"Error sending request to {url}: {e}")
+def send_request(url, n_trigger):
+    for i in range(n_trigger):
+        try:
+            response = requests.post(url, timeout=3)
+            print(f"Request to {url} completed with status code: {response.status_code}")
+        except requests.exceptions.RequestException as e:
+            print(f"Error sending request to {url}: {e}")
+        time.sleep(0.5)
 
-def send_nonblocking_request(url):
-    thread = threading.Thread(target=send_request, args=(url,))
+def send_nonblocking_request(url, n_trigger):
+    thread = threading.Thread(target=send_request, args=(url, n_trigger))
     thread.daemon = True
     thread.start()
     print("Non-blocking POST request initiated")
@@ -57,6 +59,6 @@ class RemoteReward():
         self.hostName = "192.168.0.150"
         self.serverPort = 8080
       
-    def trigger(self, ip_address): # set some default so the manual reward button works
+    def trigger(self, ip_address, n_trigger): # set some default so the manual reward button works
         url = f"http://{ip_address}:{self.serverPort}"
-        send_nonblocking_request(url)
+        send_nonblocking_request(url, n_trigger)
