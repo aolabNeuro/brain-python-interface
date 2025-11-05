@@ -120,8 +120,7 @@ class PelletReward(RewardSystem):
         self.reportstats['Reward #'] += 1
         
         if self.reportstats['Reward #'] % self.trials_per_reward == 0:
-            # for i in range(self.pellets_per_reward): # call trigger as many times as pellets_per_reward
-            self.reward.trigger(self.ip_address, self.pellets_per_reward)
+            self.reward.trigger(self.ip_address, self.pellets_per_reward) # triggers as many times as pellets_per_reward
 
     def _end_reward(self):
         if hasattr(super(RewardSystem, self), '_end_reward'):

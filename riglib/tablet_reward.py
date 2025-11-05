@@ -41,16 +41,16 @@ def send_request(url, n_trigger):
     for i in range(n_trigger):
         try:
             response = requests.post(url, timeout=3)
-            print(f"Request to {url} completed with status code: {response.status_code}")
+            print(f"Request to {url} completed: {response.status_code}")
         except requests.exceptions.RequestException as e:
-            print(f"Error sending request to {url}: {e}")
+            print(f"Error sending request to {url}: {e}") # error occurs even when pellet dispenses
         time.sleep(0.5)
 
 def send_nonblocking_request(url, n_trigger):
     thread = threading.Thread(target=send_request, args=(url, n_trigger))
     thread.daemon = True
     thread.start()
-    print("Non-blocking POST request initiated")
+    print("Request initiated")
 
 class RemoteReward():
 
