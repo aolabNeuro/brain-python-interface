@@ -93,6 +93,7 @@ class PelletReward(RewardSystem):
     '''
     Trigger pellet rewards.    
     '''
+    exclude_parent_traits = ['reward_time']
     pellets_per_reward = traits.Int(1, desc='The number of pellets to dispense per reward.') 
     port_value = traits.Int(8000, desc='The port value to identify which tablet is running.')
 
