@@ -242,8 +242,8 @@ class EyeConstrained(ScreenTargetCapture):
         '''
         if self.target_index <= 0:   
             d = np.linalg.norm(self.calibrated_eye_pos)
-            return (d > self.fixation_dist) or self.pause
-    
+            return (d > self.fixation_dist)
+        
     def _test_fixation_penalty_end(self,ts):
         # d = np.linalg.norm(self.calibrated_eye_pos)
         return (ts > self.fixation_penalty_time) # (d < self.fixation_dist) and 
@@ -274,9 +274,13 @@ class EyeConstrained(ScreenTargetCapture):
         self.num_fixation_state = 0 # because target state comes again after hold state in a trial
 
     def _start_fixation_penalty(self):
+        if hasattr(super(), '_start_fixation_penalty'):
+            super()._start_fixation_penalty()
+
         self._increment_tries()
         self.sync_event('FIXATION_PENALTY') 
         self.penalty_index = 1
+        self.num_fixation_state = 0
         
         # Hide targets
         for target in self.targets:
