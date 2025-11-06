@@ -182,6 +182,11 @@ class PenaltyAudio(traits.HasTraits):
             super()._start_timeout_penalty()
         self.penalty_player.play()
 
+    def _start_fixation_penalty(self):
+        if hasattr(super(), '_start_fixation_penalty'):
+            super()._start_fixation_penalty()
+        self.penalty_player.play()
+
 class PenaltyAudioMulti(traits.HasTraits):
     '''
     Separate penalty sounds for each type of penalty.
