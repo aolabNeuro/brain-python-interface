@@ -37,17 +37,17 @@ def open():
         import builtins
         traceback.print_exc()
 
-def send_request(url, n_trigger):
+def send_request(url, dispense_time, n_trigger):
     for i in range(n_trigger):
         try:
             response = requests.post(url, timeout=3)
-            print(f"Request to {url} completed: {response.status_code}")
+            print(f"Request to {url} completed: {response.status_code}") # successful response is status code 200
         except requests.exceptions.RequestException as e:
-            print(f"Error sending request to {url}: {e}") # error occurs even when pellet dispenses
-        time.sleep(0.5)
+            print(f"Error sending request to {url}: {e}")
+        time.sleep(dispense_time)
 
-def send_nonblocking_request(url, n_trigger):
-    thread = threading.Thread(target=send_request, args=(url, n_trigger))
+def send_nonblocking_request(url, dispense_time, n_trigger):
+    thread = threading.Thread(target=send_request, args=(url, dispense_time, n_trigger))
     thread.daemon = True
     thread.start()
     print("Request initiated")
@@ -59,6 +59,6 @@ class RemoteReward():
         self.hostName = "192.168.0.150"
         self.serverPort = 8080
       
-    def trigger(self, ip_address, n_trigger): # set some default so the manual reward button works
+    def trigger(self, ip_address, dispense_time, n_trigger): # TODO: set a default ip address so the manual reward button works
         url = f"http://{ip_address}:{self.serverPort}"
-        send_nonblocking_request(url, n_trigger)
+        send_nonblocking_request(url, dispense_time, n_trigger)
