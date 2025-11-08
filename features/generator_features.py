@@ -366,15 +366,13 @@ class ReadysetColorChange(traits.HasTraits):
     '''
     Change the color to go along with the set cue
     '''
-    def _cycle(self):
-        super()._cycle()
-        if self.set_played and self.ready_played and not self.go_played and (self.get_time() - self.prep_start_time) >= self.tone_space:
-            self.targets[0].cue_set_tone() #turn target orange on set tone 
-            
-    def _start_leave_center(self):
-        self.targets[0].show()
-        self.targets[0].cue_fixation()
+    def color_set_cue(self):
+        self.targets[0].cue_set_tone() #turn target orange on set tone
 
+    def color_go_cue(self):
+        self.targets[0].show()
+        self.targets[0].cue_fixation() #turn target green on go tone
+                    
     def _start_tooslow_penalty(self):
         self.tooslow_start = self.get_time()
         super()._start_tooslow_penalty()

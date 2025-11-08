@@ -41,7 +41,7 @@ class TestManualControlTasks(unittest.TestCase):
     def test_readysetgo(self):
         seq = ManualControl.centerout_2D()
         exp = init_exp(ReadySetGoTask, [MouseControl, Window2D], seq, early_move_time = 0.1,
-                       delay_time = 0.2, mustmv_time = 0.8, ready_freq = 320, set_freq = 360, go_freq = 400, 
+                       delay_time = 0.8, mustmv_time = 0.8, ready_freq = 320, set_freq = 360, go_freq = 400,
                         tooslow_penalty_sound = 'buzzer.wav', window_size=(1200,800), 
                        fullscreen=False)
         exp.rotation = 'xzy'
@@ -50,8 +50,8 @@ class TestManualControlTasks(unittest.TestCase):
     @unittest.skip("")
     def test_readysetgo_feat(self):
         seq = ManualControl.centerout_2D()
-        exp = init_exp(ReadySetGoTask, [MouseControl, Window2D, ReadysetMedley, ReadysetColorChange], seq, early_move_time = 0,
-                       display_times = [0.9, 0.1], frac_times = [0.1, 0.9], mustmv_time = 0.4, ready_freq = 320, set_freq = 360, go_freq = 400, tone_space = 0.5,
+        exp = init_exp(ReadySetGoTask, [MouseControl, Window2D, ReadysetMedley, ReadysetColorChange], seq, early_move_time = 0.5,
+                       display_times = [0.9, 1.5], frac_times = [0.1, 0.9], mustmv_time = 0.8, ready_freq = 320, set_freq = 360, go_freq = 400, tone_space = 1.0,
                         tooslow_penalty_sound = 'buzzer.wav', window_size=(1200,800), 
                        fullscreen=False)
         exp.rotation = 'xzy'
