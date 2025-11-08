@@ -5,7 +5,7 @@ from built_in_tasks.othertasks import Conditions, LaserConditions, SweptLaserCon
 from built_in_tasks.target_capture_task import ScreenTargetCapture
 from built_in_tasks.passivetasks import YouTube
 from built_in_tasks.example_task import ExampleSequenceTask
-from features.generator_features import Autostart, HideLeftTrajectory
+from features.generator_features import Autostart, HideLeftTrajectory, ReadysetMedley, ReadysetColorChange
 from features.hdf_features import SaveHDF
 from features.touch_features import MouseEmulateTouch
 from riglib.stereo_opengl.environment import Grid
@@ -40,15 +40,22 @@ class TestManualControlTasks(unittest.TestCase):
     @unittest.skip("")
     def test_readysetgo(self):
         seq = ManualControl.centerout_2D()
-        exp = init_exp(ReadySetGoTask, [MouseControl, Window2D], seq, prepbuff_time = 0.8,
-                       delay_time = 0.2, mustmv_time = 0.4,ready_set_sound = 'click.wav', readyset_freq = 320, go_freq = 400, 
-                       tooslow_penalty_sound = 'buzzer.wav', window_size=(1200,800), 
+        exp = init_exp(ReadySetGoTask, [MouseControl, Window2D], seq, early_move_time = 0.1,
+                       delay_time = 0.2, mustmv_time = 0.8, ready_freq = 320, set_freq = 360, go_freq = 400, 
+                        tooslow_penalty_sound = 'buzzer.wav', window_size=(1200,800), 
                        fullscreen=False)
-        #exp.rotation = 'yzx'
         exp.rotation = 'xzy'
-        #exp.offset = [-20, -95, -2]
         exp.run()
 
+    @unittest.skip("")
+    def test_readysetgo_feat(self):
+        seq = ManualControl.centerout_2D()
+        exp = init_exp(ReadySetGoTask, [MouseControl, Window2D, ReadysetMedley, ReadysetColorChange], seq, early_move_time = 0,
+                       display_times = [0.9, 0.1], frac_times = [0.1, 0.9], mustmv_time = 0.4, ready_freq = 320, set_freq = 360, go_freq = 400, tone_space = 0.5,
+                        tooslow_penalty_sound = 'buzzer.wav', window_size=(1200,800), 
+                       fullscreen=False)
+        exp.rotation = 'xzy'
+        exp.run()
 
     @unittest.skip("")
     def test_exp(self):

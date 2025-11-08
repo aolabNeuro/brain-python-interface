@@ -2,14 +2,17 @@ import pygame
 import os
 import numpy as np
 
+def init_mixer():
+    if not pygame.mixer.get_init():
+        pygame.mixer.pre_init(44100, -16, 2, 2048)
+        pygame.mixer.init()
+
 audio_path = os.path.dirname(__file__)
 
 class AudioPlayer():
 
     def __init__(self, filename='click.wav'):
-        if not pygame.mixer.get_init():
-            pygame.mixer.pre_init(44100, -16, 2, 2048)
-            pygame.mixer.init()
+        init_mixer()
         self.effect = pygame.mixer.Sound(os.path.join(audio_path, filename))
 
     def get_length(self):
@@ -24,6 +27,7 @@ class AudioPlayer():
 class TonePlayer():
 
     def __init__(self, frequency = 440, duration = 0.1, sample_rate = 44100):
+        init_mixer()
         self.frequency = frequency
         self.duration = duration
         self.sample_rate = sample_rate
