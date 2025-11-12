@@ -366,12 +366,12 @@ class ReadysetColorChange(traits.HasTraits):
     '''
     Change the color to go along with the set cue
     '''
-    def color_set_cue(self):
+    def color_set_cue(self): #update function to have color change 
         self.targets[0].cue_set_tone() #turn target orange on set tone
 
-    def color_go_cue(self):
-        self.targets[0].show()
-        self.targets[0].cue_fixation() #turn target green on go tone
+    def color_go_cue(self): #update function to have color change
+        self.targets[0].show() #need to show as the target will be hidden by the baseline logic
+        self.targets[0].cue_fixation() #turn target blue on go tone
                     
     def _start_tooslow_penalty(self):
         self.tooslow_start = self.get_time()
