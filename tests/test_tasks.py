@@ -14,7 +14,7 @@ from riglib import experiment
 from riglib import audio
 from features.peripheral_device_features import ForceControl, MouseControl
 from features.optitrack_features import OptitrackSimulate, Optitrack, SpheresToCylinders
-from features.reward_features import ProgressBar, ScoreRewards
+from features.reward_features import ProgressBar, ScoreRewards, PenaltyAudioMulti
 import cProfile
 import pstats
 from riglib.stereo_opengl.window import Window, Window2D
@@ -42,7 +42,7 @@ class TestManualControlTasks(unittest.TestCase):
         seq = ManualControl.centerout_2D()
         exp = init_exp(ReadySetGoTask, [MouseControl, Window2D], seq, early_move_time = 0.1,
                        delay_time = 0.45, mustmv_time = 0.3, ready_freq = 320, set_freq = 360, go_freq = 400,
-                        tooslow_penalty_sound = 'buzzer.wav', window_size=(1200,800), 
+                         window_size=(1200,800), 
                        fullscreen=False)
         exp.rotation = 'xzy'
         exp.run()
@@ -50,9 +50,9 @@ class TestManualControlTasks(unittest.TestCase):
     @unittest.skip("")
     def test_readysetgo_feat(self):
         seq = ManualControl.centerout_2D()
-        exp = init_exp(ReadySetGoTask, [MouseControl, Window2D, ReadysetMedley, ReadysetColorChange], seq, early_move_time = 0.5,
+        exp = init_exp(ReadySetGoTask, [MouseControl, Window2D, ReadysetMedley, ReadysetColorChange, PenaltyAudioMulti], seq, early_move_time = 0.5,
                        display_times = [0.9, 1.5], frac_times = [0.1, 0.9], mustmv_time = 0.5, ready_freq = 320, set_freq = 360, go_freq = 400, tone_space = 1.0,
-                        tooslow_penalty_sound = 'buzzer.wav', window_size=(1200,800), 
+                     window_size=(1200,800), 
                        fullscreen=False)
         exp.rotation = 'xzy'
         exp.run()

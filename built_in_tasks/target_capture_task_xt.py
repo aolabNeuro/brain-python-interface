@@ -930,8 +930,6 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
     wait_time = traits.Float(1., desc="Length of time in wait state (inter-trial interval)")
     mustmv_time = traits.Float(.2, desc="Must leave center target within this time after auditory go cue.")
     tooslow_penalty_time = traits.Float(1, desc="Length of penalty time for too slow error")
-    files = [f for f in os.listdir(audio_path) if '.wav' in f]
-    tooslow_penalty_sound = traits.OptionsList(files, desc="File in riglib/audio to play on each must move penalty") #hold penalty is normally incorrect.wav
     shadow_periph_radius = traits.Float(0.5, desc = 'additional radius for peripheral target')
     periph_hold = traits.Float(0.2, desc = "Hold time for peripheral target")
     ready_freq = traits.Float(320, desc="Frequency of the ready-set tone")
@@ -947,7 +945,6 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
         self.ready_tone = TonePlayer(frequency=self.ready_freq, duration=self.tone_duration)
         self.set_tone = TonePlayer(frequency=self.set_freq, duration=self.tone_duration)
         self.go_tone = TonePlayer(frequency=self.go_freq, duration=self.tone_duration)
-        self.tooslow_penalty_player = AudioPlayer(self.tooslow_penalty_sound)
         self.pseudo_reward = 0
 
         # Assert that parameters are set logically 
@@ -1098,7 +1095,6 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
     def _start_tooslow_penalty(self):
         self._increment_tries()
         self.sync_event('OTHER_PENALTY') #integer code 79
-        self.tooslow_penalty_player.play()
         self.ready_tone.stop()
         self.set_tone.stop()
         self.go_tone.stop()
