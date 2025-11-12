@@ -1033,7 +1033,7 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
             self.set_tone.play()
             self.set_played = True
             self.sync_event('CUE', 1) #integer code 113
-            self.color_set_cue()
+            self.color_set_cue() #placeholder function for the color change feature 
 
         if not self.go_played and self.set_played and (self.get_time() - self.prep_start_time) >= 2 * self.tone_space:
             self.go_tone.play()
@@ -1041,12 +1041,12 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
             if self.target_index + 1 < self.chain_length:
                 self.targets[self.target_index % 2].hide()
             self.go_played = True
-            self.color_go_cue()
+            self.color_go_cue() #placeholder function for the color change feature
     
-    def color_set_cue(self):
+    def color_set_cue(self): #do nothing in normal version (no color change)
         pass
 
-    def color_go_cue(self):
+    def color_go_cue(self): #do nothing in normal version (no color change)
         pass
     
     def _start_hold_penalty(self):
