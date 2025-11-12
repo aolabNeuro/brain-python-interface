@@ -1043,8 +1043,7 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
         if not self.go_played and self.set_played and (self.get_time() - self.prep_start_time) >= 2 * self.tone_space:
             self.go_tone.play()
             self.sync_event('CUE', 2) #integer code 114
-            if self.target_index + 1 < self.chain_length:
-                self.targets[self.target_index % 2].hide()
+            self.targets[0].hide()
             self.go_played = True
             self.color_go_cue() #placeholder function for the color change feature
     
@@ -1054,6 +1053,11 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
     def color_go_cue(self): #do nothing in normal version (no color change)
         pass
     
+    def _start_targ_transition(self):
+        super()._start_targ_transition()
+        if self.target_index == -1:   # Came from a penalty state
+            pass
+
     def _start_hold_penalty(self):
         self.pseudo_success() #run before increment trials to prevent reseting of trial index 
         if hasattr(super(), '_start_hold_penalty'):
