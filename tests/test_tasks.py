@@ -41,7 +41,7 @@ class TestManualControlTasks(unittest.TestCase):
     def test_readysetgo(self):
         seq = ManualControl.centerout_2D()
         exp = init_exp(ReadySetGoTask, [MouseControl, Window2D], seq, early_move_time = 0.1,
-                       delay_time = 0.5, mustmv_time = 0.4, ready_freq = 320, set_freq = 360, go_freq = 400,
+                       delay_time = 0.45, mustmv_time = 0.3, ready_freq = 320, set_freq = 360, go_freq = 400,
                         tooslow_penalty_sound = 'buzzer.wav', window_size=(1200,800), 
                        fullscreen=False)
         exp.rotation = 'xzy'

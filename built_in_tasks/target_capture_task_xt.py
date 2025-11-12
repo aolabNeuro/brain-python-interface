@@ -1019,13 +1019,22 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
         self.reportstats['Pseudo Reward'] = self.pseudo_reward + self.reward_count
 
     ### State Functions ###
-    def _start_wait(self):
+    def _start_wait(self): #necessary reset so that these parameters exist at the beginning of each trial 
         super()._start_wait()
+        self.ready_played = False
+        self.set_played = False
+        self.go_played = False
+    
+    def _start_hold(self): #this addresses a potential issue if the task is solved too quickly so that the go tone is not played after the trial has been rewarded 
+        super()._start_hold()
         self.ready_played = False
         self.set_played = False
         self.go_played = False
         
     def _start_prepbuff(self):
+        self.epsilon = 1/self.fps #small value to account for floating point precision errors. can set this to 1/(2*self.fps) to be more permissive 
+
+        assert abs(self.prepbuff_time - (self.tone_space - 1/self.fps)) > self.epsilon, "Prep buffer time must not be within the time between tones minus one frame rate to avoid timing issues."
         self.sync_event('CUE') #integer code 112
         self.prep_start_time = self.get_time()
         self.ready_tone.play()
