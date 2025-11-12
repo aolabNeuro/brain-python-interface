@@ -949,6 +949,11 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
         self.go_tone = TonePlayer(frequency=self.go_freq, duration=self.tone_duration)
         self.tooslow_penalty_player = AudioPlayer(self.tooslow_penalty_sound)
         self.pseudo_reward = 0
+
+        # Assert that parameters are set logically 
+        assert self.tone_duration < self.tone_space, "Tone duration must be less than time between tones."
+        assert self.delay_time + self.early_move_time <= 2*self.tone_space, "Time of peripheral target display (delay_time) plus early move allowance should be less than or equal to length of tone sequence"
+        assert self.mustmv_time >= self.tone_duration, "Allow at least length of tone duration to move after the onset of the go cue"
         
     ###Test Functions ###
 
