@@ -342,10 +342,10 @@ class ReadysetMedley(traits.HasTraits):
 
     '''
     Allows for mulitple different prepbuff and delay times to be used within a single experiment.
-    Replaces the prepbuff_time and delay_time parameters with a list of possible values and correspondniig probabilities.
+    Replaces the prepbuff_time and delay_time parameters with a list of possible values and corresponding probabilities.
     '''
 
-    exclude_parent_traits = ['prepbuff_time', 'delay_time']
+    exclude_parent_traits = ['delay_time']
     display_times = traits.List([0,], desc = 'Possible peripheral target display times')
     frac_times = traits.List([0.1,], desc = 'Proportion of each type of display time. Need to be equal length to delay_times and sum to 1') #should sum to 1.0 
     
@@ -358,7 +358,33 @@ class ReadysetMedley(traits.HasTraits):
         At the start of the 'wait' state, determine which prepbuff & delay_time to use
         '''
         self.delay_time = np.random.choice((self.display_times), p = (self.frac_times)) 
-        audio_length = 1.0 # length of the audio cue in seconds. need to automate this
-        self.prepbuff_time = audio_length - self.delay_time
+        audio_length = 2*self.tone_space - self.early_move_time #use the same value but update to account for the different delay times
+        self.prepbuff_time = audio_length - self.delay_time #update the prepbuff time accordingly
         super()._start_wait()
 
+class ReadysetColorChange(traits.HasTraits):
+    '''
+    Change the color to go along with the set cue
+    '''
+    def color_set_cue(self): #update function to have color change 
+        self.targets[0].cue_set_tone() #turn target orange on set tone
+
+    def color_go_cue(self): #update function to have color change
+        self.targets[0].show() #need to show as the target will be hidden by the baseline logic
+        self.targets[0].cue_fixation() #turn target blue on go tone
+                    
+    def _start_tooslow_penalty(self):
+        self.tooslow_start = self.get_time()
+        super()._start_tooslow_penalty()
+        self.targets[0].show()
+        self.targets[0].cue_trial_end_failure()
+        self.targets[1].hide()
+    
+    def _while_tooslow_penalty(self):
+        if (self.get_time() - self.tooslow_start) >= 0.5 * self.tooslow_penalty_time:
+            for targets in self.targets:
+                targets.hide()
+                targets.reset()
+
+    def _end_tooslow_penalty(self):
+        self.sync_event('TRIAL_END')

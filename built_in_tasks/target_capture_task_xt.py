@@ -9,7 +9,7 @@ import os
 from .target_graphics import *
 from .target_capture_task import ScreenTargetCapture
 from riglib.experiment import traits
-from riglib.audio import AudioPlayer
+from riglib.audio import AudioPlayer, TonePlayer
 
 audio_path = os.path.join(os.path.dirname(__file__), '../riglib/audio')        
 
@@ -928,20 +928,29 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
     # the sum of the prepbuff & the delay time should be equal to the length of the ready_set_sound file 
     # the delay time corresponds to the amount of time the peripheral target is displayed, and the prepbuff time then makes up the difference 
     wait_time = traits.Float(1., desc="Length of time in wait state (inter-trial interval)")
-    prepbuff_time = traits.Float(.2, desc="How long after completing center target hold before peripheral target appears")
     mustmv_time = traits.Float(.2, desc="Must leave center target within this time after auditory go cue.")
     tooslow_penalty_time = traits.Float(1, desc="Length of penalty time for too slow error")
-    files = [f for f in os.listdir(audio_path) if '.wav' in f]
-    ready_set_sound = traits.OptionsList(files, desc="File in riglib/audio to play on each trial for the go cue")
-    tooslow_penalty_sound = traits.OptionsList(files, desc="File in riglib/audio to play on each must move penalty") #hold penalty is normally incorrect.wav
     shadow_periph_radius = traits.Float(0.5, desc = 'additional radius for peripheral target')
     periph_hold = traits.Float(0.2, desc = "Hold time for peripheral target")
+    ready_freq = traits.Float(320, desc="Frequency of the ready-set tone")
+    set_freq = traits.Float(320, desc="Frequency of the set tone")
+    go_freq = traits.Float(440, desc="Frequency of the go tone")
+    tone_duration = traits.Float(0.1, desc="Duration of the ready-set and go tones")
+    tone_space = traits.Float(0.5, desc="Time between start tone and start of next tone")
+    early_move_time = traits.Float(0.0, desc = "Time prior to go cue that user is allowed to start moving") #difference between end of delay state and go tone 
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.ready_set_player = AudioPlayer(self.ready_set_sound)
-        self.tooslow_penalty_player = AudioPlayer(self.tooslow_penalty_sound)
+        self.prepbuff_time = 2*self.tone_space - self.delay_time - self.early_move_time
+        self.ready_tone = TonePlayer(frequency=self.ready_freq, duration=self.tone_duration)
+        self.set_tone = TonePlayer(frequency=self.set_freq, duration=self.tone_duration)
+        self.go_tone = TonePlayer(frequency=self.go_freq, duration=self.tone_duration)
         self.pseudo_reward = 0
+
+        # Assert that parameters are set logically 
+        assert self.tone_duration < self.tone_space, "Tone duration must be less than time between tones."
+        assert self.delay_time + self.early_move_time <= 2*self.tone_space, "Time of peripheral target display (delay_time) plus early move allowance should be less than or equal to length of tone sequence"
+        assert self.mustmv_time >= self.tone_duration, "Allow at least length of tone duration to move after the onset of the go cue"
         
     ###Test Functions ###
 
@@ -984,7 +993,7 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
         The delay state will display the peripheral target so this state just requires a center hold.  
 
         '''
-        return time_in_state > self.prepbuff_time
+        return time_in_state > self.prepbuff_time 
     
     def _test_mustmv_complete(self, time_in_state):
         '''
@@ -996,7 +1005,7 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
             - Sensorized object moved to the required location
             - Manually triggered by experimenter
         '''
-        return time_in_state > self.mustmv_time
+        return time_in_state > self.mustmv_time + self.early_move_time
     
     def _test_tooslow_penalty_end(self, time_in_state):
         return time_in_state > self.tooslow_penalty_time
@@ -1007,41 +1016,96 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
         self.reportstats['Pseudo Reward'] = self.pseudo_reward + self.reward_count
 
     ### State Functions ###
-    def _start_prepbuff(self):
-        self.sync_event('CUE') #integer code 112
-        self.ready_set_player.play() 
-
-    def _start_leave_center(self):
-        self.sync_event('CURSOR_LEAVE_TARGET') #integer code 96
-        self.targets[0].cue_fixation() #turn center target blue 
+    def _start_wait(self): #necessary reset so that these parameters exist at the beginning of each trial 
+        super()._start_wait()
+        self.ready_played = False
+        self.set_played = False
+        self.go_played = False
     
+    def _start_hold(self): #this addresses a potential issue if the task is solved too quickly so that the go tone is not played after the trial has been rewarded 
+        super()._start_hold()
+        self.ready_played = False
+        self.set_played = False
+        self.go_played = False
         
+    def _start_prepbuff(self):
+        self.epsilon = 1/self.fps #small value to account for floating point precision errors. can set this to 1/(2*self.fps) to be more permissive 
+
+        assert abs(self.prepbuff_time - (self.tone_space - 1/self.fps)) > self.epsilon, "Prep buffer time must not be within the time between tones minus one frame rate to avoid timing issues."
+        self.sync_event('CUE') #integer code 112
+        self.prep_start_time = self.get_time()
+        self.ready_tone.play()
+        self.ready_played = True
+
+    def _cycle(self):
+        super()._cycle()
+
+        if not self.set_played and self.ready_played and (self.get_time() - self.prep_start_time) >= self.tone_space:
+            self.set_tone.play()
+            self.set_played = True
+            self.sync_event('CUE', 1) #integer code 113
+            self.color_set_cue() #placeholder function for the color change feature 
+
+        if not self.go_played and self.set_played and (self.get_time() - self.prep_start_time) >= 2 * self.tone_space:
+            self.go_tone.play()
+            self.sync_event('CUE', 2) #integer code 114
+            self.targets[0].hide()
+            self.go_played = True
+            self.color_go_cue() #placeholder function for the color change feature
+    
+    def color_set_cue(self): #do nothing in normal version (no color change)
+        pass
+
+    def color_go_cue(self): #do nothing in normal version (no color change)
+        pass
+    
+    def _start_targ_transition(self):
+        super()._start_targ_transition()
+        if self.target_index == -1:   # Came from a penalty state
+            pass
+
     def _start_hold_penalty(self):
         self.pseudo_success() #run before increment trials to prevent reseting of trial index 
         if hasattr(super(), '_start_hold_penalty'):
             super()._start_hold_penalty()
-        self.ready_set_player.stop()
+        self.ready_tone.stop()
+        self.set_tone.stop()
+        self.go_tone.stop()
+        self.ready_played = False
+        self.set_played = False
+        self.go_played = False
     
     def _start_delay_penalty(self):
         if hasattr(super(), '_start_delay_penalty'):
             super()._start_delay_penalty()
-        self.ready_set_player.stop()
+        self.ready_tone.stop()
+        self.set_tone.stop()
+        self.go_tone.stop()
+        self.ready_played = False
+        self.set_played = False
+        self.go_played = False
     
     def _start_timeout_penalty(self):
         self.pseudo_success() #run before increment trials to prevent reseting of trial index
         super()._start_timeout_penalty()
+        self.ready_played = False
+        self.set_played = False
+        self.go_played = False
 
     def _start_tooslow_penalty(self):
         self._increment_tries()
         self.sync_event('OTHER_PENALTY') #integer code 79
-        self.tooslow_penalty_player.play()
-        self.ready_set_player.stop()
+        self.ready_tone.stop()
+        self.set_tone.stop()
+        self.go_tone.stop()
         self.jack_count = 0
-        # # Hide targets
-        for target in self.targets:
+        self.ready_played = False
+        self.set_played = False
+        self.go_played = False
+        for target in self.targets: #Hide Targets 
             target.hide()
             target.reset()
-    
+
     def _end_tooslow_penalty(self):
         self.sync_event('TRIAL_END')
     
@@ -1054,4 +1118,9 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
 
     def _start_pause(self):
         super()._start_pause()
-        self.ready_set_player.stop()
+        self.ready_tone.stop()
+        self.set_tone.stop()
+        self.go_tone.stop()
+        self.ready_played = False
+        self.set_played = False
+        self.go_played = False
