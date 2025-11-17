@@ -8,8 +8,8 @@ from scipy.spatial.transform import Rotation as R
 from riglib.experiment import traits
 
 from .target_graphics import *
-from .target_capture_task import ScreenTargetCapture, ScreenReachAngle, SequenceCapture, HandConstrainedEyeCapture, ScreenTargetCapture_Saccade
-from .ready_set_go_centerout import ScreenTargetCapture_ReadySet
+from .target_capture_task import ScreenTargetCapture
+from .target_capture_task_xt import ScreenReachAngle, ScreenReachLine, SequenceCapture, HandConstrainedEyeCapture, ScreenTargetCapture_Saccade, ScreenTargetCapture_ReadySet
 from .target_tracking_task import ScreenTargetTracking
 from .rotation_matrices import *
 
@@ -180,6 +180,12 @@ class ManualControl(ManualControlMixin, ScreenTargetCapture):
 class ManualControlDirectionConstraint(ManualControlMixin, ScreenReachAngle):
     '''
     Adds an additional constraint that the direction of travel must be within a certain angle
+    '''
+    pass
+
+class ManualControlAreaConstraint(ManualControlMixin, ScreenReachLine):
+    '''
+    Adds an additional constraint that the cursor must be within a certain straight line
     '''
     pass
 

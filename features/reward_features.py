@@ -56,19 +56,61 @@ class RewardSystem(traits.HasTraits):
         float_dur = float(duration)  # these parameters always end up being strings
         reward_sys.async_drain(float_dur)
 
+class RewardSystemPulse(RewardSystem):
+    '''
+    Give multiple reward defined by reward duration, inter-reward interval, and iterations
+    Please turn off other reward related features such as reward_system, consecutive_jackpot, and jackpot
+    '''
+    
+    exclude_parent_traits = ['reward_time']
+    single_reward_duration = traits.Float(0.2, desc='Duration of reward for 1 pulse')
+    inter_reward_interval = traits.Float(0.2, desc='interval of reward')
+    pulses_per_total_reward = traits.Int(5, desc='the nubmer of iterations for reward pulse')
+        
+    def _start_reward(self):
+        super()._start_reward()
+        self.reward_start = self.get_time()
+        self.duration_per_single_reward = self.single_reward_duration + self.inter_reward_interval
+        self.total_reward_duration = self.pulses_per_total_reward * self.duration_per_single_reward
+
+    def _while_reward(self):
+        super()._while_reward()
+        time_in_reward = self.get_time() - self.reward_start
+        time_within_single_reward = time_in_reward % self.duration_per_single_reward
+
+        if self.reportstats['Reward #'] % self.trials_per_reward == 0:
+            if time_within_single_reward < self.single_reward_duration:
+                self.reward.on()
+            else:
+                self.reward.off()
+
+    def _test_reward_end(self, ts):
+        return ts > self.total_reward_duration
+    
 audio_path = os.path.join(os.path.dirname(__file__), '../riglib/audio')
 
 class PelletReward(RewardSystem):
     '''
     Trigger pellet rewards.    
     '''
-    pellets_per_reward = traits.Int(1, desc='The number of pellets to dispense per reward.')      
+    pellets_per_reward = traits.Int(1, desc='The number of pellets to dispense per reward.') 
+    port_value = traits.Int(8000, desc='The port value to identify which tablet is running.')     
 
     def __init__(self, *args, **kwargs):
         from riglib.tablet_reward import RemoteReward
         super(RewardSystem, self).__init__(*args, **kwargs)
         self.reward = RemoteReward()
         self.reportstats['Reward #'] = 0
+        
+        if self.port_value == 8000:
+            self.ip_address = "192.168.0.100"
+        elif self.port_value == 9000:
+            self.ip_address = "192.168.0.200"
+        elif self.port_value== 7000:
+            self.ip_address = "192.168.0.170" # 300
+        else:
+            print('uh oh')
+            self.ip_address = "192.168.0.150"
 
     def _start_reward(self):
         if hasattr(super(RewardSystem, self), '_start_reward'):
@@ -77,7 +119,7 @@ class PelletReward(RewardSystem):
         
         if self.reportstats['Reward #'] % self.trials_per_reward == 0:
             for _ in range(self.pellets_per_reward): # call trigger num of pellets_per_reward time
-                self.reward.trigger()
+                self.reward.trigger(self.ip_address)
                 time.sleep(0.5) # wait for 0.5 seconds
 
     def _end_reward(self):
@@ -139,6 +181,11 @@ class PenaltyAudio(traits.HasTraits):
         if hasattr(super(), '_start_timeout_penalty'):
             super()._start_timeout_penalty()
         self.penalty_player.play()
+    
+    def _start_tooslow_penalty(self):
+        if hasattr(super(), '_start_tooslow_penalty'):
+            super()._start_tooslow_penalty()
+        self.penalty_player.play()
 
 class PenaltyAudioMulti(traits.HasTraits):
     '''
@@ -150,6 +197,7 @@ class PenaltyAudioMulti(traits.HasTraits):
     timeout_penalty_sound = "incorrect.wav"
     reach_penalty_sound = "incorrect.wav"
     tracking_out_penalty_sound = "buzzer.wav"
+    tooslow_penalty_sound = "buzzer.wav"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -158,6 +206,7 @@ class PenaltyAudioMulti(traits.HasTraits):
         self.timeout_penalty_player = AudioPlayer(self.timeout_penalty_sound)
         self.reach_penalty_player = AudioPlayer(self.reach_penalty_sound)
         self.tracking_out_penalty_player = AudioPlayer(self.tracking_out_penalty_sound)
+        self.tooslow_penalty_player = AudioPlayer(self.tooslow_penalty_sound)
 
     def _start_hold_penalty(self):
         if hasattr(super(), '_start_hold_penalty'):
@@ -183,6 +232,11 @@ class PenaltyAudioMulti(traits.HasTraits):
         if hasattr(super(), '_start_tracking_out_penalty'):
             super()._start_tracking_out_penalty()
         self.tracking_out_penalty_player.play()
+
+    def _start_tooslow_penalty(self):
+        if hasattr(super(), '_start_tooslow_penalty'):
+            super()._start_tooslow_penalty()
+        self.tooslow_penalty_player.play()
 
 class HoldCompleteRewards(traits.HasTraits):
     '''
@@ -214,7 +268,6 @@ class JackpotRewards(traits.HasTraits):
             return True
 
 class ConsecutiveJackpot(traits.HasTraits):
-
     '''
     Extra reward if a string of consecutive rewards equal to jackstring variable
     '''
@@ -223,8 +276,7 @@ class ConsecutiveJackpot(traits.HasTraits):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.jack_count = 0 #initialize
-        
-    #reset following each penalty. If task has extra penalty states, can add into _start function for that task as well. 
+    
     def _start_hold_penalty(self):
         super()._start_hold_penalty()
         self.jack_count = 0
@@ -254,6 +306,7 @@ class ConsecutiveJackpot(traits.HasTraits):
         else:
             return True
         
+
 class ProgressBar(traits.HasTraits):
     '''
     Adds a graphical progress bar for the tracking task which fills up when the cursor is
@@ -275,7 +328,7 @@ class ProgressBar(traits.HasTraits):
                 self.remove_model(model)
             del self.bar
 
-        self.bar = VirtualRectangularTarget(target_width=1.3, target_height=self.tracking_rate, target_color=(0., 1., 0., 0.75), starting_pos=[self.tracking_rate-self.bar_width,0,9])
+        self.bar = VirtualRectangularTarget(target_width=1.3, target_height=self.tracking_rate, target_color=(0., 1., 0., 0.75), starting_pos=[self.tracking_rate-self.bar_width,-15,9])
         for model in self.bar.graphics_models:
             self.add_model(model)
         self.bar.show()
@@ -291,7 +344,7 @@ class ProgressBar(traits.HasTraits):
         self.reward_frame_index += 1
         reward_numframe = self.reward_time*self.fps
         reward_amount = self.tracking_rate - self.reward_frame_index*self.tracking_rate/reward_numframe
-        self.bar = VirtualRectangularTarget(target_width=1.3, target_height=reward_amount, target_color=(0., 1., 0., 0.75), starting_pos=[reward_amount-self.bar_width,0,9])
+        self.bar = VirtualRectangularTarget(target_width=1.3, target_height=reward_amount, target_color=(0., 1., 0., 0.75), starting_pos=[reward_amount-self.bar_width,-15,9])
         for model in self.bar.graphics_models:
             self.add_model(model)
         self.bar.show()        
@@ -397,6 +450,7 @@ class ScoreRewards(traits.HasTraits):
         if hasattr(super(), '_end_reward'):
             super()._end_reward()
         self.remove_model(self.score_display.model)
+        self.score_display.model.release()
 
 """"" BELOW THIS IS ALL THE OLD CODE ASSOCIATED WITH REWARD FEATURES"""
 

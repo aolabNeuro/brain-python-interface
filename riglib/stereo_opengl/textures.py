@@ -141,3 +141,6 @@ class TexModel(Model):
             yield shader, self.draw, self.tex
         else:
             yield self.shader, self.draw, self.tex
+
+    def release(self):
+        self.tex.delete()

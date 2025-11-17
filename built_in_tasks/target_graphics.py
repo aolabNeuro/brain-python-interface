@@ -16,6 +16,7 @@ GREEN = (0,1,0,0.5)
 BLUE = (0.,0.,1.,0.75)
 GOLD = (1., 0.843, 0., 0.5)
 YELLOW = (1,1,0,0.75)
+ORANGE = (1,0.502,0.,0.75)
 mm_per_cm = 1./10
 
 target_colors = {
@@ -77,6 +78,9 @@ class VirtualCircularTarget(CircularTarget):
 
     def cue_fixation(self):
         self.sphere.color = BLUE
+    
+    def cue_set_tone(self):
+        self.sphere.color = ORANGE
 
     def cue_trial_end_success(self):
         self.sphere.color = GREEN
@@ -124,14 +128,23 @@ class RectangularTarget(object):
 class VirtualRectangularTarget(RectangularTarget):
     def drive_to_new_pos(self):
         self.position = self.int_position
-        corner_pos = self.position - self.center_offset
+        corner_pos = self.position #- self.center_offset
         self.cube.translate(*corner_pos, reset=True)
-
+        
     def hide(self):
         self.cube.detach()
 
     def show(self):
         self.cube.attach()
+
+    def rotate_xaxis(self, angle, reset=False):
+        self.cube.rotate_x(angle, reset=reset)
+
+    def rotate_yaxis(self, angle, reset=False):
+        self.cube.rotate_y(angle, reset=reset)
+
+    def rotate_zaxis(self, angle, reset=False):
+        self.cube.rotate_z(angle, reset=reset)
 
     def cue_trial_start(self):
         self.cube.color = RED

@@ -450,11 +450,15 @@ class ScreenTargetTracking(TargetTracking, Window):
             for model in self.target.graphics_models:
                 self.add_model(model)
 
-            # This is the progress bar
-            self.bar = VirtualRectangularTarget(target_width=1, target_height=0, target_color=(0., 1., 0., 0.75), starting_pos=[0,0,9])
+            # This is the optional progress bar (off by default)
+            self.bar = VirtualRectangularTarget(target_width=1, target_height=0, target_color=(0., 1., 0., 0.75), starting_pos=[0,-15,9])
             # print('INIT TRAJ')
             for model in self.bar.graphics_models:
                 self.add_model(model)
+
+            # This is a black cube that optionally hides the "lookbehind" of trajectory (off by default)
+            self.box = VirtualRectangularTarget(target_width=20, target_height=10, target_color=(0, 0, 0, 1), starting_pos=[-10,-1,0])
+            # target_width of RectangularTarget is total height, target_height is 1/2 of total width (from center to edge)
 
         # Declare any plant attributes which must be saved to the HDF file at the _cycle rate
         for attr in self.plant.hdf_attrs:
@@ -536,6 +540,10 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def setup_start_wait(self):
 
+        for model in self.box.graphics_models:
+            self.add_model(model)
+            self.box.hide()
+
         # Allow 2d movement
         if not self.always_1d:
             self.limit1d = False
@@ -581,6 +589,8 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.trajectory.reset()
         self.bar.hide()
         self.bar.reset()
+        self.box.hide()
+        self.box.reset()
 
     def setup_start_tracking_in(self):
         # Revert to settable trait
@@ -625,7 +635,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         '''
         cursor_pos = self.plant.get_endpoint_pos()
         d = np.linalg.norm(cursor_pos - self.target.get_position())
-        return d > (self.target_radius - self.cursor_radius) or super()._test_leave_target(time_in_state)
+        return np.isnan(d) or d > (self.target_radius - self.cursor_radius) or super()._test_leave_target(time_in_state)
 
     #### STATE FUNCTIONS ####
     def _start_wait(self):
@@ -1098,7 +1108,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     
     ### Generator functions ####
     @staticmethod
-    def tracking_target_chain(nblocks=1, ntrials=2, time_length=20, ramp=0, ramp_down=0, num_primes=8, seed=40, sample_rate=120, dimensions = 1, disturbance=True, boundaries=(-10,10,-10,10)):
+    def tracking_target_chain(nblocks=1, ntrials=500, time_length=20, ramp=1.5, ramp_down=1.5, num_primes=8, seed=40, sample_rate=120, dimensions = 1, disturbance=True, boundaries=(-10,10,-10,10)):
         '''
         Generates a sequence of 1D (z axis) target trajectories
 
