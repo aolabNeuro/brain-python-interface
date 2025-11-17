@@ -512,7 +512,7 @@ class Snake(Cable, TexModel):
     '''
     A Cable with a gradient texture applied along its length.
     '''
-    def __init__(self, radius=.5, trajectory=np.array([np.sin(x) for x in range(100)]), segments=12, n_colors=1000, **kwargs):
+    def __init__(self, radius=.5, trajectory=np.array([np.sin(x) for x in range(100)]), segments=12, n_colors=10000, **kwargs):
         self.trajectory = trajectory
         self.n_colors = n_colors
         color = kwargs.pop('color', [1, 1, 1, 1])  # Default color if not provided

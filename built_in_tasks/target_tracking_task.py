@@ -456,10 +456,6 @@ class ScreenTargetTracking(TargetTracking, Window):
             for model in self.bar.graphics_models:
                 self.add_model(model)
 
-            # This is a black cube that optionally hides the "lookbehind" of trajectory (off by default)
-            self.box = VirtualRectangularTarget(target_width=20, target_height=10, target_color=(0, 0, 0, 1), starting_pos=[-10,-1,0])
-            # target_width of RectangularTarget is total height, target_height is 1/2 of total width (from center to edge)
-
         # Declare any plant attributes which must be saved to the HDF file at the _cycle rate
         for attr in self.plant.hdf_attrs:
             self.add_dtype(*attr)
@@ -533,16 +529,12 @@ class ScreenTargetTracking(TargetTracking, Window):
     def update_frame(self):
         self.target.move_to_position(self.targs[self.frame_index+self.lookahead])
         if self.trajectory_type == 'time':
-            self.trajectory.move_to_position(np.array([-self.frame_index,0,0])) # same update constant works for 60 and 120 hz
+            self.trajectory.move_to_position(np.array([-self.frame_index,0,0])) 
         elif self.trajectory_type == 'space':
             self.trajectory.update_mask(self.frame_index, self.frame_index+self.lookahead)
         self.frame_index +=1
 
     def setup_start_wait(self):
-
-        for model in self.box.graphics_models:
-            self.add_model(model)
-            self.box.hide()
 
         # Allow 2d movement
         if not self.always_1d:
@@ -565,11 +557,10 @@ class ScreenTargetTracking(TargetTracking, Window):
                 np.zeros(len(next_trajectory)), 
                 next_trajectory
             ]).T
-            self.trajectory = VirtualCableTarget(target_radius=self.trajectory_radius, target_color=target_colors[self.trajectory_color], trajectory=next_trajectory)
+            self.trajectory = VirtualSnakeTarget(target_radius=self.trajectory_radius, target_color=target_colors[self.trajectory_color], trajectory=next_trajectory)
         elif self.trajectory_type == 'space':
             next_trajectory = self.targs[self.lookahead:]
             self.trajectory = VirtualSnakeTarget(target_radius=self.trajectory_radius, target_color=target_colors[self.trajectory_color], trajectory=next_trajectory)
-            print(target_colors[self.trajectory_color])
             self.trajectory.update_mask(self.frame_index, self.frame_index+self.lookahead)
         else: # 'none'
             next_trajectory = np.zeros((self.lookahead, 3))
@@ -589,8 +580,6 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.trajectory.reset()
         self.bar.hide()
         self.bar.reset()
-        self.box.hide()
-        self.box.reset()
 
     def setup_start_tracking_in(self):
         # Revert to settable trait

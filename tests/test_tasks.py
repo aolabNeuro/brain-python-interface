@@ -75,11 +75,11 @@ class TestManualControlTasks(unittest.TestCase):
         exp = init_exp(ExampleSequenceTask, [], seq, window_size=(1200,800), fullscreen=False)
         exp.run()
     
-    @unittest.skip("")
+    # @unittest.skip("")
     def test_tracking(self):
         print("Running tracking task test")
         seq = TrackingTask.tracking_target_debug(nblocks=1, ntrials=6, time_length=5, seed=40, sample_rate=60, ramp=1) # sample_rate needs to match fps in ScreenTargetTracking
-        exp = init_exp(TrackingTask, [MouseControl, Window2D], seq, window_size=(1000,800), fullscreen=False)
+        exp = init_exp(TrackingTask, [HideLeftTrajectory, MouseControl, Window2D], seq, window_size=(1000,800), fullscreen=False)
         exp.rotation = 'xzy'
         # exp.trajectory_type = 'space'
         exp.trajectory_amplitude = 5
@@ -180,7 +180,7 @@ class TestSeqGenerators(unittest.TestCase):
         print(loc)
         print("---------------corners")
 
-    #@unittest.skip("")
+    @unittest.skip("")
     def test_tracking_2d(self):
         seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=20, ramp=0, ramp_down=0, 
                                                  num_primes=12, seed=42, sample_rate=60, dimensions=2, 
