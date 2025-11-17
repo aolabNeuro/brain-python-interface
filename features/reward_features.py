@@ -97,14 +97,14 @@ class PelletReward(RewardSystem):
     pellets_per_reward = traits.Int(1, desc='The number of pellets to dispense per reward.') 
     port_value = traits.Int(8000, desc='The port value to identify which tablet is running.')
 
-    pellet_dispense_time = 0.5 # in sec, for a single pellet dispense
-    reward_time = pellet_dispense_time * pellets_per_reward
-
     def __init__(self, *args, **kwargs):
         from riglib.tablet_reward import RemoteReward
         super(RewardSystem, self).__init__(*args, **kwargs)
         self.reward = RemoteReward()
         self.reportstats['Reward #'] = 0
+
+        self.pellet_dispense_time = 0.5 # in sec, for a single pellet dispense
+        self.reward_time = self.pellet_dispense_time * self.pellets_per_reward
         
         if self.port_value == 8000:
             self.ip_address = "192.168.0.100"
