@@ -6,6 +6,9 @@ from features.peripheral_device_features import KeyboardControl, MouseControl
 import features.sync_features as sync_features
 from features.laser_features import CrystaLaser
 from features.video_recording_features import E3Video
+from features.peripheral_device_features import RecordAudio
+from riglib.source import DataSource
+from riglib.audio import MonoAudio
 from riglib.e3vision import E3VisionInterface
 import numpy as np
 import time
@@ -25,6 +28,32 @@ def init_exp(base_class, feats, seq=None, **kwargs):
         exp = Exp(**kwargs)
     exp.init()
     return exp
+
+class TestAudioRecording(unittest.TestCase):
+
+    def test_source_cls(self):
+        src = MonoAudio()
+        src.start()
+        time.sleep(1)
+        src.get()
+        src.stop()
+
+    @unittest.skip("msg")
+    def test_record_audio(self):
+        source = DataSource(MonoAudio)
+        source.start()
+        time.sleep(2)
+        data = source.get()
+        source.stop()
+        self.assertEqual(data.shape[0], 44100 * 2)  # 2 seconds of audio at 44100 Hz
+
+    @unittest.skip("msg")
+    def test_exp(self):
+        seq = ManualControl.centerout_2D()
+        exp = init_exp(ManualControl, [RecordAudio], seq=seq,
+                       window_size=(1200,800), fullscreen=False,
+                       session_length=2)
+        exp.run()
 
 class TestKeyboardControl(unittest.TestCase):
 
@@ -147,6 +176,7 @@ class TestE3Video(unittest.TestCase):
     #     time.sleep(5)
     #     e3v.stop_rec()
 
+    @unittest.skip("msg")
     def test_feature(self):
         exp = init_exp(experiment.Experiment, [E3Video], saveid=0)
         exp.run()

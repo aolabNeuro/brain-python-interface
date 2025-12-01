@@ -5,9 +5,13 @@ Peripheral interface device features
 import types
 import numpy as np
 import pygame
+import time
+
 from riglib import gpio
 from config.rig_defaults import force_sensor_address
 from riglib.experiment import traits
+from riglib.audio import MonoAudio, TonePlayer
+from riglib import source, sink
 
 ###### CONSTANTS
 sec_per_min = 60
@@ -334,3 +338,60 @@ class ForceControl():
         def get(self):
             return self.analog_read(0)
         self.joystick.get = types.MethodType(get, self.joystick)
+
+class RecordAudio():
+    '''
+    Record audio from the default audio source.
+    '''
+
+    def init(self, *args, **kwargs):
+        '''
+        Initialize the audio recording.
+        '''
+        super().init(*args, **kwargs)
+        # MonoAudio.subj = self.subject_name 
+        # MonoAudio.saveid = self.saveid # for naming the tmp file
+
+        self.audiodata = source.DataSource(MonoAudio) 
+        sink_manager = sink.SinkManager.get_instance()
+        sink_manager.register(self.audiodata)
+
+    def run(self):
+        '''
+        Start the audio recording.
+        '''
+        self.audiodata.start()
+        time.sleep(0.5)  # Give some time for the audio stream to start
+        tone_gen = TonePlayer(frequency=2000, duration=0.25)
+        tone_gen.play() # Play a tone to indicate the start of recording
+
+        try:
+            super().run()
+        finally:
+            self.audiodata.stop()
+
+    def cleanup(self, database, saveid, **kwargs):
+        '''
+        Function to run at 'cleanup' time, after the FSM has finished executing. See riglib.experiment.Experiment.cleanup
+        This 'cleanup' method links the file created to the database ID for the current TaskEntry
+        '''
+        super_result = super().cleanup(database, saveid, **kwargs)
+        
+        # Play a tone to indicate the task is over
+        tone_gen = TonePlayer(frequency=2000, duration=0.5)
+        tone_gen.play()
+
+        # Sleep time so that the audio file has time to save cleanly
+        time.sleep(1)
+        dbname = kwargs['dbname'] if 'dbname' in kwargs else 'default'
+        filename = f'/var/tmp/tmp_{str(MonoAudio)}_{self.subject_name}_{saveid}.hdf'
+        print(f"Saving {filename} to database {dbname}")
+        if saveid is not None:    
+            if dbname == 'default':
+                database.save_data(filename, "audio", saveid, True, False)
+            else:
+                database.save_data(filename, "audio", saveid, True, False, dbname=dbname)
+        else:
+            print('\n\nAudio file not found properly! It will have to be manually linked!\n\n')
+
+        return super_result
