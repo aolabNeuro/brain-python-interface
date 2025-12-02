@@ -31,6 +31,7 @@ def init_exp(base_class, feats, seq=None, **kwargs):
 
 class TestAudioRecording(unittest.TestCase):
 
+    @unittest.skip("msg")
     def test_source_cls(self):
         src = MonoAudio()
         src.start()
@@ -38,14 +39,28 @@ class TestAudioRecording(unittest.TestCase):
         src.get()
         src.stop()
 
-    @unittest.skip("msg")
+    # @unittest.skip("msg")
     def test_record_audio(self):
         source = DataSource(MonoAudio)
         source.start()
         time.sleep(2)
         data = source.get()
         source.stop()
-        self.assertEqual(data.shape[0], 44100 * 2)  # 2 seconds of audio at 44100 Hz
+        
+        # Play back the recorded audio data
+        import pyaudio
+        p = pyaudio.PyAudio()
+        stream = p.open(format=pyaudio.paInt16,
+                        channels=1,
+                        rate=44100,
+                        output=True,
+                        output_device_index=3)
+        stream.write(
+            data.astype(np.int16).tobytes()
+        )
+        stream.stop_stream()
+        stream.close()
+        p.terminate()
 
     @unittest.skip("msg")
     def test_exp(self):

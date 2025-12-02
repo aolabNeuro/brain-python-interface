@@ -12,7 +12,7 @@ class MonoAudio(DataSourceSystem):
     Wrapper class for pyaudio compatible with using in DataSource for
     buffering audio data.
     '''
-    update_freq = 44100./1024  # Approx 43 Hz
+    update_freq = 44100
     dtype = np.dtype('int16')
 
     def start(self):
@@ -26,7 +26,10 @@ class MonoAudio(DataSourceSystem):
             rate=44100,
             input=True,
             frames_per_buffer=1024,
+            input_device_index=2
         )
+
+        self.gen = iter(())
 
     def stop(self):
         self.stream.stop_stream()
@@ -37,5 +40,10 @@ class MonoAudio(DataSourceSystem):
         '''
         Retrieve a packet from the host
         '''
-        data = self.stream.read(1024, exception_on_overflow=False)
-        return np.expand_dims(np.frombuffer(data, dtype=self.dtype), axis=1)
+        try:
+            return next(self.gen)
+        except StopIteration:
+
+            data = self.stream.read(1024, exception_on_overflow=False)
+            self.gen = iter(np.frombuffer(data, dtype=self.dtype))
+            return next(self.gen) 

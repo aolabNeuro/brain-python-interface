@@ -362,7 +362,7 @@ class RecordAudio():
         '''
         self.audiodata.start()
         time.sleep(0.5)  # Give some time for the audio stream to start
-        tone_gen = TonePlayer(frequency=2000, duration=0.25)
+        tone_gen = TonePlayer(frequency=10000, duration=0.25)
         tone_gen.play() # Play a tone to indicate the start of recording
 
         try:
