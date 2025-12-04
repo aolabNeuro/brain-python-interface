@@ -231,7 +231,7 @@ class BehaviorAnalysisWorker(AnalysisWorker):
                 self.targets[event_data] = 1
             elif event_name == 'TARGET_OFF':
                 self.targets[event_data] = 0
-            elif event_name in ['PAUSE', 'TRIAL_END', 'HOLD_PENALTY', 'DELAY_PENALTY', 'TIMEOUT_PENALTY']:
+            elif event_name in ['PAUSE', 'TRIAL_END', 'HOLD_PENALTY', 'DELAY_PENALTY', 'TIMEOUT_PENALTY','FIXATION_PENALTY']:
                 # Clear targets at the end of the trial
                 self.targets = {}
             elif event_name == 'REWARD':
@@ -247,9 +247,19 @@ class BehaviorAnalysisWorker(AnalysisWorker):
             self.eye_pos = np.array(values[0])[:2]
 
             # Update eye diameter
-            self.temp = np.array(values[0])[[0,1,4]]
-            self.eye_diam = np.roll(self.eye_diam, -1, axis=0)
-            self.eye_diam[-1] = self.temp
+            if self.eye_pos.size > 2:
+                self.temp = np.array(values[0])[[0,1,4]]
+                self.eye_diam = np.roll(self.eye_diam, -1, axis=0)
+                self.eye_diam[-1] = self.temp
+
+        elif key == 'calibrated_eye_pos':
+            self.calibrated_eye_pos = np.array(values[0])[:2]
+
+            # Update eye diameter
+            if self.calibrated_eye_pos.size > 2:
+                self.temp = np.array(values[0])[[0,1,4]]
+                self.eye_diam = np.roll(self.eye_diam, -1, axis=0)
+                self.eye_diam[-1] = self.temp
 
         elif key == 'target_location':
             target_idx, target_location = values
@@ -283,6 +293,64 @@ class BehaviorAnalysisWorker(AnalysisWorker):
         filepath = os.path.join(self.calibration_dir, self.calibration_filename)
         if self.calibration_flag and not np.array_equal(self.eye_coeff, np.array([[1,0],[1,0]])):
             aopy.data.pkl_write(self.calibration_filename, (self.eye_coeff, self.eye_coeff_corr), self.calibration_dir)
+
+class SaccadeAnalysisWorker(BehaviorAnalysisWorker):
+    '''
+    Plots eye, cursor, and target data from experiments that have them. Performs automatic
+    calibration of eye data to target locations when the cursor enters the target if no
+    calibration coefficients are available. 
+    '''
+   
+    def __init__(self, task_params, data_queue, calibration_dir='/var/tmp', buffer_time=1, ylim=1, px_per_cm=51.67, **kwargs):
+        super().__init__(task_params, data_queue, **kwargs)
+
+    def init(self):
+        super().init()
+        self.calibrated_eye_pos = np.zeros(2)
+        self.calibration_flag = False
+ 
+    def get_current_pos(self):
+        '''
+        Get the current cursor, eye, and target positions
+
+        Returns:
+            cursor_pos ((2,) tuple): Current cursor position
+            eye_pos ((2,) tuple): Current eye position and diameters
+            targets (list): List of active targets in (position, radius, color) format
+        '''
+        try:
+            radius = self.task_params['target_radius']
+            color = 'orange'
+            targets = [(self.target_pos[k], radius, color if v == 1 else 'green') for k, v in self.targets.items() if v]
+        except:
+            targets = []
+        return self.cursor_pos, self.calibrated_eye_pos, targets
+
+    def draw(self):
+        cursor_pos, calibrated_eye_pos, targets = self.get_current_pos()
+        cursor_radius = self.task_params.get('cursor_radius', 0.25)
+        if 'fixation_radius_buffer' in self.task_params:
+            buffer = self.task_params['fixation_radius_buffer']
+        elif 'fixation_dist' in self.task_params:
+            buffer = self.task_params['fixation_dist'] - self.task_params['target_radius']
+        eye_radius = 0.2
+
+        patches1 = [plt.Circle(pos, radius+buffer) for pos, radius, _ in targets]
+        patches2 = [plt.Circle(cursor_pos, cursor_radius), plt.Circle(calibrated_eye_pos, eye_radius)]
+        patches3 = [plt.Circle(pos, radius) for pos, radius, _ in targets]
+        patches = patches1 + patches2 + patches3
+        self.circles.set_paths(patches)
+        colors = [[0.8,0.8,0.8] for _, _, c in targets]  + ['darkblue', 'darkgreen']  + [c for _, _, c in targets] 
+        self.circles.set_facecolor(colors)
+        self.circles.set_alpha(0.5)
+
+        # Update eye diameter plot
+        self.x_plot.set_data(np.arange(len(self.eye_diam)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
+                                self.eye_diam[:, 0])
+        self.y_plot.set_data(np.arange(len(self.eye_diam)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
+                                self.eye_diam[:, 1])
+        self.diam_plot.set_data(np.arange(len(self.eye_diam)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
+                                self.eye_diam[:, 2]/self.px_per_cm)
 
 class ERPAnalysisWorker(AnalysisWorker):
     '''
@@ -569,7 +637,14 @@ class OnlineDataServer(threading.Thread):
         # Always start with the behavior analysis worker
         print('init in state', self.state)
         data_queue = mp.Queue()
-        self.analysis_workers.append((BehaviorAnalysisWorker(self.task_params, data_queue), data_queue))
+        if self.task_params['experiment_name'] == 'ManualControl':
+            self.analysis_workers.append((BehaviorAnalysisWorker(self.task_params, data_queue), data_queue))
+
+        elif self.task_params['experiment_name'] == 'EyeConstrainedManualControl':
+            self.analysis_workers.append((SaccadeAnalysisWorker(self.task_params, data_queue), data_queue))
+
+        elif self.task_params['experiment_name'] == 'SaccadeTask':
+            self.analysis_workers.append((SaccadeAnalysisWorker(self.task_params, data_queue), data_queue))
 
         # Is there ecube neural data?
         if 'record_headstage' in self.task_params and self.task_params['record_headstage']:
