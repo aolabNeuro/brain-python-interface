@@ -9,7 +9,8 @@ from riglib.experiment import traits
 
 from .target_graphics import *
 from .target_capture_task import ScreenTargetCapture
-from .target_capture_task_xt import ScreenReachAngle, ScreenReachLine, SequenceCapture, HandConstrainedEyeCapture, ScreenTargetCapture_Saccade, ScreenTargetCapture_ReadySet
+from .target_capture_task_xt import ScreenReachAngle, ScreenReachLine, SequenceCapture, ScreenTargetCapture_ReadySet
+from .target_capture_task_eye import EyeConstrainedTargetCapture, HandConstrainedEyeCapture, ScreenTargetCapture_Saccade
 from .target_tracking_task import ScreenTargetTracking
 from .rotation_matrices import *
 
@@ -198,6 +199,12 @@ class TrackingTask(ManualControlMixin, ScreenTargetTracking):
 class SequenceTask(ManualControlMixin, SequenceCapture):
     '''
     Sequence task. Subjects need to capture 3 targets. The last target appears while reaching to the 2st target.
+    '''
+    pass
+
+class EyeConstrainedManualControl(ManualControlMixin, EyeConstrainedTargetCapture):
+    '''
+    Slightly refactored original manual control task
     '''
     pass
 
