@@ -282,6 +282,11 @@ class ConsecutiveJackpot(traits.HasTraits):
         super()._start_timeout_penalty()
         self.jack_count = 0 
 
+    def _start_fixation_penalty(self):
+        if hasattr(super(), '_start_fixation_penalty'):
+            super()._start_fixation_penalty()
+        self.jack_count = 0
+
     def _start_reward(self):
         super()._start_reward()
         self.jack_count += 1 #add one for each rewarded trial
