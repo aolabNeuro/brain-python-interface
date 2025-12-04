@@ -637,10 +637,10 @@ class OnlineDataServer(threading.Thread):
         # Always start with the behavior analysis worker
         print('init in state', self.state)
         data_queue = mp.Queue()
-        if self.task_params['experiment_name'] == 'ManualControl' and 'fixation_dist' not in self.task_params:
+        if self.task_params['experiment_name'] == 'ManualControl':
             self.analysis_workers.append((BehaviorAnalysisWorker(self.task_params, data_queue), data_queue))
 
-        elif self.task_params['experiment_name'] == 'ManualControl' and 'fixation_dist' in self.task_params:
+        elif self.task_params['experiment_name'] == 'EyeConstrainedManualControl':
             self.analysis_workers.append((SaccadeAnalysisWorker(self.task_params, data_queue), data_queue))
 
         elif self.task_params['experiment_name'] == 'SaccadeTask':
