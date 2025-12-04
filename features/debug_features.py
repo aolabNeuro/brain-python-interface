@@ -125,6 +125,8 @@ class OnlineAnalysis(traits.HasTraits):
             self._send_online_analysis_msg('cursor', self.plant.get_endpoint_pos())
         if hasattr(self, 'eye_pos'):
             self._send_online_analysis_msg('eye_pos', self.eye_pos)
+        if hasattr(self, 'calibrated_eye_pos'):
+            self._send_online_analysis_msg('calibrated_eye_pos', self.calibrated_eye_pos)
         if hasattr(self, 'task_data') and 'decoder_state' in self.task_data.dtype.names:
             self._send_online_analysis_msg('decoder_state', self.task_data['decoder_state'].flatten().tolist())
         if hasattr(self, 'task_data') and hasattr(self, 'extractor') and self.extractor.feature_type in self.task_data.dtype.names:

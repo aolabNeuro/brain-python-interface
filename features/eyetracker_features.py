@@ -34,6 +34,7 @@ class EyeCalibration(traits.HasTraits):
     taskid_for_eye_calibration = traits.Int(0, desc="directory where hdf file lives")
     show_eye_pos = traits.Bool(False, desc="Whether to show eye positions")
     eye_target_calibration = traits.Bool(False, desc="Whether to regress eye positions against target positions")
+    center_eye_data = traits.Bool(False, desc="Whether to demean eye data with eye position for the center target")
 
     def __init__(self, *args, **kwargs): #, start_pos, calibration):
         super(EyeCalibration,self).__init__(*args, **kwargs)
@@ -46,6 +47,7 @@ class EyeCalibration(traits.HasTraits):
         files = {}
         files['hdf'] = hdf_file
         files['ecube'] = ecube_file
+        self.eye_center = np.zeros((4,))
         print(files)
 
         if not self.keyboard_control:
@@ -81,7 +83,16 @@ class EyeCalibration(traits.HasTraits):
 
                 target_pos = get_target_locations(bmi3d_data, [1,2,3,4,5,6,7,8])
                 
-                self.eye_coeff, _ = aopy.preproc.calc_eye_target_calibration(eye_interp[:,:4], \
+                # Get eye_pos data when subjects gaze at the center. Target position doesn't matter for this computation
+                if self.center_eye_data:
+                    _, _, eye_center = aopy.preproc.calc_eye_target_calibration(eye_interp[:,:4], \
+                        bmi3d_metadata['cursor_interp_samplerate'], events['timestamp'], events['code'], target_pos, \
+                        offset=0.1, duration=0.2, align_events=80, return_datapoints=True)
+                    
+                    self.eye_center = np.nanmedian(eye_center, axis=0)
+
+                # Calculate coefficient by linear regression between targets and centered eye positions
+                self.eye_coeff, _ = aopy.preproc.calc_eye_target_calibration(eye_interp[:,:4]-self.eye_center, \
                     bmi3d_metadata['cursor_interp_samplerate'], events['timestamp'], events['code'], target_pos)
             
             print("Calibration complete:", self.eye_coeff)
@@ -113,7 +124,7 @@ class EyeCalibration(traits.HasTraits):
         # Do calibration
         ave_pos = self.eye_pos
         if not self.keyboard_control:
-            calibrated_pos = aopy.postproc.get_calibrated_eye_data(self.eye_pos[:4],self.eye_coeff)
+            calibrated_pos = aopy.postproc.get_calibrated_eye_data(self.eye_pos[:4]-self.eye_center, self.eye_coeff)
             ave_pos = np.array([(calibrated_pos[0] + calibrated_pos[2])/2, (calibrated_pos[1] + calibrated_pos[3])/2])
         
         # Save calibration
