@@ -333,9 +333,14 @@ class HideLeftTrajectory(traits.HasTraits):
     Useful for task with bumpers.
     '''
 
+    def setup_start_wait(self):
+        super().setup_start_wait()
+        print(self.frame_index)
+        self.trajectory.update_mask(self.lookahead+2, self.lookahead*2)
+                                    
     def update_frame(self):
         super().update_frame()
-        self.trajectory.update_mask(self.frame_index+self.lookahead, self.frame_index+2*self.lookahead)
+        self.trajectory.update_mask(self.frame_index+self.lookahead+1, self.frame_index+2*self.lookahead)
 
 class ReadysetMedley(traits.HasTraits):
 

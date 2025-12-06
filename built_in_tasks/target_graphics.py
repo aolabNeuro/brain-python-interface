@@ -248,11 +248,11 @@ class VirtualSnakeTarget(VirtualCableTarget):
         self.graphics_models = [self.cable]
         self.cable.translate(*self.position)
 
-    def update_mask(self, start_frame, end_frame):
+    def update_mask(self, start_frame, end_frame, inverse=False):
         '''
         Update the texture mask of the snake target.
         '''
-        self.cable.update_texture(start_frame, end_frame)
+        self.cable.update_texture(start_frame, end_frame, inverse=inverse)
 
 class VirtualTorusTarget(VirtualCircularTarget):
 

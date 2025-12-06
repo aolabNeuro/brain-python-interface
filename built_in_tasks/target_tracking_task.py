@@ -92,9 +92,6 @@ class TargetTracking(Sequence):
         self.targs = np.squeeze(self.targs,axis=0)
         self.disturbance_path = np.squeeze(self.disturbance_path)
 
-        WIDTH, HEIGHT = self.window_size[0], self.window_size[1]
-        lookahead = np.zeros((self.lookahead,np.shape(self.targs)[1])) # (30,3)
-
         self.targs = self.trajectory_amplitude*self.targs
         self.disturbance_path = self.disturbance_amplitude*self.disturbance_path
         # print(np.amax(self.targs), np.amax(self.disturbance_path))
@@ -104,18 +101,16 @@ class TargetTracking(Sequence):
             self.ramp_counter[:int(self.ramp_up_time*self.sample_rate)] = 1
         if self.ramp_down_time > 0:
             self.ramp_counter[-int(self.ramp_down_time*self.sample_rate):] = 2
-
-        self.targs = np.concatenate((lookahead, self.targs),axis=0) # (time_length*sample_rate+30,3) # targs and disturbance are no longer same length
     
     def tracking_task_start_wait(self):
-        print(self.gen_index)
+        # print(self.gen_index)
 
         self.trial_record['trial'] = self.calc_trial_num()
         self.trial_record['index'] = self.gen_index
         self.trial_record['is_disturbance'] = self.disturbance_trial
         for i in range(len(self.disturbance_path)):
             # Update the data sinks with trial information --> bmi3d_trials
-            self.trial_record['target'] = self.targs[i+self.lookahead]
+            self.trial_record['target'] = self.targs[i]
             self.trial_record['disturbance'] = self.disturbance_path[i]
             self.sinks.send("trials", self.trial_record)
 
@@ -334,15 +329,15 @@ class TargetTracking(Sequence):
 
     def _test_traj_complete(self, time_in_state):
         '''Test whether the trajectory is finished and whether there is a ramp down before the trial ends'''
-        return (self.frame_index + self.lookahead == self.trajectory_length - self.ramp_down_time*self.sample_rate) and (self.ramp_down_time > 0)
+        return (self.frame_index == self.trajectory_length - self.ramp_down_time*self.sample_rate) and (self.ramp_down_time > 0)
 
     def _test_ramp_and_trial_complete(self, time_in_state):
         '''Test whether the ramp down is finished, ending the trial'''
-        return (self.frame_index + self.lookahead == self.trajectory_length) and (self.ramp_down_time > 0)
+        return (self.frame_index == self.trajectory_length) and (self.ramp_down_time > 0)
     
     def _test_trial_complete(self, time_in_state):
         '''Test whether the trajectory is finished, ending the trial'''
-        return (self.frame_index + self.lookahead == self.trajectory_length) and (self.ramp_down_time == 0)
+        return (self.frame_index == self.trajectory_length) and (self.ramp_down_time == 0)
 
     def _test_tracking_out_timeout(self, time_in_state):
         return time_in_state > self.tracking_out_time
@@ -432,6 +427,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.plant_vis_prev = True
         self.cursor_vis_prev = True
         self.lookahead = int(self.fps * self.lookahead_time)
+        self.lookahead_scale = (2 * self.screen_cm[0]) / self.lookahead # cm per frame
         self.original_limit1d = self.limit1d # keep track of original settable trait
         
         if not self.always_1d:
@@ -496,7 +492,7 @@ class ScreenTargetTracking(TargetTracking, Window):
              self.task_data['current_disturbance'] = [np.nan,np.nan,np.nan]
              self.task_data['current_target_validate'] = self.target.get_position() # default VirtualCircularTarget position is [0,0,0]
         else:
-            self.task_data['current_target'] = self.targs[self.frame_index+self.lookahead]
+            self.task_data['current_target'] = self.targs[self.frame_index]
             self.task_data['current_disturbance'] = self.disturbance_path[self.frame_index]
             self.task_data['current_target_validate'] = self.target.get_position()
 
@@ -527,9 +523,9 @@ class ScreenTargetTracking(TargetTracking, Window):
             self.plant.set_visibility(self.plant_visible)
 
     def update_frame(self):
-        self.target.move_to_position(self.targs[self.frame_index+self.lookahead])
+        self.target.move_to_position(self.targs[self.frame_index])
         if self.trajectory_type == 'time':
-            self.trajectory.move_to_position(np.array([-self.frame_index,0,0])) 
+            self.trajectory.move_to_position(np.array([-self.frame_index*self.lookahead_scale - self.lookahead*self.lookahead_scale,0,0])) 
         elif self.trajectory_type == 'space':
             self.trajectory.update_mask(self.frame_index, self.frame_index+self.lookahead)
         self.frame_index +=1
@@ -550,17 +546,18 @@ class ScreenTargetTracking(TargetTracking, Window):
                 self.remove_model(model)
             del self.trajectory
         if self.trajectory_type == 'time':
-            next_trajectory = np.array(np.squeeze(self.targs)[:,2])
-            next_trajectory[:self.lookahead] = next_trajectory[self.lookahead]
+
+            lookbehind = np.zeros((self.lookahead, np.shape(self.targs)[1]))
+            next_trajectory = np.concatenate((lookbehind, self.targs), axis=0)
+            next_trajectory = np.array(np.squeeze(next_trajectory)[:,2])
             next_trajectory = np.vstack([
-                np.arange(len(next_trajectory))-self.lookahead, # x-axis is in cm, so divide by 3? to get time? idk
+                self.lookahead_scale * np.arange(len(next_trajectory)), # set the lookahead by scaling the trajectory to fit in the screen
                 np.zeros(len(next_trajectory)), 
                 next_trajectory
             ]).T
             self.trajectory = VirtualSnakeTarget(target_radius=self.trajectory_radius, target_color=target_colors[self.trajectory_color], trajectory=next_trajectory)
         elif self.trajectory_type == 'space':
-            next_trajectory = self.targs[self.lookahead:]
-            self.trajectory = VirtualSnakeTarget(target_radius=self.trajectory_radius, target_color=target_colors[self.trajectory_color], trajectory=next_trajectory)
+            self.trajectory = VirtualSnakeTarget(target_radius=self.trajectory_radius, target_color=target_colors[self.trajectory_color], trajectory=self.targs)
             self.trajectory.update_mask(self.frame_index, self.frame_index+self.lookahead)
         else: # 'none'
             next_trajectory = np.zeros((self.lookahead, 3))
@@ -606,7 +603,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.update_frame()
 
         # Check if the trial is over and there are no more target frames to display
-        if self.frame_index+self.lookahead >= np.shape(self.targs)[0]:
+        if self.frame_index >= np.shape(self.targs)[0]:
             self.trial_timed_out = True
 
     #### TEST FUNCTIONS ####
@@ -645,10 +642,10 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def _start_trajectory(self):
         super()._start_trajectory()
-        if self.frame_index == 0:
-            #self.target.move_to_position(np.array([0,0,self.targs[self.frame_index+self.lookahead][2]])) # tablet screen x-axis ranges -19,19, center 0
-            self.target.move_to_position(self.targs[self.frame_index+self.lookahead]) # tablet screen x-axis ranges -19,19, center 0
-            self.trajectory.move_to_position(np.array([0,0,0])) # tablet screen x-axis ranges 0,41.33333, center 22ish
+        if self.frame_index == 0: # why would this ever not be 0?
+            self.target.move_to_position(self.targs[self.frame_index])
+            if self.trajectory_type == 'time':
+                self.trajectory.move_to_position(np.array([-self.lookahead*self.lookahead_scale,0,0]))
             # print(self.target.get_position())
             # print(self.trajectory.get_position())
 
@@ -657,6 +654,8 @@ class ScreenTargetTracking(TargetTracking, Window):
                 self.trajectory.show()
             # print('SHOW TRAJ')
             self.sync_event('TARGET_ON')
+        else:
+            print('WARNING: trajectory state started with frame_index != 0', self.frame_index)
 
     def _while_trajectory(self):
         super()._while_trajectory()

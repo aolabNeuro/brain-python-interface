@@ -512,35 +512,34 @@ class Snake(Cable, TexModel):
     '''
     A Cable with a gradient texture applied along its length.
     '''
-    def __init__(self, radius=.5, trajectory=np.array([np.sin(x) for x in range(100)]), segments=12, n_colors=10000, **kwargs):
+    def __init__(self, radius=.5, trajectory=np.array([np.sin(x) for x in range(100)]), segments=12, **kwargs):
         self.trajectory = trajectory
-        self.n_colors = n_colors
         color = kwargs.pop('color', [1, 1, 1, 1])  # Default color if not provided
         self.color = color
-        tex = self.get_texture(0, len(trajectory), n_colors)
+        tex = self.get_texture(0, len(trajectory))
         super().__init__(radius, trajectory, segments, tex=tex, color=[0, 0, 0, 1], **kwargs)
         self.color = color  # Store the color for later use
 
-    def get_texture(self, start_frame, end_frame, n_colors):
-        mask = np.zeros(n_colors)
-        start_frame_idx = int(float(start_frame) / len(self.trajectory) * n_colors)
-        end_frame_idx = int(float(end_frame) / len(self.trajectory) * n_colors)
-        if start_frame_idx >= n_colors:
-            start_frame_idx = n_colors
-        if end_frame_idx >= n_colors:
-            end_frame_idx = n_colors
-        mask[start_frame_idx:end_frame_idx] = 1
+    def get_texture(self, start_frame, end_frame, inverse=False):
+        mask = np.zeros((len(self.trajectory)))
+        if start_frame >= len(self.trajectory):
+            start_frame = len(self.trajectory)
+        if end_frame >= len(self.trajectory):
+            end_frame = len(self.trajectory)
+        mask[start_frame:end_frame] = 1
+        if inverse:
+            mask = 1 - mask
         mask = np.tile(mask, (4, 1)).T  # Repeat for RGBA
         mask = self.color * mask  # Apply color
         tex = Texture(mask.reshape((1, len(mask), 4))) # Reshape to (1, n_colors, 4)
         return tex
         
-    def update_texture(self, start_frame, end_frame):
+    def update_texture(self, start_frame, end_frame, inverse=False):
         '''
         Update the texture of the snake based on the new trajectory.
         '''
         self.tex.delete()  # Delete the old texture
-        tex = self.get_texture(start_frame, end_frame, self.n_colors)
+        tex = self.get_texture(start_frame, end_frame, inverse=inverse)
         self.tex = tex
         self.tex.init()
 

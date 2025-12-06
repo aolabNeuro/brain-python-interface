@@ -78,12 +78,15 @@ class TestManualControlTasks(unittest.TestCase):
     @unittest.skip("")
     def test_tracking(self):
         print("Running tracking task test")
-        seq = TrackingTask.tracking_target_debug(nblocks=1, ntrials=6, time_length=5, seed=40, sample_rate=60, ramp=1) # sample_rate needs to match fps in ScreenTargetTracking
-        exp = init_exp(TrackingTask, [HideLeftTrajectory, MouseControl, Window2D], seq, window_size=(1000,800), fullscreen=False)
+        seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=5, ramp=1, ramp_down=1, 
+                                                 num_primes=8, seed=42, sample_rate=60, 
+                                                 disturbance=False, boundaries=(-10,10,-10,10))
+        exp = init_exp(TrackingTask, [HideLeftTrajectory, MouseControl, Window2D], seq, window_size=(1000,800), fullscreen=False,
+                       lookahead_time=1, screen_half_height=10)
         exp.rotation = 'xzy'
         # exp.trajectory_type = 'space'
         exp.trajectory_amplitude = 5
-        # exp.lookahead_time = 1
+        exp.trajectory_radius = 0.2
         exp.run()
 
     @unittest.skip("")
