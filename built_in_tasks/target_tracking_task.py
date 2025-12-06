@@ -930,7 +930,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         return trials, trial_order
 
     @staticmethod
-    def generate_2D_trajectories(num_trials=2, time_length=20, seed=40, sample_rate=120, base_period=20, ramp=0, ramp_down=0, num_primes=8):
+    def generate_2D_trajectories(num_trials=2, time_length=20, seed=40, sample_rate=120, base_period=20, ramp=0, ramp_down=0, num_primes=8, use_disturb = True, decay_rate = None):
         '''
         Sets up variables and uses prime numbers to call the above functions and generate trajectories in both x & y 
         ramp is time length for preparatory lines
@@ -958,12 +958,14 @@ class ScreenTargetTracking(TargetTracking, Window):
         f_x = xprimes*w0 # stimulated frequencies
         f_y = yprimes*w0
 
-        #a_x = 1/(1+np.arange(f_x.size)) # amplitude linear/reciprocal 
-        #a_y = 1/(1+np.arange(f_y.size))
+        if decay_rate is None: #use linear decay rate to generate amplitudes if no decay rate is specified 
+            a_x = 1/(1+np.arange(f_x.size)) # amplitude linear/reciprocal 
+            a_y = 1/(1+np.arange(f_y.size))
 
-        k = 0.1 #decay rate
-        a_x = np.exp(-k*np.arange(f_x.size)) # amplitude exponential decay
-        a_y = np.exp(-k*np.arange(f_y.size))
+        if decay_rate is not None: #if the decay rate is a value then use exponential decay to generate amplitiudes
+            k = decay_rate
+            a_x = np.exp(-k*np.arange(f_x.size)) # amplitude exponential decay
+            a_y = np.exp(-k*np.arange(f_y.size))
 
         # phase offset
         o_x = np.random.rand(num_trials, f_x.size)
@@ -993,73 +995,48 @@ class ScreenTargetTracking(TargetTracking, Window):
             trial_order = [(1,'E','O'),(1,'O','E')]
         elif order == 1:
             trial_order = [(1,'O','E'),(1,'E','O')]
-
-        # generate pairing of elements 
-        first_set = [] #initialize empty first list
-        second_set = [] #initialize second list 
-        nele = len(xprimes) # number of elements in xprimes (and yprimes) 
-        #set up logic for final two elements 
-        if nele % 2: #if number of elements divided by 2 has remainder (ie if num of elements is odd)
-            ele2 = 0 
-        else:
-            ele2 = 1 #set up to be able to skip the last two elements 
-
-        for ele in range((nele//2) - ele2): #floor division to get half the length of elments 
-            left_side = ele
-            right_side = nele-1-ele 
-
-            if ele % 2 == 0: #remainder division for odds and evens 
-                first_set.extend([left_side, right_side])
-            else:
-                second_set.extend([left_side, right_side])
-            
-
-        if nele % 2 == 1: #if odd number of elements in xprime or yprime 
-            mid_ele = nele// 2 #grab element in middle 
-            second_set.append(mid_ele)
-        else:
-            mid1 = nele // 2 - 1
-            mid2 = nele // 2
-            first_set.append(mid1)
-            second_set.append(mid2)
-
-        # #check with disturbance adn reference sharing primes 
-        # sines_r = np.arange(len(xprimes))
-        # sines_d = np.arange(len(xprimes))
         
         # generate reference and disturbance trajectories for all trials
         for trial_id, (num_reps,ref_ind,dis_ind) in enumerate(trial_order*int(num_trials/2)):   
             if ref_ind == 'E': 
-                #sines_r = np.arange(len(xprimes))[0::2] # use even indices
-                sines_r = first_set
+                sines_r = np.arange(len(xprimes))[0::2] # use even indices
+                
             elif ref_ind == 'O': 
-                #sines_r = np.arange(len(xprimes))[1::2] # use odd indices
-                sines_r = second_set
+                sines_r = np.arange(len(xprimes))[1::2] # use odd indices
+    
             else:
                 sines_r = np.arange(len(xprimes))
             if dis_ind == 'E':
-                #sines_d = np.arange(len(xprimes))[0::2]
-                sines_d = first_set
+                sines_d = np.arange(len(xprimes))[0::2]
+                
             elif dis_ind == 'O':
-                #sines_d = np.arange(len(xprimes))[1::2]
-                sines_d = second_set
+                sines_d = np.arange(len(xprimes))[1::2]
+                
             else:
                 sines_d = np.arange(len(xprimes)) #every element in vector 
             
+            if use_disturb == False: #use both odd and even indices for reference trajectory if distrubance is turned off. 
             # generate X-dimension 
-            refx_traj, ref_Ax = ScreenTargetTracking.calc_sum_of_sines_ramp(t, r, rd, f_x[sines_r], a_x[sines_r], o_x[trial_id][sines_r])
-            disx_traj, dis_Ax = ScreenTargetTracking.calc_sum_of_sines_ramp(t,r,rd, f_x[sines_d], a_x[sines_d], o_xdis[trial_id][sines_d])
+                refx_traj, ref_Ax = ScreenTargetTracking.calc_sum_of_sines_ramp(t, r, rd, f_x[np.arange(len(xprimes))], a_x[np.arange(len(xprimes))], o_x[trial_id][np.arange(len(xprimes))])
+                disx_traj, dis_Ax = ScreenTargetTracking.calc_sum_of_sines_ramp(t,r,rd, f_x[sines_d], a_x[sines_d], o_xdis[trial_id][sines_d])
             # generate Y-dimension 
-            refy_traj, ref_Ay = ScreenTargetTracking.calc_sum_of_sines_ramp(t, r, rd, f_y[sines_r], a_y[sines_r], o_y[trial_id][sines_r])
-            disy_traj, dis_Ay = ScreenTargetTracking.calc_sum_of_sines_ramp(t, r, rd, f_y[sines_d], a_y[sines_d], o_ydis[trial_id][sines_d])
+                refy_traj, ref_Ay = ScreenTargetTracking.calc_sum_of_sines_ramp(t, r, rd, f_y[np.arange(len(xprimes))], a_y[np.arange(len(xprimes))], o_y[trial_id][np.arange(len(xprimes))])
+                disy_traj, dis_Ay = ScreenTargetTracking.calc_sum_of_sines_ramp(t, r, rd, f_y[sines_d], a_y[sines_d], o_ydis[trial_id][sines_d])
+            
+            else:
+                # generate X-dimension 
+                refx_traj, ref_Ax = ScreenTargetTracking.calc_sum_of_sines_ramp(t, r, rd, f_x[sines_r], a_x[sines_r], o_x[trial_id][sines_r])
+                disx_traj, dis_Ax = ScreenTargetTracking.calc_sum_of_sines_ramp(t,r,rd, f_x[sines_d], a_x[sines_d], o_xdis[trial_id][sines_d])
+            # generate Y-dimension 
+                refy_traj, ref_Ay = ScreenTargetTracking.calc_sum_of_sines_ramp(t, r, rd, f_y[sines_r], a_y[sines_r], o_y[trial_id][sines_r])
+                disy_traj, dis_Ay = ScreenTargetTracking.calc_sum_of_sines_ramp(t, r, rd, f_y[sines_d], a_y[sines_d], o_ydis[trial_id][sines_d])
+            
             
             # normalized trajectories
             trials['ref_x'][trial_id] = refx_traj/ref_Ax   # previously, denominator was np.sum(a_ref)
             trials['dis_x'][trial_id] = disx_traj/dis_Ax   # previously, denominator was np.sum(a_dis)
             trials['ref_y'][trial_id] = refy_traj/ref_Ay   # previously, denominator was np.sum(a_ref)
             trials['dis_y'][trial_id] = disy_traj/dis_Ay   # previously, denominator was np.sum(a_dis)
-            
-            # print(trial_order, ref_A, dis_A)
         
         return trials, trial_order
 
@@ -1097,7 +1074,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     
     ### Generator functions ####
     @staticmethod
-    def tracking_target_chain(nblocks=1, ntrials=500, time_length=20, ramp=1.5, ramp_down=1.5, num_primes=8, seed=40, sample_rate=120, dimensions = 1, disturbance=True, boundaries=(-10,10,-10,10)):
+    def tracking_target_chain(nblocks=1, ntrials=500, time_length=20, ramp=1.5, ramp_down=1.5, num_primes=8, seed=40, sample_rate=120, dimensions = 1, disturbance=True, boundaries=(-10,10,-10,10), decay_rate = None):
         '''
         Generates a sequence of 1D (z axis) target trajectories
 
@@ -1121,6 +1098,8 @@ class ScreenTargetTracking(TargetTracking, Window):
             Whether to add disturbance to the cursor (disturbance is generated regardless)
         boundaries: 4 element tuple
             The limits of the allowed target locations (-x, x, -z, z)
+        decay_rate: None or float
+            This generates amplitudes using a decay_rate. Used for 2d trajectories. If set to None (default), amplitudes are generated using a linear decay.
 
         Returns
         -------
@@ -1148,12 +1127,13 @@ class ScreenTargetTracking(TargetTracking, Window):
 
             if dimensions == 2: 
                 trials, trial_order = ScreenTargetTracking.generate_2D_trajectories(
-                    num_trials=ntrials, time_length=time_length, seed=seed, sample_rate=sample_rate, base_period=base_period, ramp=ramp, ramp_down=ramp_down, num_primes=num_primes
-                    )
+                    num_trials=ntrials, time_length=time_length, seed=seed, sample_rate=sample_rate, base_period=base_period, ramp=ramp, ramp_down=ramp_down, num_primes=num_primes, use_disturb = disturbance,
+                    decay_rate = decay_rate)
                 for trial_id in range(ntrials):
                     targs = []
                     ref_trajectory = np.zeros((int((time_length+ramp+ramp_down)*sample_rate),3))
                     dis_trajectory = ref_trajectory.copy()
+                    
                     ref_trajectory[:,2] = trials['ref_y'][trial_id] #y is out of the screen, x is left and right and z is up and down 
                     ref_trajectory[:,0] = trials['ref_x'][trial_id]
 

@@ -75,7 +75,7 @@ class TestManualControlTasks(unittest.TestCase):
         exp = init_exp(ExampleSequenceTask, [], seq, window_size=(1200,800), fullscreen=False)
         exp.run()
     
-    # @unittest.skip("")
+    @unittest.skip("")
     def test_tracking(self):
         print("Running tracking task test")
         seq = TrackingTask.tracking_target_debug(nblocks=1, ntrials=6, time_length=5, seed=40, sample_rate=60, ramp=1) # sample_rate needs to match fps in ScreenTargetTracking
@@ -91,7 +91,7 @@ class TestManualControlTasks(unittest.TestCase):
         print("Running tracking task test")
         seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=20, ramp=1, ramp_down=1, 
                                                  num_primes=10, seed=42, sample_rate=60, dimensions=2, 
-                                                 disturbance=False, boundaries=(-10,10,-10,10))
+                                                 disturbance=True, boundaries=(-10,10,-10,10), decay_rate = 0.1)
         exp = init_exp(TrackingTask, [Window2D, MouseControl], seq, window_size=(1000,800), fullscreen=False, 
                        limit1d=False, trajectory_amplitude=5, lookahead_time=1)
         exp.stereo_mode = 'projection'
@@ -184,8 +184,8 @@ class TestSeqGenerators(unittest.TestCase):
     def test_tracking_2d(self):
         seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=20, ramp=0, ramp_down=0, 
                                                  num_primes=12, seed=42, sample_rate=60, dimensions=2, 
-                                                 disturbance=False, boundaries=(-10,10,-10,10))
-        trajectories = [t[1][0] for t in seq]
+                                                 disturbance=False, boundaries=(-10,10,-10,10), decay_rate = None)
+        trajectories = [t[1][0] for t in seq] # pulls out trajectory. Can use t[3] to get disturbance array
         print("2D Test-------")
         print(np.shape(trajectories))
         print("2D Test-------")
