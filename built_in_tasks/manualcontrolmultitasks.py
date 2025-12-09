@@ -10,7 +10,7 @@ from riglib.experiment import traits
 from .target_graphics import *
 from .target_capture_task import ScreenTargetCapture
 from .target_capture_task_xt import ScreenReachAngle, ScreenReachLine, SequenceCapture, ScreenTargetCapture_ReadySet
-from .target_capture_task_eye import EyeConstrainedTargetCapture, HandConstrainedEyeCapture, ScreenTargetCapture_Saccade
+from .target_capture_task_eye import EyeConstrainedTargetCapture, HandConstrainedEyeCapture, ScreenTargetCapture_Saccade, EyeHandSequenceCapture
 from .target_tracking_task import ScreenTargetTracking
 from .rotation_matrices import *
 
@@ -203,6 +203,12 @@ class SequenceTask(ManualControlMixin, SequenceCapture):
     pass
 
 class EyeConstrainedManualControl(ManualControlMixin, EyeConstrainedTargetCapture):
+    '''
+    Slightly refactored original manual control task
+    '''
+    pass
+
+class EyeHandSequenceTask(ManualControlMixin, EyeHandSequenceCapture):
     '''
     Slightly refactored original manual control task
     '''
