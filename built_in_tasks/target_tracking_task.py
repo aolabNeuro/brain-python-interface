@@ -330,11 +330,11 @@ class TargetTracking(Sequence):
 
     def _test_ramp_complete(self, time_in_state):
         '''Test whether the ramp up is finished'''
-        return self.frame_index > self.ramp_up_time*self.sample_rate
+        return self.frame_index-1 == self.ramp_up_time*self.sample_rate
 
     def _test_traj_complete(self, time_in_state):
         '''Test whether the trajectory is finished and whether there is a ramp down before the trial ends'''
-        return (self.frame_index + self.lookahead > self.trajectory_length - self.ramp_down_time*self.sample_rate) and (self.ramp_down_time > 0)
+        return (self.frame_index-1 + self.lookahead == self.trajectory_length - self.ramp_down_time*self.sample_rate) and (self.ramp_down_time > 0)
 
     def _test_ramp_and_trial_complete(self, time_in_state):
         '''Test whether the ramp down is finished, ending the trial'''
@@ -467,7 +467,6 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.add_dtype('plant_visible', '?', (1,))
         self.add_dtype('target', 'f8', (3,))
         self.add_dtype('disturbance', 'f8', (3,))
-        self.add_dtype('intended_cursor', 'f8', (3,)) # cursor position without added disturbance
         super().init()
         self.plant.set_endpoint_pos(np.array(self.starting_pos))
 
@@ -597,18 +596,19 @@ class ScreenTargetTracking(TargetTracking, Window):
         # Cue successful tracking
         self.target.cue_trial_end_success()
 
-        # Add disturbance
-        if self.disturbance_trial == True:
-            cursor_pos = self.plant.get_endpoint_pos()
-            if self.velocity_control:
-                # TODO check manualcontrolmixin for how to implement velocity control
-                self.vel_offset = (cursor_pos + self.disturbance_path[self.frame_index])*1/self.fps
-            else: 
-                # position control
-                self.pos_offset = self.disturbance_path[self.frame_index]
+        if self.frame_index == 0:
+            # Add disturbance
+            if self.disturbance_trial == True:
+                cursor_pos = self.plant.get_endpoint_pos()
+                if self.velocity_control:
+                    # TODO check manualcontrolmixin for how to implement velocity control
+                    self.vel_offset = (cursor_pos + self.disturbance_path[self.frame_index])*1/self.fps
+                else: 
+                    # position control
+                    self.pos_offset = self.disturbance_path[self.frame_index]
 
-        # Move target and trajectory to next frame so it appears to be moving
-        self.update_frame()
+            # Move target and trajectory to next frame so it appears to be moving
+            self.update_frame()
 
     def setup_start_tracking_out(self):
         # Reset target color
@@ -696,7 +696,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     def _start_tracking_in_ramp(self):
         super()._start_tracking_in_ramp()
         self.setup_start_tracking_in()
-        print('START TRACKING RAMP', self.ramp_counter[self.frame_index-1])
+        print('START TRACKING IN RAMP', self.ramp_counter[self.frame_index-1])
         self.sync_event('CURSOR_ENTER_TARGET', self.ramp_counter[self.frame_index-1])
 
     def _while_tracking_in_ramp(self):
@@ -716,7 +716,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     def _start_tracking_out_ramp(self):
         super()._start_tracking_out_ramp()
         self.setup_start_tracking_out()
-        print('STOP TRACKING RAMP', self.ramp_counter[self.frame_index-1])
+        print('START TRACKING OUT RAMP', self.ramp_counter[self.frame_index-1])
         self.sync_event('CURSOR_LEAVE_TARGET', self.ramp_counter[self.frame_index-1])
 
     def _while_tracking_out_ramp(self):
