@@ -227,9 +227,9 @@ class BehaviorAnalysisWorker(AnalysisWorker):
         super().handle_data(key, values)
         if key == 'sync_event':
             event_name, event_data = values
-            if event_name == 'TARGET_ON':
+            if event_name == 'EYE_TARGET_ON':
                 self.targets[event_data] = 1
-            elif event_name == 'TARGET_OFF':
+            elif event_name == 'EYE_TARGET_OFF':
                 self.targets[event_data] = 0
             elif event_name in ['PAUSE', 'TRIAL_END', 'HOLD_PENALTY', 'DELAY_PENALTY', 'TIMEOUT_PENALTY','FIXATION_PENALTY']:
                 # Clear targets at the end of the trial
@@ -321,9 +321,10 @@ class SaccadeAnalysisWorker(BehaviorAnalysisWorker):
         try:
             radius = self.task_params['target_radius']
             color = 'orange'
-            targets = [(self.target_pos[k], radius, color if v == 1 else 'green') for k, v in self.targets.items() if v]
+            targets = [(self.target_pos[k], radius, color if v == 1 else 'green') for k, v in self.targets.items()]
         except:
             targets = []
+        
         return self.cursor_pos, self.calibrated_eye_pos, targets
 
     def draw(self):
@@ -644,6 +645,9 @@ class OnlineDataServer(threading.Thread):
             self.analysis_workers.append((SaccadeAnalysisWorker(self.task_params, data_queue), data_queue))
 
         elif self.task_params['experiment_name'] == 'SaccadeTask':
+            self.analysis_workers.append((SaccadeAnalysisWorker(self.task_params, data_queue), data_queue))
+
+        elif self.task_params['experiment_name'] == 'HandConstrainedSaccadeTask':
             self.analysis_workers.append((SaccadeAnalysisWorker(self.task_params, data_queue), data_queue))
 
         # Is there ecube neural data?
