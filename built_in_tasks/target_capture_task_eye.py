@@ -246,12 +246,12 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
             # the eye target is on when the hand positon is within the hand target
             if hand_d <= self.target_radius - self.cursor_radius and not self.is_eye_target_on:
                 target.show()
-                self.sync_event('EYE_TARGET_ON', self.gen_indices[-1]) # sync_event only when eye target is off
+                self.sync_event('EYE_TARGET_ON', self.gen_indices[self.target_index]) # sync_event only when eye target is off
                 self.is_eye_target_on = True
 
             elif hand_d > self.target_radius - self.cursor_radius and self.is_eye_target_on:
                 target.hide()
-                self.sync_event('EYE_TARGET_OFF', self.gen_indices[-1]) # sync_event only when eye target is on
+                self.sync_event('EYE_TARGET_OFF', self.gen_indices[self.target_index]) # sync_event only when eye target is on
                 self.is_eye_target_on = False
 
     def _start_target_eye(self):
