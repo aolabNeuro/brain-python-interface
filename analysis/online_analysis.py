@@ -415,9 +415,11 @@ class EyeHandAnalysisWorker(SaccadeAnalysisWorker):
         '''
         try:
             radius = self.task_params['target_radius']
+            eye_radius = self.task_params['fixation_radius']
             color = 'orange'
-            eye_targets = [(self.target_pos[0], radius, color if v == 1 else 'green') for k, v in self.eye_targets.items() if v and k < 3]
-            eye_targets.extend([(self.target_pos[1], radius, color if v == 1 else 'green') for k, v in self.eye_targets.items() if v and k >= 3])
+            eye_color = 'lightskyblue'
+            eye_targets = [(self.target_pos[0], eye_radius, eye_color if v == 1 else 'green') for k, v in self.eye_targets.items() if v and k < 3]
+            eye_targets.extend([(self.target_pos[1], eye_radius, eye_color if v == 1 else 'green') for k, v in self.eye_targets.items() if v and k >= 3])
             hand_targets = [(self.target_pos[2], radius, color if v == 1 else 'green') for k, v in self.hand_targets.items() if v]
         except:
             eye_targets = []

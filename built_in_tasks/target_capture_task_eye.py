@@ -160,7 +160,7 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
         cursor_pos = self.plant.get_endpoint_pos()
         hand_d = np.linalg.norm(cursor_pos - self.targs[-1])
         
-        return (eye_d <= self.target_radius + self.fixation_radius_buffer) and (hand_d <= self.target_radius - self.cursor_radius)
+        return (eye_d <= self.fixation_radius + self.fixation_radius_buffer) and (hand_d <= self.target_radius - self.cursor_radius)
     
     def _test_gaze_target(self, ts):
         '''
@@ -169,7 +169,7 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
         eye_pos = self.calibrated_eye_pos
         eye_d = np.linalg.norm(eye_pos - self.targs[self.target_index,[0,2]])
 
-        return eye_d <= self.target_radius + self.fixation_radius_buffer   
+        return eye_d <= self.fixation_radius + self.fixation_radius_buffer   
     
     def _test_fixation_break(self,ts):
         '''

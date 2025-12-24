@@ -36,6 +36,8 @@ target_colors = {
     "gold": (0.941,0.637,0.25,0.75),
     "elephant":(0.5,0.5,0.5,0.5),
     "white": (1, 1, 1, 0.75),
+    "lightskyblue": (0.3, 0.8, 0.980, 0.75), # This rgb value is different from matplotlib. It was modified for visibility
+    "darkskyblue": (0, 0.6, 1.0, 0.75), # This rgb value is different from matplotlib. It was modified for visibility
 }
 
 class CircularTarget(object): 
