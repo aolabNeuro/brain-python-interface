@@ -434,7 +434,7 @@ class EyeHandAnalysisWorker(SaccadeAnalysisWorker):
             buffer = self.task_params['fixation_radius_buffer']
         elif 'fixation_dist' in self.task_params:
             buffer = self.task_params['fixation_dist'] - self.task_params['target_radius']
-        eye_radius = 0.2
+        eye_radius = 0.1
 
         patches1 = [plt.Circle(pos, radius+buffer) for pos, radius, _ in eye_targets]
         patches2 = [plt.Circle(cursor_pos, cursor_radius), plt.Circle(calibrated_eye_pos, eye_radius)]
@@ -750,7 +750,9 @@ class OnlineDataServer(threading.Thread):
 
         elif self.task_params['experiment_name'] == 'HandConstrainedSaccadeTask':
             self.analysis_workers.append((EyeHandAnalysisWorker(self.task_params, data_queue), data_queue))
-            
+
+        elif self.task_params['experiment_name'] == 'EyeConstrainedReachingTask':
+            self.analysis_workers.append((EyeHandAnalysisWorker(self.task_params, data_queue), data_queue))        
 
         # Is there ecube neural data?
         if 'record_headstage' in self.task_params and self.task_params['record_headstage']:
