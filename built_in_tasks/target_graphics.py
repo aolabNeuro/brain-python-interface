@@ -36,8 +36,8 @@ target_colors = {
     "gold": (0.941,0.637,0.25,0.75),
     "elephant":(0.5,0.5,0.5,0.5),
     "white": (1, 1, 1, 0.75),
-    "lightskyblue": (0.3, 0.8, 0.980, 0.75), # This rgb value is different from matplotlib. It was modified for visibility
-    "darkskyblue": (0, 0.6, 1.0, 0.75), # This rgb value is different from matplotlib. It was modified for visibility
+    "eye_color": (0.9, 0.9, 0.9, 1.),
+    "fixation_color": (0., 0.6, 0.6, 1.),
 }
 
 class CircularTarget(object): 
@@ -147,18 +147,19 @@ class VirtualRectangularTarget(RectangularTarget):
         self.cube.rotate_z(angle, reset=reset)
 
     def cue_trial_start(self):
-        self.cube.color = RED
-        self.show()
+        #self.cube.color = RED
+        #self.show()
+        pass
 
     def cue_trial_end_success(self):
         self.cube.color = GREEN
 
     def cue_trial_end_failure(self):
-        self.cube.color = YELLOW
-        self.hide()
+        self.cube.color = RED
+        #self.hide()
 
     def idle(self):
-        self.cube.color = RED
+        #self.cube.color = RED
         self.hide()
 
     def pt_inside(self, pt):
