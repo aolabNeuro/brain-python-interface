@@ -333,7 +333,7 @@ class SaccadeAnalysisWorker(BehaviorAnalysisWorker):
             buffer = self.task_params['fixation_radius_buffer']
         elif 'fixation_dist' in self.task_params:
             buffer = self.task_params['fixation_dist'] - self.task_params['target_radius']
-        eye_radius = 0.2
+        eye_radius = 0.1
 
         patches1 = [plt.Circle(pos, radius+buffer) for pos, radius, _ in targets]
         patches2 = [plt.Circle(cursor_pos, cursor_radius), plt.Circle(calibrated_eye_pos, eye_radius)]
@@ -363,24 +363,32 @@ class EyeHandAnalysisWorker(SaccadeAnalysisWorker):
         self.hand_targets = {}
         self.eye_targets = {}
         self.target_pos = []
+        self.target_idx_trial = []
 
     def handle_data(self, key, values):
         #super().handle_data(key, values)
         if key == 'sync_event':
             event_name, event_data = values
             if event_name == 'TARGET_ON':
-                self.hand_targets[event_data] = 1
+                self.hand_targets[event_data] = 1 # event data represents target index in bmi3d
+                self.eye_targets[self.target_idx_trial[0]] = 1 # bacause eye initial target and hand target appear at the same time
             elif event_name == 'TARGET_OFF':
                 self.hand_targets[event_data] = 0
             elif event_name == 'EYE_TARGET_ON':
                 self.eye_targets[event_data] = 1
             elif event_name == 'EYE_TARGET_OFF':
                 self.eye_targets[event_data] = 0
-            elif event_name in ['PAUSE', 'TRIAL_END', 'HOLD_PENALTY', 'DELAY_PENALTY', 'TIMEOUT_PENALTY','FIXATION_PENALTY']:
+
+                if self.task_params['experiment_name'] == 'EyeConstrainedReachingTask':
+                    self.hand_targets[self.target_idx_trial[-1]] = 0 # In this task, hand target also disappear
+
+            elif event_name in ['PAUSE', 'TRIAL_END', 'HOLD_PENALTY', 'DELAY_PENALTY', 'TIMEOUT_PENALTY','FIXATION_PENALTY','OTHER_PENALTY']:
                 # Clear targets at the end of the trial
                 self.hand_targets = {}
                 self.eye_targets = {}
                 self.target_pos = []
+                self.target_idx_trial = []
+
             elif event_name == 'REWARD':
                 # Set all active targets to reward
                 for target_idx in self.hand_targets.keys():
@@ -402,6 +410,7 @@ class EyeHandAnalysisWorker(SaccadeAnalysisWorker):
         elif key == 'target_location':
             target_idx, target_location = values
             self.target_pos.append(np.array(target_location)[[0,2]])
+            self.target_idx_trial.append(target_idx)
 
             
     def get_current_pos(self):
@@ -434,7 +443,7 @@ class EyeHandAnalysisWorker(SaccadeAnalysisWorker):
             buffer = self.task_params['fixation_radius_buffer']
         elif 'fixation_dist' in self.task_params:
             buffer = self.task_params['fixation_dist'] - self.task_params['target_radius']
-        eye_radius = 0.1
+        eye_radius = 0.2
 
         patches1 = [plt.Circle(pos, radius+buffer) for pos, radius, _ in eye_targets]
         patches2 = [plt.Circle(cursor_pos, cursor_radius), plt.Circle(calibrated_eye_pos, eye_radius)]
