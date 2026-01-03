@@ -300,7 +300,8 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
 
     def _start_target(self):
         self.target_index += 1
-        self.is_eye_target_on = False # this is for _while_target
+        self.is_eye_target_on = False # Track if the eye init pos is on or off
+        self.is_first_target_appearance = True # Track if the eye init pos is shown once or many times in a given trial
 
         # Show the hand target
         target_hand = self.targets_hand[0]
@@ -321,13 +322,15 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
             # the eye target is on when the hand positon is within the hand target
             if hand_d <= self.target_radius - self.cursor_radius and not self.is_eye_target_on:
                 target.show()
-                #self.sync_event('EYE_TARGET_ON', self.gen_indices[self.target_index]) # sync_event only when eye target is off
                 self.is_eye_target_on = True
-
+                if self.tries == 0 and self.is_first_target_appearance:
+                    self.sync_event('EYE_TARGET_ON', self.gen_indices[self.target_index]) # do sync_event once. Doens't sync event after animals saw target pos
+                
             elif hand_d > self.target_radius - self.cursor_radius and self.is_eye_target_on:
-                target.hide()
-                #self.sync_event('EYE_TARGET_OFF', self.gen_indices[self.target_index]) # sync_event only when eye target is on
+                target.hide() # Mihgt not be necessary to sync event because animals know where the target is
                 self.is_eye_target_on = False
+                self.is_first_target_appearance = False
+                
 
     def _start_target_eye(self):
         self.target_index += 1

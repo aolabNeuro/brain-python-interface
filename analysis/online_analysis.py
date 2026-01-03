@@ -371,7 +371,7 @@ class EyeHandAnalysisWorker(SaccadeAnalysisWorker):
             event_name, event_data = values
             if event_name == 'TARGET_ON':
                 self.hand_targets[event_data] = 1 # event data represents target index in bmi3d
-                self.eye_targets[self.target_idx_trial[0]] = 1 # bacause eye initial target and hand target appear at the same time
+                #self.eye_targets[self.target_idx_trial[0]] = 1 # bacause eye initial target and hand target appear at the same time
             elif event_name == 'TARGET_OFF':
                 self.hand_targets[event_data] = 0
             elif event_name == 'EYE_TARGET_ON':
@@ -380,7 +380,7 @@ class EyeHandAnalysisWorker(SaccadeAnalysisWorker):
                 self.eye_targets[event_data] = 0
 
                 if self.task_params['experiment_name'] == 'EyeConstrainedReachingTask':
-                    self.hand_targets[self.target_idx_trial[-1]] = 0 # In this task, hand target also disappear
+                    self.hand_targets[self.target_idx_trial[-1]] = 0 # In this task, the hand target also disappear
 
             elif event_name in ['PAUSE', 'TRIAL_END', 'HOLD_PENALTY', 'DELAY_PENALTY', 'TIMEOUT_PENALTY','FIXATION_PENALTY','OTHER_PENALTY']:
                 # Clear targets at the end of the trial
