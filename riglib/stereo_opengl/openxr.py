@@ -5,6 +5,9 @@ from OpenGL.GL import *
 import pygame
 try:
     import xr
+    from xr.utils.gl import ContextObject, OpenGLGraphics
+    from xr.utils import GraphicsAPI, Matrix4x4f
+    from xr.utils.gl.glfw_util import GLFWOffscreenContextProvider
 except:
     print("No OpenXR support")
     
@@ -64,7 +67,7 @@ class WindowVR(Window):
         self.clock = Clock()
         self.fps = 90
 
-        context = xr.ContextObject(
+        context = ContextObject(
             instance_create_info=xr.InstanceCreateInfo(
                 enabled_extension_names=[
                     xr.KHR_OPENGL_ENABLE_EXTENSION_NAME,
@@ -74,7 +77,7 @@ class WindowVR(Window):
                 reference_space_type=xr.ReferenceSpaceType.STAGE,
                 pose_in_reference_space=xr.Posef((0,0,0,1), (0,0,0)),
             ),
-            
+            context_provider=GLFWOffscreenContextProvider()
         )
         # context.__enter__()
 
@@ -94,12 +97,12 @@ class WindowVR(Window):
         )
 
         if context._session_create_info.next is None:
-            context.graphics = xr.OpenGLGraphics(
+            context.graphics = OpenGLGraphics(
                 instance=context.instance,
                 system=context.system_id,
-                title=context._instance_create_info.application_info.application_name.decode()
+                context_provider=context.context_provider,
             )
-            context.graphics_binding_pointer = cast(pointer(context.graphics.graphics_binding), c_void_p)
+            context.graphics_binding_pointer = context.graphics.graphics_binding.pointer
             context._session_create_info.next = context.graphics_binding_pointer
         else:
             context.graphics_binding_pointer = context._session_create_info.next
@@ -222,8 +225,8 @@ class WindowVR(Window):
             self.state = None  # Exit loop if the generator is exhausted
 
         for view_index, view in enumerate(self.xr_context.view_loop(frame_state)):
-            projection = xr.Matrix4x4f.create_projection_fov(
-                graphics_api=xr.GraphicsAPI.OPENGL,
+            projection = Matrix4x4f.create_projection_fov(
+                graphics_api=GraphicsAPI.OPENGL,
                 fov=view.fov,
                 near_z=0.05,
                 far_z=1024,

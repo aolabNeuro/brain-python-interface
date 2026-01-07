@@ -59,7 +59,7 @@ moon = CalibrationSphere(radius=2)
 
 pos_list = np.array([[0,0,0],[0,0,5]])
 
-class Test2(Window):
+class Test2(WindowVR):
 
     def __init__(self, *args, **kwargs):
         self.count=0
