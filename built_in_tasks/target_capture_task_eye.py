@@ -154,7 +154,7 @@ class EyeConstrainedTargetCapture(ScreenTargetCapture):
 class HandConstrainedEyeCapture(ScreenTargetCapture):
     '''
     Saccade task with holding another target with hand. Subjects need to hold an initial target with their hand. 
-    Then they need to fixate the first eye target and make a saccade for the second eye target 
+    Then they need to fixate the first eye target and make a saccade for the second eye target. 2 of chain_length is only tested.
     '''
 
     fixation_radius = traits.Float(2.5, desc="Distance from center that is considered a broken fixation")
@@ -167,8 +167,9 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
     exclude_parent_traits = ['hold_time']
 
     status = dict(
-        wait = dict(start_trial="target", start_pause="pause"),
-        target = dict(start_pause="pause", timeout="timeout_penalty", gaze_enter_target="fixation"),
+        wait = dict(start_trial="init_target", start_pause="pause"),
+        init_target = dict(enter_target="target", start_pause="pause"),
+        target = dict(start_pause="pause", timeout="timeout_penalty", return_init_target='init_target', gaze_enter_target="fixation"),
         target_eye = dict(start_pause="pause", timeout="timeout_penalty", leave_target='hold_penalty', gaze_target="fixation", gaze_incorrect_target="incorrect_target_penalty"),
         fixation = dict(start_pause="pause", leave_target="hold_penalty", fixation_complete="delay", fixation_break="fixation_penalty"), 
         delay = dict(leave_target="delay_penalty", delay_complete="targ_transition", fixation_break="fixation_penalty", start_pause="pause"),
@@ -273,6 +274,14 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
         cursor_pos = self.plant.get_endpoint_pos()
         d = np.linalg.norm(cursor_pos - self.targs[-1]) # hand must be within the initial target
         return d > self.target_radius - self.cursor_radius
+
+    def _test_return_init_target(self, ts):
+        '''
+        return true if cursor moves outside the exit radius, but only applied when the target index is 0.
+        '''
+        cursor_pos = self.plant.get_endpoint_pos()
+        d = np.linalg.norm(cursor_pos - self.targs[-1])
+        return (d > self.target_radius - self.cursor_radius) and self.target_index == 0
     
     def _test_trial_incomplete(self, ts):
         return self.target_index < self.chain_length
@@ -284,6 +293,7 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
         super()._start_wait()
         # Redefine chain length because targs in this task has both eye and hand targets
         self.chain_length = len(self.targets)
+        self.isfixation_state = False
 
         if self.calc_trial_num() == 0:
 
@@ -298,44 +308,37 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
                     self.add_model(model)
                     target.hide()
 
-    def _start_target(self):
-        self.target_index += 1
-        self.is_eye_target_on = False # Track if the eye init pos is on or off
-        self.is_first_target_appearance = True # Track if the eye init pos is shown once or many times in a given trial
-
-        # Show the hand target
-        target_hand = self.targets_hand[0]
-        if self.target_index == 0:
+    def _start_init_target(self):
+        # Only show the hand target
+        if self.target_index == -1:
+            target_hand = self.targets_hand[0]
             target_hand.move_to_position(self.targs[-1])
             target_hand.show()
-            self.sync_event('TARGET_ON', self.gen_indices[-1]) # the hand target is on
+            self.sync_event('TARGET_ON', self.gen_indices[-1]) # the hand target is on  
 
-    def _while_target(self):
-        
-        if self.target_index == 0:
-            cursor_pos = self.plant.get_endpoint_pos()
-            hand_d = np.linalg.norm(cursor_pos - self.targs[-1])
-
+        elif self.target_index == 0: # this is from the target state
             target = self.targets[self.target_index]
-            target.move_to_position(self.targs[self.target_index])
+            target.hide()
+            self.sync_event('EYE_TARGET_OFF', self.gen_indices[self.target_index])
 
-            # the eye target is on when the hand positon is within the hand target
-            if hand_d <= self.target_radius - self.cursor_radius and not self.is_eye_target_on:
-                target.show()
-                self.is_eye_target_on = True
-                if self.tries == 0 and self.is_first_target_appearance:
-                    self.sync_event('EYE_TARGET_ON', self.gen_indices[self.target_index]) # do sync_event once. Doens't sync event after animals saw target pos
-                
-            elif hand_d > self.target_radius - self.cursor_radius and self.is_eye_target_on:
-                target.hide() # Mihgt not be necessary to sync event because animals know where the target is
-                self.is_eye_target_on = False
-                self.is_first_target_appearance = False
-                
+    def _start_target(self):
+        if self.target_index == -1 and not self.isfixation_state:
+            self.target_index += 1
+
+        if self.isfixation_state:
+            self.target_index += 1
+
+        # Show the eye target
+        target = self.targets[self.target_index]
+        target.move_to_position(self.targs[self.target_index])
+        target.show()
+        self.sync_event('EYE_TARGET_ON', self.gen_indices[self.target_index])
 
     def _start_target_eye(self):
         self.target_index += 1
 
     def _start_fixation(self):
+        self.isfixation_state = True
         self.targets[self.target_index].cube.color = target_colors[self.fixation_target_color] # change target color in fixation state
         self.sync_event('FIXATION', self.gen_indices[self.target_index])
 
@@ -510,8 +513,9 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
 class EyeConstrainedHandCapture(HandConstrainedEyeCapture):
 
     status = dict(
-        wait = dict(start_trial="target", start_pause="pause"),
-        target = dict(start_pause="pause", timeout="timeout_penalty", gaze_enter_target="fixation"),
+        wait = dict(start_trial="init_target", start_pause="pause"),
+        init_target = dict(enter_target="target", start_pause="pause"),
+        target = dict(start_pause="pause", timeout="timeout_penalty", return_init_target='init_target', gaze_enter_target="fixation"),
         fixation = dict(start_pause="pause", leave_target="hold_penalty", fixation_hold_complete="delay", fixation_break="fixation_penalty"), 
         delay = dict(leave_target="delay_penalty", delay_complete="targ_transition", fixation_break="fixation_penalty", start_pause="pause"),
         targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target", start_pause="pause"),
@@ -567,8 +571,6 @@ class EyeConstrainedHandCapture(HandConstrainedEyeCapture):
         return ts > self.fixation_time
     
     def _while_target(self):
-        super()._while_target()
-
         target = self.targets[self.target_index]
         target.move_to_position(self.targs[self.target_index] - self.offset_cube)
 
