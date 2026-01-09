@@ -297,8 +297,8 @@ class ScreenTargetCapture(TargetCapture, Window):
     limit2d = traits.Bool(True, desc="Limit cursor movement to 2D")
 
     sequence_generators = [
-        'out_2D', 'out_2D_select','centerout_2D', 'centeroutback_2D', 'centerout_2D_select', 'rand_target_chain_2D', 'rand_same_target_chain_2D', 
-        'rand_target_chain_3D', 'corners_2D', 'centerout_tabletop',
+        'out_2D', 'out_2D_select', 'centerout_2D', 'centeroutback_2D', 'centerout_2D_select', 'rand_target_chain_2D', 'rand_same_target_chain_2D', 
+        'rand_target_chain_3D', 'corners_2D', 'centerout_tabletop', 'out_2D_square', 'centerout_2D_square'
     ]
 
     hidden_traits = ['cursor_color', 'target_color', 'cursor_bounds', 'cursor_radius', 'plant_hide_rate', 'starting_pos']
@@ -587,6 +587,39 @@ class ScreenTargetCapture(TargetCapture, Window):
                 yield [idx], [pos + origin]
 
     @staticmethod
+    def out_2D_square(nblocks=100, width=10, height=10, origin=(0,0,0)):
+        '''
+        Generates a sequence of 2D (x and z) targets at a point on the side of the square
+        '''
+        ntargets = 8
+        rng = np.random.default_rng()
+        for _ in range(nblocks):
+            order = np.arange(ntargets) + 1 # target indices, starting from 1
+            rng.shuffle(order)
+
+            for t in range(ntargets):
+                idx = order[t]
+                
+                if idx == 1:
+                    pos = np.array([0,0,height/2]).T
+                elif idx == 2:
+                    pos = np.array([width/2,0,height/2]).T
+                elif idx == 3:
+                    pos = np.array([width/2,0,0]).T
+                elif idx == 4:
+                    pos = np.array([width/2,0,-height/2]).T
+                elif idx == 5:
+                    pos = np.array([0,0,-height/2]).T
+                elif idx == 6:
+                    pos = np.array([-width/2,0,-height/2]).T
+                elif idx == 7:
+                    pos = np.array([-width/2,0,0]).T
+                elif idx == 8:
+                    pos = np.array([-width/2,0,height/2]).T
+
+                yield [idx], [pos + origin]
+
+    @staticmethod
     def centerout_2D(nblocks=100, ntargets=8, distance=10, origin=(0,0,0)):
         '''
         Pairs of central targets at the origin and peripheral targets centered around the origin
@@ -637,6 +670,25 @@ class ScreenTargetCapture(TargetCapture, Window):
                     yield next_indices, next_targs # only yield the targets that match target_idx
             except StopIteration:
                 break
+
+    @staticmethod
+    def centerout_2D_square(nblocks=100, width=10, height=10, origin=(0,0,0)):
+        '''
+        Pairs of central targets at the origin and peripheral targets centered around the origin
+
+        Returns
+        -------
+        [nblocks*ntargets x 1] array of tuples containing trial indices and [2 x 3] target coordinates
+        '''
+        ntargets = 8
+        gen = ScreenTargetCapture.out_2D_square(nblocks, width, height, origin)
+        for _ in range(nblocks*ntargets):
+            idx, pos = next(gen)
+            targs = np.zeros([2, 3]) + origin
+            targs[1,:] = pos[0]
+            indices = np.zeros([2,1])
+            indices[1] = idx
+            yield indices, targs
 
     @staticmethod
     def centeroutback_2D(nblocks=100, ntargets=8, distance=10, origin=(0,0,0)):
