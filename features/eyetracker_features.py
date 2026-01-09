@@ -34,6 +34,7 @@ class EyeCalibration(traits.HasTraits):
     taskid_for_eye_calibration = traits.Int(0, desc="directory where hdf file lives")
     show_eye_pos = traits.Bool(False, desc="Whether to show eye positions")
     eye_target_calibration = traits.Bool(False, desc="Whether to regress eye positions against target positions")
+    center_eye_data = traits.Bool(False, desc="Whether to demean eye data with eye position for the center target")
 
     def __init__(self, *args, **kwargs): #, start_pos, calibration):
         super(EyeCalibration,self).__init__(*args, **kwargs)
@@ -46,6 +47,7 @@ class EyeCalibration(traits.HasTraits):
         files = {}
         files['hdf'] = hdf_file
         files['ecube'] = ecube_file
+        self.eye_center = np.zeros((4,))
         print(files)
 
         if not self.keyboard_control:
@@ -81,7 +83,16 @@ class EyeCalibration(traits.HasTraits):
 
                 target_pos = get_target_locations(bmi3d_data, [1,2,3,4,5,6,7,8])
                 
-                self.eye_coeff, _ = aopy.preproc.calc_eye_target_calibration(eye_interp[:,:4], \
+                # Get eye_pos data when subjects gaze at the center. Target position doesn't matter for this computation
+                if self.center_eye_data:
+                    _, _, eye_center = aopy.preproc.calc_eye_target_calibration(eye_interp[:,:4], \
+                        bmi3d_metadata['cursor_interp_samplerate'], events['timestamp'], events['code'], target_pos, \
+                        offset=0.1, duration=0.2, align_events=80, return_datapoints=True)
+                    
+                    self.eye_center = np.nanmedian(eye_center, axis=0)
+
+                # Calculate coefficient by linear regression between targets and centered eye positions
+                self.eye_coeff, _ = aopy.preproc.calc_eye_target_calibration(eye_interp[:,:4]-self.eye_center, \
                     bmi3d_metadata['cursor_interp_samplerate'], events['timestamp'], events['code'], target_pos)
             
             print("Calibration complete:", self.eye_coeff)
@@ -113,7 +124,7 @@ class EyeCalibration(traits.HasTraits):
         # Do calibration
         ave_pos = self.eye_pos
         if not self.keyboard_control:
-            calibrated_pos = aopy.postproc.get_calibrated_eye_data(self.eye_pos[:4],self.eye_coeff)
+            calibrated_pos = aopy.postproc.get_calibrated_eye_data(self.eye_pos[:4]-self.eye_center, self.eye_coeff)
             ave_pos = np.array([(calibrated_pos[0] + calibrated_pos[2])/2, (calibrated_pos[1] + calibrated_pos[3])/2])
         
         # Save calibration
@@ -210,17 +221,18 @@ class EyeConstrained(ScreenTargetCapture):
     fixation_target_color = traits.OptionsList("cyan", *target_colors, desc="Color of the center target under fixation state", bmi3d_input_options=list(target_colors.keys()))
     
     status = dict(
-        wait = dict(start_trial="target"),
-        target = dict(timeout="timeout_penalty",gaze_target="fixation"),
-        fixation = dict(enter_target="hold", fixation_break="target"),
-        hold = dict(leave_target="hold_penalty", hold_complete="delay", fixation_break="fixation_penalty"),
-        delay = dict(leave_target="delay_penalty", delay_complete="targ_transition", fixation_break="fixation_penalty"),
-        targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target"),
-        timeout_penalty = dict(timeout_penalty_end="targ_transition", end_state=True),
-        hold_penalty = dict(hold_penalty_end="targ_transition", end_state=True),
-        delay_penalty = dict(delay_penalty_end="targ_transition", end_state=True),
-        fixation_penalty = dict(fixation_penalty_end="targ_transition",end_state=True),
-        reward = dict(reward_end="wait", stoppable=False, end_state=True)
+        wait = dict(start_trial="target", start_pause="pause"),
+        target = dict(timeout="timeout_penalty",gaze_target="fixation", start_pause="pause"),
+        fixation = dict(enter_target="hold", fixation_break="target", start_pause="pause"),
+        hold = dict(leave_target="hold_penalty", hold_complete="delay", fixation_break="fixation_penalty", start_pause="pause"),
+        delay = dict(leave_target="delay_penalty", delay_complete="targ_transition", fixation_break="fixation_penalty", start_pause="pause"),
+        targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target", start_pause="pause"),
+        timeout_penalty = dict(timeout_penalty_end="wait", start_pause="pause", end_state=True),
+        hold_penalty = dict(hold_penalty_end="wait", start_pause="pause", end_state=True),
+        delay_penalty = dict(delay_penalty_end="wait", start_pause="pause", end_state=True),
+        fixation_penalty = dict(fixation_penalty_end="wait", start_pause="pause", end_state=True),
+        reward = dict(reward_end="wait", start_pause="pause", stoppable=False, end_state=True),
+        pause = dict(end_pause="wait", end_state=True),
     )
  
     def _test_gaze_target(self,ts):
@@ -241,10 +253,8 @@ class EyeConstrained(ScreenTargetCapture):
         '''
         if self.target_index <= 0:   
             d = np.linalg.norm(self.calibrated_eye_pos)
-            return (d > self.fixation_dist) or self.pause
-        else:
-            return self.pause
-    
+            return (d > self.fixation_dist)
+        
     def _test_fixation_penalty_end(self,ts):
         # d = np.linalg.norm(self.calibrated_eye_pos)
         return (ts > self.fixation_penalty_time) # (d < self.fixation_dist) and 
@@ -275,9 +285,14 @@ class EyeConstrained(ScreenTargetCapture):
         self.num_fixation_state = 0 # because target state comes again after hold state in a trial
 
     def _start_fixation_penalty(self):
+        if hasattr(super(), '_start_fixation_penalty'):
+            super()._start_fixation_penalty()
+
         self._increment_tries()
         self.sync_event('FIXATION_PENALTY') 
-
+        self.penalty_index = 1
+        self.num_fixation_state = 0
+        
         # Hide targets
         for target in self.targets:
             target.hide()
