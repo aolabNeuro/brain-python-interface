@@ -189,10 +189,17 @@ class TransparentDelayTarget(traits.HasTraits):
         next_idx = (self.target_index + 1)
         if next_idx < self.chain_length:
             target = self.targets[next_idx % 2]
-            self._old_target_color = np.copy(target.sphere.color)
-            new_target_color = list(target.sphere.color)
-            new_target_color[3] = self.delay_target_alpha
-            target.sphere.color = tuple(new_target_color)
+
+            if hasattr(target, "sphere"):
+                self._old_target_color = np.copy(target.sphere.color)
+                new_target_color = list(target.sphere.color)
+                new_target_color[3] = self.delay_target_alpha
+                target.sphere.color = tuple(new_target_color)
+            elif hasattr(target, "cube"):
+                self._old_target_color = np.copy(target.cube.color)
+                new_target_color = list(target.cube.color)
+                new_target_color[3] = self.delay_target_alpha
+                target.cube.color = tuple(new_target_color)
 
     def _start_target(self):
         super()._start_target()
@@ -200,7 +207,10 @@ class TransparentDelayTarget(traits.HasTraits):
         # Reset the transparency of the current target
         if self.target_index > 0:
             target = self.targets[self.target_index % 2]
-            target.sphere.color = self._old_target_color
+            if hasattr(target, "sphere"):
+                target.sphere.color = self._old_target_color
+            elif hasattr(target, "cube"):
+                target.cube.color = self._old_target_color
 
 class StartTrialBelowSpeedThr(traits.HasTraits):
     '''
