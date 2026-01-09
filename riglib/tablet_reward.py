@@ -1,10 +1,11 @@
 from .gpio import ArduinoGPIO
 from multiprocessing import Process
 from riglib import singleton
-#from pyfirmata import Arduino, util
 import traceback
 import time
 import os
+import requests
+import threading
 
 log_path = os.path.join(os.path.dirname(__file__), '../log/reward.log')
 
@@ -36,18 +37,28 @@ def open():
         import builtins
         traceback.print_exc()
 
-import requests
+def send_request(url, dispense_time, n_trigger):
+    for i in range(n_trigger):
+        try:
+            response = requests.post(url, timeout=3)
+            print(f"Request to {url} completed: {response.status_code}") # successful response is status code 200
+        except requests.exceptions.RequestException as e:
+            print(f"Error sending request to {url}: {e}")
+        time.sleep(dispense_time)
+
+def send_nonblocking_request(url, dispense_time, n_trigger):
+    thread = threading.Thread(target=send_request, args=(url, dispense_time, n_trigger))
+    thread.daemon = True
+    thread.start()
+    print("Request initiated")
+
 class RemoteReward():
 
     def __init__(self):
 
-        self.hostName = "192.168.0.200"
+        self.hostName = "192.168.0.150"
         self.serverPort = 8080
-
-    def trigger(self, ip_address):
+      
+    def trigger(self, ip_address, dispense_time, n_trigger): # TODO: set a default ip address so the manual reward button works
         url = f"http://{ip_address}:{self.serverPort}"
-        print(url)
-        try:
-            requests.post(url, timeout=3)
-        except:
-            traceback.print_exc()
+        send_nonblocking_request(url, dispense_time, n_trigger)
