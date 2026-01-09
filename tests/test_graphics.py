@@ -7,7 +7,9 @@ import os
 
 from riglib.pupillabs import utils
 from riglib.stereo_opengl.textures import Texture
-os.environ['DISPLAY'] = ':0'
+# os.environ['DISPLAY'] = ':0'
+os.environ['LIBGL_ALWAYS_INDIRECT'] = '1'
+os.environ['LIBGL_DEBUG'] = 'verbose'
 
 from riglib.stereo_opengl.environment import Grid
 from riglib.stereo_opengl.window import Window, Window2D, FPScontrol
