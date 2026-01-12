@@ -400,7 +400,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     target_radius = traits.Float(2, desc="Radius of targets in cm") #2,0.75
     trajectory_radius = traits.Float(.5, desc="Radius of targets in cm")
     trajectory_color = traits.OptionsList("gold", *target_colors, desc="Color of the trajectory", bmi3d_input_options=list(target_colors.keys()))
-    trajectory_type = traits.OptionsList("time", ["time", "space", "none"], desc="Type of trajectory to use", bmi3d_input_options=["time", "space", "none"])
+    trajectory_type = traits.OptionsList("1d", ["1d", "2d", "none"], desc="Type of trajectory to use", bmi3d_input_options=["1d", "2d", "none"])
     lookahead_time = traits.Float(0.5, desc="Time in seconds to display the future trajectory")
     target_color = traits.OptionsList("yellow", *target_colors, desc="Color of the target", bmi3d_input_options=list(target_colors.keys()))
     plant_hide_rate = traits.Float(0.0, desc='If the plant is visible, specifies a percentage of trials where it will be hidden')
@@ -426,8 +426,8 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.plant.set_cursor_radius(self.cursor_radius)
         self.plant_vis_prev = True
         self.cursor_vis_prev = True
-        self.lookahead = int(self.fps * self.lookahead_time)
-        self.lookahead_scale = (2 * self.screen_cm[0]) / self.lookahead # cm per frame
+        self.lookahead = int(self.fps * self.lookahead_time) # convert to frames
+        self.lookahead_scale = (0.5 * self.screen_cm[0]) / self.lookahead # cm per frame
         self.original_limit1d = self.limit1d # keep track of original settable trait
         
         if not self.always_1d:
@@ -525,9 +525,9 @@ class ScreenTargetTracking(TargetTracking, Window):
             use_frame_index = self.frame_index
 
         self.target.move_to_position(self.targs[use_frame_index])
-        if self.trajectory_type == 'time':
+        if self.trajectory_type == '1d':
             self.trajectory.move_to_position(np.array([-use_frame_index*self.lookahead_scale - self.lookahead*self.lookahead_scale,0,0])) 
-        elif self.trajectory_type == 'space':
+        elif self.trajectory_type == '2d':
             self.trajectory.update_mask(use_frame_index, use_frame_index+self.lookahead)
         self.frame_index += 1 # increment the frame_index for the following cycle
 
@@ -546,9 +546,9 @@ class ScreenTargetTracking(TargetTracking, Window):
             for model in self.trajectory.graphics_models:
                 self.remove_model(model)
             del self.trajectory
-        if self.trajectory_type == 'time':
+        if self.trajectory_type == '1d':
 
-            lookbehind = np.zeros((self.lookahead, np.shape(self.targs)[1]))
+            lookbehind = self.targs[1,:]*np.ones((self.lookahead, np.shape(self.targs)[1]))
             next_trajectory = np.concatenate((lookbehind, self.targs), axis=0)
             next_trajectory = np.array(np.squeeze(next_trajectory)[:,2])
             next_trajectory = np.vstack([
@@ -557,7 +557,7 @@ class ScreenTargetTracking(TargetTracking, Window):
                 next_trajectory
             ]).T
             self.trajectory = VirtualSnakeTarget(target_radius=self.trajectory_radius, target_color=target_colors[self.trajectory_color], trajectory=next_trajectory)
-        elif self.trajectory_type == 'space':
+        elif self.trajectory_type == '2d':
             self.trajectory = VirtualSnakeTarget(target_radius=self.trajectory_radius, target_color=target_colors[self.trajectory_color], trajectory=self.targs)
             self.trajectory.update_mask(self.frame_index, self.frame_index+self.lookahead)
         else: # 'none'
@@ -662,7 +662,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         super()._start_trajectory()
         if self.frame_index == 0:
             self.target.move_to_position(self.targs[self.frame_index])
-            if self.trajectory_type == 'time':
+            if self.trajectory_type == '1d':
                 self.trajectory.move_to_position(np.array([-self.lookahead*self.lookahead_scale,0,0]))
 
             self.target.show()
