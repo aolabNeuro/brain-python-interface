@@ -329,10 +329,11 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
             self.target_index += 1
 
         # Show the eye target
-        target = self.targets[self.target_index]
-        target.move_to_position(self.targs[self.target_index])
-        target.show()
-        self.sync_event('EYE_TARGET_ON', self.gen_indices[self.target_index])
+        if self.target_index == 0:
+            target = self.targets[self.target_index]
+            target.move_to_position(self.targs[self.target_index])
+            target.show()
+            self.sync_event('EYE_TARGET_ON', self.gen_indices[self.target_index])
 
     def _start_target_eye(self):
         self.target_index += 1
@@ -406,11 +407,15 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
             target.reset()
 
         for target in self.targets_hand:
-            target.hide()
-            target.reset()
+            target.cue_trial_end_failure()
+            target.show()
 
     def _end_incorrect_target_penalty(self):
         self.sync_event('TRIAL_END')
+
+        for target in self.targets_hand:
+            target.hide()
+            target.reset()
 
     def _start_reward(self):
         super()._start_reward()
@@ -515,13 +520,14 @@ class EyeConstrainedHandCapture(HandConstrainedEyeCapture):
     status = dict(
         wait = dict(start_trial="init_target", start_pause="pause"),
         init_target = dict(enter_target="target", start_pause="pause"),
-        target = dict(start_pause="pause", timeout="timeout_penalty", return_init_target='init_target', gaze_enter_target="fixation"),
+        target = dict(start_pause="pause", timeout="timeout_penalty", return_init_target='init_target', gaze_incorrect_target="incorrect_target_penalty", gaze_enter_target="fixation"),
         fixation = dict(start_pause="pause", leave_target="hold_penalty", fixation_hold_complete="delay", fixation_break="fixation_penalty"), 
         delay = dict(leave_target="delay_penalty", delay_complete="targ_transition", fixation_break="fixation_penalty", start_pause="pause"),
         targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target", start_pause="pause"),
         timeout_penalty = dict(timeout_penalty_end="wait", start_pause="pause", end_state=True),
         hold_penalty = dict(hold_penalty_end="wait", start_pause="pause", end_state=True),
         delay_penalty = dict(delay_penalty_end="wait", start_pause="pause", end_state=True),
+        incorrect_target_penalty = dict(incorrect_target_penalty_end="wait", start_pause="pause", end_state=True),
         fixation_penalty = dict(fixation_penalty_end="wait", start_pause="pause", end_state=True),
         reward = dict(reward_end="wait", start_pause="pause", stoppable=False, end_state=True),
         pause = dict(end_pause="wait", end_state=True),
@@ -559,6 +565,15 @@ class EyeConstrainedHandCapture(HandConstrainedEyeCapture):
         
         return (eye_d <= self.fixation_radius + self.fixation_radius_buffer) and (hand_d <= self.target_radius - self.cursor_radius)
 
+    def _test_gaze_incorrect_target(self, ts):
+        '''
+        Check whether eye position is within the different target (hand target). This is only applied to the second target
+        ''' 
+        eye_pos = self.calibrated_eye_pos
+        eye_d = np.linalg.norm(eye_pos - self.targs[-1,[0,2]])
+
+        return eye_d <= self.target_radius and self.target_index == 1
+    
     def _test_leave_target(self, ts):
         '''
         return true if cursor moves outside the exit radius
