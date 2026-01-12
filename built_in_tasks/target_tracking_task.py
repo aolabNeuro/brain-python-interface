@@ -474,9 +474,9 @@ class ScreenTargetTracking(TargetTracking, Window):
         '''
         Calls any update functions necessary and redraws screen
         '''
-        if self.frame_index >= 0:
-            print('FRAME ', self.frame_index, self.get_state(), self.trial_timed_out)
-            print(self.target.get_position()[2], self.pos_offset[2])
+        # if self.frame_index >= 0:
+        #     print('FRAME ', self.frame_index, self.get_state(), self.trial_timed_out)
+        #     print(self.target.get_position()[2], self.pos_offset[2])
 
         self.move_effector(pos_offset=np.asarray(self.pos_offset), vel_offset=np.asarray(self.vel_offset))
 
@@ -677,7 +677,7 @@ class ScreenTargetTracking(TargetTracking, Window):
 
             self.target.show()
             self.trajectory.show()
-            print('SHOW TRAJ')
+            # print('SHOW TRAJ')
             self.sync_event('TARGET_ON')
 
     def _while_trajectory(self):
@@ -685,7 +685,7 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def _start_hold(self):
         super()._start_hold()
-        print('START HOLD')
+        # print('START HOLD')
         self.sync_event('TRIAL_START')
         # Cue successful tracking
         self.target.cue_trial_end_success()
@@ -696,7 +696,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     def _start_tracking_in_ramp(self):
         super()._start_tracking_in_ramp()
         self.setup_start_tracking_in()
-        print('START TRACKING IN RAMP', self.ramp_counter[self.frame_index-1])
+        # print('START TRACKING IN RAMP', self.ramp_counter[self.frame_index-1])
         self.sync_event('CURSOR_ENTER_TARGET', self.ramp_counter[self.frame_index-1])
 
     def _while_tracking_in_ramp(self):
@@ -706,7 +706,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     def _start_tracking_in(self):
         super()._start_tracking_in()
         self.setup_start_tracking_in()
-        print('START TRACKING')
+        # print('START TRACKING')
         self.sync_event('CURSOR_ENTER_TARGET')
 
     def _while_tracking_in(self):
@@ -716,7 +716,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     def _start_tracking_out_ramp(self):
         super()._start_tracking_out_ramp()
         self.setup_start_tracking_out()
-        print('START TRACKING OUT RAMP', self.ramp_counter[self.frame_index-1])
+        # print('START TRACKING OUT RAMP', self.ramp_counter[self.frame_index-1])
         self.sync_event('CURSOR_LEAVE_TARGET', self.ramp_counter[self.frame_index-1])
 
     def _while_tracking_out_ramp(self):
@@ -788,7 +788,7 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def _start_reward(self):
         super()._start_reward()
-        print('REWARD')
+        # print('REWARD')
         self.sync_event('REWARD')
 
         # Cue successful trial
