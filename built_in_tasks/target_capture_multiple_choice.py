@@ -21,11 +21,11 @@ class TwoChoiceTargetCapture(ScreenTargetCapture):
         targ_transition = dict(trial_complete="reward", 
                                trial_abort="wait", 
                                trial_incomplete="target"),
-        timeout_penalty = dict(timeout_penalty_end="targ_transition", 
+        timeout_penalty = dict(timeout_penalty_end="wait", 
                                end_state=True),
-        hold_penalty = dict(hold_penalty_end="targ_transition",
+        hold_penalty = dict(hold_penalty_end="wait",
                             end_state=True),
-        delay_penalty = dict(delay_penalty_end="targ_transition",
+        delay_penalty = dict(delay_penalty_end="wait",
                              end_state=True),
         reward = dict(reward_end="wait",
                       stoppable=False, 
@@ -58,6 +58,7 @@ class TwoChoiceTargetCapture(ScreenTargetCapture):
             self.targets[0].show()
             self.sync_event('TARGET_ON', 0)
 
+
     def _start_hold(self):
         super()._start_hold()
         
@@ -78,7 +79,7 @@ class TwoChoiceTargetCapture(ScreenTargetCapture):
                 self.targets[1].hide()  # Hide unchosen target
             
             self.sync_event('CURSOR_ENTER_TARGET', self.chosen_target)
-            
+
     def _start_delay(self):
         super()._start_delay()
         
@@ -151,21 +152,6 @@ class TwoChoiceTargetCapture(ScreenTargetCapture):
             
             return in_target1 or in_target2
 
-    def _test_leave_target(self, ts):
-        '''
-        Check if cursor leaves current target
-        '''
-        cursor_pos = self.plant.get_endpoint_pos()
-        
-        if self.target_index == 0:
-            # Leaving center target
-            d = np.linalg.norm(cursor_pos - self.targs[0])
-        else:
-            # Leaving whichever peripheral was chosen
-            d = np.linalg.norm(cursor_pos - self.targs[self.chosen_target])
-        
-        rad = self.target_radius - self.cursor_radius
-        return d > rad or super()._test_leave_target(ts)
 
     def _test_hold_complete(self, time_in_state):
         '''
