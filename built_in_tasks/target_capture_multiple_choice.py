@@ -58,19 +58,6 @@ class TwoChoiceTargetCapture(ScreenTargetCapture):
             self.targets[0].show()
             self.sync_event('TARGET_ON', 0)
 
-    def _start_delay(self):
-        super()._start_delay()
-        
-        # After holding center, show BOTH peripheral targets
-        if self.target_index == 0:  # Just finished holding center
-            self.targets[1].move_to_position(self.targs[1])
-            self.targets[1].show()
-            
-            self.targets[2].move_to_position(self.targs[2])
-            self.targets[2].show()
-            
-            self.sync_event('TARGET_ON', [1, 2])
-
     def _start_hold(self):
         super()._start_hold()
         
@@ -91,6 +78,19 @@ class TwoChoiceTargetCapture(ScreenTargetCapture):
                 self.targets[1].hide()  # Hide unchosen target
             
             self.sync_event('CURSOR_ENTER_TARGET', self.chosen_target)
+            
+    def _start_delay(self):
+        super()._start_delay()
+        
+        # After holding center, show BOTH peripheral targets
+        if self.target_index == 0:  # Just finished holding center
+            self.targets[1].move_to_position(self.targs[1])
+            self.targets[1].show()
+            
+            self.targets[2].move_to_position(self.targs[2])
+            self.targets[2].show()
+            
+            self.sync_event('TARGET_ON', [1, 2])
 
     def _start_reward(self):
         super()._start_reward()
