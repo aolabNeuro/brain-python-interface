@@ -7,8 +7,8 @@ from .target_capture_task import ScreenTargetCapture
 from riglib.experiment import traits
 
 class TwoChoiceTargetCapture(ScreenTargetCapture):
-    '''
-    Add a penalty state when subjects looks away.
+'''    '''
+    #Add a penalty state when subjects looks away.
     '''
 
     status = dict(
@@ -103,7 +103,7 @@ class TwoChoiceTargetCapture(ScreenTargetCapture):
     @staticmethod
     def dual_peripheral(nblocks=100, distance=10, origin=(0,0,0)):
         '''
-        Generates center target + two peripheral targets
+        #Generates center target + two peripheral targets
         '''
         rng = np.random.default_rng()
         for _ in range(nblocks):
@@ -128,12 +128,14 @@ class TwoChoiceTargetCapture(ScreenTargetCapture):
             ]) + origin
             
             # Yield indices and positions for all three targets
-            yield [0, 1, 2], [center, pos1, pos2]
-
+            yield [0, 1, 2], [cself.pts = (unit*[-30/1.36,self.radius,self.radius])+intial[0]
+        for i in range(1,len(intial)):
+            self.pts = np.vstack([self.pts, (unit*[(i-30)/3,self.radius,self.radius])+intial[i]])enter, pos1, pos2]
+BMIControlMultiDirectionConstraint
             
     def _test_enter_target(self, ts):
         '''
-        Check if cursor is in the appropriate target(s)
+        #Check if cursor is in the appropriate target(s)
         '''
         cursor_pos = self.plant.get_endpoint_pos()
         
@@ -155,13 +157,13 @@ class TwoChoiceTargetCapture(ScreenTargetCapture):
 
     def _test_hold_complete(self, time_in_state):
         '''
-        Hold complete after holding center OR after holding chosen peripheral
+        #Hold complete after holding center OR after holding chosen peripheral
         '''
         return time_in_state > self.hold_time
     
     def _test_trial_complete(self, time_in_state):
         '''
-        Trial complete after acquiring either peripheral target (index 1)
+        #Trial complete after acquiring either peripheral target (index 1)
         '''
         return self.target_index == 1
 
@@ -176,4 +178,4 @@ class TwoChoiceTargetCapture(ScreenTargetCapture):
             return False  # No target chosen yet, can't have left it
         
         rad = self.target_radius - self.cursor_radius
-        return d > rad or super()._test_leave_target(ts)
+        return d > rad or super()._test_leave_target(ts)'''
