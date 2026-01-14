@@ -7,7 +7,7 @@ from .target_capture_task import ScreenTargetCapture
 from riglib.experiment import traits
 
 class TwoChoiceTargetCapture(ScreenTargetCapture):
-'''    '''
+    '''
     #Add a penalty state when subjects looks away.
     '''
 
@@ -128,10 +128,9 @@ class TwoChoiceTargetCapture(ScreenTargetCapture):
             ]) + origin
             
             # Yield indices and positions for all three targets
-            yield [0, 1, 2], [cself.pts = (unit*[-30/1.36,self.radius,self.radius])+intial[0]
+            yield [0, 1, 2], [self.pts = (unit*[-30/1.36,self.radius,self.radius])+intial[0]
         for i in range(1,len(intial)):
             self.pts = np.vstack([self.pts, (unit*[(i-30)/3,self.radius,self.radius])+intial[i]])enter, pos1, pos2]
-BMIControlMultiDirectionConstraint
             
     def _test_enter_target(self, ts):
         '''
@@ -178,4 +177,4 @@ BMIControlMultiDirectionConstraint
             return False  # No target chosen yet, can't have left it
         
         rad = self.target_radius - self.cursor_radius
-        return d > rad or super()._test_leave_target(ts)'''
+        return d > rad or super()._test_leave_target(ts)
