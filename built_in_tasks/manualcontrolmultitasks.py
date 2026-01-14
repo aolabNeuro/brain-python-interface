@@ -13,6 +13,7 @@ from .target_capture_task_xt import ScreenReachAngle, ScreenReachLine, SequenceC
 from .target_capture_task_eye import EyeConstrainedTargetCapture, HandConstrainedEyeCapture, ScreenTargetCapture_Saccade
 from .target_tracking_task import ScreenTargetTracking
 from .rotation_matrices import *
+from .target_capture_multiple_choice import TwoChoiceTargetCapture
 
 class ManualControlMixin(traits.HasTraits):
     '''Target capture task where the subject operates a joystick
@@ -226,3 +227,8 @@ class ReadySetGoTask(ManualControlMixin, ScreenTargetCapture_ReadySet):
     of center circle (mustmv_time) parameter or there will be an error. 
     '''
     pass
+
+class TwoChoiceManualControl(ManualControlMixin, TwoChoiceTargetCapture):
+    '''
+    Center out task with two peripheral targets
+    '''
