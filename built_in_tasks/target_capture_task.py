@@ -55,7 +55,7 @@ class TargetCapture(Sequence):
     delay_time = traits.Float(0, desc="Length of time after a hold while the next target is on before the go cue")
     delay_penalty_time = traits.Float(1, desc="Length of penalty time for delay error")
     timeout_time = traits.Float(10, desc="Time allowed to go between targets")
-    timeout_penalty_time = traits.Float(1, desc="Length of penalty time for timeout error")
+    timeout_penalty_ScreenTargetCapturetime = traits.Float(1, desc="Length of penalty time for timeout error")
     max_attempts = traits.Int(10, desc='The number of attempts of a target chain before skipping to the next one')
     num_targets_per_attempt = traits.Int(2, desc="Minimum number of target acquisitions to be counted as an attempt")
 
@@ -739,7 +739,7 @@ class ScreenTargetCapture(TargetCapture, Window):
         rng = np.random.default_rng()
         idx = 0
         for t in range(ntrials):
-
+            self.sync_event('TARGET_ON', 1)
             # Choose a random sequence of points within the boundaries
             pts = rng.uniform(size=(chain_length, 3))*((boundaries[1]-boundaries[0]),
                 (boundaries[3]-boundaries[2]), (boundaries[5]-boundaries[4]))
