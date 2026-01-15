@@ -84,7 +84,7 @@ class TwoChoiceTargetCapture(ScreenTargetCapture):
             self.sync_event('CURSOR_ENTER_TARGET', self.chosen_target)
 
     def _start_delay(self):
-        super()._start_delay()
+        #super()._start_delay()
         # After holding center, show BOTH peripheral targets
         if self.target_index == 0:  # Just finished holding center
             self.targets[1].move_to_position(self.targs[1])
@@ -143,6 +143,29 @@ class TwoChoiceTargetCapture(ScreenTargetCapture):
             # Yield indices and positions for all three targets
             yield [0, 1, 2], targs
 
+    @staticmethod
+    def dual_centerout_2D(nblocks=100, ntargets=8, distance=10, origin=(0,0,0)):
+        '''
+        triplets of central targets at the origin and 2 peripheral targets centered around the origin
+
+        Returns
+        -------
+        [nblocks*ntargets x 1] array of tuples containing trial indices and [2 x 3] target coordinates
+        '''
+        gen = ScreenTargetCapture.out_2D(nblocks, ntargets, distance, origin)
+        for _ in range(nblocks*ntargets):
+            
+            idx, pos = next(gen)
+            while pos[0][-1]==0.0
+                idx, pos = next(gen)
+
+            targs = np.zeros([3, 3]) + origin
+            targs[1,:] = pos[0]
+            targs[2,:] = pos[0]*[-1,1,1] #flip the position
+            indices = np.zeros([3,1])
+            indices[1] = 1
+            indices[2] = 2
+            yield indices, targs
     
     def _test_enter_target(self, ts):
         '''
