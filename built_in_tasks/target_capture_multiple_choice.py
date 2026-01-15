@@ -88,14 +88,14 @@ class TwoChoiceTargetCapture(ScreenTargetCapture):
             if d1 < d2:
                 self.chosen_target = 1
                 self.reward_time = self.base_reward_time * self.reward_multiplier
-                self.pulses_per_total_reward = np.ceil(self.reward_multiplier)*self.base_pulses_per_total_reward
+                self.pulses_per_total_reward = int(np.ceil(self.reward_multiplier)*self.base_pulses_per_total_reward)
 
                 self.targets[2].hide()  # Hide unchosen target
             else:
                 self.chosen_target = 2
                 self.reward_time = self.base_reward_time
                 self.targets[1].hide()  # Hide unchosen target
-                self.pulses_per_total_reward = self.base_pulses_per_total_reward
+                self.pulses_per_total_reward = int(self.base_pulses_per_total_reward)
 
 
             self.sync_event('CURSOR_ENTER_TARGET', self.chosen_target)
@@ -114,7 +114,7 @@ class TwoChoiceTargetCapture(ScreenTargetCapture):
             #self.sync_event('TARGET_ON', 2)
 
     def _start_targ_transition(self):
-        super()._start_targ_transition()
+        #super()._start_targ_transition()
         if self.target_index == -1:
 
             # Came from a penalty state
