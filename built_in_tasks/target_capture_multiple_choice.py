@@ -35,7 +35,7 @@ class TwoChoiceTargetCapture(ScreenTargetCapture):
                       end_state=True),
     )
 
-    sequence_generators = ['dual_peripheral']
+    sequence_generators = ['dual_centerout_2D', 'dual_peripheral']
 
     def __init__(self, *args, **kwargs):
         kwargs['instantiate_targets'] = False
@@ -93,7 +93,7 @@ class TwoChoiceTargetCapture(ScreenTargetCapture):
             self.targets[2].move_to_position(self.targs[2])
             self.targets[2].show()
             
-            self.sync_event('TARGET_ON', 1)
+            self.sync_event('TARGET_ON', 1)#dual_centerout_2D
             self.sync_event('TARGET_ON', 2)
 
     def _start_targ_transition(self):
@@ -156,7 +156,7 @@ class TwoChoiceTargetCapture(ScreenTargetCapture):
         for _ in range(nblocks*ntargets):
             
             idx, pos = next(gen)
-            while pos[0][-1]==0.0
+            while pos[0][-1] == 0:
                 idx, pos = next(gen)
 
             targs = np.zeros([3, 3]) + origin
