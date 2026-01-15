@@ -85,7 +85,6 @@ class TwoChoiceTargetCapture(ScreenTargetCapture):
 
     def _start_delay(self):
         super()._start_delay()
-        
         # After holding center, show BOTH peripheral targets
         if self.target_index == 0:  # Just finished holding center
             self.targets[1].move_to_position(self.targs[1])
@@ -190,4 +189,4 @@ class TwoChoiceTargetCapture(ScreenTargetCapture):
             return False  # No target chosen yet, can't have left it
         
         rad = self.target_radius - self.cursor_radius
-        return d > rad or super()._test_leave_target(ts)
+        return d > rad #or super()._test_leave_target(ts)
