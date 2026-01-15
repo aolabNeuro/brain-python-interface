@@ -11,6 +11,9 @@ class TwoChoiceTargetCapture(ScreenTargetCapture):
     #Add a penalty state when subjects looks away.
     '''
 
+    periph_targ1_color = traits.OptionsList("red", *target_colors, desc="Color of peripheral target 1", bmi3d_input_options=list(target_colors.keys()))
+    periph_targ2_color = traits.OptionsList("blue", *target_colors, desc="Color of peripheral target 1", bmi3d_input_options=list(target_colors.keys()))
+
     status = dict(
         wait = dict(start_trial="target"),
         target = dict(timeout="timeout_penalty",
@@ -42,9 +45,9 @@ class TwoChoiceTargetCapture(ScreenTargetCapture):
         target_center = VirtualCircularTarget(target_radius=self.target_radius, 
                                             target_color=target_colors[self.target_color])
         target_periph1 = VirtualCircularTarget(target_radius=self.target_radius,
-                                            target_color=target_colors[self.target_color])
+                                            target_color=target_colors["red"])
         target_periph2 = VirtualCircularTarget(target_radius=self.target_radius,
-                                            target_color=target_colors[self.target_color])
+                                            target_color=target_colors["blue"])
         
         self.targets = [target_center, target_periph1, target_periph2]
         self.chosen_target = None
@@ -91,7 +94,18 @@ class TwoChoiceTargetCapture(ScreenTargetCapture):
             self.targets[2].move_to_position(self.targs[2])
             self.targets[2].show()
             
-            self.sync_event('TARGET_ON', [1, 2])
+            self.sync_event('TARGET_ON', 1)
+            self.sync_event('TARGET_ON', 2)
+
+    def _start_targ_transition(self):
+        super()._start_targ_transition()
+        if self.target_index == -1:
+
+            # Came from a penalty state
+            pass
+        elif self.target_index == 0:
+            self.targets[0].hide()
+            self.sync_event('TARGET_OFF', self.gen_indices[self.target_index])
 
     def _start_reward(self):
         super()._start_reward()
@@ -126,12 +140,11 @@ class TwoChoiceTargetCapture(ScreenTargetCapture):
                 0,
                 distance*np.sin(angles[1])
             ]) + origin
-            
+            targs = np.array([center, pos1, pos2])
             # Yield indices and positions for all three targets
-            yield [0, 1, 2], [self.pts = (unit*[-30/1.36,self.radius,self.radius])+intial[0]
-        for i in range(1,len(intial)):
-            self.pts = np.vstack([self.pts, (unit*[(i-30)/3,self.radius,self.radius])+intial[i]])enter, pos1, pos2]
-            
+            yield [0, 1, 2], targs
+
+    
     def _test_enter_target(self, ts):
         '''
         #Check if cursor is in the appropriate target(s)
@@ -164,7 +177,7 @@ class TwoChoiceTargetCapture(ScreenTargetCapture):
         '''
         #Trial complete after acquiring either peripheral target (index 1)
         '''
-        return self.target_index == 1
+        return self.target_index > 0
 
     def _test_leave_target(self, ts):
         cursor_pos = self.plant.get_endpoint_pos()
