@@ -102,8 +102,10 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
 
     status = dict(
         wait = dict(start_trial="target", start_pause="pause"),
-        target = dict(timeout="timeout_penalty", gaze_enter_target='hold', start_pause="pause"),
-        target_eye = dict(timeout="timeout_penalty", gaze_target="fixation", leave_target="hold_penalty", start_pause="pause"),
+        target = dict(timeout="timeout_penalty", gaze_enter_target='fixation', start_pause="pause"),
+        target_eye = dict(timeout="timeout_penalty", gaze_target="delay", leave_target="hold_penalty", start_pause="pause"),
+        target_eye_only = dict(timeout="timeout_penalty", gaze_target="fixation", start_pause="pause"),
+        target_eye_hand = dict(timeout="timeout_penalty", gaze_enter_target='fixation', start_pause="pause"),
         target_hand = dict(timeout="timeout_penalty", enter_target="hold", fixation_break="fixation_penalty", start_pause="pause"),
         fixation = dict(fixation_complete="delay", leave_target="hold_penalty", fixation_break="fixation_penalty", start_pause="pause"),
         hold = dict(hold_complete="delay", leave_target="hold_penalty",  fixation_break="fixation_penalty", start_pause="pause"),
