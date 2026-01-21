@@ -97,20 +97,32 @@ class EyeConstrainedTargetCapture(ScreenTargetCapture):
 
 class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
     '''
-    Subjects have to gaze at and reach to a target.
+    Subjects have to gaze at and reach to a target, responding to the eye or hand go cue indivisually in sequence trials.
+    They need to simultaneously move eye and hand to the target in simultaneous trials.
     '''
+
+    exclude_parent_traits = ['delay_time', 'rand_delay']
+    rand_delay1 = traits.Tuple((0.4, 0.7), desc="Delay interval for eye")
+    rand_delay2 = traits.Tuple((0., 0.7), desc="Delay interval for hand")
+    fixation_time = traits.Float(0.2, desc='Length of fixation required at targets')
+    sequence_ratio = traits.Float(0.5, desc='Ratio of sequence trials')
+    fixation_penalty_time = traits.Float(1.0, desc="Time in fixation penalty state")
+    fixation_radius = traits.Float(2.5, desc="Distance from center that is considered a broken fixation")
+    fixation_radius_buffer = traits.Float(.5, desc="additional radius for eye target")
+    fixation_target_color = traits.OptionsList("fixation_color", *target_colors, desc="Color of the eye target under fixation state", bmi3d_input_options=list(target_colors.keys()))
+    eye_target_color = traits.OptionsList("eye_color", *target_colors, desc="Color of the eye target", bmi3d_input_options=list(target_colors.keys()))
 
     status = dict(
         wait = dict(start_trial="target", start_pause="pause"),
         target = dict(timeout="timeout_penalty", gaze_enter_target='fixation', start_pause="pause"),
         target_eye = dict(timeout="timeout_penalty", gaze_target="delay", leave_target="hold_penalty", start_pause="pause"),
-        target_eye_only = dict(timeout="timeout_penalty", gaze_target="fixation", start_pause="pause"),
-        target_eye_hand = dict(timeout="timeout_penalty", gaze_enter_target='fixation', start_pause="pause"),
         target_hand = dict(timeout="timeout_penalty", enter_target="hold", fixation_break="fixation_penalty", start_pause="pause"),
+        target_eye_hand = dict(timeout="timeout_penalty", gaze_enter_target='fixation', start_pause="pause"),
         fixation = dict(fixation_complete="delay", leave_target="hold_penalty", fixation_break="fixation_penalty", start_pause="pause"),
         hold = dict(hold_complete="delay", leave_target="hold_penalty",  fixation_break="fixation_penalty", start_pause="pause"),
         delay = dict(delay_complete="targ_transition", leave_target="delay_penalty", fixation_break="fixation_penalty", start_pause="pause"),
-        targ_transition = dict(trial_complete="reward", trial_abort="wait", first_targ_complete="target_eye", second_targ_complete="target_hand", start_pause="pause"),
+        targ_transition = dict(trial_complete="reward", trial_abort="wait", targ_simultaneous="target_eye_hand",\
+                               targ_first_sequence="target_eye", targ_second_sequence="target_hand", start_pause="pause"),
         timeout_penalty = dict(timeout_penalty_end="wait", start_pause="pause", end_state=True),
         hold_penalty = dict(hold_penalty_end="wait", start_pause="pause", end_state=True),
         delay_penalty = dict(delay_penalty_end="wait", start_pause="pause", end_state=True),
@@ -119,11 +131,24 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
         pause = dict(end_pause="wait", end_state=True),
     )
 
-    exclude_parent_traits = ['delay_time', 'rand_delay']
-    rand_delay1 = traits.Tuple((0.4, 0.4), desc="Delay interval for eye")
-    rand_delay2 = traits.Tuple((0.4, 0.4), desc="Delay interval for hand")
-    fixation_time = traits.Float(0.2, desc='Length of fixation required at targets')
-    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Instantiate the targets
+        instantiate_targets = kwargs.pop('instantiate_targets', True)
+        if instantiate_targets:
+
+            # Target 1 and 2 are for eye targets. Target 3 and 4 is for hand targets
+            target1 = VirtualRectangularTarget(target_width=self.fixation_radius, target_height=self.fixation_radius/2, target_color=target_colors[self.eye_target_color])
+            target2 = VirtualRectangularTarget(target_width=self.fixation_radius, target_height=self.fixation_radius/2, target_color=target_colors[self.eye_target_color])
+            target3 = VirtualCircularTarget(target_radius=self.target_radius, target_color=target_colors[self.target_color])
+            target4 = VirtualCircularTarget(target_radius=self.target_radius, target_color=target_colors[self.target_color])
+
+            self.targets_eye = [target1, target2]
+            self.targets_hand = [target3, target4]
+
+            self.offset_cube = np.array([0,0,self.fixation_radius/2]) # To center the cube target
+
     def _test_gaze_enter_target(self,ts):
         '''
         Check whether eye positions and hand cursor are within the target radius
@@ -190,11 +215,14 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
     def _test_trial_complete(self, ts):
         return self.eye_target_index == 1 and self.hand_target_index == 1
     
-    def _test_first_targ_complete(self, ts):
-        return self.eye_target_index == 0 and self.hand_target_index == 0
+    def _test_targ_simultaneous(self,ts):
+        return self.eye_target_index == 0 and self.hand_target_index == 0 and self.is_simultaneous_trials
     
-    def _test_second_targ_complete(self, ts):
-        return self.eye_target_index == 1 and self.hand_target_index == 0
+    def _test_targ_first_sequence(self, ts):
+        return self.eye_target_index == 0 and self.hand_target_index == 0 and self.is_sequence_trials
+    
+    def _test_targ_second_sequence(self, ts):
+        return self.eye_target_index == 1 and self.hand_target_index == 0 and self.is_sequence_trials
     
     def _start_wait(self):
         super()._start_wait()
@@ -207,14 +235,26 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
         self.eye_gen_indices = np.copy(self.gen_indices)
         self.hand_gen_indices = np.copy(self.gen_indices)
 
-        if self.tries == 0: # only update delay_time for the first attempt
-            self.chain_length = 3
-            
+        if self.tries == 0: # Update delay_time only in the first attempt
+
             # Set delay time
             s, e = self.rand_delay1
             self.delay_time1 = random.random()*(e-s) + s
             s, e = self.rand_delay2
             self.delay_time2 = random.random()*(e-s) + s
+
+            # Decide sequence or simultaneous trials
+            self.is_sequence_trials = False
+            self.is_simultaneous_trials = False
+
+            a = random.random()
+            if a < self.sequence_ratio:
+                self.is_sequence_trials = True
+                self.chain_length = 3
+            else:
+                self.is_simultaneous_trials = True
+                self.chain_length = 2
+            print(f'is sequence trials?: {self.is_sequence_trials}')
 
     def _start_target(self):
         
@@ -223,7 +263,7 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
         self.hand_target_index += 1
 
         # Show eye hand target
-        target = self.targets[self.eye_target_index]
+        target = self.targets_eye[self.eye_target_index]
         target.move_to_position(self.eye_targs[self.eye_target_index])
         target.show()
         self.sync_event('EYE_TARGET_ON', self.eye_gen_indices[self.eye_target_index])
@@ -232,9 +272,9 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
         eye_pos = self.calibrated_eye_pos
         eye_d = np.linalg.norm(eye_pos - self.eye_targs[self.eye_target_index,[0,2]])
         if eye_d <= (self.target_radius + self.fixation_radius_buffer):
-            self.targets[self.eye_target_index].sphere.color = target_colors[self.fixation_target_color] # chnage color in fixating center
+            self.targets_eye[self.eye_target_index].cube.color = target_colors[self.fixation_target_color] # chnage color in fixating center
         else:
-            self.targets[self.eye_target_index].reset()
+            self.targets_eye[self.eye_target_index].cube.color = target_colors[self.eye_target_color]
     
     def _start_target_eye(self):
         self.target_index += 1
@@ -244,35 +284,61 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
         self.target_index += 1
         self.hand_target_index += 1
 
+    def _start_target_eye_hand(self):
+        self.target_index += 1
+        self.eye_target_index += 1
+        self.hand_target_index += 1
+
+    def _while_target_eye_hand(self):
+        eye_pos = self.calibrated_eye_pos
+        eye_d = np.linalg.norm(eye_pos - self.eye_targs[self.eye_target_index,[0,2]])
+        if eye_d <= (self.target_radius + self.fixation_radius_buffer):
+            self.targets_eye[self.eye_target_index].cube.color = target_colors[self.fixation_target_color] # chnage color in fixating center
+        else:
+            self.targets_eye[self.eye_target_index].cube.color = target_colors[self.eye_target_color]
+
     def _start_fixation(self):
         if self.target_index != 0:
             self.sync_event('FIXATION', self.eye_gen_indices[self.eye_target_index])
-        self.targets[self.eye_target_index].sphere.color = target_colors[self.fixation_target_color]
+        self.targets_eye[self.eye_target_index].cube.color = target_colors[self.fixation_target_color]
 
     def _start_hold(self):
         if self.target_index != 1: # when the state comes from target_eye, skip start_hold
             self.sync_event('CURSOR_ENTER_TARGET', self.hand_gen_indices[self.hand_target_index])
 
     def _start_delay(self):
-        if self.target_index == 0: # This is for eye target in the first delay
+        if self.target_index == 0 and self.is_simultaneous_trials: # This is for both eye and hand targets
             next_idx = (self.eye_target_index + 1)
-            self.targets[next_idx].move_to_position(self.eye_targs[next_idx])
-            self.targets[next_idx].show()
+            self.targets_eye[next_idx].move_to_position(self.eye_targs[next_idx])
+            self.targets_hand[next_idx].move_to_position(self.hand_targs[next_idx])
+            self.targets_eye[next_idx].show()
+            self.targets_hand[next_idx].show()
             self.sync_event('EYE_TARGET_ON', self.eye_gen_indices[next_idx])
 
-        elif self.target_index == 1: # This is for hand target in the second delay
+        elif self.target_index == 0 and self.is_sequence_trials: # This is for eye target in the first delay
+            next_idx = (self.eye_target_index + 1)
+            self.targets_eye[next_idx].move_to_position(self.eye_targs[next_idx])
+            self.targets_eye[next_idx].show()
+            self.sync_event('EYE_TARGET_ON', self.eye_gen_indices[next_idx])
+
+        elif self.target_index == 1 and self.is_sequence_trials: # This is for hand target in the second delay
             next_idx = (self.hand_target_index + 1)
-            self.targets[next_idx].move_to_position(self.hand_targs[next_idx]) # Target position is the same, but change color?
-            self.targets[next_idx].show()
+            self.targets_hand[next_idx].move_to_position(self.hand_targs[next_idx]) # Target position is the same, but change color?
+            self.targets_hand[next_idx].show()
             self.sync_event('TARGET_ON', self.hand_gen_indices[next_idx])
 
     def _start_targ_transition(self):
-        if self.target_index == 0: # This is a go cue for eye target
-            self.targets[self.eye_target_index].sphere.color = target_colors[self.hand_target_color]
+        if self.target_index == 0 and self.is_simultaneous_trials: # This is a go cue for both eye and hand
+            self.targets_eye[self.eye_target_index].hide()
+            self.targets_hand[self.hand_target_index].hide()
+            self.sync_event('EYE_TARGET_OFF', self.eye_gen_indices[self.eye_target_index])
+
+        elif self.target_index == 0 and self.is_sequence_trials: # This is a go cue for eye
+            self.targets_eye[self.eye_target_index].hide()
             self.sync_event('EYE_TARGET_OFF', self.eye_gen_indices[self.eye_target_index])
         
-        elif self.target_index == 1: # This is a go cue for hand target
-            self.targets[self.hand_target_index].hide()
+        elif self.target_index == 1 and self.is_sequence_trials: # This is a go cue for hand
+            self.targets_hand[self.hand_target_index].hide()
             self.sync_event('TARGET_OFF', self.hand_gen_indices[self.hand_target_index])            
 
 class HandConstrainedEyeCapture(ScreenTargetCapture):
