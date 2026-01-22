@@ -629,11 +629,6 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
     rand_delay2 = traits.Tuple((0., 0.7), desc="Delay interval for hand")
     fixation_time = traits.Float(0.2, desc='Length of fixation required at targets')
     sequence_ratio = traits.Float(0.5, desc='Ratio of sequence trials')
-    fixation_penalty_time = traits.Float(1.0, desc="Time in fixation penalty state")
-    fixation_radius = traits.Float(2.5, desc="Distance from center that is considered a broken fixation")
-    fixation_radius_buffer = traits.Float(.5, desc="additional radius for eye target")
-    fixation_target_color = traits.OptionsList("fixation_color", *target_colors, desc="Color of the eye target under fixation state", bmi3d_input_options=list(target_colors.keys()))
-    eye_target_color = traits.OptionsList("eye_color", *target_colors, desc="Color of the eye target", bmi3d_input_options=list(target_colors.keys()))
 
     status = dict(
         wait = dict(start_trial="target", start_pause="pause"),
@@ -670,7 +665,7 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
             self.targets_eye = [target1, target2]
             self.targets_hand = [target3, target4]
 
-            self.offset_cube = np.array([0,0,self.fixation_radius/2]) # To center the cube target
+            self.offset_cube = np.array([0,10,self.fixation_radius/2]) # To center the cube target
 
     def _test_gaze_enter_target(self,ts):
         '''
@@ -758,6 +753,19 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
         self.eye_gen_indices = np.copy(self.gen_indices)
         self.hand_gen_indices = np.copy(self.gen_indices)
 
+        if self.calc_trial_num() == 0:
+
+            # Instantiate the targets here so they don't show up in any states that might come before "wait"
+            for target in self.targets_eye:
+                for model in target.graphics_models:
+                    self.add_model(model)
+                    target.hide()
+
+            for target in self.targets_hand:
+                for model in target.graphics_models:
+                    self.add_model(model)
+                    target.hide()
+
         if self.tries == 0: # Update delay_time only in the first attempt
 
             # Set delay time
@@ -786,9 +794,12 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
         self.hand_target_index += 1
 
         # Show eye hand target
-        target = self.targets_eye[self.eye_target_index]
-        target.move_to_position(self.eye_targs[self.eye_target_index])
-        target.show()
+        target_hand = self.targets_hand[self.hand_target_index]
+        target_hand.move_to_position(self.hand_targs[self.hand_target_index])
+        target_eye = self.targets_eye[self.eye_target_index]
+        target_eye.move_to_position(self.eye_targs[self.eye_target_index] - self.offset_cube)
+        target_hand.show()
+        target_eye.show()
         self.sync_event('EYE_TARGET_ON', self.eye_gen_indices[self.eye_target_index])
 
     def _while_target(self):
@@ -832,7 +843,7 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
     def _start_delay(self):
         if self.target_index == 0 and self.is_simultaneous_trials: # This is for both eye and hand targets
             next_idx = (self.eye_target_index + 1)
-            self.targets_eye[next_idx].move_to_position(self.eye_targs[next_idx])
+            self.targets_eye[next_idx].move_to_position(self.eye_targs[next_idx] - self.offset_cube)
             self.targets_hand[next_idx].move_to_position(self.hand_targs[next_idx])
             self.targets_eye[next_idx].show()
             self.targets_hand[next_idx].show()
@@ -840,7 +851,7 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
 
         elif self.target_index == 0 and self.is_sequence_trials: # This is for eye target in the first delay
             next_idx = (self.eye_target_index + 1)
-            self.targets_eye[next_idx].move_to_position(self.eye_targs[next_idx])
+            self.targets_eye[next_idx].move_to_position(self.eye_targs[next_idx] - self.offset_cube)
             self.targets_eye[next_idx].show()
             self.sync_event('EYE_TARGET_ON', self.eye_gen_indices[next_idx])
 
@@ -863,7 +874,60 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
         elif self.target_index == 1 and self.is_sequence_trials: # This is a go cue for hand
             self.targets_hand[self.hand_target_index].hide()
             self.sync_event('TARGET_OFF', self.hand_gen_indices[self.hand_target_index])   
+
+    def _start_timeout_penalty(self):
+        super()._start_timeout_penalty()
+        for target_eye, target_hand in zip(self.targets_eye,self.targets_hand):
+            target_eye.hide()
+            target_eye.reset()
+            target_hand.hide()
+            target_hand.reset()
             
+    def _start_hold_penalty(self):
+        super()._start_hold_penalty()
+        for target_eye, target_hand in zip(self.targets_eye,self.targets_hand):
+            target_eye.hide()
+            target_eye.reset()
+            target_hand.hide()
+            target_hand.reset()
+
+    def _start_delay_penalty(self):
+        super()._start_delay_penalty()
+        for target_eye, target_hand in zip(self.targets_eye,self.targets_hand):
+            target_eye.hide()
+            target_eye.reset()
+            target_hand.hide()
+            target_hand.reset()
+
+    def _start_fixation_penalty(self):
+        super()._start_fixation_penalty()
+        for target_eye, target_hand in zip(self.targets_eye,self.targets_hand):
+            target_eye.hide()
+            target_eye.reset()
+            target_hand.hide()
+            target_hand.reset()
+
+    def _start_reward(self):
+        super()._start_reward()
+        for target in self.targets_eye:
+            target.cue_trial_end_success()
+
+    def _end_reward(self):
+        super()._end_reward()
+        for target_eye, target_hand in zip(self.targets_eye,self.targets_hand):
+            target_eye.hide()
+            target_eye.reset()
+            target_hand.hide()
+            target_hand.reset()     
+
+    def _start_pause(self):
+        super()._start_pause()
+        for target_eye, target_hand in zip(self.targets_eye,self.targets_hand):
+            target_eye.hide()
+            target_eye.reset()
+            target_hand.hide()
+            target_hand.reset()
+
 class ScreenTargetCapture_Saccade(ScreenTargetCapture):
     '''
     Center-out saccade task. The controller for the cursor position is eye position.
