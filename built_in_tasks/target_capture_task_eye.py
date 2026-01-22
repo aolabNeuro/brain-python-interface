@@ -163,6 +163,7 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
     eye_target_color = traits.OptionsList("eye_color", *target_colors, desc="Color of the eye target", bmi3d_input_options=list(target_colors.keys()))
     fixation_radius_buffer = traits.Float(.5, desc="additional radius for eye target")
     fixation_time = traits.Float(.2, desc="additional radius for eye target")
+    incorrect_target_radius_buffer = traits.Float(.5, desc="additional radius for eye target")
     incorrect_target_penalty_time = traits.Float(1, desc="Length of penalty time for acquiring an incorrect target")
     exclude_parent_traits = ['hold_time']
 
@@ -242,7 +243,7 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
         eye_pos = self.calibrated_eye_pos
         eye_d = np.linalg.norm(eye_pos - self.targs[-1,[0,2]])
 
-        return eye_d <= self.target_radius
+        return eye_d <= self.target_radius + self.incorrect_target_radius_buffer
     
     def _test_fixation_break(self,ts):
         '''
