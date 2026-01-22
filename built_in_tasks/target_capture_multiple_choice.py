@@ -39,7 +39,7 @@ class TwoChoiceTargetCapture(ScreenTargetCapture):
                       end_state=True),
     )
 
-    sequence_generators = ['dual_centerout_2D', 'dual_peripheral']
+    sequence_generators = ['dual_centerout_2D_mirror', 'dual_centerout_2D_180', 'dual_peripheral']
 
     def __init__(self, *args, **kwargs):
         kwargs['instantiate_targets'] = False
@@ -159,7 +159,7 @@ class TwoChoiceTargetCapture(ScreenTargetCapture):
             yield [0, 1, 2], targs
 
     @staticmethod
-    def dual_centerout_2D(nblocks=100, ntargets=8, distance=10, origin=(0,0,0)):
+    def dual_centerout_2D_mirror(nblocks=100, ntargets=8, distance=10, origin=(0,0,0)):
         '''
         triplets of central targets at the origin and 2 peripheral targets centered around the origin
 
@@ -180,6 +180,30 @@ class TwoChoiceTargetCapture(ScreenTargetCapture):
             indices = np.zeros([3,1])
             indices[1] = idx[0]
             indices[2] = 10 - idx[0]
+            yield indices, targs
+
+    @staticmethod
+    def dual_centerout_2D_180(nblocks=100, ntargets=8, distance=10, origin=(0,0,0)):
+        '''
+        triplets of central targets at the origin and 2 peripheral targets centered around the origin
+
+        Returns
+        -------
+        [nblocks*ntargets x 1] array of tuples containing trial indices and [2 x 3] target coordinates
+        '''
+        gen = ScreenTargetCapture.out_2D(nblocks, ntargets, distance, origin)
+        for _ in range(nblocks*ntargets):
+            
+            idx, pos = next(gen)
+            #while abs(pos[0][0]) < 0.1:
+            #    idx, pos = next(gen)
+
+            targs = np.zeros([3, 3]) + origin
+            targs[1,:] = pos[0]
+            targs[2,:] = pos[0]*[-1,1,-1] #flip the position
+            indices = np.zeros([3,1])
+            indices[1] = idx[0]
+            indices[2] = (idx[0] + 4) % 8
             yield indices, targs
     
     def _test_enter_target(self, ts):
