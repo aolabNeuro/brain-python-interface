@@ -332,7 +332,7 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
         # Show the eye target
         if self.target_index == 0:
             target = self.targets[self.target_index]
-            target.move_to_position(self.targs[self.target_index])
+            target.move_to_position(self.targs[self.target_index] - self.offset_cube)
             target.show()
             self.sync_event('EYE_TARGET_ON', self.gen_indices[self.target_index])
 
@@ -521,7 +521,7 @@ class EyeConstrainedHandCapture(HandConstrainedEyeCapture):
     status = dict(
         wait = dict(start_trial="init_target", start_pause="pause"),
         init_target = dict(enter_target="target", start_pause="pause"),
-        target = dict(start_pause="pause", timeout="timeout_penalty", return_init_target='init_target', gaze_incorrect_target="incorrect_target_penalty", gaze_enter_target="fixation"),
+        target = dict(start_pause="pause", timeout="timeout_penalty", return_init_target='init_target', gaze_enter_target="fixation", gaze_incorrect_target="incorrect_target_penalty"),
         fixation = dict(start_pause="pause", leave_target="hold_penalty", fixation_hold_complete="delay", fixation_break="fixation_penalty"), 
         delay = dict(leave_target="delay_penalty", delay_complete="targ_transition", fixation_break="fixation_penalty", start_pause="pause"),
         targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target", start_pause="pause"),
@@ -573,7 +573,7 @@ class EyeConstrainedHandCapture(HandConstrainedEyeCapture):
         eye_pos = self.calibrated_eye_pos
         eye_d = np.linalg.norm(eye_pos - self.targs[-1,[0,2]])
 
-        return eye_d <= self.target_radius and self.target_index == 1
+        return eye_d <= (self.target_radius + self.incorrect_target_radius_buffer) and self.target_index == 1
     
     def _test_leave_target(self, ts):
         '''
