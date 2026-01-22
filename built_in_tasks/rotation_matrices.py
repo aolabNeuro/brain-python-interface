@@ -34,6 +34,12 @@ baseline_rotations = dict(
 
 exp_rotations = dict(
     none = np.identity(4),
+    mirror_x = np.array(
+        [[-1, 0, 0, 0], 
+        [0, 1, 0, 0], 
+        [0, 0, 1, 0], 
+        [0, 0, 0, 1]]
+    ),
     about_x_90 = np.array(
         [[1, 0, 0, 0], 
         [0, 0, 1, 0], 
