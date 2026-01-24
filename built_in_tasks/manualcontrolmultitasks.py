@@ -125,12 +125,12 @@ class ManualControlMixin(traits.HasTraits):
             self.task_data['user_screen'] = np.ones((3,))*np.nan
             return
 
-        self.task_data['manual_input'] = raw_coords.copy()
+        self.task_data['manual_input'] = raw_coords.copy() # in raw input coords (for optitrack x: back/front, y: down/up, z: left/right)
         self.no_data_counter[self.cycle_count % self._quality_window_size] = 0
 
-        # Transform coordinates
+        # Transform coordinates into screen space and save it as task data
         coords = self._transform_coords(raw_coords)
-        self.task_data['user_screen'] = coords
+        self.task_data['user_screen'] = coords # in bmi3d coords (x: left/right, y: into/out of the screen, z: down/up)
         
         try:
             if self.limit2d:
