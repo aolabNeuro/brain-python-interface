@@ -985,7 +985,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     
     ### Generator functions ####
     @staticmethod
-    def tracking_target_chain(nblocks=1, ntrials=500, time_length=20, ramp=1.5, ramp_down=1.5, num_primes=8, seed=40, sample_rate=120, disturbance=True, boundaries=(-10,10,-10,10)):
+    def tracking_target_chain(nblocks=1, ntrials=500, time_length=20, ramp=1.5, ramp_down=1.5, num_primes=8, seed=40, sample_rate=120, disturbance=True):
         '''
         Generates a sequence of 1D (z axis) target trajectories
 
@@ -1005,8 +1005,6 @@ class ScreenTargetTracking(TargetTracking, Window):
             The length of ramp up into a trial in seconds
         disturbance : boolean
             Whether to add disturbance to the cursor (disturbance is generated regardless)
-        boundaries: 4 element tuple
-            The limits of the allowed target locations (-x, x, -z, z)
 
         Returns
         -------
@@ -1032,7 +1030,7 @@ class ScreenTargetTracking(TargetTracking, Window):
                 idx += 1
 
     @staticmethod
-    def tracking_target_debug(nblocks=1, ntrials=2, time_length=20, seed=40, sample_rate=60, ramp=0, disturbance=True, boundaries=(-10,10,-10,10)):
+    def tracking_target_debug(nblocks=1, ntrials=2, time_length=20, seed=40, sample_rate=60, ramp=0, disturbance=True):
         '''
         Generates a sequence of 1D (z axis) target trajectories for debugging
         '''
@@ -1057,7 +1055,7 @@ class ScreenTargetTracking(TargetTracking, Window):
                 idx += 1
     
     @staticmethod
-    def tracking_target_training(nblocks=1, ntrials=2, time_length=5, frequencies = [1,.75], boundaries=(-10,10,-10,10)):
+    def tracking_target_training(nblocks=1, ntrials=2, time_length=5, frequencies = [1,.75]):
         '''
         Generates a sequence of 1D (z axis) target trajectories for training
 
@@ -1070,8 +1068,6 @@ class ScreenTargetTracking(TargetTracking, Window):
         time_length : int
         frequencies: numpy.ndarray
             A list of frequencies used to generate the trajectories
-        boundaries: 4 element Tuple
-            The limits of the allowed target locations (-x, x, -z, z)
 
         Returns
         -------
