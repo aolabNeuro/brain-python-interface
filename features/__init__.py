@@ -12,7 +12,7 @@ from .generator_features import Autostart, RandomDelay, AdaptiveGenerator, Ignor
 from .peripheral_device_features import Button, Joystick, DualJoystick, Joystick_plus_TouchSensor, KeyboardControl, MouseControl, ForceControl
 from .reward_features import RewardSystem, RewardSystemPulse, TTLReward, JuiceLogging, PelletReward, JackpotRewards, ProgressBar, TrackingRewards, RewardAudio, PenaltyAudio, ScoreRewards, ConsecutiveJackpot
 from .eyetracker_features import EyeCursor, EyeData, CalibratedEyeData, PupilLabStreaming, SimulatedEyeData, FixationStart, EyeConstrained, EyeCalibration, EyeStreaming
-from .touch_features import MouseEmulateTouch
+from .touch_features import MouseEmulateTouch, TabletTouch
 from .phasespace_features import MotionData, MotionSimulate, MotionAutoAlign
 from .optitrack_features import Optitrack, SpheresToCylinders
 from .plexon_features import PlexonBMI, RelayPlexon, RelayPlexByte
@@ -101,6 +101,7 @@ built_in_features = dict(
     start_trial_below_speed_thr=StartTrialBelowSpeedThr,
     reward_system_pulse = RewardSystemPulse,
     readyset_colorchange = ReadysetColorChange,
+    tablet_touch = TabletTouch,
 )
 
 # >>> features.built_in_features['autostart'].__module__

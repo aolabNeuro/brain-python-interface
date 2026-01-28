@@ -7,11 +7,43 @@ from riglib import touch_data
 import numpy as np
 import pygame
 from riglib.experiment import traits
-
+from riglib.touch_data import TabletTouchData
 
 ########################################################################################################
 # Touch sensor datasources
 ########################################################################################################
+
+class TabletTouch(traits.HasTraits):
+    
+    def init(self, *args, **kwargs):
+        super().init(*args, **kwargs)
+        
+        # Create a source to buffer the touch data
+        from riglib import source
+        self.touch = source.DataSource(TabletTouchData)
+
+        # Save to the sink
+        from riglib import sink
+        sink_manager = sink.SinkManager.get_instance()
+        sink_manager.register(self.touch)
+        super().init()
+
+
+    def _get_manual_position(self):
+        ''' Overridden method to get input coordinates based on motion data'''
+
+        # Get data from optitrack datasource
+        data = self.touch.get() # List of (list of features)
+        if len(data) == 0:
+            return [np.nan, np.nan, np.nan]
+        
+        pos = data[-1] # get the most recent event
+        pos[0] = (pos[0] / self.window_size[0] - 0.5) * self.screen_cm[0]
+        pos[1] = -(pos[1] / self.window_size[1] - 0.5) * self.screen_cm[1] # pygame counts (0,0) as the top left
+
+        return [pos[0], 0, pos[1]]
+
+
 
 class MouseEmulateTouch(traits.HasTraits):
     '''

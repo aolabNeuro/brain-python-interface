@@ -4,6 +4,9 @@ Code for getting data from kinarm
 import numpy as np
 from .source import DataSourceSystem
 import serial
+import socket
+import struct
+import sys
 
 class TouchData(DataSourceSystem):
     '''
@@ -93,3 +96,50 @@ class TouchDataInterface(object):
 
     def connect(self):
         self._test_connected()
+
+TOUCHEVENTF_MOVE = 0x0001
+TOUCHEVENTF_DOWN = 0x0002
+TOUCHEVENTF_UP   = 0x0004
+
+class TabletTouchData(DataSourceSystem):
+    '''
+    Client for touch data streamed from Orsborn lab tablets
+    '''
+    update_freq = 1000.
+    dtype = np.dtype((float, (2,)))
+
+    def start(self):
+        '''
+        Start receiving data
+        '''
+        UDP_IP = "0.0.0.0" # Listen on all interfaces
+        UDP_PORT = 5005
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock.bind((UDP_IP, UDP_PORT))
+
+        self.data = self.get_iterator()
+
+    def stop(self):
+        '''
+        Disconnect from kinarmdata socket
+        '''
+        self.sock.close()
+
+    def get(self):
+        '''
+        Get a new kinarm sample
+        '''
+        data, addr = self.sock.recvfrom(1024)
+        
+        # Packet should be 4 integers (16 bytes)
+        if len(data) != 16:
+            return [np.nan, np.nan]
+    
+        # Parse: ID, X, Y, Flags
+        t_id, t_x, t_y, t_flags = struct.unpack("<iiii", data)
+        if (t_flags & TOUCHEVENTF_DOWN) | (t_flags & TOUCHEVENTF_MOVE):
+            # DOWN or MOVE event
+            return [float(t_x), float(t_y)]
+        
+        return [np.nan, np.nan]
+
