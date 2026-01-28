@@ -14,26 +14,29 @@ from riglib.touch_data import TabletTouchData
 ########################################################################################################
 
 class TabletTouch(traits.HasTraits):
+
+    port_value = traits.Int(8000, desc='The port value to identify which tablet is running.')
     
     def init(self, *args, **kwargs):
-        super().init(*args, **kwargs)
         
         # Create a source to buffer the touch data
         from riglib import source
+        TabletTouchData.udp_port = 5005 # self.port_value - 8000 + 5005
         self.touch = source.DataSource(TabletTouchData)
 
         # Save to the sink
         from riglib import sink
         sink_manager = sink.SinkManager.get_instance()
         sink_manager.register(self.touch)
-        super().init()
+        super().init(*args, **kwargs)
 
 
     def _get_manual_position(self):
-        ''' Overridden method to get input coordinates based on motion data'''
+        ''' Overridden method to get input coordinates based on touch data'''
 
         # Get data from optitrack datasource
         data = self.touch.get() # List of (list of features)
+        print(data)
         if len(data) == 0:
             return [np.nan, np.nan, np.nan]
         

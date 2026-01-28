@@ -107,17 +107,16 @@ class TabletTouchData(DataSourceSystem):
     '''
     update_freq = 1000.
     dtype = np.dtype((float, (2,)))
+    udp_ip = ""
+    udp_port = 5005
 
     def start(self):
         '''
         Start receiving data
         '''
-        UDP_IP = "0.0.0.0" # Listen on all interfaces
-        UDP_PORT = 5005
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.bind((UDP_IP, UDP_PORT))
-
-        self.data = self.get_iterator()
+        self.sock.settimeout(1.0)
+        self.sock.bind((self.udp_ip, self.udp_port))
 
     def stop(self):
         '''
@@ -129,14 +128,17 @@ class TabletTouchData(DataSourceSystem):
         '''
         Get a new kinarm sample
         '''
-        data, addr = self.sock.recvfrom(1024)
+        try:
+            data, addr = self.sock.recvfrom(1024)
+        except socket.timeout:
+            return [np.nan, np.nan]
         
         # Packet should be 4 integers (16 bytes)
         if len(data) != 16:
             return [np.nan, np.nan]
     
-        # Parse: ID, X, Y, Flags
-        t_id, t_x, t_y, t_flags = struct.unpack("<iiii", data)
+        # Parse
+        t_id, t_x, t_y, t_flags = struct.unpack("<iiii", data) # Data format: (Finger ID, X pos, Y pos, Flags)
         if (t_flags & TOUCHEVENTF_DOWN) | (t_flags & TOUCHEVENTF_MOVE):
             # DOWN or MOVE event
             return [float(t_x), float(t_y)]
