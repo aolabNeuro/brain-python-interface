@@ -328,15 +328,19 @@ class IncrementalRotation(traits.HasTraits):
 
 class HideLeftTrajectory(traits.HasTraits):
     '''
-    Cover left side of tracking task screen with a black box. 
+    Hide the left side of the tracking trajectory. 
     This will cover the 'lookbehind' of the target trajectory. 
     Useful for task with bumpers.
     '''
 
-    def _start_trajectory(self):
-        super()._start_trajectory()
-        if self.frame_index == 0:
-            self.box.show()
+    def setup_start_wait(self):
+        super().setup_start_wait()
+        print(self.frame_index)
+        self.trajectory.update_mask(self.lookahead+2, self.lookahead*2)
+                                    
+    def update_frame(self):
+        super().update_frame()
+        self.trajectory.update_mask(self.frame_index+self.lookahead+1, self.frame_index+2*self.lookahead)
 
 class ReadysetMedley(traits.HasTraits):
 
