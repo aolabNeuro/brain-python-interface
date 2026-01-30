@@ -408,3 +408,21 @@ class HideCursorReturn(traits.HasTraits):
             if dist_from_center < self.show_cursor_return:
                 self.plant_visible = True 
     
+    def _start_hold_penalty(self):
+        super()._start_hold_penalty()
+        self.plant_visible = False
+    
+    def _start_timeout_penalty(self):
+        super()._start_timeout_penalty()
+        self.plant_visible = False
+    
+    def _start_delay_penalty(self):
+        super()._start_delay_penalty()
+        self.plant_visible = False
+    
+    def _start_tooslow_penalty(self):
+        super()._start_tooslow_penalty()
+        self.plant_visible = False
+    
+    
+    

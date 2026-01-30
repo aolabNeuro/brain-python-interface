@@ -47,6 +47,13 @@ class TestManualControlTasks(unittest.TestCase):
         exp.rotation = 'xzy'
         exp.run()
 
+    #@unittest.skip("")
+    def test_exp(self):
+        seq = ManualControl.centerout_2D()
+        exp = init_exp(ScreenTargetCapture, [MouseControl, Window2D, HideCursorReturn], seq, window_size=(1200,800), fullscreen=False, show_cursor_return=2.5)
+        exp.rotation = 'xzy'
+        exp.run()
+
     @unittest.skip("")
     def test_readysetgo_feat(self):
         seq = ManualControl.centerout_2D()
