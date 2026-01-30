@@ -40,6 +40,7 @@ class TestTouch(unittest.TestCase):
             print(sample)
         touch_data.stop()
 
+    @unittest.skip("msg")
     def test_touch_datasource(self):
         from riglib.touch_data import TabletTouchData
         from riglib.source import DataSource
@@ -51,10 +52,11 @@ class TestTouch(unittest.TestCase):
             time.sleep(2)
         touch_data.stop()
 
-    @unittest.skip("msg")
+    # @unittest.skip("msg")
     def test_exp(self):
         seq = ManualControl.centerout_2D()
-        exp = init_exp(ManualControl, [TabletTouch, Window2D], seq, fullscreen=False, window_size=(1200,800))
+        exp = init_exp(ManualControl, [TabletTouch, Window2D], seq, fullscreen=False, window_size=(1200,800),
+            rotation='xzy')
         exp.run()
 
 class TestLaser(unittest.TestCase):

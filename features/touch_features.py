@@ -22,29 +22,39 @@ class TabletTouch(traits.HasTraits):
         # Create a source to buffer the touch data
         from riglib import source
         TabletTouchData.udp_port = 5005 # self.port_value - 8000 + 5005
-        self.touch = source.DataSource(TabletTouchData)
+        self.touch_data = source.DataSource(TabletTouchData)
 
         # Save to the sink
         from riglib import sink
         sink_manager = sink.SinkManager.get_instance()
-        sink_manager.register(self.touch)
+        sink_manager.register(self.touch_data)
         super().init(*args, **kwargs)
 
+    def run(self):
+        '''
+        Code to execute immediately prior to the beginning of the task FSM executing, or after the FSM has finished running. 
+        See riglib.experiment.Experiment.run(). This 'run' method starts the motiondata source and stops it after the FSM has finished running
+        '''
+        self.touch_data.start()
+        try:
+            super().run()
+        finally:
+            print("Stopping touch streaming")
+            self.touch_data.stop()
 
     def _get_manual_position(self):
         ''' Overridden method to get input coordinates based on touch data'''
 
         # Get data from optitrack datasource
-        data = self.touch.get() # List of (list of features)
-        print(data)
-        if len(data) == 0:
+        data = self.touch_data.get() # List of (list of features)
+        if len(data) == 0 or np.any(np.isnan(data)):
             return [np.nan, np.nan, np.nan]
         
-        pos = data[-1] # get the most recent event
+        pos = np.array(data[-1]) # get the most recent event
         pos[0] = (pos[0] / self.window_size[0] - 0.5) * self.screen_cm[0]
         pos[1] = -(pos[1] / self.window_size[1] - 0.5) * self.screen_cm[1] # pygame counts (0,0) as the top left
 
-        return [pos[0], 0, pos[1]]
+        return [pos[0], pos[1], 0]
 
 
 
