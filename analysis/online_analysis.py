@@ -462,7 +462,127 @@ class EyeHandAnalysisWorker(SaccadeAnalysisWorker):
                                 self.eye_diam[:, 1])
         self.diam_plot.set_data(np.arange(len(self.eye_diam)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
                                 self.eye_diam[:, 2]/self.px_per_cm)
+
+class EyeHandSequenceAnalysisWorker(SaccadeAnalysisWorker):
+    '''
+    Plots calibrated_eye, cursor, and target data from experiments that have them. 
+    This is for eye-hand task
+    '''
+
+    def __init__(self, task_params, data_queue, calibration_dir='/var/tmp', buffer_time=1, ylim=1, px_per_cm=51.67, **kwargs):
+        super().__init__(task_params, data_queue, **kwargs)
+
+    def init(self):
+        super().init()
+        self.calibrated_eye_pos = np.zeros(2)
+        self.calibration_flag = False
+        self.hand_targets = {}
+        self.eye_targets = {}
+        self.is_sequence = False
+
+    def handle_data(self, key, values):
+        if key == 'cycle_count':
+            self.cycle_count = values[0]       
+        elif key == 'sync_event':
+            event_name, event_data = values
+            if event_name == 'TARGET_ON':
+                self.hand_targets[event_data] = 1
+            elif event_name == 'TARGET_OFF':
+                self.hand_targets[event_data] = 0
+            elif event_name == 'EYE_TARGET_ON':
+                self.hand_targets[event_data] = 1
+                self.eye_targets[event_data] = 1
+            elif event_name == 'EYE_TARGET_OFF':
+                if not self.is_sequence:
+                    self.hand_targets[event_data] = 0
+
+                self.eye_targets[event_data] = 0
+            elif event_name in ['PAUSE', 'TRIAL_END', 'HOLD_PENALTY', 'DELAY_PENALTY', 'TIMEOUT_PENALTY','FIXATION_PENALTY']:
+                # Clear targets at the end of the trial
+                self.hand_targets = {}
+                self.eye_targets = {}
+                self.is_sequence = False
+
+            elif event_name == 'REWARD':
+                # Set all active targets to reward
+                for target_idx in self.hand_targets.keys():
+                    self.hand_targets[target_idx] = 2 if self.hand_targets[target_idx] else 0
+                for target_idx in self.eye_targets.keys():
+                    self.eye_targets[target_idx] = 2 if self.eye_targets[target_idx] else 0
+
+        elif key == 'cursor':
+            self.cursor_pos = np.array(values[0])[[0,2]]
+        elif key == 'eye_pos':
+            self.eye_pos = np.array(values[0])[:2]
+
+            # Update eye diameter
+            if self.eye_pos.size > 2:
+                self.temp = np.array(values[0])[[0,1,4]]
+                self.eye_diam = np.roll(self.eye_diam, -1, axis=0)
+                self.eye_diam[-1] = self.temp
+
+        elif key == 'calibrated_eye_pos':
+            self.calibrated_eye_pos = np.array(values[0])[:2]
+
+        elif key == 'target_location':
+            target_idx, target_location = values
+            self.target_pos[int(target_idx)] = np.array(target_location)[[0,2]]
+
+        elif key == 'is_sequence':
+            self.is_sequence = values[0]
+
+
+    def get_current_pos(self):
+        '''
+        Get the current cursor, eye, and target positions
+
+        Returns:
+            cursor_pos ((2,) tuple): Current cursor position
+            eye_pos ((2,) tuple): Current eye position and diameters
+            targets (list): List of active targets in (position, radius, color) format
+        '''
+        try:
+            radius = self.task_params['target_radius']
+            eye_radius = self.task_params['fixation_radius']
+            color = 'orange'
+            eye_color = 'darkcyan'
+            eye_targets = [(self.target_pos[k], eye_radius, eye_color if v == 1 else 'green') for k, v in self.eye_targets.items() if v]
+            hand_targets = [(self.target_pos[k], radius, color if v == 1 else 'green') for k, v in self.hand_targets.items() if v]
+        except:
+            eye_targets = []
+            hand_targets = []
         
+        return self.cursor_pos, self.calibrated_eye_pos, eye_targets, hand_targets
+
+    def draw(self):
+        cursor_pos, calibrated_eye_pos, eye_targets, hand_targets = self.get_current_pos()
+        cursor_radius = self.task_params.get('cursor_radius', 0.25)
+        if 'fixation_radius_buffer' in self.task_params:
+            buffer = self.task_params['fixation_radius_buffer']
+        elif 'fixation_dist' in self.task_params:
+            buffer = self.task_params['fixation_dist'] - self.task_params['target_radius']
+        eye_radius = 0.2
+
+        patches1 = [plt.Circle(pos, radius+buffer) for pos, radius, _ in eye_targets]
+        patches2 = [plt.Circle(pos, radius) for pos, radius, _ in hand_targets]
+        patches3 = [plt.Circle(pos, radius) for pos, radius, _ in eye_targets]
+        patches4 = [plt.Circle(cursor_pos, cursor_radius), plt.Circle(calibrated_eye_pos, eye_radius)]
+        
+        patches = patches1 + patches2 + patches3 + patches4
+        self.circles.set_paths(patches)
+        colors = [[0.8,0.8,0.8] for _, _, c in eye_targets]  + [c for _, _, c in hand_targets] + [c for _, _, c in eye_targets] +  ['indigo', 'darkgreen']  
+        self.circles.set_facecolor(colors)
+        self.circles.set_alpha(0.7)
+
+        # Update eye diameter plot
+        self.x_plot.set_data(np.arange(len(self.eye_diam)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
+                                self.eye_diam[:, 0])
+        self.y_plot.set_data(np.arange(len(self.eye_diam)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
+                                self.eye_diam[:, 1])
+        self.diam_plot.set_data(np.arange(len(self.eye_diam)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
+                                self.eye_diam[:, 2]/self.px_per_cm)
+        
+
 class ERPAnalysisWorker(AnalysisWorker):
     '''
     Plots ERP data from experiments with an ECoG244 array. Automatically calculates 
@@ -762,6 +882,9 @@ class OnlineDataServer(threading.Thread):
 
         elif self.task_params['experiment_name'] == 'EyeConstrainedReachingTask':
             self.analysis_workers.append((EyeHandAnalysisWorker(self.task_params, data_queue), data_queue))        
+
+        elif self.task_params['experiment_name'] == 'EyeHandSequenceTask':
+            self.analysis_workers.append((EyeHandSequenceAnalysisWorker(self.task_params, data_queue), data_queue))     
 
         # Is there ecube neural data?
         if 'record_headstage' in self.task_params and self.task_params['record_headstage']:

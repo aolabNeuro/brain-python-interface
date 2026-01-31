@@ -114,7 +114,9 @@ class OnlineAnalysis(traits.HasTraits):
         if hasattr(self, 'targs') and hasattr(self, 'gen_indices'):
             for i in range(len(self.targs)):
                 self._send_online_analysis_msg('target_location', self.gen_indices[i], self.targs[i])
-
+        if hasattr(self, 'is_sequence'):
+            self._send_online_analysis_msg('is_sequence', self.is_sequence)
+            
     def _cycle(self):
         '''
         Send cursor and eye position data to the online analysis server
@@ -127,6 +129,7 @@ class OnlineAnalysis(traits.HasTraits):
             self._send_online_analysis_msg('eye_pos', self.eye_pos)
         if hasattr(self, 'calibrated_eye_pos'):
             self._send_online_analysis_msg('calibrated_eye_pos', self.calibrated_eye_pos)
+
         if hasattr(self, 'task_data') and 'decoder_state' in self.task_data.dtype.names:
             self._send_online_analysis_msg('decoder_state', self.task_data['decoder_state'].flatten().tolist())
         if hasattr(self, 'task_data') and hasattr(self, 'extractor') and self.extractor.feature_type in self.task_data.dtype.names:
