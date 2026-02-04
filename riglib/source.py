@@ -142,7 +142,7 @@ class DataSource(RPCProcess):
                         self.lock.release()
                     except Exception as e:
                         print("source.DataSource.run, exception saving data to ring buffer")
-                        print(e)
+                        traceback.print_exc()
             else:
                 time.sleep(.001)        
 

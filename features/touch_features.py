@@ -27,7 +27,7 @@ class TabletTouch(traits.HasTraits):
         # Save to the sink
         from riglib import sink
         sink_manager = sink.SinkManager.get_instance()
-        sink_manager.register(self.touch_data)
+        # sink_manager.register(self.touch_data)
         super().init(*args, **kwargs)
 
     def run(self):
@@ -46,11 +46,16 @@ class TabletTouch(traits.HasTraits):
         ''' Overridden method to get input coordinates based on touch data'''
 
         # Get data from optitrack datasource
-        data = self.touch_data.get() # List of (list of features)
-        if len(data) == 0 or np.any(np.isnan(data)):
+        data = self.touch_data.get(all=True) # List of (list of features)
+        if len(data) == 0:
             return [np.nan, np.nan, np.nan]
         
-        pos = np.array(data[-1]) # get the most recent event
+        # Check if the last event was a finger up
+        if data[-1][0] == -1:
+            return [np.nan, np.nan, np.nan]
+
+        # Otherwise get the most recent touch position
+        pos = np.array(data[-1])[1:].astype(float) # get the most recent event
         pos[0] = (pos[0] / self.window_size[0] - 0.5) * self.screen_cm[0]
         pos[1] = -(pos[1] / self.window_size[1] - 0.5) * self.screen_cm[1] # pygame counts (0,0) as the top left
 
