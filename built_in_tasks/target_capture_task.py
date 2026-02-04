@@ -589,7 +589,8 @@ class ScreenTargetCapture(TargetCapture, Window):
     @staticmethod
     def out_2D_square(nblocks=100, width=10, height=10, origin=(0,0,0)):
         '''
-        Generates a sequence of 2D (x and z) targets at a point on the side of the square
+        Generates a sequence of 2D (x and z) targets at the corners and the midpoints of each edge of the rectangle
+        The number of targets are 8.
         '''
         ntargets = 8
         rng = np.random.default_rng()
@@ -674,7 +675,7 @@ class ScreenTargetCapture(TargetCapture, Window):
     @staticmethod
     def centerout_2D_square(nblocks=100, width=10, height=10, origin=(0,0,0)):
         '''
-        Pairs of central targets at the origin and peripheral targets centered around the origin
+        Pairs of central targets at the origin and 8 targets at the corners and midpoints of each edge of the rectangle
 
         Returns
         -------

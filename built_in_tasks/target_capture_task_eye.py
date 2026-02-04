@@ -154,18 +154,22 @@ class EyeConstrainedTargetCapture(ScreenTargetCapture):
 class HandConstrainedEyeCapture(ScreenTargetCapture):
     '''
     Saccade task with holding another target with hand. Subjects need to hold an initial target with their hand. 
-    Then they need to fixate the first eye target and make a saccade for the second eye target. 2 of chain_length is only tested.
+    Then they need to fixate the first eye target and make a saccade for the second eye target. The eye target is a square whose width is adjusted by fixation_radius.
+    The acceprance radius for eye fixation is fixation_radius + fixation_radius_buffer. The buffer radius is invisible for subjects. 
+    2 of chain_length is only tested.
     '''
 
     fixation_radius = traits.Float(2.5, desc="Distance from center that is considered a broken fixation")
     fixation_penalty_time = traits.Float(1.0, desc="Time in fixation penalty state")
     fixation_target_color = traits.OptionsList("fixation_color", *target_colors, desc="Color of the eye target under fixation state", bmi3d_input_options=list(target_colors.keys()))
     eye_target_color = traits.OptionsList("eye_color", *target_colors, desc="Color of the eye target", bmi3d_input_options=list(target_colors.keys()))
-    fixation_radius_buffer = traits.Float(.5, desc="additional radius for eye target")
-    fixation_time = traits.Float(.2, desc="additional radius for eye target")
-    incorrect_target_radius_buffer = traits.Float(.5, desc="additional radius for eye target")
+    fixation_radius_buffer = traits.Float(.5, desc="additional radius for eye target. fixation_radius + buffer determines the break of fixation")
+    fixation_time = traits.Float(.2, desc="fixation duration during which subjects have to keep fixating the eye target")
+    incorrect_target_radius_buffer = traits.Float(.5, desc="target radius + buffer radius determines if subjects look at the incorrect target")
     incorrect_target_penalty_time = traits.Float(1, desc="Length of penalty time for acquiring an incorrect target")
+
     exclude_parent_traits = ['hold_time']
+    hidden_traits = ['eye_target_color', 'fixation_target_color']
 
     status = dict(
         wait = dict(start_trial="init_target", start_pause="pause"),
@@ -294,7 +298,7 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
         super()._start_wait()
         # Redefine chain length because targs in this task has both eye and hand targets
         self.chain_length = len(self.targets)
-        self.isfixation_state = False
+        self.fixation_passed = False
 
         if self.calc_trial_num() == 0:
 
@@ -323,10 +327,10 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
             self.sync_event('EYE_TARGET_OFF', self.gen_indices[self.target_index])
 
     def _start_target(self):
-        if self.target_index == -1 and not self.isfixation_state:
+        if self.target_index == -1 and not self.fixation_passed:
             self.target_index += 1
 
-        if self.isfixation_state:
+        if self.fixation_passed:
             self.target_index += 1
 
         # Show the eye target
@@ -340,7 +344,7 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
         self.target_index += 1
 
     def _start_fixation(self):
-        self.isfixation_state = True
+        self.fixation_passed = True
         self.targets[self.target_index].cube.color = target_colors[self.fixation_target_color] # change target color in fixation state
         self.sync_event('FIXATION', self.gen_indices[self.target_index])
 
@@ -543,7 +547,7 @@ class EyeConstrainedHandCapture(HandConstrainedEyeCapture):
         instantiate_targets = kwargs.pop('instantiate_targets', True)
         if instantiate_targets:
 
-            # Target 1 and 2 are for saccade. Target 3 is for hand
+            # Target 1 and 2 are for saccade. Target 3 and target 4 are for hand
             target1 = VirtualRectangularTarget(target_width=self.fixation_radius, target_height=self.fixation_radius/2, target_color=target_colors[self.eye_target_color])
             target2 = VirtualRectangularTarget(target_width=self.fixation_radius, target_height=self.fixation_radius/2, target_color=target_colors[self.eye_target_color])
             target3 = VirtualCircularTarget(target_radius=self.target_radius, target_color=target_colors[self.target_color])
@@ -626,14 +630,16 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
     '''
 
     exclude_parent_traits = ['delay_time', 'rand_delay']
-    rand_delay1 = traits.Tuple((0.4, 0.7), desc="Delay interval for eye")
-    rand_delay2 = traits.Tuple((0., 0.7), desc="Delay interval for hand")
-    rand_fixation1 = traits.Tuple((0., 0.7), desc='Length of fixation required at targets')
+    rand_delay_eye = traits.Tuple((0.4, 0.7), desc="Delay interval for eye")
+    rand_delay_hand = traits.Tuple((0., 0.7), desc="Delay interval for hand")
+    rand_fixation_eye_hand = traits.Tuple((0., 0.7), desc='Length of fixation required at targets')
     rand_fixation2 = traits.Tuple((0., 0.7), desc='Length of 2nd fixation required at targets')
     trials_block_sequence = traits.Int(100, desc='Trials of each block for sequence trials')
     trials_block_simultaneous = traits.Int(100, desc='Trials of each block for simultaneous trials')
     sequence_target_color = traits.OptionsList("orange", *target_colors, desc="Color of the hand target in sequence trials", bmi3d_input_options=list(target_colors.keys()))
 
+    hidden_traits = ['sequence_target_color']
+    
     status = dict(
         wait = dict(start_trial="target", start_pause="pause"),
         target = dict(timeout="timeout_penalty", gaze_enter_target='fixation', start_pause="pause"),
@@ -780,11 +786,11 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
         if self.tries == 0: # Update delay_time only in the first attempt
 
             # Set delay time
-            s, e = self.rand_delay1
+            s, e = self.rand_delay_eye
             self.delay_time1 = random.random()*(e-s) + s
-            s, e = self.rand_delay2
+            s, e = self.rand_delay_hand
             self.delay_time2 = random.random()*(e-s) + s
-            s, e = self.rand_fixation1
+            s, e = self.rand_fixation_eye_hand
             self.fixation_time1 = random.random()*(e-s) + s
             s, e = self.rand_fixation2
             self.fixation_time2 = random.random()*(e-s) + s

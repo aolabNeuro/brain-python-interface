@@ -147,19 +147,16 @@ class VirtualRectangularTarget(RectangularTarget):
         self.cube.rotate_z(angle, reset=reset)
 
     def cue_trial_start(self):
-        #self.cube.color = RED
-        #self.show()
-        pass
+        self.cube.color = self.target_color
+        self.show()
 
     def cue_trial_end_success(self):
         self.cube.color = GREEN
 
     def cue_trial_end_failure(self):
         self.cube.color = RED
-        #self.hide()
 
     def idle(self):
-        #self.cube.color = RED
         self.hide()
 
     def pt_inside(self, pt):

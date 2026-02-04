@@ -300,13 +300,9 @@ class SaccadeAnalysisWorker(BehaviorAnalysisWorker):
     This is for eye-related task that requires calibrated eye position
     '''
    
-    def __init__(self, task_params, data_queue, calibration_dir='/var/tmp', buffer_time=1, ylim=1, px_per_cm=51.67, **kwargs):
-        super().__init__(task_params, data_queue, **kwargs)
-
     def init(self):
         super().init()
         self.calibrated_eye_pos = np.zeros(2)
-        self.calibration_flag = False
  
     def get_current_pos(self):
         '''
@@ -352,7 +348,7 @@ class SaccadeAnalysisWorker(BehaviorAnalysisWorker):
         self.diam_plot.set_data(np.arange(len(self.eye_diam)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
                                 self.eye_diam[:, 2]/self.px_per_cm)
 
-class EyeHandAnalysisWorker(SaccadeAnalysisWorker):
+class EyeHandAnalysisWorker(BehaviorAnalysisWorker):
     '''
     Plots calibrated_eye, cursor, and target data from experiments that have them. 
     This is for eye-hand task
@@ -360,6 +356,7 @@ class EyeHandAnalysisWorker(SaccadeAnalysisWorker):
 
     def init(self):
         super().init()
+        self.calibrated_eye_pos = np.zeros(2)
         self.hand_targets = {}
         self.eye_targets = {}
         self.target_pos = []
@@ -401,6 +398,7 @@ class EyeHandAnalysisWorker(SaccadeAnalysisWorker):
         elif key == 'calibrated_eye_pos':
             self.calibrated_eye_pos = np.array(values[0])[:2]
 
+        elif key == 'eye_pos':
             # Update eye diameter
             if self.calibrated_eye_pos.size > 2:
                 self.temp = np.array(values[0])[[0,1,4]]
@@ -463,19 +461,15 @@ class EyeHandAnalysisWorker(SaccadeAnalysisWorker):
         self.diam_plot.set_data(np.arange(len(self.eye_diam)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
                                 self.eye_diam[:, 2]/self.px_per_cm)
 
-class EyeHandSequenceAnalysisWorker(SaccadeAnalysisWorker):
+class EyeHandSequenceAnalysisWorker(BehaviorAnalysisWorker):
     '''
     Plots calibrated_eye, cursor, and target data from experiments that have them. 
     This is for eye-hand task
     '''
 
-    def __init__(self, task_params, data_queue, calibration_dir='/var/tmp', buffer_time=1, ylim=1, px_per_cm=51.67, **kwargs):
-        super().__init__(task_params, data_queue, **kwargs)
-
     def init(self):
         super().init()
         self.calibrated_eye_pos = np.zeros(2)
-        self.calibration_flag = False
         self.hand_targets = {}
         self.eye_targets = {}
         self.is_sequence = False
