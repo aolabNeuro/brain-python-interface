@@ -105,8 +105,8 @@ class TabletTouchData(DataSourceSystem):
     '''
     Client for touch data streamed from Orsborn lab tablets
     '''
-    update_freq = 1000.
-    dtype = np.dtype((float, (2,)))
+    update_freq = 60
+    dtype = np.dtype((int, (2,)))
     udp_ip = ""
     udp_port = 5005
 
@@ -131,17 +131,21 @@ class TabletTouchData(DataSourceSystem):
         try:
             data, addr = self.sock.recvfrom(1024)
         except socket.timeout:
+            print('timeout')
             return [np.nan, np.nan]
         
         # Packet should be 4 integers (16 bytes)
         if len(data) != 16:
+            print('wrong packet size')
             return [np.nan, np.nan]
     
         # Parse
         t_id, t_x, t_y, t_flags = struct.unpack("<iiii", data) # Data format: (Finger ID, X pos, Y pos, Flags)
         if (t_flags & TOUCHEVENTF_DOWN) | (t_flags & TOUCHEVENTF_MOVE):
             # DOWN or MOVE event
-            return [float(t_x), float(t_y)]
+            print(t_id, t_x, t_y)
+            return [t_id, t_x, t_y]
         
+        print('up event')
         return [np.nan, np.nan]
 
