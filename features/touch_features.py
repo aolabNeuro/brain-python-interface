@@ -25,6 +25,7 @@ class TabletTouch(traits.HasTraits):
         # Create a source to buffer the touch data
         from riglib import source
         TabletTouchData.udp_port = 5005
+        #self.touch_port = TabletTouchData.udp_port
         self.touch_data = source.DataSource(TabletTouchData)
 
         # Save to the sink
@@ -41,6 +42,7 @@ class TabletTouch(traits.HasTraits):
         try:
             print("Starting touch app")
             ssh_cmd = ["ssh", f"{self.tablet_username}@{self.tablet_ip}", rf"C:\Users\{self.tablet_username}\Desktop\start_touch.bat"]
+            #ssh_cmd = ["ssh", f"{self.tablet_username}@{self.tablet_ip}", rf"C:\Users\{self.tablet_username}\Desktop\start_touch.bat" {self.tablet_ip} {self.touch_port}]
             subprocess.Popen(ssh_cmd)
             super().run()
         finally:
