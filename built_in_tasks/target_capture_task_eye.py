@@ -630,7 +630,6 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
     rand_delay2 = traits.Tuple((0., 0.7), desc="Delay interval for hand")
     rand_fixation1 = traits.Tuple((0., 0.7), desc='Length of fixation required at targets')
     rand_fixation2 = traits.Tuple((0., 0.7), desc='Length of 2nd fixation required at targets')
-    sequence_ratio = traits.Float(0.5, desc='Ratio of sequence trials')
     trials_block_sequence = traits.Int(100, desc='Trials of each block for sequence trials')
     trials_block_simultaneous = traits.Int(100, desc='Trials of each block for simultaneous trials')
     sequence_target_color = traits.OptionsList("orange", *target_colors, desc="Color of the hand target in sequence trials", bmi3d_input_options=list(target_colors.keys()))
