@@ -52,7 +52,7 @@ class TestTouch(unittest.TestCase):
             time.sleep(2)
         touch_data.stop()
 
-    @unittest.skip("msg")
+    #@unittest.skip("msg")
     def test_exp(self):
         seq = ManualControl.centerout_2D()
         exp = init_exp(ManualControl, [TabletTouch, Window2D], seq, fullscreen=False, window_size=(1200,800),

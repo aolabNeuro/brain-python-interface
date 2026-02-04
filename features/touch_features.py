@@ -8,6 +8,7 @@ import numpy as np
 import pygame
 from riglib.experiment import traits
 from riglib.touch_data import TabletTouchData
+import subprocess
 
 ########################################################################################################
 # Touch sensor datasources
@@ -15,14 +16,15 @@ from riglib.touch_data import TabletTouchData
 
 class TabletTouch(traits.HasTraits):
 
-    port_value = traits.Int(8000, desc='The port value to identify which tablet is running.')
-    
+    tablet_ip = traits.String("192.168.0.207", desc='The ip address to identify which tablet is running.')
+    tablet_username = traits.String("AOLabs", desc='The username for the tablet account.')
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
         # Create a source to buffer the touch data
         from riglib import source
-        TabletTouchData.udp_port = 5005 # self.port_value - 8000 + 5005
+        TabletTouchData.udp_port = 5005
         self.touch_data = source.DataSource(TabletTouchData)
 
         # Save to the sink
@@ -37,10 +39,16 @@ class TabletTouch(traits.HasTraits):
         '''
         self.touch_data.start()
         try:
+            print("Starting touch app")
+            ssh_cmd = ["ssh", f"{self.tablet_username}@{self.tablet_ip}", rf"C:\Users\{self.tablet_username}\Desktop\start_touch.bat"]
+            subprocess.Popen(ssh_cmd)
             super().run()
         finally:
             print("Stopping touch streaming")
             self.touch_data.stop()
+            print("Stopping touch app")
+            ssh_cmd = ["ssh", f"{self.tablet_username}@{self.tablet_ip}", rf"C:\Users\{self.tablet_username}\Desktop\exit_touch.bat"]
+            subprocess.Popen(ssh_cmd)
 
     def _get_manual_position(self):
         ''' Overridden method to get input coordinates based on touch data'''
