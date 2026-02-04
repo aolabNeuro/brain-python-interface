@@ -631,6 +631,9 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
     rand_fixation1 = traits.Tuple((0., 0.7), desc='Length of fixation required at targets')
     rand_fixation2 = traits.Tuple((0., 0.7), desc='Length of 2nd fixation required at targets')
     sequence_ratio = traits.Float(0.5, desc='Ratio of sequence trials')
+    trials_block_sequence = traits.Int(100, desc='Trials of each block for sequence trials')
+    trials_block_simultaneous = traits.Int(100, desc='Trials of each block for simultaneous trials')
+    sequence_target_color = traits.OptionsList("orange", *target_colors, desc="Color of the hand target in sequence trials", bmi3d_input_options=list(target_colors.keys()))
 
     status = dict(
         wait = dict(start_trial="target", start_pause="pause"),
@@ -791,15 +794,22 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
             self.is_sequence = False
             self.is_simultaneous = False
 
-            a = random.random()
-            if a < self.sequence_ratio:
+            #a = random.random()
+            trials_all_blocks = self.trials_block_sequence + self.trials_block_simultaneous
+            self.trial_count_blocks = self.reward_count % trials_all_blocks
+            if (self.trial_count_blocks >= self.trials_block_simultaneous) and (self.trial_count_blocks < trials_all_blocks):
                 self.is_sequence = True
                 self.chain_length = 3
-            else:
+
+            elif self.trial_count_blocks < self.trials_block_simultaneous:
                 self.is_simultaneous = True
                 self.chain_length = 2
 
             self.task_data['is_sequence'] =  self.is_sequence
+
+        if self.is_sequence:
+            for target in self.targets_hand:
+                target.sphere.color = target_colors[self.sequence_target_color]
 
     def _start_target(self):
         
@@ -935,8 +945,9 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
 
     def _start_reward(self):
         super()._start_reward()
-        for target in self.targets_eye:
-            target.cue_trial_end_success()
+        for target_eye, target_hand in zip(self.targets_eye,self.targets_hand):
+            target_eye.cue_trial_end_success()
+            target_hand.cue_trial_end_success()
 
     def _end_reward(self):
         super()._end_reward()
@@ -963,6 +974,7 @@ class ScreenTargetCapture_Saccade(ScreenTargetCapture):
     fixation_radius_buffer = traits.Float(.5, desc="additional radius for eye target")
     target_color = traits.OptionsList("eye_color", *target_colors, desc="Color of the target", bmi3d_input_options=list(target_colors.keys()))
     fixation_target_color = traits.OptionsList("fixation_color", *target_colors, desc="Color of the eye target under fixation state", bmi3d_input_options=list(target_colors.keys()))
+    automatic_reward = traits.Bool(False, desc="Whether to deliver automatic reward")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -984,20 +996,26 @@ class ScreenTargetCapture_Saccade(ScreenTargetCapture):
         Check whether eye positions from a target are within the fixation distance
         '''
         # Distance of an eye position from a target position
-        eye_pos = self.calibrated_eye_pos
-        target_pos = np.delete(self.targs[self.target_index],1)
-        d_eye = np.linalg.norm(eye_pos - target_pos)
-        return (d_eye <= self.target_radius + self.fixation_radius_buffer) or self.pause
+        if not self.automatic_reward:
+            eye_pos = self.calibrated_eye_pos
+            target_pos = np.delete(self.targs[self.target_index],1)
+            d_eye = np.linalg.norm(eye_pos - target_pos)
+            return (d_eye <= self.target_radius + self.fixation_radius_buffer)
+        else:
+            return True
 
     def _test_leave_target(self, ts):
         '''
         Check whether eye positions from a target are outside the fixation distance
         '''
         # Distance of an eye position from a target position
-        eye_pos = self.calibrated_eye_pos
-        target_pos = np.delete(self.targs[self.target_index],1)
-        d_eye = np.linalg.norm(eye_pos - target_pos)
-        return (d_eye > self.target_radius + self.fixation_radius_buffer) or self.pause
+        if not self.automatic_reward:
+            eye_pos = self.calibrated_eye_pos
+            target_pos = np.delete(self.targs[self.target_index],1)
+            d_eye = np.linalg.norm(eye_pos - target_pos)
+            return (d_eye > self.target_radius + self.fixation_radius_buffer)
+        else:
+            return False
 
     def _start_target(self):
         self.target_index += 1
