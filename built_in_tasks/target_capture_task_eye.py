@@ -639,7 +639,7 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
     sequence_target_color = traits.OptionsList("orange", *target_colors, desc="Color of the hand target in sequence trials", bmi3d_input_options=list(target_colors.keys()))
 
     hidden_traits = ['sequence_target_color']
-    
+
     status = dict(
         wait = dict(start_trial="target", start_pause="pause"),
         target = dict(timeout="timeout_penalty", gaze_enter_target='fixation', start_pause="pause"),
@@ -677,9 +677,27 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
 
             self.offset_cube = np.array([0,10,self.fixation_radius/2]) # To center the cube target
 
+        self.trials_all_blocks = self.trials_block_sequence + self.trials_block_simultaneous
+        self.trial_count_blocks = self.reward_count % self.trials_all_blocks
+        self.is_sequence = False
+        self.is_simultaneous = True
+
     def init(self):
         self.add_dtype('is_sequence', bool, (1,))
         super().init()
+
+    def update_report_stats(self):
+        '''
+        see experiment.Experiment.update_report_stats for docs
+        '''
+        super().update_report_stats()
+        self.trial_count_blocks = self.reward_count % self.trials_all_blocks
+        if self.is_simultaneous:
+            self.reportstats['Task of this block'] = 'Simultaneous'
+            self.reportstats['Trial # / Block'] = f'{self.trial_count_blocks} / {self.trials_block_simultaneous}'
+        else:
+            self.reportstats['Task of this block'] = 'Sequence'
+            self.reportstats['Trial # / Block'] = f'{self.trial_count_blocks - self.trials_block_simultaneous} / {self.trials_block_sequence}'
 
     def _test_gaze_enter_target(self,ts):
         '''
@@ -795,20 +813,17 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
             s, e = self.rand_fixation2
             self.fixation_time2 = random.random()*(e-s) + s
 
-            # Decide sequence or simultaneous trials
-            self.is_sequence = False
-            self.is_simultaneous = False
+            # Decide sequence or simultaneous trials  
+            self.trial_count_blocks = self.reward_count % self.trials_all_blocks
 
-            #a = random.random()
-            trials_all_blocks = self.trials_block_sequence + self.trials_block_simultaneous
-            self.trial_count_blocks = self.reward_count % trials_all_blocks
-            if (self.trial_count_blocks >= self.trials_block_simultaneous) and (self.trial_count_blocks < trials_all_blocks):
+            if self.trial_count_blocks < self.trials_block_simultaneous:
+                self.is_simultaneous = True
+                self.is_sequence = False
+                self.chain_length = 2
+            elif self.trial_count_blocks - self.trials_block_simultaneous < self.trials_block_sequence:
+                self.is_simultaneous = False
                 self.is_sequence = True
                 self.chain_length = 3
-
-            elif self.trial_count_blocks < self.trials_block_simultaneous:
-                self.is_simultaneous = True
-                self.chain_length = 2
 
             self.task_data['is_sequence'] =  self.is_sequence
 
