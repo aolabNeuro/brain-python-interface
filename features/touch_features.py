@@ -17,7 +17,8 @@ class TabletTouch(traits.HasTraits):
 
     port_value = traits.Int(8000, desc='The port value to identify which tablet is running.')
     
-    def init(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         
         # Create a source to buffer the touch data
         from riglib import source
@@ -27,8 +28,7 @@ class TabletTouch(traits.HasTraits):
         # Save to the sink
         from riglib import sink
         sink_manager = sink.SinkManager.get_instance()
-        # sink_manager.register(self.touch_data)
-        super().init(*args, **kwargs)
+        sink_manager.register(self.touch_data)
 
     def run(self):
         '''

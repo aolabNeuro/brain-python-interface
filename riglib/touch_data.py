@@ -106,7 +106,7 @@ class TabletTouchData(DataSourceSystem):
     Client for touch data streamed from Orsborn lab tablets
     '''
     update_freq = 60
-    dtype = np.dtype(('int64', (3,)))
+    dtype = np.dtype((int, (3,)))
     udp_ip = ""
     udp_port = 5005
 
@@ -130,19 +130,18 @@ class TabletTouchData(DataSourceSystem):
         '''
         try:
             data, addr = self.sock.recvfrom(1024)
+            
+            # Parse
+            t_id, t_x, t_y, t_flags = struct.unpack("<iiii", data) # Data format: (Finger ID, X pos, Y pos, Flags)
+            if (t_flags & TOUCHEVENTF_DOWN) | (t_flags & TOUCHEVENTF_MOVE):
+                # DOWN or MOVE event
+                coords = [int(t_id), int(t_x), int(t_y)]
+            else:
+                # UP event
+                coords = [-1, 0, 0]
+
         except socket.timeout:
-            return [-1, 0, 0]
-        
-        # Packet should be 4 integers (16 bytes)
-        if len(data) != 16:
-            return [-1, 0, 0]
-    
-        # Parse
-        t_id, t_x, t_y, t_flags = struct.unpack("<iiii", data) # Data format: (Finger ID, X pos, Y pos, Flags)
-        if (t_flags & TOUCHEVENTF_DOWN) | (t_flags & TOUCHEVENTF_MOVE):
-            # DOWN or MOVE event
-            return [t_id, t_x, t_y]
-        
-        # UP event
-        return [-1, 0, 0]
+            coords = [-1, 0, 0]
+            
+        return np.expand_dims(coords, axis=0)
 
