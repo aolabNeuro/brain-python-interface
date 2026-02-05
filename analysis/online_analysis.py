@@ -491,7 +491,7 @@ class EyeHandSequenceAnalysisWorker(BehaviorAnalysisWorker):
                     self.hand_targets[event_data] = 0
 
                 self.eye_targets[event_data] = 0
-            elif event_name in ['PAUSE', 'TRIAL_END', 'HOLD_PENALTY', 'DELAY_PENALTY', 'TIMEOUT_PENALTY','FIXATION_PENALTY']:
+            elif event_name in ['PAUSE', 'TRIAL_END', 'HOLD_PENALTY', 'DELAY_PENALTY', 'TIMEOUT_PENALTY','FIXATION_PENALTY', 'OTHER_PENALTY']:
                 # Clear targets at the end of the trial
                 self.hand_targets = {}
                 self.eye_targets = {}

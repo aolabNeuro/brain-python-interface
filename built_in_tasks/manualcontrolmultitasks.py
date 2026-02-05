@@ -216,13 +216,13 @@ class HandConstrainedSaccadeTask(ManualControlMixin, HandConstrainedEyeCapture):
 
 class EyeHandSequenceTask(ManualControlMixin, EyeHandSequenceCapture):
     '''
-    Saccade task while holding different targets by hand
+    Eye-hand sequence task where the hand go cue and the eye go cue come separately or simultaneously
     '''
     pass
 
 class EyeConstrainedReachingTask(ManualControlMixin, EyeConstrainedHandCapture):
     '''
-    Saccade and reaching task while holding different targets by eye and hand
+    Saccade and reaching task. The initial eye and hand positions are different, but the goal target is the same.
     '''
     pass
 
