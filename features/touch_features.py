@@ -32,6 +32,7 @@ class TabletTouch(traits.HasTraits):
             self.tablet_username = "AOLabs"
         elif self.port_value == 9000:
             self.tablet_ip = "192.168.0.200"
+            self.tablet_username = "aolabs"
         elif self.port_value== 7000:
             self.tablet_ip = "192.168.0.170" # 300
         elif self.port_value == 8500:
