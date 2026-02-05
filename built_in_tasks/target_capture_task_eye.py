@@ -626,16 +626,16 @@ class EyeConstrainedHandCapture(HandConstrainedEyeCapture):
 class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
     '''
     Subjects have to gaze at and reach to a target, responding to the eye or hand go cue indivisually in sequence trials.
-    They need to simultaneously move eye and hand to the target in simultaneous trials.
+    They need to keep their eye position while moving the cursor to the hand target.
+    In simultaneous trials, they need to simultaneously move eye and hand to the target, responding a single go cue.
     '''
 
     exclude_parent_traits = ['delay_time', 'rand_delay']
-    rand_delay_eye = traits.Tuple((0.4, 0.7), desc="Delay interval for eye")
-    rand_delay_hand = traits.Tuple((0., 0.7), desc="Delay interval for hand")
-    rand_fixation_eye_hand = traits.Tuple((0., 0.7), desc='Length of fixation required at targets')
-    rand_fixation2 = traits.Tuple((0., 0.7), desc='Length of 2nd fixation required at targets')
-    trials_block_sequence = traits.Int(100, desc='Trials of each block for sequence trials')
-    trials_block_simultaneous = traits.Int(100, desc='Trials of each block for simultaneous trials')
+    rand_delay_eye = traits.Tuple((0.4, 0.7), desc="Delay interval for eye in sequence trials, and for eye and hand in simultaneous trials")
+    rand_delay_hand = traits.Tuple((0., 0.7), desc="Delay interval for hand only used in sequence trials")
+    fixation_time = traits.Float(.3, desc="fixation duration during which subjects have to keep fixating the first eye target")
+    trials_block_sequence = traits.Int(100, desc='Trial numbers of the block in sequence trials')
+    trials_block_simultaneous = traits.Int(100, desc='Trial numbers of the block in simultaneous trials')
     sequence_target_color = traits.OptionsList("orange", *target_colors, desc="Color of the hand target in sequence trials", bmi3d_input_options=list(target_colors.keys()))
 
     hidden_traits = ['sequence_target_color']
@@ -694,10 +694,10 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
         self.trial_count_blocks = self.reward_count % self.trials_all_blocks
         if self.is_simultaneous:
             self.reportstats['Task of this block'] = 'Simultaneous'
-            self.reportstats['Trial # / Block'] = f'{self.trial_count_blocks} / {self.trials_block_simultaneous}'
+            self.reportstats['Success trial # / Block'] = f'{self.trial_count_blocks} / {self.trials_block_simultaneous}'
         else:
             self.reportstats['Task of this block'] = 'Sequence'
-            self.reportstats['Trial # / Block'] = f'{self.trial_count_blocks - self.trials_block_simultaneous} / {self.trials_block_sequence}'
+            self.reportstats['Success trial # / Block'] = f'{self.trial_count_blocks - self.trials_block_simultaneous} / {self.trials_block_sequence}'
 
     def _test_gaze_enter_target(self,ts):
         '''
@@ -746,9 +746,9 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
 
     def _test_fixation_complete(self, ts):
         if self.eye_target_index == 0:
-            return ts > self.fixation_time1
+            return ts > self.fixation_time
         else:
-            return ts > self.fixation_time2
+            return True
     
     def _test_hold_complete(self, ts):
         return ts > self.hold_time
@@ -759,9 +759,9 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
         while another target is being presented, is over. 
         '''
         if self.target_index == 0:
-            return ts > self.delay_time1
+            return ts > self.delay_time_eye
         elif self.target_index == 1:
-            return ts > self.delay_time2
+            return ts > self.delay_time_hand
         else:
             return True
     
@@ -805,13 +805,9 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
 
             # Set delay time
             s, e = self.rand_delay_eye
-            self.delay_time1 = random.random()*(e-s) + s
+            self.delay_time_eye = random.random()*(e-s) + s
             s, e = self.rand_delay_hand
-            self.delay_time2 = random.random()*(e-s) + s
-            s, e = self.rand_fixation_eye_hand
-            self.fixation_time1 = random.random()*(e-s) + s
-            s, e = self.rand_fixation2
-            self.fixation_time2 = random.random()*(e-s) + s
+            self.delay_time_hand = random.random()*(e-s) + s
 
             # Decide sequence or simultaneous trials  
             self.trial_count_blocks = self.reward_count % self.trials_all_blocks
