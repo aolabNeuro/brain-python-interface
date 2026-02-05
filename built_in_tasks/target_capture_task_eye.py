@@ -686,7 +686,7 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
         self.trial_count_blocks = self.reward_count % self.trials_all_blocks
         self.is_sequence = False
         self.is_simultaneous = True
-        self.reaction_time = 0.0
+        self.reward_scale = 0.0
 
         # Store the original reward value because this task adjusts reward value for each trial
         self.original_reward_time = self.reward_time
