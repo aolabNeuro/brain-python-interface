@@ -632,10 +632,14 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
 
     exclude_parent_traits = ['delay_time', 'rand_delay']
     rand_delay_eye = traits.Tuple((0.4, 0.7), desc="Delay interval for eye in sequence trials, and for eye and hand in simultaneous trials")
-    rand_delay_hand = traits.Tuple((0., 0.7), desc="Delay interval for hand only used in sequence trials")
+    rand_delay_hand = traits.Tuple((0., 0.5), desc="Delay interval for hand only used in sequence trials")
     fixation_time = traits.Float(.3, desc="fixation duration during which subjects have to keep fixating the first eye target")
     trials_block_sequence = traits.Int(100, desc='Trial numbers of the block in sequence trials')
     trials_block_simultaneous = traits.Int(100, desc='Trial numbers of the block in simultaneous trials')
+    reward_scale_simul = traits.Tuple((0.5, 0.2), desc="Scale reward value based on reach reaction times computed based on cursor position (not speed)")
+    rrt_thr_simul = traits.Tuple((0.55, 1.), desc="threshold of reach reaction times (rrt) in seconds. reward_scale is multiplied by reward_times based on rrt")
+    reward_scale_seq = traits.Tuple((0.5, 0.2), desc="Scale reward value based on reach reaction times. This is only used in sequence trials")
+    rrt_thr_seq = traits.Tuple((0.55, 1.), desc="threshold of reach reaction times (rrt) in seconds. This is only used in sequence trials")
     sequence_target_color = traits.OptionsList("orange", *target_colors, desc="Color of the hand target in sequence trials", bmi3d_input_options=list(target_colors.keys()))
 
     hidden_traits = ['sequence_target_color']
@@ -677,10 +681,15 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
 
             self.offset_cube = np.array([0,10,self.fixation_radius/2]) # To center the cube target
 
+        # Initialize these values for report_stats
         self.trials_all_blocks = self.trials_block_sequence + self.trials_block_simultaneous
         self.trial_count_blocks = self.reward_count % self.trials_all_blocks
         self.is_sequence = False
         self.is_simultaneous = True
+        self.reaction_time = 0.0
+
+        # Store the original reward value because this task adjusts reward value for each trial
+        self.original_reward_time = self.reward_time
 
     def init(self):
         self.add_dtype('is_sequence', bool, (1,))
@@ -698,6 +707,8 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
         else:
             self.reportstats['Task of this block'] = 'Sequence'
             self.reportstats['Success trial # / Block'] = f'{self.trial_count_blocks - self.trials_block_simultaneous} / {self.trials_block_sequence}'
+        self.reportstats['Reward scale'] = f'{self.reward_scale}'
+        #self.reportstats['Reaction time (ms)'] = f'{self.reaction_time*1000:.03}'
 
     def _test_gaze_enter_target(self,ts):
         '''
@@ -866,10 +877,36 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
         self.target_index += 1
         self.hand_target_index += 1
 
+        # for reaction time detection
+        self.target_hand_start_time = self.get_time()
+        self.reaction_time = 0
+
+    def _while_target_hand(self):
+        # Compute reaction time based on cursor position
+        cursor_pos = self.plant.get_endpoint_pos()
+        hand_d = np.linalg.norm(cursor_pos - self.hand_targs[0])
+        if hand_d > (self.target_radius - self.cursor_radius) and self.reaction_time == 0:
+            self.reaction_time = self.get_time() - self.target_hand_start_time
+
+    def _end_target_hand(self):
+        # Adjust reward value based on reaction_time
+        if self.reaction_time < self.rrt_thr_seq[0]:
+            self.reward_scale = 1.0
+        elif self.reaction_time >= self.rrt_thr_seq[0] and self.reaction_time < self.rrt_thr_seq[1]:
+            self.reward_scale = self.reward_scale_seq[0]
+        elif self.reaction_time >= self.rrt_thr_seq[1]:
+            self.reward_scale = self.reward_scale_seq[1]
+
+        self.reward_time = self.reward_scale*self.original_reward_time
+
     def _start_target_eye_hand(self):
         self.target_index += 1
         self.eye_target_index += 1
         self.hand_target_index += 1
+
+        # for reaction time detection
+        self.target_eye_hand_start_time = self.get_time()
+        self.reaction_time = 0
 
     def _while_target_eye_hand(self):
         eye_pos = self.calibrated_eye_pos
@@ -878,6 +915,23 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
             self.targets_eye[self.eye_target_index].cube.color = target_colors[self.fixation_target_color] # chnage color in fixating center
         else:
             self.targets_eye[self.eye_target_index].cube.color = target_colors[self.eye_target_color]
+
+        # Compute reaction time based on cursor position
+        cursor_pos = self.plant.get_endpoint_pos()
+        hand_d = np.linalg.norm(cursor_pos - self.hand_targs[0])
+        if hand_d > (self.target_radius - self.cursor_radius) and self.reaction_time == 0:
+            self.reaction_time = self.get_time() - self.target_eye_hand_start_time 
+    
+    def _end_target_eye_hand(self):
+        # Adjust reward value based on reaction_time
+        if self.reaction_time < self.rrt_thr_simul[0]:
+            self.reward_scale = 1.0
+        elif self.reaction_time >= self.rrt_thr_simul[0] and self.reaction_time < self.rrt_thr_simul[1]:
+            self.reward_scale = self.reward_scale_simul[0]
+        elif self.reaction_time >= self.rrt_thr_simul[1]:
+            self.reward_scale = self.reward_scale_simul[1]
+
+        self.reward_time = self.reward_scale*self.original_reward_time
 
     def _start_fixation(self):
         #if self.target_index != 0:
