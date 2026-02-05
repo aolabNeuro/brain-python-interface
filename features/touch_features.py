@@ -16,17 +16,30 @@ import subprocess
 
 class TabletTouch(traits.HasTraits):
 
-    tablet_ip = traits.String("192.168.0.207", desc='The ip address to identify which tablet is running.')
-    tablet_username = traits.String("AOLabs", desc='The username for the tablet account.')
+    host_ip = traits.String("192.168.0.150", desc="The ip address of the bmi host machine.")
+    port_value = traits.Int(8000, desc='The port value to identify which tablet is running.')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
         # Create a source to buffer the touch data
         from riglib import source
-        TabletTouchData.udp_port = 5005
-        #self.touch_port = TabletTouchData.udp_port
+        TabletTouchData.udp_port = self.port_value + 5
         self.touch_data = source.DataSource(TabletTouchData)
+
+        if self.port_value == 8000:
+            self.tablet_ip = "192.168.0.100"
+            self.tablet_username = "AOLabs"
+        elif self.port_value == 9000:
+            self.tablet_ip = "192.168.0.200"
+        elif self.port_value== 7000:
+            self.tablet_ip = "192.168.0.170" # 300
+        elif self.port_value == 8500:
+            self.tablet_ip = "192.168.0.201"
+            self.tablet_username = "AOLabs"
+        else:
+            print('uh oh')
+            self.tablet_ip = "192.168.0.150"
 
         # Save to the sink
         from riglib import sink
@@ -41,8 +54,7 @@ class TabletTouch(traits.HasTraits):
         self.touch_data.start()
         try:
             print("Starting touch app")
-            ssh_cmd = ["ssh", f"{self.tablet_username}@{self.tablet_ip}", rf"C:\Users\{self.tablet_username}\Desktop\start_touch.bat"]
-            #ssh_cmd = ["ssh", f"{self.tablet_username}@{self.tablet_ip}", rf"C:\Users\{self.tablet_username}\Desktop\start_touch.bat" {self.tablet_ip} {self.touch_port}]
+            ssh_cmd = ["ssh", f"{self.tablet_username}@{self.tablet_ip}", rf"C:\Users\{self.tablet_username}\Desktop\start_touch.bat", rf"{self.host_ip}", rf"{self.port_value + 5}"]
             subprocess.Popen(ssh_cmd)
             super().run()
         finally:
@@ -70,8 +82,6 @@ class TabletTouch(traits.HasTraits):
         pos[1] = -(pos[1] / self.window_size[1] - 0.5) * self.screen_cm[1] # pygame counts (0,0) as the top left
 
         return [pos[0], pos[1], 0]
-
-
 
 class MouseEmulateTouch(traits.HasTraits):
     '''
