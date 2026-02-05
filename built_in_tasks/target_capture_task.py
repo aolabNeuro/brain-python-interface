@@ -64,6 +64,8 @@ class TargetCapture(Sequence):
         super().init()
         self.penalty_index = 0
         self.pause_index = 0
+        self.total_pause_time = 0
+        self.current_pause_time = 0
 
     def _start_wait(self):
         
@@ -203,14 +205,15 @@ class TargetCapture(Sequence):
 
     def _start_pause(self):
         self.pause_index = 1
+        self.pause_start_time = self.get_time()
+        self.total_pause_time_old = self.total_pause_time
 
     def _while_pause(self):
-        '''Nothing generic to do.'''
-        pass
+        self.current_pause_time = self.get_time() - self.pause_start_time
+        self.total_pause_time = self.total_pause_time_old + self.current_pause_time
 
     def _end_pause(self):
-        '''Nothing generic to do.'''
-        pass
+        self.current_pause_time = 0
 
     ################## State transition test functions ##################
     def _test_start_trial(self, time_in_state):
@@ -289,6 +292,8 @@ class TargetCapture(Sequence):
         super().update_report_stats()
         self.reportstats['Trial #'] = self.calc_trial_num()
         self.reportstats['Reward/min'] = np.round(self.calc_events_per_min('reward', 120.), decimals=2)
+        self.reportstats['Total pause time'] = self._time_to_string(self.total_pause_time)
+        self.reportstats['Current pause time'] = self._time_to_string(self.current_pause_time)
 
 class ScreenTargetCapture(TargetCapture, Window):
     """Concrete implementation of TargetCapture task where targets
