@@ -69,7 +69,7 @@ class TargetTracking(Sequence):
         self.trial_dtype = np.dtype([('trial', 'u4'), ('index', 'u4'), ('target', 'f8',(3,)), ('disturbance', 'f8',(3,)), ('is_disturbance', '?')])
         super().init()
 
-        self.frame_index = 0 # index in the frame in a trial
+        self.frame_index = -1 # index in the frame in a trial
         self.total_distance_error = 0 # Euclidian distance between cursor and target during each trial
         self.trial_timed_out = True # check if the trial is finished
         self.plant_position = []
@@ -326,11 +326,11 @@ class TargetTracking(Sequence):
 
     def _test_ramp_complete(self, time_in_state):
         '''Test whether the ramp up is finished'''
-        return self.frame_index >= self.ramp_up_time*self.sample_rate
+        return self.frame_index-1 >= self.ramp_up_time*self.sample_rate
 
     def _test_traj_complete(self, time_in_state):
         '''Test whether the trajectory is finished and whether there is a ramp down before the trial ends'''
-        return (self.frame_index >= self.trajectory_length - self.ramp_down_time*self.sample_rate) and (self.ramp_down_time > 0)
+        return (self.frame_index-1 >= self.trajectory_length - self.ramp_down_time*self.sample_rate) and (self.ramp_down_time > 0)
 
     def _test_ramp_and_trial_complete(self, time_in_state):
         '''Test whether the ramp down is finished, ending the trial'''
@@ -401,7 +401,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     target_radius = traits.Float(2, desc="Radius of targets in cm") #2,0.75
     trajectory_radius = traits.Float(.5, desc="Radius of targets in cm")
     trajectory_color = traits.OptionsList("gold", *target_colors, desc="Color of the trajectory", bmi3d_input_options=list(target_colors.keys()))
-    trajectory_type = traits.OptionsList("time", ["time", "space", "none"], desc="Type of trajectory to use", bmi3d_input_options=["time", "space", "none"])
+    trajectory_type = traits.OptionsList("1d", ["1d", "2d", "none"], desc="Type of trajectory to use", bmi3d_input_options=["1d", "2d", "none"])
     lookahead_time = traits.Float(0.5, desc="Time in seconds to display the future trajectory")
     target_color = traits.OptionsList("yellow", *target_colors, desc="Color of the target", bmi3d_input_options=list(target_colors.keys()))
     plant_hide_rate = traits.Float(0.0, desc='If the plant is visible, specifies a percentage of trials where it will be hidden')
@@ -427,8 +427,8 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.plant.set_cursor_radius(self.cursor_radius)
         self.plant_vis_prev = True
         self.cursor_vis_prev = True
-        self.lookahead = int(self.fps * self.lookahead_time)
-        self.lookahead_scale = (2 * self.screen_cm[0]) / self.lookahead # cm per frame
+        self.lookahead = int(self.fps * self.lookahead_time) # convert to frames
+        self.lookahead_scale = (0.5 * self.screen_cm[0]) / self.lookahead # cm per frame
         self.original_limit1d = self.limit1d # keep track of original settable trait
         
         if not self.always_1d:
@@ -461,9 +461,8 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.add_dtype('trial', 'u4', (1,))
         self.add_dtype('gen_idx', 'int', (1,)) # dtype needs to be able to represent -1
         self.add_dtype('plant_visible', '?', (1,))
-        self.add_dtype('current_target', 'f8', (3,))
-        self.add_dtype('current_disturbance', 'f8', (3,)) # see task_data['manual_input'] for cursor position without added disturbance
-        self.add_dtype('current_target_validate', 'f8', (3,))
+        self.add_dtype('target', 'f8', (3,))
+        self.add_dtype('disturbance', 'f8', (3,))
         super().init()
         self.plant.set_endpoint_pos(np.array(self.starting_pos))
 
@@ -471,6 +470,10 @@ class ScreenTargetTracking(TargetTracking, Window):
         '''
         Calls any update functions necessary and redraws screen
         '''
+        # if self.frame_index >= 0:
+        #     print('FRAME ', self.frame_index, self.get_state(), self.trial_timed_out)
+        #     print(self.target.get_position()[2], self.pos_offset[2])
+
         self.move_effector(pos_offset=np.asarray(self.pos_offset), vel_offset=np.asarray(self.vel_offset))
 
         # Run graphics commands to show/hide the plant if the visibility has changed
@@ -485,17 +488,10 @@ class ScreenTargetTracking(TargetTracking, Window):
         # Update the trial index
         self.task_data['trial'] = self.calc_trial_num()
         self.task_data['gen_idx'] = self.gen_index
-        # print(self.task_data['gen_idx'])
         
-        # Save the target position at each cycle. 
-        if self.trial_timed_out:
-             self.task_data['current_target'] = [np.nan,np.nan,np.nan]
-             self.task_data['current_disturbance'] = [np.nan,np.nan,np.nan]
-             self.task_data['current_target_validate'] = self.target.get_position() # default VirtualCircularTarget position is [0,0,0]
-        else:
-            self.task_data['current_target'] = self.targs[self.frame_index]
-            self.task_data['current_disturbance'] = self.disturbance_path[self.frame_index]
-            self.task_data['current_target_validate'] = self.target.get_position()
+        # Save the target position and disturbance value at each cycle
+        self.task_data['target'] = self.target.get_position()
+        self.task_data['disturbance'] = self.pos_offset
 
         super()._cycle()
 
@@ -524,11 +520,16 @@ class ScreenTargetTracking(TargetTracking, Window):
             self.plant.set_visibility(self.plant_visible)
 
     def update_frame(self):
-        self.target.move_to_position(self.targs[self.frame_index])
-        if self.trajectory_type == 'time':
-            self.trajectory.move_to_position(np.array([-self.frame_index*self.lookahead_scale - self.lookahead*self.lookahead_scale,0,0])) 
-        elif self.trajectory_type == 'space':
-            self.trajectory.update_mask(self.frame_index, self.frame_index+self.lookahead)
+        if self.trial_timed_out:
+            use_frame_index = self.frame_index - 1
+        else:
+            use_frame_index = self.frame_index
+
+        self.target.move_to_position(self.targs[use_frame_index])
+        if self.trajectory_type == '1d':
+            self.trajectory.move_to_position(np.array([-use_frame_index*self.lookahead_scale - self.lookahead*self.lookahead_scale,0,0])) 
+        elif self.trajectory_type == '2d':
+            self.trajectory.update_mask(use_frame_index, use_frame_index+self.lookahead)
         time_in_trajectory = self.get_time() - self.trajectory_start_time
         self.frame_index = int(time_in_trajectory * self.sample_rate)
 
@@ -547,9 +548,9 @@ class ScreenTargetTracking(TargetTracking, Window):
             for model in self.trajectory.graphics_models:
                 self.remove_model(model)
             del self.trajectory
-        if self.trajectory_type == 'time':
+        if self.trajectory_type == '1d':
 
-            lookbehind = np.zeros((self.lookahead, np.shape(self.targs)[1]))
+            lookbehind = self.targs[1,:]*np.ones((self.lookahead, np.shape(self.targs)[1]))
             next_trajectory = np.concatenate((lookbehind, self.targs), axis=0)
             next_trajectory = np.array(np.squeeze(next_trajectory)[:,2])
             next_trajectory = np.vstack([
@@ -558,7 +559,7 @@ class ScreenTargetTracking(TargetTracking, Window):
                 next_trajectory
             ]).T
             self.trajectory = VirtualSnakeTarget(target_radius=self.trajectory_radius, target_color=target_colors[self.trajectory_color], trajectory=next_trajectory)
-        elif self.trajectory_type == 'space':
+        elif self.trajectory_type == '2d':
             self.trajectory = VirtualSnakeTarget(target_radius=self.trajectory_radius, target_color=target_colors[self.trajectory_color], trajectory=self.targs)
             self.trajectory.update_mask(self.frame_index, self.frame_index+self.lookahead)
         else: # 'none'
@@ -586,27 +587,44 @@ class ScreenTargetTracking(TargetTracking, Window):
         # Cue successful tracking
         self.target.cue_trial_end_success()
 
+        if self.frame_index == 0:
+            # Add disturbance
+            if self.disturbance_trial == True:
+                cursor_pos = self.plant.get_endpoint_pos()
+                if self.velocity_control:
+                    # TODO check manualcontrolmixin for how to implement velocity control
+                    self.vel_offset = (cursor_pos + self.disturbance_path[self.frame_index])*1/self.fps
+                else: 
+                    # position control
+                    self.pos_offset = self.disturbance_path[self.frame_index]
+
+            # Move target and trajectory to next frame so it appears to be moving
+            self.update_frame()
+
     def setup_start_tracking_out(self):
         # Reset target color
         self.target.reset()
 
     def setup_while_tracking(self):
-        # Add disturbance
-        cursor_pos = self.plant.get_endpoint_pos()
-        if self.disturbance_trial == True:
-            if self.velocity_control:
-                # TODO check manualcontrolmixin for how to implement velocity control
-                self.vel_offset = (cursor_pos + self.disturbance_path[self.frame_index])*1/self.fps
-            else: 
-                # position control
-                self.pos_offset = self.disturbance_path[self.frame_index]
+        # Check whether there are no more target frames to display
+        if self.frame_index + self.lookahead == self.trajectory_length:
+            self.trial_timed_out = True
+            self.pos_offset = [0,0,0]
+            self.vel_offset = [0,0,0]
+
+        else:
+            # Add disturbance
+            if self.disturbance_trial == True:
+                cursor_pos = self.plant.get_endpoint_pos()
+                if self.velocity_control:
+                    # TODO check manualcontrolmixin for how to implement velocity control
+                    self.vel_offset = (cursor_pos + self.disturbance_path[self.frame_index])*1/self.fps
+                else: 
+                    # position control
+                    self.pos_offset = self.disturbance_path[self.frame_index]
 
         # Move target and trajectory to next frame so it appears to be moving
         self.update_frame()
-
-        # Check if the trial is over and there are no more target frames to display
-        if self.frame_index >= np.shape(self.targs)[0]:
-            self.trial_timed_out = True
 
     #### TEST FUNCTIONS ####
     def _test_enter_target(self, time_in_state):
@@ -644,12 +662,10 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def _start_trajectory(self):
         super()._start_trajectory()
-        if self.frame_index == 0: # why would this ever not be 0?
+        if self.frame_index == 0:
             self.target.move_to_position(self.targs[self.frame_index])
-            if self.trajectory_type == 'time':
+            if self.trajectory_type == '1d':
                 self.trajectory.move_to_position(np.array([-self.lookahead*self.lookahead_scale,0,0]))
-            # print(self.target.get_position())
-            # print(self.trajectory.get_position())
 
             self.target.show()
             if self.trajectory_type != "none":
@@ -675,8 +691,8 @@ class ScreenTargetTracking(TargetTracking, Window):
     def _start_tracking_in_ramp(self):
         super()._start_tracking_in_ramp()
         self.setup_start_tracking_in()
-        # print('START TRACKING RAMP', self.ramp_counter[self.frame_index])
-        self.sync_event('CURSOR_ENTER_TARGET', self.ramp_counter[self.frame_index])
+        # print('START TRACKING IN RAMP', self.ramp_counter[self.frame_index-1])
+        self.sync_event('CURSOR_ENTER_TARGET', self.ramp_counter[self.frame_index-1])
 
     def _while_tracking_in_ramp(self):
         super()._while_tracking_in_ramp()
@@ -695,8 +711,8 @@ class ScreenTargetTracking(TargetTracking, Window):
     def _start_tracking_out_ramp(self):
         super()._start_tracking_out_ramp()
         self.setup_start_tracking_out()
-        # print('STOP TRACKING RAMP', self.ramp_counter[self.frame_index])
-        self.sync_event('CURSOR_LEAVE_TARGET', self.ramp_counter[self.frame_index])
+        # print('START TRACKING OUT RAMP', self.ramp_counter[self.frame_index-1])
+        self.sync_event('CURSOR_LEAVE_TARGET', self.ramp_counter[self.frame_index-1])
 
     def _while_tracking_out_ramp(self):
         super()._while_tracking_out_ramp()

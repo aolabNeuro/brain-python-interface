@@ -45,6 +45,7 @@ class ManualControlMixin(traits.HasTraits):
 
     def init(self):
         self.add_dtype('manual_input', 'f8', (3,))
+        self.add_dtype('user_screen', 'f8', (3,))
         super().init()
         self.no_data_counter = np.zeros((self._quality_window_size,), dtype='?')
 
@@ -121,6 +122,7 @@ class ManualControlMixin(traits.HasTraits):
             self.no_data_counter[self.cycle_count % self._quality_window_size] = 1
             self.update_report_stats()
             self.task_data['manual_input'] = np.ones((3,))*np.nan
+            self.task_data['user_screen'] = np.ones((3,))*np.nan
             return
 
         self.task_data['manual_input'] = raw_coords.copy()
@@ -128,6 +130,7 @@ class ManualControlMixin(traits.HasTraits):
 
         # Transform coordinates
         coords = self._transform_coords(raw_coords)
+        self.task_data['user_screen'] = coords
         
         try:
             if self.limit2d:
