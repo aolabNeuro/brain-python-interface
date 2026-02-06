@@ -32,7 +32,7 @@ class TabletTouch(traits.HasTraits):
             self.tablet_username = "AOLabs"
         elif self.port_value == 9000:
             self.tablet_ip = "192.168.0.200"
-            self.tablet_username = "aolabs"
+            self.tablet_username = "aolab"
         elif self.port_value== 7000:
             self.tablet_ip = "192.168.0.170" # 300
         elif self.port_value == 8500:
@@ -55,14 +55,14 @@ class TabletTouch(traits.HasTraits):
         self.touch_data.start()
         try:
             print("Starting touch app")
-            ssh_cmd = ["ssh", f"{self.tablet_username}@{self.tablet_ip}", rf"C:\Users\{self.tablet_username}\Desktop\start_touch.bat", rf"{self.host_ip}", rf"{self.port_value + 5}"]
+            ssh_cmd = ["ssh", f"{self.tablet_username}@{self.tablet_ip}", rf"C:\Users\tablet_touch\start_touch.bat", rf"{self.host_ip}", rf"{self.port_value + 5}"]
             subprocess.Popen(ssh_cmd)
             super().run()
         finally:
             print("Stopping touch streaming")
             self.touch_data.stop()
             print("Stopping touch app")
-            ssh_cmd = ["ssh", f"{self.tablet_username}@{self.tablet_ip}", rf"C:\Users\{self.tablet_username}\Desktop\exit_touch.bat"]
+            ssh_cmd = ["ssh", f"{self.tablet_username}@{self.tablet_ip}", rf"C:\Users\tablet_touch\exit_touch.bat"]
             subprocess.Popen(ssh_cmd)
 
     def _get_manual_position(self):
