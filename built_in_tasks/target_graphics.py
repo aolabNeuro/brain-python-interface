@@ -36,6 +36,7 @@ target_colors = {
     "gold": (0.941,0.637,0.25,0.75),
     "elephant":(0.5,0.5,0.5,0.5),
     "white": (1, 1, 1, 0.75),
+    "bright_white":  (1, 1, 1, 1),
     "eye_color": (0.7, 0.7, 0.7, 1.),
     "fixation_color": (0., 0.7, 0.7, 1),
 }

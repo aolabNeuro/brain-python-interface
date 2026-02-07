@@ -155,15 +155,15 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
     '''
     Saccade task with holding another target with hand. Subjects need to hold an initial target with their hand. 
     Then they need to fixate the first eye target and make a saccade for the second eye target. The eye target is a square whose width is adjusted by fixation_radius.
-    The acceprance radius for eye fixation is fixation_radius + fixation_radius_buffer. The buffer radius is invisible for subjects. 
+    The acceprance radius for eye fixation is fixation_radius (width) + fixation_radius_buffer. The buffer radius is invisible for subjects. 
     2 of chain_length is only tested.
     '''
 
-    fixation_radius = traits.Float(2.5, desc="Distance from center that is considered a broken fixation")
+    fixation_radius = traits.Float(2.5, desc="Width of the square eye target")
     fixation_penalty_time = traits.Float(1.0, desc="Time in fixation penalty state")
     fixation_target_color = traits.OptionsList("fixation_color", *target_colors, desc="Color of the eye target under fixation state", bmi3d_input_options=list(target_colors.keys()))
     eye_target_color = traits.OptionsList("eye_color", *target_colors, desc="Color of the eye target", bmi3d_input_options=list(target_colors.keys()))
-    fixation_radius_buffer = traits.Float(.5, desc="additional radius for eye target. fixation_radius + buffer determines the break of fixation")
+    fixation_radius_buffer = traits.Float(.5, desc="additional radius for eye target. fixation_radius (width) + buffer determines the break of fixation")
     fixation_time = traits.Float(.2, desc="fixation duration during which subjects have to keep fixating the eye target")
     incorrect_target_radius_buffer = traits.Float(.5, desc="target radius + buffer radius determines if subjects look at the incorrect target")
     incorrect_target_penalty_time = traits.Float(1, desc="Length of penalty time for acquiring an incorrect target")
@@ -521,6 +521,12 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
             yield indices, targs
 
 class EyeConstrainedHandCapture(HandConstrainedEyeCapture):
+    '''
+    Saccade and reaching task. Subjects need to hold an initial hand target and fixate the initial eye target, separately. 
+    Then the shared goal target appears for eye and hand. Subjects need to make a saccade and reach the goal target.
+    The acceprance radius for eye fixation is fixation_radius + fixation_radius_buffer. The buffer radius is invisible for subjects. 
+    2 of chain_length is only tested.
+    '''
 
     status = dict(
         wait = dict(start_trial="init_target", start_pause="pause"),
@@ -630,7 +636,7 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
     In simultaneous trials, they need to simultaneously move eye and hand to the target, responding a single go cue.
     '''
 
-    exclude_parent_traits = ['delay_time', 'rand_delay']
+    exclude_parent_traits = ['delay_time', 'rand_delay','prob_catch_trials','short_delay_catch_trials']
     rand_delay_eye = traits.Tuple((0.4, 0.7), desc="Delay interval for eye in sequence trials, and for eye and hand in simultaneous trials")
     rand_delay_hand = traits.Tuple((0., 0.5), desc="Delay interval for hand only used in sequence trials")
     fixation_time = traits.Float(.3, desc="fixation duration during which subjects have to keep fixating the first eye target")
@@ -927,6 +933,14 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
         self.reaction_time_hand = 0
         self.reaction_time_eye = 0
 
+    def _while_target_eye_hand(self):
+        eye_pos = self.calibrated_eye_pos
+        eye_d = np.linalg.norm(eye_pos - self.eye_targs[self.eye_target_index,[0,2]])
+        if eye_d <= (self.target_radius + self.fixation_radius_buffer):
+            self.targets_eye[self.eye_target_index].cube.color = target_colors[self.fixation_target_color] # chnage color in fixating center
+        else:
+            self.targets_eye[self.eye_target_index].cube.color = target_colors[self.eye_target_color]
+
     def _start_fixation(self):
         self.sync_event('FIXATION', self.eye_gen_indices[self.eye_target_index])
         self.targets_eye[self.eye_target_index].cube.color = target_colors[self.fixation_target_color]
@@ -1061,6 +1075,7 @@ class ScreenTargetCapture_Saccade(ScreenTargetCapture):
     target_color = traits.OptionsList("eye_color", *target_colors, desc="Color of the target", bmi3d_input_options=list(target_colors.keys()))
     fixation_target_color = traits.OptionsList("fixation_color", *target_colors, desc="Color of the eye target under fixation state", bmi3d_input_options=list(target_colors.keys()))
     automatic_reward = traits.Bool(False, desc="Whether to deliver automatic reward")
+    automatic_flash = traits.Bool(False, desc="Whether to blink the eye target")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
