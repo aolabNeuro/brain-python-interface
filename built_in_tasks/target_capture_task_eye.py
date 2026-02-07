@@ -445,7 +445,7 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
 
     # Generator functions
     @staticmethod
-    def row_target(nblocks=20, ntargets=3, dx=5.,offset1=(0,0,-2),offset2=(0,0,6.),offset3=(0,0,-7.5),origin=(0,0,0),seed=0):
+    def row_target(nblocks=20, ntargets=3, dx=5.,offset1=(0,0,-2),offset2=(0,0,6.),offset3=(0,0,-7.5),origin=(0,0,0)):
         '''
         Generates a sequence of 3D for 2 eye targets and 1 hand target at a given distance from the origin
 
@@ -471,7 +471,7 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
         [nblocks*ntargets x 1] array of tuples containing trial indices and [1 x 3] target coordinates
 
         '''
-        rng = np.random.default_rng(seed=seed)
+        rng = np.random.default_rng()
         for _ in range(nblocks):
             order = np.arange(ntargets**3)
             rng.shuffle(order)
@@ -495,7 +495,7 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
                 yield [idx1],[idx2],[idx3],[pos1+offset1+origin],[pos2+offset2+origin],[pos3+offset3+origin]
 
     @staticmethod
-    def sac_hand_2d(nblocks=20, ntargets=3, dx=10,offset1=(0,0,-2),offset2=(0,0,6.),offset3=(0,0,-7.5),origin=(0,0,0),seed=0):
+    def sac_hand_2d(nblocks=20, ntargets=3, dx=10,offset1=(0,0,-2),offset2=(0,0,6.),offset3=(0,0,-7.5),origin=(0,0,0)):
         '''
         Pairs of hand targets and eye targets
 
@@ -504,7 +504,7 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
         [nblocks*ntargets x 1] array of tuples containing trial indices and [3 x 3] target coordinates
         '''
 
-        gen = HandConstrainedEyeCapture.row_target(nblocks=nblocks,ntargets=ntargets,dx=dx,offset1=offset1,offset2=offset2,offset3=offset3,origin=origin,seed=seed)
+        gen = HandConstrainedEyeCapture.row_target(nblocks=nblocks,ntargets=ntargets,dx=dx,offset1=offset1,offset2=offset2,offset3=offset3,origin=origin)
         for _ in range(nblocks*(ntargets**3)):
             idx1,idx2,idx3,pos1,pos2,pos3 = next(gen)
 
