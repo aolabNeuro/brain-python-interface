@@ -1075,7 +1075,6 @@ class ScreenTargetCapture_Saccade(ScreenTargetCapture):
     target_color = traits.OptionsList("eye_color", *target_colors, desc="Color of the target", bmi3d_input_options=list(target_colors.keys()))
     fixation_target_color = traits.OptionsList("fixation_color", *target_colors, desc="Color of the eye target under fixation state", bmi3d_input_options=list(target_colors.keys()))
     automatic_reward = traits.Bool(False, desc="Whether to deliver automatic reward")
-    automatic_flash = traits.Bool(False, desc="Whether to blink the eye target")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
