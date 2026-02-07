@@ -520,7 +520,7 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def update_frame(self):
         if self.trial_timed_out:
-            use_frame_index = self.frame_index - 1
+            use_frame_index = self.trajectory_length - 1
         else:
             use_frame_index = self.frame_index
 
@@ -605,7 +605,7 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def setup_while_tracking(self):
         # Check whether there are no more target frames to display
-        if self.frame_index + self.lookahead == self.trajectory_length:
+        if self.frame_index == self.trajectory_length:
             self.trial_timed_out = True
             self.pos_offset = [0,0,0]
             self.vel_offset = [0,0,0]
