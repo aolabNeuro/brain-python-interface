@@ -443,14 +443,10 @@ class ScreenTargetTracking(TargetTracking, Window):
         if instantiate_targets:
             # This is the center target being followed by the user
             self.target = VirtualCircularTarget(target_radius=self.target_radius, target_color=target_colors[self.target_color])
-            for model in self.target.graphics_models:
-                self.add_model(model)
 
             # This is the optional progress bar (off by default)
             self.bar = VirtualRectangularTarget(target_width=1, target_height=0, target_color=(0., 1., 0., 0.75), starting_pos=[0,-15,9])
             # print('INIT TRAJ')
-            for model in self.bar.graphics_models:
-                self.add_model(model)
 
         # Declare any plant attributes which must be saved to the HDF file at the _cycle rate
         for attr in self.plant.hdf_attrs:
@@ -543,6 +539,15 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.bar_width = 12        
         self.tracking_frame_index = 0
         
+        if self.calc_trial_num() == 0:
+            # Instantiate the targets here so they don't show up in any states that might come before "wait" 
+            for model in self.target.graphics_models:
+                self.add_model(model)
+                self.target.hide()
+            for model in self.bar.graphics_models:
+                self.add_model(model)
+                self.bar.hide()
+
         # Set up the next trajectory
         if hasattr(self, 'trajectory'):
             for model in self.trajectory.graphics_models:
