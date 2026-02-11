@@ -402,7 +402,8 @@ class HideCursorReturn(traits.HasTraits):
 
     def _start_wait(self):
         super()._start_wait()
-        self.plant_visible = False
+        if self.calc_trial_num() > 0:
+            self.plant_visible = False
 
     def _while_target(self):
         
