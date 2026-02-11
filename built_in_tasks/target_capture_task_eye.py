@@ -644,7 +644,8 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
     trials_block_simultaneous = traits.Int(100, desc='Trial numbers of the block in simultaneous trials')
     diff_eye_hand_RTs_thr = traits.Float(0.5, desc="Accepted difference between eye and hand RTs in simultaneous trials")
     coordination_penalty_time = traits.Float(0.5, desc="Length of penalty time for less coordinated eye and hand movement in simultaneous trials")
-    hand_RTs_thr = traits.Float(0.55, desc="Accepted reach RTs in both simultaneous trials and sequence trials")
+    hand_RTs_thr_simul = traits.Float(0.55, desc="Accepted reach RTs in simultaneous trials")
+    hand_RTs_thr_seq = traits.Float(0.55, desc="Accepted reach RTs in sequence trials")
     tooslow_penalty_time = traits.Float(0.5, desc="Length of penalty time for too slow reach RTs in both simultaneous and sequence trials")
     sequence_target_color = traits.OptionsList("orange", *target_colors, desc="Color of the hand target in sequence trials", bmi3d_input_options=list(target_colors.keys()))
 
@@ -704,7 +705,7 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
         see experiment.Experiment.update_report_stats for docs
         '''
         super().update_report_stats()
-        self.trial_count_blocks = self.reward_count % self.trials_all_blocks
+        self.trial_count_blocks = self.calc_state_occurrences('reward') % self.trials_all_blocks
         if self.is_simultaneous:
             self.reportstats['Task of this block'] = 'Simultaneous'
             self.reportstats['Success trial # / Block'] = f'{self.trial_count_blocks} / {self.trials_block_simultaneous}'
@@ -773,16 +774,16 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
     
     def _test_slow_reach_onset(self,ts):
         '''
-        check whether reach onset computed based on cursor position is slow 
+        check whether the hand cursor is still within the center taret even when a ceratin amount of time (reaction_time_thr) passed
         '''
         # Compute reaction time for hand
         cursor_pos = self.plant.get_endpoint_pos()
         hand_d = np.linalg.norm(cursor_pos - self.hand_targs[0]) # distance from the center target
 
-        if hand_d > (self.target_radius - self.cursor_radius) and self.reaction_time_hand == 0:
-            self.reaction_time_hand = ts
-
-        return self.reaction_time_hand > self.hand_RTs_thr
+        if ts > self.reaction_time_thr:
+            return hand_d < (self.target_radius - self.cursor_radius)
+        else:
+            return False
     
     def _test_fixation_break(self,ts):
         '''
@@ -794,7 +795,14 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
         return eye_d > (self.fixation_radius + self.fixation_radius_buffer)
 
     def _test_fixation_complete(self, ts):
-        if self.eye_target_index == 0:
+        '''
+        Test whether the fixation is complete. In sequence trials, there are only 1 fixation period for the center target. After subjects fixate
+        the peripheral eye target, fixation state is skipped and the next delay starts.
+        In simultaneous trials, there are 2 fixation periods for the center target and the peripheral target
+        '''
+        if self.target_index == 0:
+            return ts > self.fixation_time
+        elif self.target_index == 1 and self.is_simultaneous:
             return ts > self.fixation_time
         else:
             return True
@@ -804,12 +812,12 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
     
     def _test_delay_complete(self, ts):
         '''
-        Test whether the delay period, when the cursor or eye or both must stay in place
-        while another target is being presented, is over. 
+        Test whether the delay period is over. In sequence trials, there are 2 delay period for each eye and hand.
+        In simultaneous trials, there is only 1 delay period.
         '''
         if self.target_index == 0:
             return ts > self.delay_time_eye
-        elif self.target_index == 1:
+        elif self.target_index == 1 and self.is_sequence:
             return ts > self.delay_time_hand
         else:
             return True
@@ -865,18 +873,21 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
             self.delay_time_hand = random.random()*(e-s) + s
 
             # Decide sequence or simultaneous trials  
-            self.trial_count_blocks = self.reward_count % self.trials_all_blocks
+            self.trial_count_blocks = self.calc_state_occurrences('reward') % self.trials_all_blocks
 
             if self.trial_count_blocks < self.trials_block_simultaneous:
                 self.is_simultaneous = True
                 self.is_sequence = False
                 self.chain_length = 2
+                self.reaction_time_thr = self.hand_RTs_thr_simul
+
             elif self.trial_count_blocks - self.trials_block_simultaneous < self.trials_block_sequence:
                 self.is_simultaneous = False
                 self.is_sequence = True
                 self.chain_length = 3
+                self.reaction_time_thr = self.hand_RTs_thr_seq
 
-            self.task_data['is_sequence'] =  self.is_sequence
+            self.task_data['is_sequence'] = self.is_sequence
 
         if self.is_sequence:
             for target in self.targets_hand:
