@@ -65,6 +65,7 @@ def _list_exp_history(dbname='default', subject=None, task=None, max_entries=Non
     templates = models.TaskEntry.objects.using(dbname).filter(**template_filter_kwargs).order_by("-date")
 
     tasks = models.Task.objects.filter(visible=True).order_by("name")
+    subjects = models.Subject.objects.all().order_by("name")
 
     epoch = datetime.datetime.utcfromtimestamp(0)
     for entry in entries:
@@ -81,6 +82,7 @@ def _list_exp_history(dbname='default', subject=None, task=None, max_entries=Non
     fields = dict(
         entries=entries,
         tasks=tasks,
+        subjects=subjects,
         templates=templates,
         features=features,
         generators=generators,
@@ -132,6 +134,14 @@ def list_exp_history(request, **kwargs):
     kwargs['show_hidden'] = request.GET.get('show_hidden') is not None
     kwargs['show_all_rigs'] = request.GET.get('show_all_rigs') is not None
 
+    # Extract subject and task filters
+    subject_filter = request.GET.get('subject')
+    if subject_filter:
+        kwargs['subject'] = subject_filter
+    task_filter = request.GET.get('task')
+    if task_filter:
+        kwargs['task'] = task_filter
+
     start_date = _parse_date(request.GET.get('start_date'))
     end_date = _parse_date(request.GET.get('end_date'))
 
@@ -149,6 +159,8 @@ def list_exp_history(request, **kwargs):
     fields['hostname'] = request.get_host()
     fields['start_date'] = start_date.strftime('%Y-%m-%d') if start_date else ''
     fields['end_date'] = end_date.strftime('%Y-%m-%d') if end_date else ''
+    fields['subject_filter'] = kwargs.get('subject', '')
+    fields['task_filter'] = kwargs.get('task', '')
 
     # this line is important--this is needed so the Track object knows if the task has ended in an error
     # TODO there's probably some better way of doing this within the multiprocessing lib (some code to run after the process has terminated)

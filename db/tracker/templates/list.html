@@ -282,10 +282,24 @@
       <input type="date" id="start_date" name="start_date" value="{{ start_date }}">
       <label for="end_date">End</label>
       <input type="date" id="end_date" name="end_date" value="{{ end_date }}">
+      <label for="subject">Subject</label>
+      <select id="subject" name="subject">
+        <option value="">All</option>
+        {% for subj in subjects %}
+        <option value="{{ subj.name }}" {% if subject_filter == subj.name %}selected{% endif %}>{{ subj.name }}</option>
+        {% endfor %}
+      </select>
+      <label for="task">Task</label>
+      <select id="task" name="task">
+        <option value="">All</option>
+        {% for t in tasks %}
+        <option value="{{ t.name }}" {% if task_filter == t.name %}selected{% endif %}>{{ t.name }}</option>
+        {% endfor %}
+      </select>
       {% if show_hidden %}<input type="hidden" name="show_hidden" value="1">{% endif %}
       {% if show_all_rigs %}<input type="hidden" name="show_all_rigs" value="1">{% endif %}
-      <button type="submit">Apply dates</button>
-      <a id="clear_dates" href="?{% if show_hidden %}show_hidden{% endif %}{% if show_hidden and show_all_rigs %}&{% endif %}{% if show_all_rigs %}show_all_rigs{% endif %}">Clear dates</a>
+      <button type="submit">Apply filters</button>
+      <a id="clear_dates" href="?{% if show_hidden %}show_hidden{% endif %}{% if show_hidden and show_all_rigs %}&{% endif %}{% if show_all_rigs %}show_all_rigs{% endif %}">Clear filters</a>
     </form>
     <hr>
   </div>
