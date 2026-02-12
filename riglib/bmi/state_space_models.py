@@ -255,7 +255,7 @@ class LinearVelocityStateSpace(StateSpace):
         W = _gen_A(0, 0, 0, w_resamp, 0, ndim=ndim)        
 
         # Control input matrix for SSM for control inputs
-        I = np.mat(np.eye(ndim))
+        I = np.asmatrix(np.eye(ndim))
         B = np.vstack([0*I, Delta*1000 * I, np.zeros([1, ndim])])
 
         # account for offset state
@@ -421,13 +421,13 @@ def resample_ssm(A, W, Delta_old=0.1, Delta_new=0.005, include_offset=True):
     N = 1./loop_ratio
     A_new = A**loop_ratio
     nS = A.shape[0]
-    I = np.mat(np.eye(nS))
+    I = np.asmatrix(np.eye(nS))
     W_new = W * ( (I - A_new**N) * (I - A_new).I - I).I
     if include_offset:
-        A_expand = np.mat(np.zeros([orig_nS, orig_nS]))
+        A_expand = np.asmatrix(np.zeros([orig_nS, orig_nS]))
         A_expand[:-1,:-1] = A_new
         A_expand[-1,-1] = 1
-        W_expand = np.mat(np.zeros([orig_nS, orig_nS]))
+        W_expand = np.asmatrix(np.zeros([orig_nS, orig_nS]))
         W_expand[:-1,:-1] = W_new
         return A_expand, W_expand
     else:
@@ -498,7 +498,7 @@ def _gen_A(t, s, m, n, off, ndim=3):
     A_lower_dim = np.array([[t, s], [m, n]])
     A[0:2*ndim, 0:2*ndim] = np.kron(A_lower_dim, np.eye(ndim))
     A[-1,-1] = off
-    return np.mat(A)
+    return np.asmatrix(A)
 
 
 if __name__ == '__main__':

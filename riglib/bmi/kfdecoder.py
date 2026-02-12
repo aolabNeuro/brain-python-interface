@@ -44,10 +44,10 @@ class KalmanFilter(bmi.GaussianStateHMM):
             ## This condition should only be true in the unpickling phase
             pass
         else:
-            self.A = np.mat(A)
-            self.W = np.mat(W)
-            self.C = np.mat(C)
-            self.Q = np.mat(Q)
+            self.A = np.asmatrix(A)
+            self.W = np.asmatrix(W)
+            self.C = np.asmatrix(C)
+            self.Q = np.asmatrix(Q)
 
             if is_stochastic is None:
                 n_states = self.A.shape[0]
@@ -131,7 +131,7 @@ class KalmanFilter(bmi.GaussianStateHMM):
         P = pred_state.cov
 
         K = self._calc_kalman_gain(P)
-        I = np.mat(np.eye(self.C.shape[1]))
+        I = np.asmatrix(np.eye(self.C.shape[1]))
         D = self.C_xpose_Q_inv_C
         KC = P*(I - D*P*(I + D*P).I)*D
         F = (I - KC)*self.A
@@ -156,7 +156,7 @@ class KalmanFilter(bmi.GaussianStateHMM):
             P = A*P*A.T + W
 
             K = self._calc_kalman_gain(P)
-            I = np.mat(np.eye(self.C.shape[1]))
+            I = np.asmatrix(np.eye(self.C.shape[1]))
             D = self.C_xpose_Q_inv_C
             KC = P*(I - D*P*(I + D*P).I)*D
             P = (I - KC) * P 
@@ -178,7 +178,7 @@ class KalmanFilter(bmi.GaussianStateHMM):
             Kalman gain matrix for the input next state prediciton covariance.        
         '''
         nX = P.shape[0]
-        I = np.mat(np.eye(nX))
+        I = np.asmatrix(np.eye(nX))
         D = self.C_xpose_Q_inv_C
         L = self.C_xpose_Q_inv
         K = P * (I - D*P*(I + D*P).I) * L
@@ -196,16 +196,16 @@ class KalmanFilter(bmi.GaussianStateHMM):
         Returns
         -------        
         """ 
-        A, W, C, Q = np.mat(self.A), np.mat(self.W), np.mat(self.C), np.mat(self.Q)
+        A, W, C, Q = np.asmatrix(self.A), np.asmatrix(self.W), np.asmatrix(self.C), np.asmatrix(self.Q)
 
         nS = A.shape[0]
-        P = np.mat(np.zeros([nS, nS]))
-        I = np.mat(np.eye(nS))
+        P = np.asmatrix(np.zeros([nS, nS]))
+        I = np.asmatrix(np.eye(nS))
 
         D = self.C_xpose_Q_inv_C 
 
-        last_K = np.mat(np.ones(C.T.shape))*np.inf
-        K = np.mat(np.ones(C.T.shape))*0
+        last_K = np.asmatrix(np.ones(C.T.shape))*np.inf
+        K = np.asmatrix(np.ones(C.T.shape))*0
 
         K_hist = []
 
@@ -224,7 +224,7 @@ class KalmanFilter(bmi.GaussianStateHMM):
             print(("Converged in %d iterations--error: %g" % (iter_idx, np.linalg.norm(K-last_K)))) 
     
         n_state_vars, n_state_vars = A.shape
-        F = (np.mat(np.eye(n_state_vars, n_state_vars)) - KC) * A
+        F = (np.asmatrix(np.eye(n_state_vars, n_state_vars)) - KC) * A
     
         if return_P and return_Khist:
             return dtype(F), dtype(K), dtype(last_P), K_hist
@@ -254,8 +254,8 @@ class KalmanFilter(bmi.GaussianStateHMM):
         list
             [K_0, K_1, ..., K_{N-1}]
         '''
-        A, W, H, Q = np.mat(self.kf.A), np.mat(self.kf.W), np.mat(self.kf.H), np.mat(self.kf.Q)
-        P = np.mat( np.zeros(A.shape) )
+        A, W, H, Q = np.asmatrix(self.kf.A), np.asmatrix(self.kf.W), np.asmatrix(self.kf.H), np.asmatrix(self.kf.Q)
+        P = np.asmatrix( np.zeros(A.shape) )
         K = [None]*N
         
         ss_idx = None # index at which K is steady-state (within tol)
@@ -293,7 +293,7 @@ class KalmanFilter(bmi.GaussianStateHMM):
         F = [None]*T
         K, ss_idx = self.get_kalman_gain_seq(N=T, verbose=False)
         nX = self.kf.A.shape[0]
-        I = np.mat(np.eye(nX))
+        I = np.asmatrix(np.eye(nX))
         
         for t in range(T):
             if t > ss_idx: F[t] = F[ss_idx]
@@ -322,20 +322,20 @@ class KalmanFilter(bmi.GaussianStateHMM):
             mask = ~hidden_state.mask[0,:] # NOTE THE INVERTER 
             inds = np.nonzero([ mask[k]*mask[k+1] for k in range(len(mask)-1)])[0]
     
-            X = np.mat(hidden_state[:,mask])
-            T = len(np.nonzero(mask)[0])
+            X = np.asmatrix(hidden_state[:,mask])
+            n_pts = len(np.nonzero(mask)[0])
     
-            Y = np.mat(obs[:,mask])
+            Y = np.asmatrix(obs[:,mask])
             if include_offset:
                 if not np.all(X[-1,:] == 1):
                     X = np.vstack([ X, np.ones([1,T]) ])
         else:
             num_hidden_state, T = hidden_state.shape
-            X = np.mat(hidden_state)
+            X = np.asmatrix(hidden_state)
             if include_offset:
                 if not np.all(X[-1,:] == 1):
                     X = np.vstack([ X, np.ones([1,T]) ])
-            Y = np.mat(obs)
+            Y = np.asmatrix(obs)
     
         n_states = X.shape[0]
         if not drives_obs is None:
@@ -343,7 +343,7 @@ class KalmanFilter(bmi.GaussianStateHMM):
             
         # ML estimate of C and Q
         if regularizer is None:
-            C = np.mat(np.linalg.lstsq(X.T, Y.T)[0].T)
+            C = np.asmatrix(np.linalg.lstsq(X.T, Y.T)[0].T)
         else:
             x = X.T
             y = Y.T
@@ -354,7 +354,7 @@ class KalmanFilter(bmi.GaussianStateHMM):
 
         if np.ndim(Q) == 0:
             # if "obs" only has 1 feature, Q might get collapsed to a scalar
-            Q = np.mat(Q.reshape(1,1))
+            Q = np.asmatrix(Q.reshape(1,1))
 
         if not drives_obs is None:
             n_obs = C.shape[0]
@@ -396,14 +396,14 @@ class KalmanFilter(bmi.GaussianStateHMM):
         Calculate the steady-state prediction covariance and set the current state prediction covariance to the steady-state value
         '''
 
-        A, W, C, Q = np.mat(self.A), np.mat(self.W), np.mat(self.C), np.mat(self.Q)
+        A, W, C, Q = np.asmatrix(self.A), np.asmatrix(self.W), np.asmatrix(self.C), np.asmatrix(self.Q)
         D = self.C_xpose_Q_inv_C 
         nS = A.shape[0]
-        P = np.mat(np.zeros([nS, nS]))
-        I = np.mat(np.eye(nS))
+        P = np.asmatrix(np.zeros([nS, nS]))
+        I = np.asmatrix(np.eye(nS))
 
-        last_K = np.mat(np.ones(C.T.shape))*np.inf
-        K = np.mat(np.ones(C.T.shape))*0
+        last_K = np.asmatrix(np.ones(C.T.shape))*np.inf
+        K = np.asmatrix(np.ones(C.T.shape))*0
 
         iter_idx = 0
         for iter_idx in range(40):
@@ -428,7 +428,7 @@ class KalmanFilter(bmi.GaussianStateHMM):
         -------        
         '''
         F, K = self.get_sskf()
-        K = np.mat(K)
+        K = np.asmatrix(K)
         n_neurons = K.shape[1]
         K_null = np.eye(n_neurons) - np.linalg.pinv(K) * K
         return K_null
@@ -443,8 +443,8 @@ class KalmanFilterDriftCorrection(KalmanFilter):
             self.drift_corr = self.prev_drift_corr.copy()
             print(('prev drift corr', np.mean(self.prev_drift_corr)))
         else:
-            self.drift_corr = np.mat(np.zeros(( self.A.shape[0], 1)))
-            self.prev_drift_corr = np.mat(np.zeros(( self.A.shape[0], 1)))
+            self.drift_corr = np.asmatrix(np.zeros(( self.A.shape[0], 1)))
+            self.prev_drift_corr = np.asmatrix(np.zeros(( self.A.shape[0], 1)))
 
         if hasattr(self, 'noise_rej'):
             if self.noise_rej:
@@ -461,7 +461,7 @@ class KalmanFilterDriftCorrection(KalmanFilter):
             if np.sum(obs_t) > self.noise_rej_cutoff:
                 #print np.sum(obs_t), 'rejecting noise!'
                 self.noise_cnt += 1 
-                obs_t = np.mat(self.noise_rej_mFR).T
+                obs_t = np.asmatrix(self.noise_rej_mFR).T
                 
 
         state = super(KalmanFilterDriftCorrection, self)._forward_infer(st, obs_t, Bu=None, u=None, x_target=None, F=None, 
@@ -500,7 +500,7 @@ class PCAKalmanFilter(KalmanFilter):
             pca_offset = 0
 
         K = self._calc_kalman_gain(P)
-        I = np.mat(np.eye(self.C.shape[1]))
+        I = np.asmatrix(np.eye(self.C.shape[1]))
         D = self.C_xpose_Q_inv_C
 
         KC = K*C
@@ -580,7 +580,7 @@ class FAKalmanFilter(KalmanFilter):
             input_dict['split_input'] = np.vstack((z, main_priv))
             #print input_dict['split_input'].shape
             
-            own_pc_trans = np.mat(self.FA_kwargs['own_pc_trans'])*np.mat(dmn)
+            own_pc_trans = np.asmatrix(self.FA_kwargs['own_pc_trans'])*np.asmatrix(dmn)
             input_dict['pca_input'] = own_pc_trans + self.FA_kwargs['fa_mu']
 
             if input_type in list(input_dict.keys()):
@@ -631,10 +631,10 @@ class KFDecoder(bmi.BMI, bmi.Decoder):
     def _pickle_init(self):
         super(KFDecoder, self)._pickle_init()
         if not hasattr(self.filt, 'B'):
-            self.filt.B = np.mat(np.vstack([np.zeros([3,3]), np.eye(3)*1000*self.binlen, np.zeros(3)]))
+            self.filt.B = np.asmatrix(np.vstack([np.zeros([3,3]), np.eye(3)*1000*self.binlen, np.zeros(3)]))
 
         if not hasattr(self.filt, 'F'):
-            self.filt.F = np.mat(np.zeros([3,7]))
+            self.filt.F = np.asmatrix(np.zeros([3,7]))
 
 
     def update_params(self, new_params, steady_state=True):
@@ -793,8 +793,8 @@ def project_Q(C_v, Q_hat):
     print("projecting!")
     from scipy.optimize import fmin_bfgs, fmin_ncg
 
-    C_v = np.mat(C_v)
-    Q_hat = np.mat(Q_hat)
+    C_v = np.asmatrix(C_v)
+    Q_hat = np.asmatrix(Q_hat)
     Q_hat_inv = Q_hat.I
 
     c_1 = C_v[:,0]
@@ -806,8 +806,8 @@ def project_Q(C_v, Q_hat):
     if 1:
         U = np.hstack([c_1 - c_2, c_2, c_1])
         V = np.vstack([(c_1 + c_2).T, c_1.T, c_2.T])
-        C_inv_fn = lambda nu: np.mat(np.diag([1./nu[0], 1./(nu[0] + nu[1]), 1./(nu[2] - nu[0]) ]))
-        C_fn = lambda nu: np.mat(np.diag([nu[0], (nu[0] + nu[1]), (nu[2] - nu[0]) ]))
+        C_inv_fn = lambda nu: np.asmatrix(np.diag([1./nu[0], 1./(nu[0] + nu[1]), 1./(nu[2] - nu[0]) ]))
+        C_fn = lambda nu: np.asmatrix(np.diag([nu[0], (nu[0] + nu[1]), (nu[2] - nu[0]) ]))
         nu_0 = np.zeros(3)
         c_scalars = np.ones(3)
     else:
@@ -815,7 +815,7 @@ def project_Q(C_v, Q_hat):
         c_scalars = np.hstack([s_1[0:2], 1, 1])
         U = np.hstack([u_1[:,0:2], c_2, c_1])
         V = np.vstack([v_1[0:2, :], c_1.T, c_2.T])
-        C_fn = lambda nu: np.mat(np.diag(nu * c_scalars))
+        C_fn = lambda nu: np.asmatrix(np.diag(nu * c_scalars))
         nu_0 = np.zeros(4)
 
     def cost_fn_gen(nu, return_type='cost'):
@@ -840,11 +840,11 @@ def project_Q(C_v, Q_hat):
         #print c_2.T*S_star*c_2
         grad = -1e-4*np.array(np.hstack([c_1.T*S_star*c_1 - c_2.T*S_star*c_2, c_1.T*S_star*c_2, c_2.T*S_star*c_1])).ravel()
         S = S_star
-        hess = np.mat([[np.trace(S*A_1*S*A_1), np.trace(S*A_2*S*A_1), np.trace(S*A_3*S*A_1)],
+        hess = np.asmatrix([[np.trace(S*A_1*S*A_1), np.trace(S*A_2*S*A_1), np.trace(S*A_3*S*A_1)],
                        [np.trace(S*A_1*S*A_2), np.trace(S*A_2*S*A_2), np.trace(S*A_3*S*A_2)],
                        [np.trace(S*A_1*S*A_3), np.trace(S*A_2*S*A_3), np.trace(S*A_3*S*A_3)]])
     
-        #grad = hess*np.mat(grad.reshape(-1,1))
+        #grad = hess*np.asmatrix(grad.reshape(-1,1))
         #log = logging.getLogger()
         #print "nu = %s, cost = %g, grad=%s" % (nu, cost, grad)
         #log.warning("nu = %s, cost = %g, grad=%s" % (nu, cost, grad))

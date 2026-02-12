@@ -311,8 +311,8 @@ class OFCLearner(Learner):
             Estimate of intended next state for BMI
         '''
         try:
-            current_state = np.mat(current_state).reshape(-1,1)
-            target_state = np.mat(target_state).reshape(-1,1)
+            current_state = np.asmatrix(current_state).reshape(-1,1)
+            target_state = np.asmatrix(target_state).reshape(-1,1)
             F = self.F_dict[task_state]
             A = self.A
             B = self.B
@@ -357,8 +357,8 @@ class OFCLearnerRotateIntendedVelocity(OFCLearner):
             target_state[3:6] = target_velocity_norm * np.linalg.norm(current_state[3:6])
 
 
-            current_state = np.mat(current_state).reshape(-1,1)
-            target_state = np.mat(target_state).reshape(-1,1)
+            current_state = np.asmatrix(current_state).reshape(-1,1)
+            target_state = np.asmatrix(target_state).reshape(-1,1)
             F = self.F_dict[task_state]
             A = self.A
             B = self.B
@@ -560,7 +560,7 @@ class PPFContinuousBayesianUpdater(Updater):
             # store beta_est
             self.beta_est[:, self.neuron_driving_state_inds] = beta_est
 
-        return {'filt.C': np.mat(self.beta_est.copy())}
+        return {'filt.C': np.asmatrix(self.beta_est.copy())}
 
 class KFRML(Updater):
     '''
@@ -629,19 +629,19 @@ class KFRML(Updater):
             mask = ~hidden_state.mask[0,:] # NOTE THE INVERTER 
             inds = np.nonzero([ mask[k]*mask[k+1] for k in range(len(mask)-1)])[0]
     
-            X = np.mat(hidden_state[:,mask])
+            X = np.asmatrix(hidden_state[:,mask])
             n_pts = len(np.nonzero(mask)[0])
     
-            Y = np.mat(obs[:,mask])
+            Y = np.asmatrix(obs[:,mask])
             if include_offset:
                 X = np.vstack([ X, np.ones([1,n_pts]) ])
         else:
             num_hidden_state, n_pts = hidden_state.shape
-            X = np.mat(hidden_state)
+            X = np.asmatrix(hidden_state)
             if include_offset:
                 X = np.vstack([ X, np.ones([1,n_pts]) ])
-            Y = np.mat(obs)
-        X = np.mat(X, dtype=np.float64)
+            Y = np.asmatrix(obs)
+        X = np.asmatrix(X, dtype=np.float64)
 
         R = (X * X.T)
         S = (Y * X.T)
@@ -749,8 +749,8 @@ class KFRML(Updater):
             mFR_old = decoder.mFR
             sdFR_old = decoder.sdFR
 
-        x = np.mat(intended_kin)
-        y = np.mat(spike_counts)
+        x = np.asmatrix(intended_kin)
+        y = np.asmatrix(spike_counts)
         #limit x to the indices that can adapt:
         #x = x[self.state_adapting_inds, :]
 
@@ -759,10 +759,10 @@ class KFRML(Updater):
 
         if values is not None:
             n_samples = np.sum(values)
-            B = np.mat(np.diag(values))
+            B = np.asmatrix(np.diag(values))
         else:
             n_samples = spike_counts.shape[1]
-            B = np.mat(np.eye(n_samples))
+            B = np.asmatrix(np.eye(n_samples))
 
         if self.adapt_C_xpose_Q_inv_C:
             #self.R[self.state_adapting_inds_mesh] = rho*self.R[self.state_adapting_inds_mesh] + (x*B*x.T)
@@ -778,7 +778,7 @@ class KFRML(Updater):
         self.T = rho*self.T + np.dot(y, B*y.T)
         self.ESS = rho*self.ESS + n_samples
 
-        R_inv = np.mat(np.zeros(self.R.shape))
+R_inv = np.asmatrix(np.zeros(self.R.shape))
         
         try:
             if self.regularizer is None:
@@ -898,7 +898,7 @@ class KFRML_IVC(KFRML):
                 d = self.scalar_riccati_eq_soln(a, w, n)
                 D_diag.append(d)
 
-            D[3:6, 3:6] = np.mat(np.diag(D_diag))
+            D[3:6, 3:6] = np.asmatrix(np.diag(D_diag))
 
         new_params['filt.C_xpose_Q_inv_C'] = D
         new_params['filt.C_xpose_Q_inv'] = C.T * np.linalg.pinv(Q)
@@ -990,16 +990,16 @@ class PPFRML(Updater):
     
         n_cells = self.C_est.shape[0]
         n_obs = intended_kin.shape[1]
-        intended_kin = np.mat(intended_kin)
+        intended_kin = np.asmatrix(intended_kin)
         # print "updating"
         # print intended_kin
         # print spike_counts.T
         spike_counts[spike_counts > 1] = 1
         for k in range(n_cells):
             for m in range(n_obs):
-                H = np.mat(self.H[k])
-                S = np.mat(self.S[k].reshape(-1,1))
-                M = np.mat(self.M[k].reshape(-1,1))
+                H = np.asmatrix(self.H[k])
+                S = np.asmatrix(self.S[k].reshape(-1,1))
+                M = np.asmatrix(self.M[k].reshape(-1,1))
                 c = self.C_est[k, self.neuron_driving_state_inds].T
 
                 # print H
@@ -1108,7 +1108,7 @@ class KFOrthogonalPlantSmoothbatch(KFSmoothbatch):
                 d = self.scalar_riccati_eq_soln(a, w, n)
                 D_diag.append(d)
 
-            D[3:6, 3:6] = np.mat(np.diag(D_diag))
+            D[3:6, 3:6] = np.asmatrix(np.diag(D_diag))
 
         new_params['kf.C_xpose_Q_inv_C'] = D
         new_params['kf.C_xpose_Q_inv'] = C.T * np.linalg.pinv(Q)
@@ -1151,7 +1151,7 @@ class PPFSmoothbatch(Updater):
         mesh = np.nonzero(pvalues < 0.1)
         C = np.array(C_old.copy())
         C[mesh] = (1-rho)*C_hat[mesh] + rho*np.array(C_old)[mesh]
-        C = np.mat(C)
+        C = np.asmatrix(C)
 
         new_params = {'filt.C':C}
         return new_params
