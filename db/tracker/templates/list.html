@@ -24,6 +24,20 @@
   var te = null;
   var feats = new Features();
   var collections = new Collections();
+
+  function updateQueryParams(params) {
+    var url = new URL(window.location.href);
+    Object.keys(params).forEach(function(key) {
+      if (params[key] === null) {
+        url.searchParams.delete(key);
+      } else {
+        url.searchParams.set(key, params[key]);
+      }
+    });
+    var query = url.searchParams.toString();
+    window.location.href = url.pathname + (query ? "?" + query : "");
+  }
+
   $(document).ready(function() {
     console.log("TEST");
     $("table#main tr").each(function() {
@@ -103,9 +117,9 @@
     $("#toggle_visible").change(
       function() {
         if (this.checked)
-          location.href = "?show_hidden{% if show_all_rigs %}&show_all_rigs{% endif %}";
+          updateQueryParams({show_hidden: "1"});
         else
-          location.href = "?{% if show_all_rigs %}&show_all_rigs{% endif %}";
+          updateQueryParams({show_hidden: null});
       }
     );
 
@@ -121,9 +135,9 @@
     $("#toggle_rigs").change(
       function() {
         if (this.checked)
-          location.href = "?show_all_rigs{% if show_hidden %}&show_hidden{% endif %}";
+          updateQueryParams({show_all_rigs: "1"});
         else
-          location.href = "?{% if show_hidden %}&show_hidden{% endif %}";
+          updateQueryParams({show_all_rigs: null});
       }
     );
 
@@ -263,6 +277,16 @@
     <input id="toggle_templates" type="checkbox"><span class="checkboxtext">Templates</span>
     <input id="toggle_rigs" type="checkbox" {% if show_all_rigs %} checked {% endif %}><span class="checkboxtext">All rigs</span>
     <button id="new_exp">Start new experiment</button><br>
+    <form id="date_filter" method="get" action="">
+      <label for="start_date">Start</label>
+      <input type="date" id="start_date" name="start_date" value="{{ start_date }}">
+      <label for="end_date">End</label>
+      <input type="date" id="end_date" name="end_date" value="{{ end_date }}">
+      {% if show_hidden %}<input type="hidden" name="show_hidden" value="1">{% endif %}
+      {% if show_all_rigs %}<input type="hidden" name="show_all_rigs" value="1">{% endif %}
+      <button type="submit">Apply dates</button>
+      <a id="clear_dates" href="?{% if show_hidden %}show_hidden{% endif %}{% if show_hidden and show_all_rigs %}&{% endif %}{% if show_all_rigs %}show_all_rigs{% endif %}">Clear dates</a>
+    </form>
     <hr>
   </div>
   <div id="main_box">
