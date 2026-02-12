@@ -70,6 +70,7 @@ urlpatterns = [
     path(r'exp_log/save_entry_name', ajax.save_entry_name),
 
     path(r'exp_log/stop/', ajax.stop_experiment),
+    path(r'exp_log/all/stop/', ajax.stop_experiment),
     path(r'enable_clda/', ajax.enable_clda),
     path(r'rewarddrain/<str:onoff>/', ajax.reward_drain),
     path(r'disable_clda/', ajax.disable_clda),
