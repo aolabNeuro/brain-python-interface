@@ -523,7 +523,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.target.move_to_position(self.targs[use_frame_index])
         if self.trajectory_type == '1d':
             self.trajectory.move_to_position(np.array([-use_frame_index*self.lookahead_scale - self.lookahead*self.lookahead_scale,0,0]))
-            print(use_frame_index, self.trajectory.get_position())
+            # print(use_frame_index, self.trajectory.get_position())
             
         elif self.trajectory_type == '2d':
             self.trajectory.update_mask(use_frame_index, use_frame_index+self.lookahead)
@@ -554,26 +554,26 @@ class ScreenTargetTracking(TargetTracking, Window):
                 self.remove_model(model)
             del self.trajectory
         if self.trajectory_type == '1d': # self.targs is (nframes, 3)
-            print(self.lookahead_scale)
-            # lookbehind = self.targs[0,:]*np.ones((self.lookahead, np.shape(self.targs)[1]))
-            lookbehind = 5*np.ones((self.lookahead, np.shape(self.targs)[1]))
-            print(lookbehind.shape) # (n_lookaheadframes, 3)
+            # print(self.lookahead_scale)
+            lookbehind = self.targs[0,:]*np.ones((self.lookahead, np.shape(self.targs)[1]))
+            # lookbehind = 5*np.ones((self.lookahead, np.shape(self.targs)[1]))
+            # print(lookbehind.shape) # (n_lookaheadframes, 3)
 
             next_trajectory = np.concatenate((lookbehind, self.targs), axis=0)
-            print(next_trajectory.shape) # (n_lookaheadframes + nframes, 3)
+            # print(next_trajectory.shape) # (n_lookaheadframes + nframes, 3)
 
             next_trajectory = np.array(np.squeeze(next_trajectory)[:,2])
-            print(next_trajectory.shape) # (n_lookaheadframes + nframes,) only the y dim
+            # print(next_trajectory.shape) # (n_lookaheadframes + nframes,) only the y dim
 
             next_trajectory = np.vstack([
                 self.lookahead_scale * np.arange(len(next_trajectory)), # set the lookahead by scaling the trajectory to fit in the screen
                 np.zeros(len(next_trajectory)), 
                 next_trajectory
             ]).T
-            print(next_trajectory.shape)
+            # print(next_trajectory.shape)
 
             self.trajectory = VirtualSnakeTarget(target_radius=self.trajectory_radius, target_color=target_colors[self.trajectory_color], trajectory=next_trajectory)
-            print(self.trajectory.get_position())
+            # print(self.trajectory.get_position())
         elif self.trajectory_type == '2d':
             self.trajectory = VirtualSnakeTarget(target_radius=self.trajectory_radius, target_color=target_colors[self.trajectory_color], trajectory=self.targs)
             self.trajectory.update_mask(self.frame_index, self.frame_index+self.lookahead)
@@ -681,7 +681,7 @@ class ScreenTargetTracking(TargetTracking, Window):
             self.target.move_to_position(self.targs[self.frame_index])
             if self.trajectory_type == '1d':
                 self.trajectory.move_to_position(np.array([-self.lookahead*self.lookahead_scale,0,0]))
-                print(self.trajectory.get_position())
+                # print(self.trajectory.get_position())
 
             self.target.show()
             if self.trajectory_type != "none":
