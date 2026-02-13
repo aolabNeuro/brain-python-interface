@@ -145,6 +145,9 @@ def list_exp_history(request, **kwargs):
     start_date = _parse_date(request.GET.get('start_date'))
     end_date = _parse_date(request.GET.get('end_date'))
 
+    # Show filters if any filter parameters are present
+    show_filters = bool(subject_filter or task_filter or start_date or end_date or kwargs['show_all_rigs'])
+
     default_days = kwargs.pop('default_days', None)
     if start_date is None and end_date is None and isinstance(default_days, int):
         end_date = datetime.date.today()
@@ -161,6 +164,7 @@ def list_exp_history(request, **kwargs):
     fields['end_date'] = end_date.strftime('%Y-%m-%d') if end_date else ''
     fields['subject_filter'] = kwargs.get('subject', '')
     fields['task_filter'] = kwargs.get('task', '')
+    fields['show_filters'] = show_filters
 
     # this line is important--this is needed so the Track object knows if the task has ended in an error
     # TODO there's probably some better way of doing this within the multiprocessing lib (some code to run after the process has terminated)
