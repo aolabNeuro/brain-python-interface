@@ -172,6 +172,8 @@ STATICFILES_DIRS = (
 )
 ADMIN_MEDIA_PREFIX = '/static/admin/'
 INSTALLED_APPS = (
+    'daphne',  # Django Channels ASGI server (must be first)
+    'channels',  # Django Channels
     'db.tracker',
     'django.contrib.auth',
     'django.contrib.admin',    
@@ -222,5 +224,14 @@ LOGGING = {
 
 APPEND_SLASH=False
 ALLOWED_HOSTS = ['*'] #['127.0.0.1', 'localhost', "testserver"]
+
+# Django Channels configuration
+ASGI_APPLICATION = 'db.asgi.application'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer'
+    }
+}
 
 

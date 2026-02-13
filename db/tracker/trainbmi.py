@@ -55,7 +55,6 @@ def make_bmi(name, clsname, extractorname, entry, cells, channels, binlen, tslic
     os.environ['DJANGO_SETTINGS_MODULE'] = 'db.settings'
     from . import models
     from .json_param import Parameters
-    from .tasktrack import Track
     from config import bmiconfig as namelist
 
     cellname = re.compile(r'(\d{1,3})\s*(\w{1})')

@@ -13,12 +13,11 @@ from django.db.models import ProtectedError
 from riglib import experiment
 from .json_param import Parameters
 from .models import TaskEntry, Feature, Sequence, Task, Generator, Subject, Experimenter, DataFile, System, Decoder, KeyValueStore, import_by_path
-from .tasktrack import Track
+from .task_launcher import _task_tracker
 from config.rig_defaults import rig_settings
 import logging
 import io, traceback
 
-from . import exp_tracker # Wrapper for tasktrack.Track
 from . import trainbmi
 
 http_request_queue = []
@@ -263,54 +262,72 @@ def start_experiment(request, save=True, execute=True):
     Handles presses of the 'Start Experiment' and 'Test' buttons in the browser
     interface
     '''
-    #make sure we don't have an already-running experiment
-    tracker = Track.get_instance()
-    if len(tracker.status.value) != 0:
-        print("Task is running, exp_tracker.status.value:", tracker.status.value)
+    # make sure we don't have an already-running experiment
+    if _task_tracker.proc is not None and _task_tracker.proc.is_alive():
         return _respond(dict(status="running", msg="Already running task!"))
 
     # Try to start the task, and if there are any errors, send them to the browser interface
     try:
         data = json.loads(request.POST['data'])
 
-        task =  Task.objects.get(pk=data['task'])
+        task = Task.objects.get(pk=data['task'])
         feature_names = list(data['feats'].keys())
         subject_name = data['metadata'].pop('subject')
         subject = Subject.objects.get(name=subject_name)
-        experimenter_name = data['metadata'].pop('experimenter')
-        experimenter = Experimenter.objects.get(name=experimenter_name)
-        project = data['metadata'].pop('project')
-        session = data['metadata'].pop('session')
+        experimenter_name = data['metadata'].pop('experimenter', None)  # Make optional
+        if experimenter_name:
+            experimenter = Experimenter.objects.get(name=experimenter_name)
+        else:
+            experimenter = None
+        project = data['metadata'].pop('project', '')
+        session = data['metadata'].pop('session', '')
 
-        entry = TaskEntry.objects.create(rig_name=rig_settings['name'], subject_id=subject.id, task_id=task.id, experimenter_id=experimenter.id,
-            project=project, session=session)
+        entry = TaskEntry.objects.create(
+            rig_name=rig_settings['name'],
+            subject_id=subject.id,
+            task_id=task.id,
+            experimenter_id=experimenter.id if experimenter else None,
+            project=project,
+            session=session
+        )
         if 'entry_name' in data:
             entry.entry_name = data['entry_name']
         if 'date' in data and data['date'] != "Today" and len(data['date'].split("-")) == 3:
             datestr = data['date'].split("-")
             print("Got custom date: ", datestr)
-            entry.date = datetime.datetime(int(datestr[0]), int(datestr[1]), int(datestr[2])) # this does not work: datetime.datetime.strptime("%Y-%m-%d", datetime.datetime.now().strftime("%Y-%m-%d"))
+            entry.date = datetime.datetime(int(datestr[0]), int(datestr[1]), int(datestr[2]))
 
         params = Parameters.from_html(data['params'])
         entry.params = params.to_json()
         feats = Feature.getall(feature_names)
-        kwargs = dict(subj=entry.subject.id, subject_name=subject_name, base_class=task.get(),
-            feats=feats, params=params)
+        
+        # Get the base task class with features mixed in
+        task_class = task.get(feats=feature_names)
+        
+        # Convert parameters to dict format for the task
+        params_dict = params.params if isinstance(params, Parameters) else params
+        
         metadata = Parameters.from_html(data['metadata'])
         entry.metadata = metadata.to_json()
 
-        # Save the target sequence to the database and link to the task entry, if the task type uses target sequences
-        if issubclass(task.get(feats=feature_names), experiment.Sequence):
+        # Handle sequence if this is a sequence-based task
+        if issubclass(task_class, experiment.Sequence):
             seq = Sequence.from_json(data['sequence'])
             seq.task = task
             if save:
                 seq.save()
             entry.sequence = seq
-            kwargs['seq'] = seq
+            # TODO: Handle sequence in task initialization
+            # params_dict['seq'] = seq
 
-        response = dict(status="testing", rig_name=rig_settings['name'], subj=entry.subject.name,
-                        task=entry.task.name)
+        response = dict(
+            status="testing",
+            rig_name=rig_settings['name'],
+            subj=entry.subject.name,
+            task=entry.task.name
+        )
 
+        saveid = None
         if save:
             # tag software version using the git hash
             import git
@@ -332,15 +349,18 @@ def start_experiment(request, save=True, execute=True):
             response['date'] = entry.date.strftime("%h %d, %Y %I:%M %p")
             response['status'] = "running"
             response['idx'] = entry.ui_id
-
-            # Give the entry ID to the runtask as a kwarg so that files can be linked after the task is done
-            kwargs['saveid'] = entry.id
+            saveid = entry.id
         else:
             entry.delete()
 
-        # Start the task FSM and tracker
+        # Start the task using the new TaskTracker
         if execute:
-            tracker.runtask(**kwargs)
+            _task_tracker.start_task(
+                target_class=task_class,
+                params=params_dict,
+                subject_name=subject_name,
+                saveid=saveid
+            )
         else:
             response["status"] = "completed"
 
@@ -349,16 +369,11 @@ def start_experiment(request, save=True, execute=True):
 
     except Exception as e:
         # Generate an HTML response with the traceback of any exceptions thrown
-        import io
-        import traceback
-        from .tasktrack import log_str
         err = io.StringIO()
         traceback.print_exc(None, err)
-        traceback.print_exc() # print again to console
+        traceback.print_exc()  # print again to console
         err.seek(0)
-        log_str(err.read()) # log to tasktracker
-        err.seek(0)
-        tracker.reset() # make sure task is stopped
+        _task_tracker.status = 'error'
         return _respond(dict(status="error", msg=err.read()))
 
 def rpc(fn):
@@ -375,16 +390,13 @@ def rpc(fn):
     -------
     JSON-encoded dictionary
     '''
-    tracker = Track.get_instance()
-
     # make sure that there exists an experiment to interact with
-    if tracker.status.value not in [b"running", b"testing"]:
-        print("Task not running!", str(tracker.status.value))
+    if _task_tracker.status not in ['running', 'testing']:
         return _respond(dict(status="error", msg="No task running, so cannot run command!"))
 
     try:
-        status = tracker.status.value.decode("utf-8")
-        fn_response = fn(tracker)
+        status = _task_tracker.status
+        fn_response = fn(_task_tracker)
         response_data = dict(status="pending", msg=status)
         if not fn_response is None:
             response_data['data'] = fn_response
@@ -415,19 +427,19 @@ def _respond_err(e):
 
 @csrf_exempt
 def stop_experiment(request):
-    return rpc(lambda tracker: tracker.stoptask())
+    return rpc(lambda tracker: tracker.stop_task())
 
 def enable_clda(request):
-    return rpc(lambda tracker: tracker.task_proxy.enable_clda())
+    return rpc(lambda tracker: tracker.call_task_method('enable_clda'))
 
 def disable_clda(request):
-    return rpc(lambda tracker: tracker.task_proxy.disable_clda())
+    return rpc(lambda tracker: tracker.call_task_method('disable_clda'))
 
 def set_task_attr(request, attr, value):
     '''
     Generic function to change a task attribute while the task is running.
     '''
-    return rpc(lambda tracker: tracker.task_proxy.remote_set_attr(attr, value))
+    return rpc(lambda tracker: tracker.call_task_method('remote_set_attr', attr=attr, value=value))
 
 @csrf_exempt
 def save_notes(request, idx):

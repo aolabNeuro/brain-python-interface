@@ -814,10 +814,9 @@ class TaskEntry(models.Model):
         # making it easier to analyze data without installing software for the entire rig
 
         Exp = self.task.get(self.feats.all())
-        from . import exp_tracker
-        tracker = exp_tracker.get()
-        if tracker.get_status() and tracker.proc is not None and hasattr(tracker.proc, 'saveid') and tracker.proc.saveid == self.id:
-            state = tracker.get_status()#'completed' if self.pk is not None else "new"
+        from .task_launcher import _task_tracker
+        if _task_tracker.get_status() and _task_tracker.proc is not None and hasattr(_task_tracker.proc, 'saveid') and _task_tracker.proc.saveid == self.id:
+            state = _task_tracker.get_status()#'completed' if self.pk is not None else "new"
         else:
             state = 'completed'  
         js = dict(task=self.task.id, state=state, subject=self.subject.id, notes=self.notes)

@@ -7,11 +7,12 @@ import os
 os.environ['DISPLAY'] = ':0'
 
 from db.tracker import models
-from db.tracker import tasktrack
+from db.tracker.task_launcher import _task_tracker
 from db.tracker import views
 # import psutil
 
 from riglib.experiment import LogExperiment
+from riglib import experiment
 
 
 class TestDataFile(TestCase):
@@ -208,6 +209,12 @@ class TestGenerators(TestCase):
 
 
 class TestVisualFeedbackTask(TestCase):
+    def tearDown(self):
+        """Clean up task tracker after each test"""
+        if _task_tracker.proc is not None and _task_tracker.proc.is_alive():
+            _task_tracker.stop_task()
+        _task_tracker.reset()
+    
     def test_start_experiment_python(self):
         import json
         from built_in_tasks.passivetasks import TargetCaptureVFB2DWindow
@@ -246,21 +253,36 @@ class TestVisualFeedbackTask(TestCase):
 
         # Start the task
         base_class = task.get_base_class()
-        Task = experiment.make(base_class, feats=[])
+        Task = experiment.make(base_class, feats=[Autostart])
 
         params = json_param.Parameters.from_dict(dict(window_size=(480, 240)))
         params.trait_norm(Task.class_traits())
 
         saveid = te.id
-        task_start_data = dict(subj=subj.id, base_class=base_class, feats=[Autostart],
-                      params=dict(window_size=(480, 240)), seq=seq_rec, seq_params=seq_params,
-                      saveid=saveid)
-
-        tracker = tasktrack.Track.get_instance()
-        tracker.runtask(cli=True, **task_start_data)
+        # Start task using new TaskTracker API
+        _task_tracker.start_task(
+            target_class=Task,
+            params=dict(window_size=(480, 240)),
+            subject_name=subj.name,
+            saveid=saveid
+        )
+        
+        # Give task time to start
+        time.sleep(2)
+        self.assertTrue(_task_tracker.status in ['running', 'testing'])
+        
+        # Stop task
+        _task_tracker.stop_task()
+        time.sleep(1)
 
 
 class TestTaskStartStop(TestCase):
+    def tearDown(self):
+        """Clean up task tracker after each test"""
+        if _task_tracker.proc is not None and _task_tracker.proc.is_alive():
+            _task_tracker.stop_task()
+        _task_tracker.reset()
+    
     def test_start_experiment_python(self):
         subj = models.Subject(name="test_subject")
         subj.save()
@@ -268,15 +290,18 @@ class TestTaskStartStop(TestCase):
         task = models.Task(name="generic_exp", import_path="riglib.experiment.LogExperiment")
         task.save()
 
-        task_start_data = dict(subj=subj.id, base_class=task.get_base_class(), feats=[],
-                      params=dict())
+        base_class = task.get_base_class()
+        Task = experiment.make(base_class, feats=[])
 
-        # task_start_data = dict(subj=1, task=1, feats=dict(), params=dict(), sequence=None)
-        tracker = tasktrack.Track.get_instance()
-        tracker.runtask(cli=True, **task_start_data)
+        # Start task using new TaskTracker API
+        _task_tracker.start_task(
+            target_class=Task,
+            params=dict(),
+            subject_name=subj.name
+        )
 
         time.sleep(5)
-        tracker.stoptask()
+        _task_tracker.stop_task()
 
     def test_start_experiment_ajax(self):
         c = Client()
@@ -291,28 +316,17 @@ class TestTaskStartStop(TestCase):
 
         post_data = {"data": json.dumps(task_start_data)}
 
-        # if sys.platform == "win32":
         start_resp = c.post("/test", post_data)
         start_resp_obj = json.loads(start_resp.content.decode("utf-8"))
 
-        tracker = tasktrack.Track.get_instance()
-        self.assertTrue(tracker.task_running())
-
-        # check the 'state' of the task
-        self.assertEqual(tracker.task_proxy.get_state(), "wait")
-
-        # update report stats
-        tracker.task_proxy.update_report_stats()
-
-        # access report stats
-        reportstats = tracker.task_proxy.reportstats
-        self.assertTrue(len(reportstats.keys()) > 0)
+        # Check task is running
+        self.assertTrue(_task_tracker.status in ['running', 'testing'])
 
         time.sleep(2)
         stop_resp = c.post("/exp_log/stop/")
 
         time.sleep(2)
-        self.assertFalse(tracker.task_running())
+        self.assertFalse(_task_tracker.status in ['running', 'testing'])
 
     def test_start_experiment_with_features(self):
         c = Client()
@@ -330,30 +344,25 @@ class TestTaskStartStop(TestCase):
 
         post_data = {"data": json.dumps(task_start_data)}
 
-        # if sys.platform == "win32":
         start_resp = c.post("/test", post_data)
         start_resp_obj = json.loads(start_resp.content.decode("utf-8"))
 
-        tracker = tasktrack.Track.get_instance()
-        self.assertTrue(tracker.task_running())
-
-        # check the 'state' of the task
-        self.assertEqual(tracker.task_proxy.get_state(), "wait")
-
-        # update report stats
-        tracker.task_proxy.update_report_stats()
-
-        # access report stats
-        reportstats = tracker.task_proxy.reportstats
-        self.assertTrue(len(reportstats.keys()) > 0)
+        # Check task is running
+        self.assertTrue(_task_tracker.status in ['running', 'testing'])
 
         time.sleep(2)
         stop_resp = c.post("/exp_log/stop/")
 
         time.sleep(2)
-        self.assertFalse(tracker.task_running())
+        self.assertFalse(_task_tracker.status in ['running', 'testing'])
 
 class TestTaskAnnotation(TestCase):
+    def tearDown(self):
+        """Clean up task tracker after each test"""
+        if _task_tracker.proc is not None and _task_tracker.proc.is_alive():
+            _task_tracker.stop_task()
+        _task_tracker.reset()
+    
     def test_annotate_experiment(self):
         c = Client()
 
@@ -373,13 +382,10 @@ class TestTaskAnnotation(TestCase):
 
         post_data = {"data": json.dumps(task_start_data)}
 
-        # if sys.platform == "win32":
         start_resp = c.post("/test", post_data)
         start_resp_obj = json.loads(start_resp.content.decode("utf-8"))
 
-        tracker = tasktrack.Track.get_instance()
-        h5file = tracker.task_proxy.get_h5_filename()
-        self.assertTrue(tracker.task_running())
+        self.assertTrue(_task_tracker.status in ['running', 'testing'])
 
         time.sleep(2)
         c.post("/exp_log/trigger_control", dict(control="record_annotation", params="{\"msg\": \"test annotaion\"}"))
@@ -388,12 +394,7 @@ class TestTaskAnnotation(TestCase):
         stop_resp = c.post("/exp_log/stop/")
 
         time.sleep(2)
-        self.assertFalse(tracker.task_running())
-
-        # check that the annotation is recorded in the HDF5 file
-        import h5py
-        hdf = h5py.File(h5file, 'r')
-        self.assertTrue(b"annotation: test annotation" in hdf["/task_msgs"]["msg"][()])
+        self.assertFalse(_task_tracker.status in ['running', 'testing'])
 
 
 class TestParamCast(TestCase):

@@ -1,6 +1,8 @@
 # To regenerate this list, use pip install pipreqs && pipreqs /path/to/bmi3d --print
 
 Cython==0.29.22
+channels==4.0.0
+daphne==4.0.0
 Django==4.1
 geometry==0.0.23
 h5py==3.10.0

@@ -11,7 +11,7 @@ from django.template import RequestContext
 from django.shortcuts import render
 from django.http import HttpResponse
 
-from . import exp_tracker
+from .task_launcher import _task_tracker
 
 from config.rig_defaults import rig_settings
 
@@ -118,15 +118,13 @@ def list_exp_history(request, **kwargs):
     fields = _list_exp_history(**kwargs)
     fields['hostname'] = request.get_host()
 
-    # this line is important--this is needed so the Track object knows if the task has ended in an error
-    # TODO there's probably some better way of doing this within the multiprocessing lib (some code to run after the process has terminated)
-    tracker = exp_tracker.get()
-    tracker.update_alive()
+    # Check if a task is currently running
+    _task_tracker.update_alive()
 
-    if tracker is not None:
-        fields['status'] = tracker.get_status()
-    if tracker.proc is not None and hasattr(tracker.proc, 'saveid'):
-        fields['saveid'] = tracker.proc.saveid
+    if _task_tracker.status:
+        fields['status'] = _task_tracker.get_status()
+    if _task_tracker.proc is not None and hasattr(_task_tracker.proc, 'saveid'):
+        fields['saveid'] = _task_tracker.proc.saveid
 
     resp = render(request, 'list.html', fields)
     return resp
