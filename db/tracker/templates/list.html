@@ -282,14 +282,18 @@
     <input id="toggle_filters" type="checkbox" {% if show_filters %}checked{% endif %}><span class="checkboxtext">Show filters</span>
     <button id="new_exp">Start new experiment</button><br>
     <form id="date_filter" method="get" action="" {% if not show_filters %}style="display: none;"{% endif %}>
-      <table>
+      <table style="margin-left: auto;">
         <tr>
-          <td><label for="start_date">Start date:</label></td>
-          <td><input type="date" id="start_date" name="start_date" value="{{ start_date }}"></td>
+          <td><label for="keyword">Keyword:</label></td>
+          <td><input type="text" id="keyword" name="keyword" value="{{ keyword_filter }}" placeholder="Search across task, project, session..." style="width: 300px;"></td>
         </tr>
         <tr>
-          <td><label for="end_date">End date:</label></td>
-          <td><input type="date" id="end_date" name="end_date" value="{{ end_date }}"></td>
+          <td><label for="start_date">Date range:</label></td>
+          <td>
+            <input type="date" id="start_date" name="start_date" value="{{ start_date }}" style="width: 140px;">
+            to
+            <input type="date" id="end_date" name="end_date" value="{{ end_date }}" style="width: 140px;">
+          </td>
         </tr>
         <tr>
           <td><label for="subject">Subject:</label></td>
