@@ -101,13 +101,17 @@
         if (this.checked) {
           $("#toggle_visible,#toggle_visible+span").show();
           $("#toggle_templates,#toggle_templates+span").show();
-          $("#toggle_rigs,#toggle_rigs+span").show();
+          $("#toggle_filters,#toggle_filters+span").show();
+          if ($("#toggle_filters").is(":checked")) {
+            $("#date_filter").show();
+          }
           $('#leftpane').show()
           $('#rightpane').css({'left': "640px", 'top': '0px', 'position': 'fixed'});
         } else {
           $("#toggle_visible,#toggle_visible+span").hide();
           $("#toggle_templates,#toggle_templates+span").hide();
-          $("#toggle_rigs,#toggle_rigs+span").hide();
+          $("#toggle_filters,#toggle_filters+span").hide();
+          $("#date_filter").hide();
           $('#leftpane').hide()
           $('#rightpane').css({'left': "0px", 'top': 'auto', 'position': 'relative'});
         }
