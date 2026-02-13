@@ -59,13 +59,17 @@ export BMI3D_PORT=$PORT
 # fi
 
 # Make sure that the server is not already running in a different program
-if [ `ps aux | grep "manage.py runserver" | grep python | wc -l` -gt 0 ]; then 
-    echo "ERROR: runserver seems to have already been executed by a different program!"
-    read -p "Do you want to restart? [y/n] " -n 1 -r
-    if [[ $REPLY =~ ^[Yy]$ ]]
-    then
-        kill -9 `ps -C "python manage.py runserver" -o pid --no-headers`
-    fi
+if [ `ps aux | grep "daphne" | grep -v grep | wc -l` -gt 0 ]; then 
+    echo "WARNING: Daphne server already running, killing it..."
+    pkill -9 -f "daphne" 2>/dev/null
+    sleep 1
+fi
+
+# Also check for old manage.py runserver processes
+if [ `ps aux | grep "manage.py runserver" | grep -v grep | wc -l` -gt 0 ]; then 
+    echo "WARNING: Old Django runserver found, killing it..."
+    pkill -9 -f "manage.py runserver" 2>/dev/null
+    sleep 1
 fi
     
 # Mount the neural recording system, if a mount point is specified in the config file
@@ -127,9 +131,37 @@ fi
 trap "exit" INT TERM ERR
 trap "kill 0" EXIT
 
+# Set Django settings module for ASGI/Daphne
+export DJANGO_SETTINGS_MODULE=db.db_settings
+
+# Wait for port to be released (in case of previous ungraceful shutdown)
+echo "Waiting for port $PORT to be released..."
+CHECK_PORT_SCRIPT='
+import socket
+import sys
+port = int(sys.argv[1])
+try:
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    s.bind(("0.0.0.0", port))
+    s.close()
+    sys.exit(0)
+except:
+    sys.exit(1)
+'
+
+for i in {1..10}; do
+    if python3 -c "$CHECK_PORT_SCRIPT" $PORT 2>/dev/null; then
+        echo "Port $PORT is available"
+        break
+    fi
+    echo "Port $PORT still in use, waiting... ($i/10)"
+    sleep 1
+done
+
 # Start python processes
 cd $BMI3D
-python manage.py runserver 0.0.0.0:$PORT --noreload &
+daphne -b 0.0.0.0 -p $PORT db.asgi:application &
 # if [ "$HOST" = "pagaiisland2" ] || [ "$HOST" = "siberut-bmi" ]; then
 #     celery -A db.tracker worker -l INFO &
 # fi

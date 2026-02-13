@@ -10,7 +10,7 @@ import asyncio
 import threading
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.layers import get_channel_layer
-from asgiref.sync import sync_to_async
+from asgiref.sync import sync_to_async, async_to_sync
 
 
 class TaskConsumer(AsyncWebsocketConsumer):
@@ -183,17 +183,11 @@ class TaskStatusBroadcaster:
 # Synchronous wrappers for use in non-async code
 def sync_broadcast_status(state, reportstats):
     """Synchronous wrapper to broadcast task status"""
-    channel_layer = get_channel_layer()
-    asyncio.run_coroutine_threadsafe(
-        TaskStatusBroadcaster.broadcast_status(state, reportstats),
-        channel_layer._async_to_sync_executor
-    )
+    # Use async_to_sync to call the async broadcast function from sync code
+    async_to_sync(TaskStatusBroadcaster.broadcast_status)(state, reportstats)
 
 
 def sync_broadcast_error(message, traceback_str=''):
     """Synchronous wrapper to broadcast error"""
-    channel_layer = get_channel_layer()
-    asyncio.run_coroutine_threadsafe(
-        TaskStatusBroadcaster.broadcast_error(message, traceback_str),
-        channel_layer._async_to_sync_executor
-    )
+    # Use async_to_sync to call the async broadcast function from sync code
+    async_to_sync(TaskStatusBroadcaster.broadcast_error)(message, traceback_str)

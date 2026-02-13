@@ -41,17 +41,49 @@ function Report(callback) {
 }
 
 Report.prototype.activate = function() {
-    //var on_windows = window.navigator.userAgent.indexOf("Windows") > 0;
-    if (!this.ws) {  // && !on_windows) { some websocket issues on windows..
+    if (!this.ws) {
         // Create a new JS WebSocket object
-        var host = hostname.split(":")[0]
-        var port = Number(hostname.split(":")[1]) + 1
-        this.ws = new WebSocket("ws://"+host+":"+port+"/connect");
+        // Connect to Django Channels WebSocket endpoint
+        var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        var host = window.location.host;
+        this.ws = new WebSocket(protocol + "//" + host + "/ws/tasks/");
+
+        this.ws.onopen = function() {
+            console.log("Report WebSocket connected");
+        };
 
         this.ws.onmessage = function(evt) {
-            debug(evt.data);
-            var report = JSON.parse(evt.data);
-            this.update(report);
+            try {
+                debug(evt.data);
+                var data = JSON.parse(evt.data);
+                
+                // Handle different message types from Django Channels
+                if (data.type === 'task_status') {
+                    // Update report with the reportstats data
+                    this.update(data.reportstats || {});
+                } else {
+                    // Fallback for other message formats
+                    this.update(data);
+                }
+            } catch(e) {
+                console.error("Error processing WebSocket message:", e);
+            }
+        }.bind(this);
+
+        this.ws.onerror = function(error) {
+            console.error("Report WebSocket error:", error);
+        };
+
+        this.ws.onclose = function() {
+            console.log("Report WebSocket disconnected");
+            this.ws = null;
+            // Try to reconnect after 2 seconds
+            setTimeout(function() {
+                if (this && this.ws === null) {
+                    console.log("Attempting to reconnect WebSocket...");
+                    this.activate();
+                }
+            }.bind(this), 2000);
         }.bind(this);
     }
 }

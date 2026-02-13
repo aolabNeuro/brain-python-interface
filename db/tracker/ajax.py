@@ -635,9 +635,14 @@ def get_report(request):
     Get data for the report field in the frontend
     '''
     def report_fn(tracker):
-        tracker.task_proxy.update_report_stats()
-        reportstats = tracker.task_proxy.reportstats
-        return reportstats
+        # Call update_report_stats on the task via RPC
+        try:
+            tracker.call_task_method('update_report_stats')
+        except Exception as e:
+            print(f"Error calling update_report_stats: {e}")
+        
+        # Return the cached reportstats
+        return tracker.reportstats
 
     return rpc(report_fn)
 

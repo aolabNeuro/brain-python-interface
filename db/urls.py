@@ -3,13 +3,33 @@ Django's standard place to look for URL pattern matching. See
 https://docs.djangoproject.com/en/dev/topics/http/urls/
 for more complete documentation
 '''
-from django.urls import path
+from django.urls import path, re_path
 
 # Uncomment the next two lines to enable the admin:
 from django.contrib import admin
 admin.autodiscover()
 
 from .tracker import ajax, views, dbq
+
+# Simple view to serve static files
+def serve_static(request, path):
+    from django.http import FileResponse
+    from django.conf import settings
+    import os
+    
+    # Get the static file from STATICFILES_DIRS
+    if settings.STATICFILES_DIRS:
+        static_root = settings.STATICFILES_DIRS[0]
+        file_path = os.path.join(static_root, path)
+        
+        # Security check: ensure the file is within the static directory
+        if os.path.abspath(file_path).startswith(os.path.abspath(static_root)):
+            if os.path.exists(file_path):
+                return FileResponse(open(file_path, 'rb'))
+    
+    # Return 404 if file not found
+    from django.http import HttpResponse
+    return HttpResponse('Not Found', status=404)
 
 urlpatterns = [
     path('', views.main),
@@ -77,5 +97,8 @@ urlpatterns = [
     path(r'RPC2/', dbq.rpc_handler),
     # Uncomment the next line to enable the admin:
     path(r'admin/', admin.site.urls),
+    
+    # Serve static files (CSS, JS, images)
+    re_path(r'^static/(?P<path>.*)$', serve_static),
 ]
 

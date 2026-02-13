@@ -129,25 +129,41 @@ class TaskProcess(mp.Process):
         # Create task instance
         self.task = self.target_class(**params)
         
-        # Store reference to this process in the task so _cycle_with_rpc can access RPC queue
+        # Store reference to this process in the task so _cycle can access RPC queue
         self.task._task_process = self
         
         # Mix in RPC handling to the task's _cycle method
-        # We'll replace the _cycle method with one that checks for RPC commands first
+        # We'll replace the _cycle method with one that checks for RPC commands and sends status
         original_cycle = self.task._cycle
         
-        def _cycle_with_rpc_check():
+        cycle_counter = [0]  # Use list to allow modification in nested function
+        
+        def _cycle_with_rpc_and_status():
             # Check for RPC commands
             try:
                 cmd = self.rpc_queue.get_nowait()
                 self._handle_rpc_command(cmd)
             except queue.Empty:
                 pass
+            
             # Call the original _cycle method
             original_cycle()
+            
+            # Send status update periodically (every ~1 second, assuming 60 FPS)
+            cycle_counter[0] += 1
+            if cycle_counter[0] >= self.task.fps:
+                cycle_counter[0] = 0
+                try:
+                    self.status_queue.put({
+                        'type': 'status',
+                        'state': self.task.state,
+                        'reportstats': dict(self.task.reportstats)
+                    })
+                except Exception as e:
+                    print(f"Error sending status: {e}")
         
         # Replace the task's _cycle method with our wrapped version
-        self.task._cycle = _cycle_with_rpc_check
+        self.task._cycle = _cycle_with_rpc_and_status
         
         try:
             # Run the task's FSM loop (which includes its own main loop)
@@ -256,6 +272,7 @@ class TaskTracker:
         self.status = ''  # 'running', 'testing', 'stopped', 'error'
         self._rpc_response_map = {}  # Map command IDs to response queues
         self._response_reader_thread = None
+        self.reportstats = {}  # Cache the last reportstats from the task
     
     def start_task(self, target_class, params, subject_name, saveid=None):
         """
@@ -386,8 +403,15 @@ class TaskTracker:
                 self._rpc_response_map[cmd_id].put(msg)
         
         elif msg_type == 'status':
-            # Status update - could send to WebSocket here
-            pass
+            # Status update - broadcast to WebSocket clients and cache reportstats
+            state = msg.get('state')
+            reported_stats = msg.get('reportstats', {})
+            self.reportstats = reported_stats  # Cache for AJAX access
+            try:
+                from .consumers import sync_broadcast_status
+                sync_broadcast_status(state, reported_stats)
+            except Exception as e:
+                print(f"Failed to broadcast status: {e}")
         
         elif msg_type == 'error':
             self.status = 'error'
