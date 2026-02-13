@@ -400,10 +400,9 @@ class HideCursorReturn(traits.HasTraits):
         
     show_cursor_return = traits.Float(2.0, desc = 'Distance from center at which to turn cursor on')
 
-    def _start_wait(self):
-        super()._start_wait()
-        if self.calc_trial_num() > 0:
-            self.plant_visible = False
+    def _start_reward(self):
+        super()._start_reward()
+        self.plant_visible = False
 
     def _while_target(self):
         
