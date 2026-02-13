@@ -333,11 +333,11 @@ class TargetTracking(Sequence):
 
     def _test_ramp_and_trial_complete(self, time_in_state):
         '''Test whether the ramp down is finished, ending the trial'''
-        return (self.frame_index == self.trajectory_length) and (self.ramp_down_time > 0)
+        return (self.frame_index > self.trajectory_length) and (self.ramp_down_time > 0)
     
     def _test_trial_complete(self, time_in_state):
         '''Test whether the trajectory is finished, ending the trial'''
-        return (self.frame_index == self.trajectory_length) and (self.ramp_down_time == 0)
+        return (self.frame_index > self.trajectory_length) and (self.ramp_down_time == 0)
 
     def _test_tracking_out_timeout(self, time_in_state):
         return time_in_state > self.tracking_out_time
@@ -465,6 +465,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         '''
         Calls any update functions necessary and redraws screen
         '''
+        # Use to debug indexing into reference and disturbance trajectories
         # if self.frame_index >= 0:
         #     print('FRAME ', self.frame_index, self.get_state(), self.trial_timed_out)
         #     print(self.target.get_position()[2], self.pos_offset[2])
