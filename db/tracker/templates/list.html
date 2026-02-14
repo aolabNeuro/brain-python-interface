@@ -10,6 +10,10 @@
 
 <script src='{{ STATIC_PREFIX }}resources/js/jquery.min.js' type='text/javascript'></script>
 <script src='{{ STATIC_PREFIX }}resources/js/jquery-ui.min.js' type='text/javascript'></script>
+
+<!-- Vue.js for modern reactive UI -->
+<script src='https://unpkg.com/vue@3/dist/vue.global.js' type='text/javascript'></script>
+
 <script src='{{ STATIC_PREFIX }}resources/js/sequence.js' type='text/javascript'></script>
 <script src='{{ STATIC_PREFIX }}resources/js/features.js' type='text/javascript'></script>
 <script src='{{ STATIC_PREFIX }}resources/js/collections.js' type='text/javascript'></script>
@@ -17,6 +21,11 @@
 <script src='{{ STATIC_PREFIX }}resources/js/list.js' type='text/javascript'></script>
 <script src='{{ STATIC_PREFIX }}resources/js/bmi.js' type='text/javascript'></script>
 <script src='{{ STATIC_PREFIX }}resources/js/report.js' type='text/javascript'></script>
+<script src='{{ STATIC_PREFIX }}resources/js/report-vue.js' type='text/javascript'></script>
+<script src='{{ STATIC_PREFIX }}resources/js/controls-vue.js' type='text/javascript'></script>
+<script src='{{ STATIC_PREFIX }}resources/js/features-vue.js' type='text/javascript'></script>
+<script src='{{ STATIC_PREFIX }}resources/js/parameters-vue.js' type='text/javascript'></script>
+<script src='{{ STATIC_PREFIX }}resources/js/filters-vue.js' type='text/javascript'></script>
 
 
 <script type='text/javascript'>
@@ -24,8 +33,39 @@
   var te = null;
   var feats = new Features();
   var collections = new Collections();
+  
+  // Features data from Django template
+  var initialFeatures = [
+    {% for f in features %}
+      {
+        id: {{ f.id }},
+        name: "{{ f.name }}",
+        desc: "{{ f.desc }}"
+      },
+    {% endfor %}
+  ];
+  
   $(document).ready(function() {
-    console.log("TEST");
+    // Initialize Vue.js applications
+    const { createApp } = Vue;
+    
+    // Initialize report component
+    const reportApp = createApp(reportVueApp);
+    reportVueApp.instance = reportApp.mount('#report_div');
+    
+    // Initialize features component
+    const featuresComponentApp = createApp(featuresApp);
+    featuresApp.instance = featuresComponentApp.mount('#features_vue');
+    featuresApp.instance.initializeFeatures(initialFeatures);
+    
+    // Initialize parameters component
+    const parametersComponentApp = createApp(parametersApp);
+    parametersApp.instance = parametersComponentApp.mount('#parameters_vue');
+    
+    // Initialize filters component
+    const filtersComponentApp = createApp(filtersApp);
+    filtersApp.instance = filtersComponentApp.mount('#filters_vue');
+    
     $("table#main tr").each(function() {
       // Register a click callback for each row of the 'main' table
       // If you click on the very top row, the id is set to "newentry"
@@ -111,10 +151,16 @@
 
     $("#toggle_templates").change(
       function() {
-        if (this.checked)
-          $("tr.template").show();
-        else
-          $("tr.template").hide();
+        if (window.filtersApp && window.filtersApp.instance) {
+          window.filtersApp.instance.showTemplates = this.checked;
+          window.filtersApp.instance.applyFilters();
+        } else {
+          // Fallback if Vue not loaded yet
+          if (this.checked)
+            $("tr.template").show();
+          else
+            $("tr.template").hide();
+        }
       }
     );
 
@@ -130,6 +176,7 @@
     $('#wait_wheel').hide();
     $('#create_new_seq').hide();
     $("tr.template").hide();
+    $('#newentry').css('display', 'none'); // Hide the new entry row until user clicks "New Experiment" or header
 
     document.addEventListener('keydown', function(event) {
         // hotkeys for simple TE tasks
@@ -265,6 +312,61 @@
     <button id="new_exp">Start new experiment</button><br>
     <hr>
   </div>
+
+  <!-- Vue Filters Component -->
+  <div id="filters_vue" style="margin: 10px 0; padding: 10px; background-color: #f5f5f5; border-radius: 4px;">
+    <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: center;">
+      <!-- Search Box -->
+      <div style="flex: 1; min-width: 200px;">
+        <input 
+          v-model="searchQuery" 
+          @input="onSearchInput"
+          type="text" 
+          placeholder="Search by task, subject, date, or description..." 
+          style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+      </div>
+      
+      <!-- Task Filter -->
+      <div>
+        <label style="margin-right: 5px;">Task:</label>
+        <select 
+          v-model="selectedTask" 
+          @change="onFilterChange"
+          style="padding: 6px; border: 1px solid #ddd; border-radius: 4px;">
+          <option value="all">All Tasks</option>
+          <option v-for="task in tasks" :key="task" :value="task">{{ task }}</option>
+        </select>
+      </div>
+      
+      <!-- Subject Filter -->
+      <div>
+        <label style="margin-right: 5px;">Subject:</label>
+        <select 
+          v-model="selectedSubject" 
+          @change="onFilterChange"
+          style="padding: 6px; border: 1px solid #ddd; border-radius: 4px;">
+          <option value="all">All Subjects</option>
+          <option v-for="subject in subjects" :key="subject" :value="subject">{{ subject }}</option>
+        </select>
+      </div>
+      
+      <!-- Clear Filters Button -->
+      <button 
+        v-if="hasActiveFilters"
+        @click="clearFilters"
+        style="padding: 6px 12px; background-color: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;">
+        Clear Filters
+      </button>
+    </div>
+    
+    <!-- Filter Summary -->
+    <div v-if="hasActiveFilters" style="margin-top: 10px; font-size: 12px; color: #666;">
+      Active: {{ filterSummary }} | Showing {{ visibleEntries }} of {{ totalEntries }}
+    </div>
+    <div v-else style="margin-top: 10px; font-size: 12px; color: #999;">
+      Showing all {{ totalEntries }} entries
+    </div>
+  </div>
   <div id="main_box">
     <div id='leftpane'>
       <a>{{ n_entries }} saved task entry records shown below{% if show_hidden %} ({{ n_hidden }} hidden) {% endif %}</a>
@@ -305,7 +407,7 @@
             </tr>
         {% endfor %}
         <!-- Header -->
-          <tr id='newentry' class='rowactive'>
+          <tr id='newentry' class='rowactive' style="display: none;">
             <td id="newentry_today" onclick="$('#date_entry_modal').css('display', 'block')">Today</td>
             <td id="newentry_now">Now</td>
             <td></td> <!-- Empty for database ID slot -->
@@ -313,6 +415,7 @@
             <td class='colSubj'></td>
             <td class='colTask'>
               <select id='tasks'>
+                <option value="">-- Select a task --</option>
                 {% for t in tasks %}<option value='{{t.id}}'>{{ t.name }}</option>
                 {% endfor %}
               </select>
@@ -366,13 +469,19 @@
             <input id="templatebtn" type="checkbox" checked="off" name="hist_checkbox">Use as template
           </div>
 
-          <div id="start_buttons">
-            <input id="testbtn" class="btn startbtn" type="submit" value="Test" title="Run the experiment without saving any data">
-            <input id="startbtn" class="btn startbtn" type="submit" value="Start Experiment">
-            <input id="saverecbtn" class="btn startbtn" type="submit" value="Save Record" title="Save a record of an already complete experiment">
+          <!-- Task Control Buttons -->
+          <div id="task_controls">
+            <div id="start_buttons">
+              <input id="testbtn" class="btn startbtn" type="submit" value="Test" title="Run the experiment without saving any data">
+              <input id="startbtn" class="btn startbtn" type="submit" value="Start Experiment">
+              <input id="saverecbtn" class="btn startbtn" type="submit" value="Save Record" title="Save a record of an already complete experiment">
+            </div>
+            <div id="stop_buttons" style="display: none;">
+              <input id="stopbtn" class="btn startbtn" type="submit" value="Stop Experiment">
+            </div>
           </div>
 
-          <div id="stop_buttons">
+          <div id="stop_buttons_old" style="display: none;">
             <input id="stopbtn" class="btn startbtn" type="submit" value="Stop Experiment">
           </div>
 
@@ -390,17 +499,39 @@
                 <table id="metadata_table"></table>
               </fieldset>
 
-              <fieldset id="features">
-                <legend>Features</legend>
-                <ul>
-                {% for f in features %}
-                  <li title="{{f.desc}}">
-                  <input type="checkbox" name="{{f.name}}" id="feat_{{f.name}}" value="{{f.id}}">
-                  <label for="{{f.name}}">{{f.name}}</label>
-                  </li>
-                {% endfor %}
-                </ul>
-              </fieldset> <!-- features -->
+              <div id="features_vue">
+                <fieldset id="features">
+                  <legend v-text="'Features (' + selectedCount + '/' + features.length + ' selected)'"></legend>
+                  
+                  <!-- Features search and controls -->
+                  <div style="margin-bottom: 10px;">
+                    <input v-model="searchQuery" 
+                           type="text" 
+                           placeholder="Search features..." 
+                           style="width: 100%; padding: 5px; margin-bottom: 5px;">
+                    <button @click="selectAll" style="margin-right: 5px;">Select All</button>
+                    <button @click="deselectAll">Clear Selection</button>
+                  </div>
+
+                  <!-- Features list -->
+                  <ul>
+                    <li v-for="f in filteredFeatures" :key="f.name" :title="f.desc">
+                      <input type="checkbox" 
+                             :name="f.name" 
+                             :id="'feat_' + f.name" 
+                             :value="f.id"
+                             v-model="selectedFeatures[f.name]">
+                      <label :for="'feat_' + f.name" v-text="f.name"></label>
+                      <small v-if="f.desc" style="color: #666; margin-left: 10px;" v-text="f.desc"></small>
+                    </li>
+                  </ul>
+                  
+                  <!-- Empty state -->
+                  <div v-if="filteredFeatures.length === 0 && searchQuery" style="color: #999; font-style: italic;">
+                    No features match your search
+                  </div>
+                </fieldset> <!-- features -->
+              </div>
 
               <fieldset id="sequence">
                 <legend>Sequence</legend>
@@ -441,10 +572,110 @@
               </fieldset> <!-- sequence -->
 
               <fieldset id="parameters">
-                <input id="show_params" type="checkbox" onclick="javascript:te.params.show_all_attrs();">Show All Parameters?   
+                <div class="show-all-checkbox">
+                  <label>
+                    <input type="checkbox" v-model="showAllParams" @change="toggleShowAll"> Show All Parameters?
+                  </label>
+                </div>
                 <legend>Parameters</legend>
-                <!-- <table id="params_table">
-                </table> -->
+                <div id="parameters_vue">
+                  <table class="parameters_table" v-if="visibleCount > 0">
+                    <tbody>
+                      <tr v-for="(param, name) in visibleParams" :key="name" class="param_row">
+                        <td class="param_label">
+                          <label :for="'param_' + name" v-text="param.label || name"></label>
+                        </td>
+                        <td class="param_input">
+                          <!-- Float Input -->
+                          <input v-if="isType(param, 'Float')" 
+                                 type="text" 
+                                 :id="'param_' + name"
+                                 v-model="param.value"
+                                 :placeholder="param.default"
+                                 pattern="-?[0-9]*\.?[0-9]*"
+                                 :disabled="!editMode">
+                          <!-- Int Input -->
+                          <input v-else-if="isType(param, 'Int')" 
+                                 type="number" 
+                                 :id="'param_' + name"
+                                 v-model.number="param.value"
+                                 :disabled="!editMode">
+                          <!-- Bool (Checkbox) -->
+                          <input v-else-if="isType(param, 'Bool')" 
+                                 type="checkbox" 
+                                 :id="'param_' + name"
+                                 v-model="param.value"
+                                 :disabled="!editMode">
+                          <!-- String Input -->
+                          <input v-else-if="isType(param, 'String')" 
+                                 type="text" 
+                                 :id="'param_' + name"
+                                 v-model="param.value"
+                                 :placeholder="param.default"
+                                 :disabled="!editMode">
+                          <!-- Enum/Options Select -->
+                          <select v-else-if="isType(param, 'Enum') || isType(param, 'OptionsList')" 
+                                  :id="'param_' + name"
+                                  v-model="param.value"
+                                  :disabled="!editMode">
+                            <option v-for="option in param.options" :key="option" :value="option">
+                              {{ option }}
+                            </option>
+                          </select>
+                          <!-- Tuple (Multiple inputs) -->
+                          <div v-else-if="isType(param, 'Tuple')" class="tuple-inputs">
+                            <input v-for="(val, idx) in (Array.isArray(param.value) ? param.value : [])" 
+                                   :key="idx"
+                                   type="text" 
+                                   v-model="param.value[idx]"
+                                   :placeholder="param.default[idx]"
+                                   :disabled="!editMode"
+                                   class="tuple-input">
+                          </div>
+                          <!-- Array (Multiple inputs or list) -->
+                          <div v-else-if="isType(param, 'Array')" class="array-inputs">
+                            <input v-for="(val, idx) in (Array.isArray(param.value) ? param.value : param.default)" 
+                                   :key="idx"
+                                   type="text" 
+                                   v-model="param.value[idx]"
+                                   :placeholder="param.default[idx]"
+                                   pattern="[0-9\\(\\)\\[\\]\\.\\,\\s\\-]*"
+                                   :disabled="!editMode"
+                                   class="array-input">
+                          </div>
+                          <!-- List (Dynamic array) -->
+                          <div v-else-if="isType(param, 'List')" class="list-inputs">
+                            <input v-for="(val, idx) in (Array.isArray(param.value) ? param.value : param.default)" 
+                                   :key="idx"
+                                   type="text" 
+                                   v-model="param.value[idx]"
+                                   :placeholder="param.default[idx]"
+                                   :disabled="!editMode"
+                                   class="list-input">
+                          </div>
+                          <!-- Instance/DataFile Select -->
+                          <select v-else-if="isType(param, 'Instance') || isType(param, 'InstanceFromDB') || isType(param, 'DataFile')" 
+                                  :id="'param_' + name"
+                                  v-model="param.value"
+                                  :disabled="!editMode">
+                            <option v-for="option in param.options" 
+                                    :key="getOptionKey(option)" 
+                                    :value="getOptionValue(option)"
+                                    v-text="getOptionText(option)">
+                            </option>
+                          </select>
+                          <!-- Fallback text input -->
+                          <input v-else 
+                                 type="text" 
+                                 :id="'param_' + name"
+                                 v-model="param.value"
+                                 :disabled="!editMode">
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <p v-else style="color: #999; font-style: italic;">No parameters for this task</p>
+                </div>
               </fieldset> <!-- parameters -->
             </div>
 
@@ -453,14 +684,35 @@
               <fieldset id="report">
                 <legend>Report</legend>
                 <div id="report_div">
-                  <input type="button" value="Update report" id="report_update" onclick="te.report.manual_update()"><br>
-                  <table class="option" id="report_info">
-                  </table>
-
-                  <div class="report_table" id="report_msgs">
-                    <pre id="stdout"></pre>
+                  <div style="margin-bottom: 10px;">
+                    <input type="button" value="Update report" onclick="te.report.manual_update()">
+                    <input type="button" value="Save FPS Log" onclick="reportVueApp.instance?.saveFpsLog()">
+                    <span v-if="wsConnected" style="color: green; margin-left: 20px;">
+                      ✓ WebSocket Connected
+                    </span>
+                    <span v-else style="color: red; margin-left: 20px;">
+                      ✗ WebSocket Disconnected
+                    </span>
                   </div>
 
+                  <!-- Report Statistics Table -->
+                  <table class="option" id="report_info" v-if="statsArray.length > 0">
+                    <tr v-for="stat in statsArray" :key="stat.name">
+                      <td><strong>{{ stat.name }}</strong></td>
+                      <td>{{ stat.value }}</td>
+                    </tr>
+                  </table>
+                  <div v-else style="color: #999; font-style: italic;">
+                    No report data yet. Start an experiment to see statistics.
+                  </div>
+
+                  <!-- Messages and Stdout Output -->
+                  <div class="report_table" id="report_msgs" v-if="stdoutText">
+                    <div style="margin-bottom: 10px;">
+                      <button @click="clearStdout">Clear Output</button>
+                    </div>
+                    <pre id="stdout">{{ stdoutText }}</pre>
+                  </div>
 
                   <div class="clear"></div>
                 </div>

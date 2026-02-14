@@ -134,31 +134,6 @@ trap "kill 0" EXIT
 # Set Django settings module for ASGI/Daphne
 export DJANGO_SETTINGS_MODULE=db.db_settings
 
-# Wait for port to be released (in case of previous ungraceful shutdown)
-echo "Waiting for port $PORT to be released..."
-CHECK_PORT_SCRIPT='
-import socket
-import sys
-port = int(sys.argv[1])
-try:
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    s.bind(("0.0.0.0", port))
-    s.close()
-    sys.exit(0)
-except:
-    sys.exit(1)
-'
-
-for i in {1..10}; do
-    if python3 -c "$CHECK_PORT_SCRIPT" $PORT 2>/dev/null; then
-        echo "Port $PORT is available"
-        break
-    fi
-    echo "Port $PORT still in use, waiting... ($i/10)"
-    sleep 1
-done
-
 # Start python processes
 cd $BMI3D
 daphne -b 0.0.0.0 -p $PORT db.asgi:application &

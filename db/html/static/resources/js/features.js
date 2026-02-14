@@ -22,49 +22,77 @@ function Features() {
  * Uncheck all the features
  */
 Features.prototype.clear = function() {
-    $("#features input[type=checkbox]").each(
-        function() {
-            this.checked = false;
-       }
-    );
+    // Use Vue if available, otherwise fallback to jQuery
+    if (window.featuresApp && window.featuresApp.instance) {
+        window.featuresApp.instance.deselectAll();
+    } else {
+        $("#features input[type=checkbox]").each(
+            function() {
+                this.checked = false;
+           }
+        );
+    }
 }
 /*
  * Check boxes for a set of features
  */
 Features.prototype.select_features = function(info_feats) {
-    // set checkmarks for all the features specified in the 'info'
-    $("#features input[type=checkbox]").each(
-        function() {
-            this.checked = false;
-            for (var idx in info_feats) {
-                if (this.name == info_feats[idx])
-                    this.checked = true;
-            }
-       }
-    );
+    // Use Vue if available, otherwise fallback to jQuery
+    if (window.featuresApp && window.featuresApp.instance) {
+        window.featuresApp.instance.setSelectedFeatures(info_feats);
+    } else {
+        // set checkmarks for all the features specified in the 'info'
+        $("#features input[type=checkbox]").each(
+            function() {
+                this.checked = false;
+                for (var idx in info_feats) {
+                    if (this.name == info_feats[idx])
+                        this.checked = true;
+                }
+           }
+        );
+    }
 }
 /*
  * Get a JSON object with the list of enabled features. Keys = feature names,
  * values are 'true'
  */
 Features.prototype.get_checked_features = function () {
-    var feats = {};
-    $("#features input").each(function() {
-        if (this.checked)
-            feats[this.name] = this.checked;
-    });
-    return feats;
+    // Use Vue if available, otherwise fallback to jQuery
+    if (window.featuresApp && window.featuresApp.instance) {
+        const selectedNames = window.featuresApp.instance.getSelectedFeatureNames();
+        const feats = {};
+        selectedNames.forEach(name => {
+            feats[name] = true;
+        });
+        return feats;
+    } else {
+        var feats = {};
+        $("#features input").each(function() {
+            if (this.checked)
+                feats[this.name] = this.checked;
+        });
+        return feats;
+    }
 }
 /*
  * Disable the ability to check/uncheck features
  */
 Features.prototype.disable_entry = function () {
+    // Disable Vue component
+    if (window.featuresApp && window.featuresApp.instance) {
+        // Could add disabled state to Vue if needed
+    }
     $("#features input").attr("disabled", "disabled");
 }
 /*
  * Enable the ability to check features
  */
 Features.prototype.enable_entry = function() {
+    // Enable Vue component
+    if (window.featuresApp && window.featuresApp.instance) {
+        // Could add disabled state to Vue if needed
+    }
     $("#features input").removeAttr("disabled");
 }
 /*

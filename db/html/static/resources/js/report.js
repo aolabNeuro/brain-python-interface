@@ -90,6 +90,12 @@ Report.prototype.activate = function() {
 Report.prototype.fps_log = [];
 
 Report.prototype.update = function(info) {
+    // Guard against undefined/null info
+    if (!info || typeof info !== 'object') {
+        console.warn("Report.update called with invalid info:", info);
+        return;
+    }
+    
     // run the 'notify' callback every time this function is provided with info
     if (typeof(this.notify) == "function" && !$.isEmptyObject(info))
         this.notify(info);

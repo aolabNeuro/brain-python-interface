@@ -33,6 +33,8 @@ function interface_fn_completed() {
     this.controls.show();
     this.controls.deactivate();
     this.report.deactivate();
+    // Deactivate Vue.js report component
+    if (reportVueApp.instance) reportVueApp.instance.deactivate();
     this.report.set_mode("completed");
 
     // Hack fix. When you select a block from the task interface, force the 'date' column to still be white
@@ -80,6 +82,8 @@ function interface_fn_running(info) {
     $("#finished_task_buttons").hide();
     $("#bmi").hide();
     this.report.activate();
+    // Activate Vue.js report component
+    if (reportVueApp.instance) reportVueApp.instance.activate();
 
     $("#report").show()
     $("#notes").show()
@@ -108,6 +112,10 @@ function interface_fn_testing(info) {
     $("#finished_task_buttons").hide()
     $("#bmi").hide();
     this.report.activate();
+    // Activate Vue.js report component
+    if (reportVueApp.instance) reportVueApp.instance.activate();
+    // Update Vue.js task controls
+    if (window.updateVueTaskState) window.updateVueTaskState('testing');
 
     $("#report").show();
     $("#notes").hide();
@@ -125,6 +133,10 @@ function interface_fn_error(info) {
     $("#finished_task_buttons").show();
     $("#bmi").hide();
     this.report.deactivate();
+    // Deactivate Vue.js report component
+    if (reportVueApp.instance) reportVueApp.instance.deactivate();
+    // Update Vue.js task controls
+    if (window.updateVueTaskState) window.updateVueTaskState('error');
 
     $("#report").show()
     this.controls.deactivate();
@@ -141,6 +153,10 @@ function interface_fn_errtest(info) {
     $("#finished_task_buttons").hide();
     $("#bmi").hide();
     this.report.deactivate();
+    // Deactivate Vue.js report component
+    if (reportVueApp.instance) reportVueApp.instance.deactivate();
+    // Update Vue.js task controls
+    if (window.updateVueTaskState) window.updateVueTaskState('errtest');
 
     $("#report").show()
     this.controls.deactivate();
@@ -372,7 +388,7 @@ function TaskEntry(idx, info) {
         $("#entry_name").val("");
         this.status = "stopped";
         this.tr = $("#newentry");
-        this.tr.show(); // make sure the task entry row is visible 
+        this.tr.css('display', 'table-row'); // Show the newentry row with proper table display
         
         feats.clear();
         this.report.hide();
@@ -407,7 +423,7 @@ TaskEntry.prototype.update = function(info) {
     debug("TaskEntry.prototype.update");
 
     // populate the list of generators
-    if (Object.keys(info.generators).length > 0) {
+    if (info.generators && Object.keys(info.generators).length > 0) {
         debug('limiting generators')
         this.sequence.update_available_generators(info.generators);
     } else {
@@ -654,8 +670,14 @@ TaskEntry.prototype.remove = function(callback) {
 
 TaskEntry.prototype._task_query = function(callback, update_params=true, update_metadata=false) {
     debug('TaskEntry.prototype._task_query')
-    var taskid = $("#tasks").attr("value");
+    var taskid = $("#tasks").val();
     var sel_feats = feats.get_checked_features();
+    
+    // Ensure a task is selected
+    if (!taskid) {
+        alert("Please select a task first");
+        return;
+    }
 
     $.getJSON("ajax/task_info/"+taskid+"/", sel_feats,
         function(taskinfo) {
@@ -761,6 +783,8 @@ TaskEntry.prototype.run = function(save, exec) {
                 this.new_row(info);
                 this.start_button_pressed = true;
                 this.report.activate();
+                // Activate Vue.js report component
+                if (reportVueApp.instance) reportVueApp.instance.activate();
                 this.report.set_mode("running");            
             } else if (info.status == "completed") {
                 this.new_row(info);
@@ -820,7 +844,7 @@ TaskEntry.prototype.new_row = function(info) {
 
 TaskEntry.prototype.get_data = function() {
     var data = {};
-    data['task'] = parseInt($("#tasks").attr("value"));
+    data['task'] = parseInt($("#tasks").val());
     data['feats'] = feats.get_checked_features();
     data['params'] = this.params.to_json();
     data['metadata'] = this.metadata.get_data();
@@ -930,6 +954,10 @@ function Notes(idx) {
 }
 Notes.prototype.update = function(notes) {
     //debug("Updating notes to \""+notes+"\"");
+    if (!notes) {
+        console.warn("Notes.update called with invalid notes:", notes);
+        notes = "";
+    }
     $("#notes textarea").attr("value", notes);
 }
 Notes.prototype.activate = function() {
@@ -1006,6 +1034,13 @@ function Controls() {
 }
 Controls.prototype.update = function(controls) {
     debug("Updating controls");
+    
+    // Guard against undefined/null controls
+    if (!controls || !Array.isArray(controls)) {
+        console.warn("Controls.update called with invalid controls:", controls);
+        return;
+    }
+    
     $("#controls_table").html('');
     this.control_list = [];
     this.static_control_list = [];

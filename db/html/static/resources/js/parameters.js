@@ -13,6 +13,16 @@ function Parameters(editable=false) {
     this.editable = editable;
 }
 Parameters.prototype.update = function(desc) {
+    // Guard against undefined/null info
+    if (!desc || typeof desc !== 'object') {
+        console.warn("Parameters.update called with invalid desc:", desc);
+        return;
+    }
+    
+    // Note: We intentionally do NOT delegate to Vue for metadata Parameters
+    // Metadata uses its own jQuery-based Parameters instance
+    // Only the main task parameters (at #parameters_vue) use Vue
+    
     // Update the parameters descriptor to include the updated values
     // "desc" is a JSON object of form {"param1": {"value": value, "type": type, "desc": string description}, "param2": ...}
     // if the parameter is a drop-down, the parameter's info should also have an "options" field
@@ -53,6 +63,10 @@ Parameters.prototype.update = function(desc) {
 }
 
 Parameters.prototype.append = function(desc) {
+    // Note: We intentionally do NOT delegate to Vue for metadata Parameters
+    // Metadata uses its own jQuery-based Parameters instance
+    // Only the main task parameters use Vue
+    
     // append the given traits to the old traits
 
     var funcs = {
@@ -492,6 +506,10 @@ function get_param_input(input_obj) {
 }
 
 Parameters.prototype.to_json = function(get_all) {
+    // Note: We intentionally do NOT delegate to Vue for metadata Parameters
+    // The metadata table uses jQuery-based Parameters
+    // Only initialize Vue delegate checking if this is clearly being called from #parameters_vue context
+    
     var jsdata = {};
 
     for (var name in this.traits) {
