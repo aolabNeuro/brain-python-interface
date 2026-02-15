@@ -401,7 +401,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     trajectory_radius = traits.Float(.5, desc="Radius of targets in cm")
     trajectory_color = traits.OptionsList("gold", *target_colors, desc="Color of the trajectory", bmi3d_input_options=list(target_colors.keys()))
     trajectory_type = traits.OptionsList("1d", ["1d", "2d", "none"], desc="Type of trajectory to use", bmi3d_input_options=["1d", "2d", "none"])
-    lookahead_time = traits.Float(0.5, desc="Time in seconds to display the future trajectory")
+    lookahead_time = traits.Float(0.5, desc="Time in seconds to display the future trajectory (must be >0)")
     target_color = traits.OptionsList("yellow", *target_colors, desc="Color of the target", bmi3d_input_options=list(target_colors.keys()))
     plant_hide_rate = traits.Float(0.0, desc='If the plant is visible, specifies a percentage of trials where it will be hidden')
     plant_type = traits.OptionsList(*plantlist, bmi3d_input_options=list(plantlist.keys()))
@@ -468,7 +468,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         # Use to debug indexing into reference and disturbance trajectories
         # if self.frame_index >= 0:
         #     print('FRAME ', self.frame_index, self.get_state(), self.trial_timed_out)
-        #     print(self.target.get_position()[2], self.pos_offset[2])
+        #     print(self.target.get_position()[2], self.pos_offset[2], self.trajectory.get_position()[0])
 
         self.move_effector(pos_offset=np.asarray(self.pos_offset), vel_offset=np.asarray(self.vel_offset))
 
@@ -524,7 +524,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.target.move_to_position(self.targs[use_frame_index])
         if self.trajectory_type == '1d':
             self.trajectory.move_to_position(np.array([-use_frame_index*self.lookahead_scale - self.lookahead*self.lookahead_scale,0,0]))
-            # print(use_frame_index, self.trajectory.get_position())
+            # print(self.frame_index, use_frame_index, self.trajectory.get_position())
             
         elif self.trajectory_type == '2d':
             self.trajectory.update_mask(use_frame_index, use_frame_index+self.lookahead)
@@ -556,25 +556,19 @@ class ScreenTargetTracking(TargetTracking, Window):
             del self.trajectory
         if self.trajectory_type == '1d': # self.targs is (nframes, 3)
             # print(self.lookahead_scale)
-            lookbehind = self.targs[0,:]*np.ones((self.lookahead, np.shape(self.targs)[1]))
-            # lookbehind = 5*np.ones((self.lookahead, np.shape(self.targs)[1]))
-            # print(lookbehind.shape) # (n_lookaheadframes, 3)
+            lookbehind = self.targs[0,:]*np.ones((self.lookahead, np.shape(self.targs)[1])) # (n_lookaheadframes, 3)
 
-            next_trajectory = np.concatenate((lookbehind, self.targs), axis=0)
-            # print(next_trajectory.shape) # (n_lookaheadframes + nframes, 3)
+            next_trajectory = np.concatenate((lookbehind, self.targs), axis=0) #(n_lookaheadframes + nframes, 3)
 
-            next_trajectory = np.array(np.squeeze(next_trajectory)[:,2])
-            # print(next_trajectory.shape) # (n_lookaheadframes + nframes,) only the y dim
+            next_trajectory = np.array(np.squeeze(next_trajectory)[:,2]) # (n_lookaheadframes + nframes,) only the y dim
 
             next_trajectory = np.vstack([
                 self.lookahead_scale * np.arange(len(next_trajectory)), # set the lookahead by scaling the trajectory to fit in the screen
                 np.zeros(len(next_trajectory)), 
                 next_trajectory
-            ]).T
-            # print(next_trajectory.shape)
+            ]).T # (n_lookaheadframes + nframes, 3) rows are frames, columns are bmi3d x, y, z coords
 
             self.trajectory = VirtualSnakeTarget(target_radius=self.trajectory_radius, target_color=target_colors[self.trajectory_color], trajectory=next_trajectory)
-            # print(self.trajectory.get_position())
         elif self.trajectory_type == '2d':
             self.trajectory = VirtualSnakeTarget(target_radius=self.trajectory_radius, target_color=target_colors[self.trajectory_color], trajectory=self.targs)
             self.trajectory.update_mask(self.frame_index, self.frame_index+self.lookahead)
