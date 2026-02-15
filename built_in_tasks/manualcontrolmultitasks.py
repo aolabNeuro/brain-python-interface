@@ -10,7 +10,7 @@ from riglib.experiment import traits
 from .target_graphics import *
 from .target_capture_task import ScreenTargetCapture
 from .target_capture_task_xt import ScreenReachAngle, ScreenReachLine, SequenceCapture, ScreenTargetCapture_ReadySet
-from .target_capture_task_eye import EyeConstrainedTargetCapture, HandConstrainedEyeCapture, ScreenTargetCapture_Saccade
+from .target_capture_task_eye import EyeConstrainedTargetCapture, HandConstrainedEyeCapture, EyeConstrainedHandCapture, EyeHandSequenceCapture, ScreenTargetCapture_Saccade
 from .target_tracking_task import ScreenTargetTracking
 from .rotation_matrices import *
 
@@ -214,6 +214,18 @@ class EyeConstrainedManualControl(ManualControlMixin, EyeConstrainedTargetCaptur
 class HandConstrainedSaccadeTask(ManualControlMixin, HandConstrainedEyeCapture):
     '''
     Saccade task while holding different targets by hand
+    '''
+    pass
+
+class EyeHandSequenceTask(ManualControlMixin, EyeHandSequenceCapture):
+    '''
+    Eye-hand sequence task where the hand go cue and the eye go cue come separately or simultaneously
+    '''
+    pass
+
+class EyeConstrainedReachingTask(ManualControlMixin, EyeConstrainedHandCapture):
+    '''
+    Saccade and reaching task. The initial eye and hand positions are different, but the goal target is the same.
     '''
     pass
 

@@ -38,6 +38,9 @@ target_colors = {
     "white": (1, 1, 1, 0.75),
     "black": (0, 0, 0, 0.75),
     "invisible": (0, 0, 0, 0.0),
+    "bright_white":  (1, 1, 1, 1),
+    "eye_color": (0.7, 0.7, 0.7, 1.),
+    "fixation_color": (0., 0.7, 0.7, 1),
 }
 
 class CircularTarget(object): 
@@ -147,18 +150,16 @@ class VirtualRectangularTarget(RectangularTarget):
         self.cube.rotate_z(angle, reset=reset)
 
     def cue_trial_start(self):
-        self.cube.color = RED
+        self.cube.color = self.target_color
         self.show()
 
     def cue_trial_end_success(self):
         self.cube.color = GREEN
 
     def cue_trial_end_failure(self):
-        self.cube.color = YELLOW
-        self.hide()
+        self.cube.color = RED
 
     def idle(self):
-        self.cube.color = RED
         self.hide()
 
     def pt_inside(self, pt):
