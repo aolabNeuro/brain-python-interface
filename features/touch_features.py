@@ -7,11 +7,82 @@ from riglib import touch_data
 import numpy as np
 import pygame
 from riglib.experiment import traits
-
+from riglib.touch_data import TabletTouchData
+import subprocess
 
 ########################################################################################################
 # Touch sensor datasources
 ########################################################################################################
+
+class TabletTouch(traits.HasTraits):
+
+    host_ip = traits.String("192.168.0.150", desc="The ip address of the bmi host machine.")
+    port_value = traits.Int(8000, desc='The port value to identify which tablet is running.')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Create a source to buffer the touch data
+        from riglib import source
+        TabletTouchData.udp_port = self.port_value + 5
+        self.touch_data = source.DataSource(TabletTouchData)
+
+        if self.port_value == 8000:
+            self.tablet_ip = "192.168.0.100"
+            self.tablet_username = "AOLabs"
+        elif self.port_value == 9000:
+            self.tablet_ip = "192.168.0.200"
+            self.tablet_username = "aolab"
+        elif self.port_value== 7000:
+            self.tablet_ip = "192.168.0.170" # 300
+        elif self.port_value == 8500:
+            self.tablet_ip = "192.168.0.201"
+            self.tablet_username = "AOLabs"
+        else:
+            print('uh oh')
+            self.tablet_ip = "192.168.0.150"
+
+        # Save to the sink
+        from riglib import sink
+        sink_manager = sink.SinkManager.get_instance()
+        sink_manager.register(self.touch_data)
+
+    def run(self):
+        '''
+        Code to execute immediately prior to the beginning of the task FSM executing, or after the FSM has finished running. 
+        See riglib.experiment.Experiment.run(). This 'run' method starts the motiondata source and stops it after the FSM has finished running
+        '''
+        self.touch_data.start()
+        try:
+            print("Starting touch app")
+            ssh_cmd = ["ssh", f"{self.tablet_username}@{self.tablet_ip}", rf"C:\Users\tablet_touch\start_touch.bat", rf"{self.host_ip}", rf"{self.port_value + 5}"]
+            subprocess.Popen(ssh_cmd)
+            super().run()
+        finally:
+            print("Stopping touch streaming")
+            self.touch_data.stop()
+            print("Stopping touch app")
+            ssh_cmd = ["ssh", f"{self.tablet_username}@{self.tablet_ip}", rf"C:\Users\tablet_touch\exit_touch.bat"]
+            subprocess.Popen(ssh_cmd)
+
+    def _get_manual_position(self):
+        ''' Overridden method to get input coordinates based on touch data'''
+
+        # Get data from optitrack datasource
+        data = self.touch_data.get(all=True) # List of (list of features)
+        if len(data) == 0:
+            return [np.nan, np.nan, np.nan]
+        
+        # Check if the last event was a finger up
+        if data[-1][0] == -1:
+            return [np.nan, np.nan, np.nan]
+
+        # Otherwise get the most recent touch position
+        pos = np.array(data[-1])[1:].astype(float) # get the most recent event
+        pos[0] = (pos[0] / self.window_size[0] - 0.5) * self.screen_cm[0]
+        pos[1] = -(pos[1] / self.window_size[1] - 0.5) * self.screen_cm[1] # pygame counts (0,0) as the top left
+
+        return [pos[0], pos[1], 0]
 
 class MouseEmulateTouch(traits.HasTraits):
     '''
