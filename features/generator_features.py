@@ -338,19 +338,19 @@ class IncrementalRotation(traits.HasTraits):
 
 class HideLeftTrajectory(traits.HasTraits):
     '''
-    Hide the left side of the tracking trajectory. 
-    This will cover the 'lookbehind' of the target trajectory. 
+    Hide the left side of the 1d target trajectory. 
+    This will make only the 'lookahead' of the trajectory visible. The 'lookbehind' will be blacked out.
     Useful for task with bumpers.
     '''
 
     def setup_start_wait(self):
         super().setup_start_wait()
-        print(self.frame_index)
-        self.trajectory.update_mask(self.lookahead+2, self.lookahead*2)
+        self.trajectory.update_mask(self.lookahead, self.lookahead*2+1) # frame indices to show 
+        # a total of lookahead*2+1 frames spans the screen width: lookahead index is at center with n_lookahead frames on either side
                                     
     def update_frame(self):
-        super().update_frame()
-        self.trajectory.update_mask(self.frame_index+self.lookahead+1, self.frame_index+2*self.lookahead)
+        self.trajectory.update_mask(self.lookahead+self.frame_index, self.lookahead*2+1+self.frame_index) # frame indices to show
+        super().update_frame() # frame_index is incremented at the end of update_frame(), so need to update trajectory mask before this
 
 class ReadysetMedley(traits.HasTraits):
 
