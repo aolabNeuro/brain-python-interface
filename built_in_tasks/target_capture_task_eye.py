@@ -636,12 +636,15 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
     In simultaneous trials, they need to simultaneously move eye and hand to the target, responding a single go cue.
     '''
 
-    exclude_parent_traits = ['delay_time', 'rand_delay','prob_catch_trials','short_delay_catch_trials']
-    rand_delay_eye = traits.Tuple((0.4, 0.7), desc="Delay interval for eye in sequence trials, and for eye and hand in simultaneous trials")
-    rand_delay_hand = traits.Tuple((0., 0.5), desc="Delay interval for hand only used in sequence trials")
+    exclude_parent_traits = ['delay_time', 'rand_delay','prob_catch_trials','short_delay_catch_trials','reward_time']
+    rand_delay_eye_hand = traits.Tuple((0.4, 0.7), desc="Delay interval for eye and hand in simultaneous trials")
+    rand_delay_eye = traits.Tuple((0.4, 0.7), desc="Delay interval for eye in sequence trials")
+    rand_delay_hand = traits.Tuple((0., 0.5), desc="Delay interval for hand in sequence trials")
     fixation_time = traits.Float(.3, desc="fixation duration during which subjects have to keep fixating the first eye target")
     trials_block_sequence = traits.Int(100, desc='Trial numbers of the block in sequence trials')
     trials_block_simultaneous = traits.Int(100, desc='Trial numbers of the block in simultaneous trials')
+    reward_time_sequence = traits.Float(.7, desc="Reward time in sequence trials")
+    reward_time_simultaneous = traits.Float(.5, desc="Reward time in simultaneous trials")
     diff_eye_hand_RTs_thr = traits.Float(0.5, desc="Accepted difference between eye and hand RTs in simultaneous trials")
     coordination_penalty_time = traits.Float(0.5, desc="Length of penalty time for less coordinated eye and hand movement in simultaneous trials")
     hand_RTs_thr_simul = traits.Float(0.55, desc="Accepted reach RTs in simultaneous trials")
@@ -815,7 +818,9 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
         Test whether the delay period is over. In sequence trials, there are 2 delay period for each eye and hand.
         In simultaneous trials, there is only 1 delay period.
         '''
-        if self.target_index == 0:
+        if self.target_index == 0 and self.is_simultaneous:
+            return ts > self.delay_time_eye_hand
+        elif self.target_index == 0 and self.is_sequence:
             return ts > self.delay_time_eye
         elif self.target_index == 1 and self.is_sequence:
             return ts > self.delay_time_hand
@@ -871,6 +876,8 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
             self.delay_time_eye = random.random()*(e-s) + s
             s, e = self.rand_delay_hand
             self.delay_time_hand = random.random()*(e-s) + s
+            s, e = self.rand_delay_eye_hand
+            self.delay_time_eye_hand = random.random()*(e-s) + s
 
             # Decide sequence or simultaneous trials  
             self.trial_count_blocks = self.calc_state_occurrences('reward') % self.trials_all_blocks
@@ -880,12 +887,14 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
                 self.is_sequence = False
                 self.chain_length = 2
                 self.reaction_time_thr = self.hand_RTs_thr_simul
+                self.reward_time = self.reward_time_simultaneous
 
             elif self.trial_count_blocks - self.trials_block_simultaneous < self.trials_block_sequence:
                 self.is_simultaneous = False
                 self.is_sequence = True
                 self.chain_length = 3
                 self.reaction_time_thr = self.hand_RTs_thr_seq
+                self.reward_time = self.reward_time_sequence
 
             self.task_data['is_sequence'] = self.is_sequence
 
