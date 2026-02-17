@@ -405,12 +405,15 @@ class HideCursorReturn(traits.HasTraits):
         self.plant_visible = False
 
     def _while_target(self):
-        
-        if self.target_index == 0:
-            cursor_pos = self.plant.get_endpoint_pos()
-            dist_from_center = np.linalg.norm(cursor_pos - self.targs[self.target_index])
-            if dist_from_center < self.show_cursor_return:
-                self.plant_visible = True 
+        if self.calc_trial_num() > 0:
+            if self.target_index == 0:
+                cursor_pos = self.plant.get_endpoint_pos()
+                dist_from_center = np.linalg.norm(cursor_pos - self.targs[self.target_index])
+                if dist_from_center < self.show_cursor_return:
+                    self.plant_visible = True 
+                else:
+                    self.plant_visible = False
+                
     
     def _start_hold_penalty(self):
         super()._start_hold_penalty()
