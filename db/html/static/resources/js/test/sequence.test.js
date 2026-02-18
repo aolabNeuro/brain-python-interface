@@ -1,8 +1,8 @@
 // Use "require" only if run from command line
 if (typeof(require) !== 'undefined') {
-    Parameters = require('../parameters.js').Parameters;
-    Sequence = require('../sequence.js').Sequence;
-    var $ = require('../sequence.js').$;
+	Parameters = require('../parameters-vue.js').Parameters;
+	Sequence = require('../sequence-vue.js').Sequence;
+	var $ = require('../sequence-vue.js').$;
 }
 
 QUnit.test("Sequence manipulation", function(assert) {

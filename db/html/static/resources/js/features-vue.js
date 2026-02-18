@@ -5,6 +5,8 @@
  * Replaces jQuery-based feature checkbox handling
  */
 
+const featuresRoot = typeof window !== 'undefined' ? window : globalThis;
+
 const featuresApp = {
     el: '#features_vue',
     data() {
@@ -140,14 +142,14 @@ const featuresApp = {
     }
 };
 
-// Export for use in list.js
-window.featuresApp = featuresApp;
+// Export for use in list-vue.js
+featuresRoot.featuresApp = featuresApp;
 
 /**
  * Bridge function to initialize features from template data
- * Called from list.js when TaskEntry is created
+ * Called from list-vue.js when TaskEntry is created
  */
-window.initializeVueFeatures = function(featuresList) {
+featuresRoot.initializeVueFeatures = function(featuresList) {
     if (featuresApp.instance && featuresApp.instance.initializeFeatures) {
         featuresApp.instance.initializeFeatures(featuresList);
     }
@@ -155,9 +157,9 @@ window.initializeVueFeatures = function(featuresList) {
 
 /**
  * Bridge function to get selected features from Vue
- * Called from list.js when submitting form
+ * Called from list-vue.js when submitting form
  */
-window.getVueSelectedFeatures = function() {
+featuresRoot.getVueSelectedFeatures = function() {
     if (featuresApp.instance) {
         return featuresApp.instance.getSelectedFeatureNames();
     }
@@ -169,21 +171,21 @@ function Features() {
 }
 
 Features.prototype.clear = function() {
-    if (window.featuresApp && window.featuresApp.instance) {
-        window.featuresApp.instance.deselectAll();
+    if (featuresRoot.featuresApp && featuresRoot.featuresApp.instance) {
+        featuresRoot.featuresApp.instance.deselectAll();
     }
 };
 
 Features.prototype.select_features = function(info_feats) {
-    if (window.featuresApp && window.featuresApp.instance) {
-        window.featuresApp.instance.setSelectedFeatures(info_feats);
+    if (featuresRoot.featuresApp && featuresRoot.featuresApp.instance) {
+        featuresRoot.featuresApp.instance.setSelectedFeatures(info_feats);
     }
 };
 
 Features.prototype.get_checked_features = function () {
     const feats = {};
-    if (window.featuresApp && window.featuresApp.instance) {
-        const selectedNames = window.featuresApp.instance.getSelectedFeatureNames();
+    if (featuresRoot.featuresApp && featuresRoot.featuresApp.instance) {
+        const selectedNames = featuresRoot.featuresApp.instance.getSelectedFeatureNames();
         selectedNames.forEach(name => {
             feats[name] = true;
         });
@@ -192,27 +194,32 @@ Features.prototype.get_checked_features = function () {
 };
 
 Features.prototype.disable_entry = function () {
-    if (window.featuresApp && window.featuresApp.instance) {
-        window.featuresApp.instance.setDisabled(true);
+    if (featuresRoot.featuresApp && featuresRoot.featuresApp.instance) {
+        featuresRoot.featuresApp.instance.setDisabled(true);
     }
 };
 
 Features.prototype.enable_entry = function() {
-    if (window.featuresApp && window.featuresApp.instance) {
-        window.featuresApp.instance.setDisabled(false);
+    if (featuresRoot.featuresApp && featuresRoot.featuresApp.instance) {
+        featuresRoot.featuresApp.instance.setDisabled(false);
     }
 };
 
 Features.prototype.bind_change_callback = function(callback) {
-    if (window.featuresApp && window.featuresApp.instance) {
-        window.featuresApp.instance.bindChangeCallback(callback);
+    if (featuresRoot.featuresApp && featuresRoot.featuresApp.instance) {
+        featuresRoot.featuresApp.instance.bindChangeCallback(callback);
     }
 };
 
 Features.prototype.unbind_change_callback = function() {
-    if (window.featuresApp && window.featuresApp.instance) {
-        window.featuresApp.instance.unbindChangeCallback();
+    if (featuresRoot.featuresApp && featuresRoot.featuresApp.instance) {
+        featuresRoot.featuresApp.instance.unbindChangeCallback();
     }
 };
 
-window.Features = Features;
+featuresRoot.Features = Features;
+
+if (typeof(module) !== 'undefined' && module.exports) {
+  exports.Features = Features;
+    exports.$ = (typeof $ !== 'undefined') ? $ : undefined;
+}

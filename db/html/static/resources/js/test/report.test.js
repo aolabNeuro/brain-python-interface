@@ -1,7 +1,7 @@
 // Use "require" only if run from command line
 if (typeof(require) !== 'undefined') {
-    Report = require('../report.js').Report;
-    var $ = require('../report.js').$;
+	Report = require('../report-vue.js').Report;
+	var $ = require('../report-vue.js').$;
 }
 
 QUnit.test("Report tests", function(assert) {

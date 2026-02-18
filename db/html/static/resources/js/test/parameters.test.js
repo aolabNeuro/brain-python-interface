@@ -1,7 +1,7 @@
 // Use "require" only if run from command line
 if (typeof(require) !== 'undefined') {
-    Parameters = require('../report.js').Parameters;
-    var $ = require('../report.js').$;
+	Parameters = require('../parameters-vue.js').Parameters;
+	var $ = require('../parameters-vue.js').$;
 }
 
 QUnit.test("Parameters creation", function( assert ) {

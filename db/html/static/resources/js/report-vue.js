@@ -8,6 +8,8 @@
  * - Less boilerplate code
  */
 
+const reportRoot = typeof window !== 'undefined' ? window : globalThis;
+
 // Create the Vue app for the report section
 const reportApp = {
     el: '#report_div',
@@ -200,8 +202,8 @@ const reportApp = {
     }
 };
 
-// Export for use in list.js
-window.reportVueApp = reportApp;
+// Export for use in list-vue.js
+reportRoot.reportVueApp = reportApp;
 
 function Report(notify_callback) {
     this.notify = notify_callback;
@@ -210,9 +212,9 @@ function Report(notify_callback) {
 }
 
 Report.prototype.activate = function() {
-    if (window.reportVueApp && window.reportVueApp.instance) {
-        window.reportVueApp.instance.externalNotify = this.notify;
-        window.reportVueApp.instance.activate();
+    if (reportRoot.reportVueApp && reportRoot.reportVueApp.instance) {
+        reportRoot.reportVueApp.instance.externalNotify = this.notify;
+        reportRoot.reportVueApp.instance.activate();
     }
 };
 
@@ -225,38 +227,38 @@ Report.prototype.update = function(info) {
         this.notify(info);
     }
 
-    if (!window.reportVueApp || !window.reportVueApp.instance) {
+    if (!reportRoot.reportVueApp || !reportRoot.reportVueApp.instance) {
         return;
     }
 
     if (info.status && info.status === "stdout") {
-        window.reportVueApp.instance.stdoutText += (info.msg || '') + '\n';
+        reportRoot.reportVueApp.instance.stdoutText += (info.msg || '') + '\n';
     } else if (info.status && info.status === "error") {
-        window.reportVueApp.instance.addMessage(info.msg || 'Error', 'error');
+        reportRoot.reportVueApp.instance.addMessage(info.msg || 'Error', 'error');
     } else {
-        window.reportVueApp.instance.reportStats = info;
+        reportRoot.reportVueApp.instance.reportStats = info;
     }
 };
 
 Report.prototype.manual_update = function() {
-    if (window.reportVueApp && window.reportVueApp.instance) {
-        window.reportVueApp.instance.manualUpdate();
+    if (reportRoot.reportVueApp && reportRoot.reportVueApp.instance) {
+        reportRoot.reportVueApp.instance.manualUpdate();
     }
 };
 
 Report.prototype.destroy = function () {
-    if (window.reportVueApp && window.reportVueApp.instance) {
-        window.reportVueApp.instance.reportStats = {};
-        window.reportVueApp.instance.stdoutText = '';
-        window.reportVueApp.instance.messages = [];
-        window.reportVueApp.instance.externalNotify = null;
+    if (reportRoot.reportVueApp && reportRoot.reportVueApp.instance) {
+        reportRoot.reportVueApp.instance.reportStats = {};
+        reportRoot.reportVueApp.instance.stdoutText = '';
+        reportRoot.reportVueApp.instance.messages = [];
+        reportRoot.reportVueApp.instance.externalNotify = null;
     }
 };
 
 Report.prototype.deactivate = function() {
-    if (window.reportVueApp && window.reportVueApp.instance) {
-        window.reportVueApp.instance.deactivate();
-        window.reportVueApp.instance.externalNotify = null;
+    if (reportRoot.reportVueApp && reportRoot.reportVueApp.instance) {
+        reportRoot.reportVueApp.instance.deactivate();
+        reportRoot.reportVueApp.instance.externalNotify = null;
     }
 };
 
@@ -272,4 +274,9 @@ Report.prototype.set_mode = function(mode) {
     this.mode = mode;
 };
 
-window.Report = Report;
+reportRoot.Report = Report;
+
+if (typeof(module) !== 'undefined' && module.exports) {
+    exports.Report = Report;
+    exports.$ = (typeof $ !== 'undefined') ? $ : undefined;
+}

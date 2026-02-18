@@ -88,12 +88,12 @@ const taskControlsApp = {
     }
 };
 
-// Export for use in list.js
+// Export for use in list-vue.js
 window.taskControlsApp = taskControlsApp;
 
 /**
  * Bridge function to update Vue state from jQuery event handlers
- * Called from list.js when task state changes
+ * Called from list-vue.js when task state changes
  */
 window.updateVueTaskState = function(newState) {
     if (taskControlsApp.instance && taskControlsApp.instance.updateTaskState) {
