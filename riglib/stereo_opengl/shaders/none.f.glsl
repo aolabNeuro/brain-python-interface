@@ -13,5 +13,7 @@ void main() {
         texcolor.rgb + basecolor.rgb,
         texcolor.a * basecolor.a
     );
+    if (frag_diffuse.a < 0.01)
+        discard;
     FragColor = frag_diffuse;
 }
