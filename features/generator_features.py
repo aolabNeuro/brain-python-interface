@@ -402,3 +402,43 @@ class ReadysetColorChange(traits.HasTraits):
 
     def _end_tooslow_penalty(self):
         self.sync_event('TRIAL_END')
+
+class HideCursorReturn(traits.HasTraits):
+
+    '''
+    Hide the cursor during the return to center after a reward or penalty. 
+    Display again when cursor is within some user specified distance of center of the center target.
+
+    '''
+    show_cursor_return = traits.Float(3, desc = 'Distance from center at which to turn curson on')
+
+    def _start_reward(self):
+        super()._start_reward()
+        self.plant_visible = False 
+    
+    def _while_target(self):
+
+        if self.calc_trial_num() > 0: #skip logic for very first trial of block 
+            if self.target_index == 0: 
+                cursor_pos = self.plant.get_endpoint_pos()
+                dist_from_center = np.linalg.norm(cursor_pos - self.targs[self.target_index])
+                if dist_from_center < self.show_cursor_return:
+                    self.plant_visible = True
+                else:
+                    self.plant_visible = False
+    
+    def _start_hold_penalty(self):
+        super()._start_hold_penalty()
+        self.plant_visible = False
+
+    def _start_timeout_penalty(self):
+        super()._start_timeout_penalty()
+        self.plant_visible = False
+    
+    def _start_delay_penalty(self):
+        super()._start_delay_penalty()
+        self.plant_visible = False  
+
+    def _start_tooslow_penalty(self):
+        super()._start_tooslow_penalty()
+        self.plant_visible = False
