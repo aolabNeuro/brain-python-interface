@@ -20,6 +20,7 @@ const reportApp = {
             ws: null,
             reconnectAttempts: 0,
             maxReconnectAttempts: 10,
+            externalNotify: null,
         };
     },
     computed: {
@@ -71,6 +72,9 @@ const reportApp = {
                         if (data.type === 'task_status') {
                             // Update report stats - Vue will automatically re-render
                             this.reportStats = data.reportstats || {};
+                            if (typeof this.externalNotify === 'function') {
+                                this.externalNotify(this.reportStats);
+                            }
                         } else if (data.type === 'error') {
                             this.addMessage(`Error: ${data.message}`, 'error');
                         } else if (data.type === 'stdout') {
@@ -198,3 +202,74 @@ const reportApp = {
 
 // Export for use in list.js
 window.reportVueApp = reportApp;
+
+function Report(notify_callback) {
+    this.notify = notify_callback;
+    this.mode = "";
+    this.fps_log = [];
+}
+
+Report.prototype.activate = function() {
+    if (window.reportVueApp && window.reportVueApp.instance) {
+        window.reportVueApp.instance.externalNotify = this.notify;
+        window.reportVueApp.instance.activate();
+    }
+};
+
+Report.prototype.update = function(info) {
+    if (!info || typeof info !== 'object') {
+        return;
+    }
+
+    if (typeof(this.notify) === "function" && !$.isEmptyObject(info)) {
+        this.notify(info);
+    }
+
+    if (!window.reportVueApp || !window.reportVueApp.instance) {
+        return;
+    }
+
+    if (info.status && info.status === "stdout") {
+        window.reportVueApp.instance.stdoutText += (info.msg || '') + '\n';
+    } else if (info.status && info.status === "error") {
+        window.reportVueApp.instance.addMessage(info.msg || 'Error', 'error');
+    } else {
+        window.reportVueApp.instance.reportStats = info;
+    }
+};
+
+Report.prototype.manual_update = function() {
+    if (window.reportVueApp && window.reportVueApp.instance) {
+        window.reportVueApp.instance.manualUpdate();
+    }
+};
+
+Report.prototype.destroy = function () {
+    if (window.reportVueApp && window.reportVueApp.instance) {
+        window.reportVueApp.instance.reportStats = {};
+        window.reportVueApp.instance.stdoutText = '';
+        window.reportVueApp.instance.messages = [];
+        window.reportVueApp.instance.externalNotify = null;
+    }
+};
+
+Report.prototype.deactivate = function() {
+    if (window.reportVueApp && window.reportVueApp.instance) {
+        window.reportVueApp.instance.deactivate();
+        window.reportVueApp.instance.externalNotify = null;
+    }
+};
+
+Report.prototype.hide = function() {
+    $("#report").hide();
+};
+
+Report.prototype.show = function() {
+    $("#report").show();
+};
+
+Report.prototype.set_mode = function(mode) {
+    this.mode = mode;
+};
+
+window.Report = Report;

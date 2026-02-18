@@ -914,6 +914,11 @@ TaskEntry.prototype.link_new_files = function() {
 // Metadata class
 //
 function Metadata() {
+    this.useVue = !!(window.metadataApp && window.metadataApp.instance);
+    if (this.useVue) {
+        return;
+    }
+
     $("#metadata_table").html("")
     var params = new Parameters(editable=true);
     this.params = params;
@@ -924,22 +929,41 @@ function Metadata() {
     $("#metadata_table").append(add_new_row);
 }
 Metadata.prototype.update = function(info) {
+    if (this.useVue && window.metadataApp && window.metadataApp.instance) {
+        window.metadataApp.instance.updateMetadata(info);
+        return;
+    }
     this.params.update(info)
 }
 Metadata.prototype.enable = function() {
+    if (this.useVue && window.metadataApp && window.metadataApp.instance) {
+        window.metadataApp.instance.setEditMode(true);
+        return;
+    }
     this.params.enable();
     this.add_new_row.show();
 }
 Metadata.prototype.disable = function() {
+    if (this.useVue && window.metadataApp && window.metadataApp.instance) {
+        window.metadataApp.instance.setEditMode(false);
+        return;
+    }
     this.params.disable();
     this.add_new_row.hide();
 }
 Metadata.prototype.get_data = function () {
+    if (this.useVue && window.metadataApp && window.metadataApp.instance) {
+        return window.metadataApp.instance.getMetadataValues();
+    }
     var data = this.params.to_json();
     return data;
 }
 Metadata.prototype.reset = function () {
     // clear the metadata values but leave the fields alone
+    if (this.useVue && window.metadataApp && window.metadataApp.instance) {
+        window.metadataApp.instance.updateMetadata(window.metadataApp.instance.metadata || {});
+        return;
+    }
     this.params.clear_all();
 }
 

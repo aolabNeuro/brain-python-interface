@@ -12,6 +12,8 @@ const featuresApp = {
             features: [],  // Will be populated from template data
             selectedFeatures: {},  // Map of feature name -> selected boolean
             searchQuery: '',  // For filtering features
+            isDisabled: false,
+            changeCallback: null,
         };
     },
     computed: {
@@ -44,11 +46,18 @@ const featuresApp = {
         }
     },
     methods: {
+        notifyChange() {
+            if (typeof this.changeCallback === 'function') {
+                this.changeCallback();
+            }
+        },
+
         /**
          * Toggle a feature's selected state
          */
         toggleFeature(featureName) {
             this.selectedFeatures[featureName] = !this.selectedFeatures[featureName];
+            this.notifyChange();
         },
 
         /**
@@ -62,6 +71,7 @@ const featuresApp = {
                 selectedObj[f.name] = false;  // Start with all unchecked
             });
             this.selectedFeatures = selectedObj;
+            this.notifyChange();
         },
 
         /**
@@ -71,6 +81,7 @@ const featuresApp = {
             this.filteredFeatures.forEach(f => {
                 this.selectedFeatures[f.name] = true;
             });
+            this.notifyChange();
         },
 
         /**
@@ -80,6 +91,7 @@ const featuresApp = {
             this.filteredFeatures.forEach(f => {
                 this.selectedFeatures[f.name] = false;
             });
+            this.notifyChange();
         },
 
         /**
@@ -107,6 +119,19 @@ const featuresApp = {
                 }
             });
             this.selectedFeatures = selected;
+            this.notifyChange();
+        },
+
+        setDisabled(disabled) {
+            this.isDisabled = !!disabled;
+        },
+
+        bindChangeCallback(callback) {
+            this.changeCallback = callback;
+        },
+
+        unbindChangeCallback() {
+            this.changeCallback = null;
         }
     },
 
@@ -138,3 +163,56 @@ window.getVueSelectedFeatures = function() {
     }
     return [];
 };
+
+function Features() {
+    this.features_obj = $("#features");
+}
+
+Features.prototype.clear = function() {
+    if (window.featuresApp && window.featuresApp.instance) {
+        window.featuresApp.instance.deselectAll();
+    }
+};
+
+Features.prototype.select_features = function(info_feats) {
+    if (window.featuresApp && window.featuresApp.instance) {
+        window.featuresApp.instance.setSelectedFeatures(info_feats);
+    }
+};
+
+Features.prototype.get_checked_features = function () {
+    const feats = {};
+    if (window.featuresApp && window.featuresApp.instance) {
+        const selectedNames = window.featuresApp.instance.getSelectedFeatureNames();
+        selectedNames.forEach(name => {
+            feats[name] = true;
+        });
+    }
+    return feats;
+};
+
+Features.prototype.disable_entry = function () {
+    if (window.featuresApp && window.featuresApp.instance) {
+        window.featuresApp.instance.setDisabled(true);
+    }
+};
+
+Features.prototype.enable_entry = function() {
+    if (window.featuresApp && window.featuresApp.instance) {
+        window.featuresApp.instance.setDisabled(false);
+    }
+};
+
+Features.prototype.bind_change_callback = function(callback) {
+    if (window.featuresApp && window.featuresApp.instance) {
+        window.featuresApp.instance.bindChangeCallback(callback);
+    }
+};
+
+Features.prototype.unbind_change_callback = function() {
+    if (window.featuresApp && window.featuresApp.instance) {
+        window.featuresApp.instance.unbindChangeCallback();
+    }
+};
+
+window.Features = Features;

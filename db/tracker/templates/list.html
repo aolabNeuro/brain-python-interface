@@ -15,16 +15,14 @@
 <script src='https://unpkg.com/vue@3/dist/vue.global.js' type='text/javascript'></script>
 
 <script src='{{ STATIC_PREFIX }}resources/js/sequence.js' type='text/javascript'></script>
-<script src='{{ STATIC_PREFIX }}resources/js/features.js' type='text/javascript'></script>
-<script src='{{ STATIC_PREFIX }}resources/js/collections.js' type='text/javascript'></script>
+<script src='{{ STATIC_PREFIX }}resources/js/collections-vue.js' type='text/javascript'></script>
 <script src='{{ STATIC_PREFIX }}resources/js/parameters.js' type='text/javascript'></script>
 <script src='{{ STATIC_PREFIX }}resources/js/list.js' type='text/javascript'></script>
 <script src='{{ STATIC_PREFIX }}resources/js/bmi.js' type='text/javascript'></script>
-<script src='{{ STATIC_PREFIX }}resources/js/report.js' type='text/javascript'></script>
 <script src='{{ STATIC_PREFIX }}resources/js/report-vue.js' type='text/javascript'></script>
-<script src='{{ STATIC_PREFIX }}resources/js/controls-vue.js' type='text/javascript'></script>
 <script src='{{ STATIC_PREFIX }}resources/js/features-vue.js' type='text/javascript'></script>
 <script src='{{ STATIC_PREFIX }}resources/js/parameters-vue.js' type='text/javascript'></script>
+<script src='{{ STATIC_PREFIX }}resources/js/metadata-vue.js' type='text/javascript'></script>
 <script src='{{ STATIC_PREFIX }}resources/js/filters-vue.js' type='text/javascript'></script>
 
 
@@ -41,6 +39,16 @@
         id: {{ f.id }},
         name: "{{ f.name }}",
         desc: "{{ f.desc }}"
+      },
+    {% endfor %}
+  ];
+
+  var initialCollections = [
+    {% for c in collections %}
+      {
+        id: {{ c.id }},
+        name: "{{ c.name|escapejs }}",
+        safe_name: "{{ c.safe_name|escapejs }}"
       },
     {% endfor %}
   ];
@@ -61,10 +69,19 @@
     // Initialize parameters component
     const parametersComponentApp = createApp(parametersApp);
     parametersApp.instance = parametersComponentApp.mount('#parameters_vue');
+
+    // Initialize metadata component
+    const metadataComponentApp = createApp(metadataApp);
+    metadataApp.instance = metadataComponentApp.mount('#metadata_vue');
     
     // Initialize filters component
     const filtersComponentApp = createApp(filtersApp);
     filtersApp.instance = filtersComponentApp.mount('#filters_vue');
+
+    // Initialize collections component
+    const collectionsComponentApp = createApp(collectionsApp);
+    collectionsApp.instance = collectionsComponentApp.mount('#collections_vue');
+    collectionsApp.instance.initializeCollections(initialCollections);
     
     $("table#main tr").each(function() {
       // Register a click callback for each row of the 'main' table
@@ -496,7 +513,59 @@
 
               <fieldset id="metadata">
                 <legend>Metadata</legend>
-                <table id="metadata_table"></table>
+                <div id="metadata_vue">
+                  <table class="parameters_table" v-if="orderedMetadataEntries.length > 0">
+                    <tbody>
+                      <tr v-for="entry in orderedMetadataEntries" :key="entry[0]" :title="fieldTitle(entry[1])">
+                        <td class="param_label" style="text-align: right;">
+                          <label :for="inputId(entry[0])" v-text="fieldLabel(entry[0], entry[1])"></label>
+                          <input v-if="editMode && !['subject','experimenter','project','session'].includes(entry[0])"
+                                 type="button"
+                                 class="paramremove"
+                                 value="-"
+                                 @click="removeCustomField(entry[0])">
+                        </td>
+                        <td>
+                          <select v-if="isType(entry[1], 'Enum') || isType(entry[1], 'OptionsList')"
+                                  :id="inputId(entry[0])"
+                                  v-model="entry[1].value"
+                                  :disabled="!editMode"
+                                  :required="entry[1].required">
+                            <option v-if="entry[1].required" value=""></option>
+                            <option v-for="opt in entry[1].options" :key="opt" :value="opt" v-text="opt"></option>
+                          </select>
+                          <input v-else-if="isType(entry[1], 'Bool')"
+                                 type="checkbox"
+                                 :id="inputId(entry[0])"
+                                 v-model="entry[1].value"
+                                 :disabled="!editMode">
+                          <input v-else
+                                 type="text"
+                                 class="string"
+                                 :id="inputId(entry[0])"
+                                 v-model="entry[1].value"
+                                 :placeholder="entry[1].default"
+                                 :disabled="!editMode"
+                                 :required="entry[1].required">
+                        </td>
+                      </tr>
+                      <tr v-if="showCustomRow && editMode">
+                        <td class="param_label" style="text-align: right;">
+                          <input type="text" placeholder="New entry" v-model="customKey" required>
+                        </td>
+                        <td>
+                          <input type="text" class="string" v-model="customValue" required>
+                          <input type="button" class="paramadd" value="✓" @click="addCustomField">
+                          <input type="button" class="paramremove" value="✕" @click="cancelCustomField">
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <div style="margin-top: 6px;" v-if="editMode">
+                    <input type="button" class="paramadd" value="+" @click="showAddCustomRow">
+                  </div>
+                </div>
+                <table id="metadata_table" style="display:none;"></table>
               </fieldset>
 
               <div id="features_vue">
@@ -508,9 +577,10 @@
                     <input v-model="searchQuery" 
                            type="text" 
                            placeholder="Search features..." 
+                            :disabled="isDisabled"
                            style="width: 100%; padding: 5px; margin-bottom: 5px;">
-                    <button @click="selectAll" style="margin-right: 5px;">Select All</button>
-                    <button @click="deselectAll">Clear Selection</button>
+                          <button @click="selectAll" :disabled="isDisabled" style="margin-right: 5px;">Select All</button>
+                          <button @click="deselectAll" :disabled="isDisabled">Clear Selection</button>
                   </div>
 
                   <!-- Features list -->
@@ -520,6 +590,7 @@
                              :name="f.name" 
                              :id="'feat_' + f.name" 
                              :value="f.id"
+                             :disabled="isDisabled"
                              v-model="selectedFeatures[f.name]">
                       <label :for="'feat_' + f.name" v-text="f.name"></label>
                       <small v-if="f.desc" style="color: #666; margin-left: 10px;" v-text="f.desc"></small>
@@ -789,14 +860,18 @@
 
               <fieldset id="collections">
                 <legend>Dataset Collections</legend>
-                <ul>
-                {% for c in collections %}
-                  <li>
-                    <input type="checkbox" name="{{c.name}}" id="col_{{c.safe_name}}" value="{{c.id}}" onchange="update_collection({{c.name}})">
-                    <label for="{{c.name}}">{{c.name}}</label>
-                  </li>
-                {% endfor %}
-                </ul>
+                <div id="collections_vue">
+                  <ul v-if="isVisible">
+                    <li v-for="c in collections" :key="c.id">
+                      <input type="checkbox"
+                             :name="c.name"
+                             :id="'col_' + c.safe_name"
+                             :value="c.id"
+                             v-model="selectedCollections[c.name]">
+                      <label :for="'col_' + c.safe_name" v-text="c.name"></label>
+                    </li>
+                  </ul>
+                </div>
               </fieldset>
 
               <fieldset id='bmi'>
