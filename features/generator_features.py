@@ -173,6 +173,30 @@ class RandomDelay(traits.HasTraits):
             self.delay_time = random.random()*(e-s) + s
         super()._start_wait()
 
+class DiscreteRandomDelay_EyeHandSequence(traits.HasTraits):
+    '''
+    Choose delay time from three discrete blocks (short, meidum, long delay) in eye-hand sequence task
+    '''
+    
+    rand_delay_hand_lower_bound = traits.List([0,], desc="lower bound of delay time in each block for hand go cue in sequence trials")
+    rand_delay_hand_upper_bound = traits.List([0.1,], desc="upper bound of delay time in each block for hand go cue in sequence trials")
+    rand_delay_hand_probability = traits.List([0.33,], desc="probablity of each block for delay time")
+    exclude_parent_traits = ['rand_delay_hand']
+
+    def _start_wait(self):
+        super()._start_wait()
+
+        if self.tries == 0:
+            if self.trial_count_blocks - self.trials_block_simultaneous < self.trials_block_sequence: # only in sequence trials
+                
+                # Set delay time for hand go cue in sequence trials
+                delays = []
+                for lower, upper in zip(self.rand_delay_hand_lower_bound, self.rand_delay_hand_upper_bound):
+                    delays.append(random.random()*(upper-lower) + lower)
+
+                self.delay_time_hand = np.random.choice(delays, p = (self.rand_delay_hand_probability))
+                print(self.delay_time_hand)
+
 class TransparentDelayTarget(traits.HasTraits):
     '''
     Feature to make the delay period show a semi-transparent target rather than the full target. Used 
