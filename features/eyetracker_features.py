@@ -4,8 +4,10 @@ Features for the eyetracker system
 
 import tempfile
 import time
+import traceback
 import numpy as np
 import tables
+from db import dbfunctions as db
 from riglib import calibrations
 from riglib.experiment import traits
 from riglib.gpio import ArduinoGPIO
@@ -44,21 +46,26 @@ class EyeCalibration(traits.HasTraits):
         
         # proc_exp # preprocess cursor data only
         taskid = self.taskid_for_eye_calibration
-        hdf_dir = '/storage/hdf'
-        hdf_file = glob.glob(os.path.join(hdf_dir, f'*{taskid}*'))[0]
-        ecube_file = glob.glob(f'/media/NeuroAcq/*{taskid}*')[0]
-        files = {}
-        files['hdf'] = hdf_file
-        files['ecube'] = ecube_file
-        self.eye_center = np.zeros((4,))
+        try:
+            entry = db.get_task_entries_by_id([taskid])[0]
+        except:
+            traceback.print_exc()
+            raise ValueError(f"Taskid {taskid} not found in database")
+        files = entry.get_data_files_dict_absolute()
         print(files)
+        
+        self.eye_center = np.zeros((4,))
 
         if not self.keyboard_control:
-            bmi3d_data, bmi3d_metadata = aopy.preproc.proc_exp(hdf_dir, files, 'hoge', 'hoge', overwrite=True, save_res=False)
+            try:
+                bmi3d_data, bmi3d_metadata = aopy.preproc.proc_exp('', files, 'hoge', 'hoge', overwrite=True, save_res=False)
+            except:
+                traceback.print_exc()
+                raise ValueError(f"Error processing hdf file for taskid {taskid}")
 
             # load raw eye data
             # raw_eye_data, raw_eye_metadata = aopy.preproc.parse_oculomatic(hdf_dir, files, debug=False)
-            eye_interp = aopy.data.get_interp_kinematics(bmi3d_data,bmi3d_metadata,datatype='eye',samplerate=bmi3d_metadata['cursor_interp_samplerate'])
+            eye_interp = aopy.data.get_interp_task_data(bmi3d_data,bmi3d_metadata,datatype='eye',samplerate=bmi3d_metadata['cursor_interp_samplerate'])
 
             # calculate coefficients to calibrate eye data
             events = bmi3d_data['events']
