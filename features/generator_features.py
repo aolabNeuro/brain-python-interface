@@ -180,7 +180,7 @@ class DiscreteRandomDelay_EyeHandSequence(traits.HasTraits):
     
     rand_delay_hand_lower_bound = traits.List([0,], desc="lower bound of delay time in each block for hand go cue in sequence trials")
     rand_delay_hand_upper_bound = traits.List([0.1,], desc="upper bound of delay time in each block for hand go cue in sequence trials")
-    rand_delay_hand_probability = traits.List([0.33,], desc="probablity of each block for delay time")
+    rand_delay_hand_probability = traits.List([1.,], desc="probablity of each block for delay time")
     exclude_parent_traits = ['rand_delay_hand']
 
     def _start_wait(self):
@@ -195,7 +195,6 @@ class DiscreteRandomDelay_EyeHandSequence(traits.HasTraits):
                     delays.append(random.random()*(upper-lower) + lower)
 
                 self.delay_time_hand = np.random.choice(delays, p = (self.rand_delay_hand_probability))
-                print(self.delay_time_hand)
 
 class TransparentDelayTarget(traits.HasTraits):
     '''
