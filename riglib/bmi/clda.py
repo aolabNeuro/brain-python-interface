@@ -778,7 +778,7 @@ class KFRML(Updater):
         self.T = rho*self.T + np.dot(y, B*y.T)
         self.ESS = rho*self.ESS + n_samples
 
-R_inv = np.asmatrix(np.zeros(self.R.shape))
+        R_inv = np.asmatrix(np.zeros(self.R.shape))
         
         try:
             if self.regularizer is None:

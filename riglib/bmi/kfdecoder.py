@@ -320,7 +320,7 @@ class KalmanFilter(bmi.GaussianStateHMM):
     
         if isinstance(hidden_state, np.ma.core.MaskedArray):
             mask = ~hidden_state.mask[0,:] # NOTE THE INVERTER 
-            inds = np.nonzero([ mask[k]*mask[k+1] for k in range(len(mask)-1)])[0]
+            T = np.nonzero([ mask[k]*mask[k+1] for k in range(len(mask)-1)])[0]
     
             X = np.asmatrix(hidden_state[:,mask])
             n_pts = len(np.nonzero(mask)[0])
