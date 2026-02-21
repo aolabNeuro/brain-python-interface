@@ -521,9 +521,9 @@ def from_file_to_FACosEnc(plot=False):
             snr_act.append(snr_des)
             s2 = spk[:, n] #Spikes: 
             x = np.linalg.lstsq(vel , s2[:, np.newaxis]) #Regress Spikes against Velocities
-            qnoise = np.var(s2[:, np.newaxis] - vel*np.mat(x[0])) #Residuals
+            qnoise = np.var(s2[:, np.newaxis] - vel*np.asmatrix(x[0])) #Residuals
             #Explained Variance vs. Residual Variance: 
-            qsig = np.var(vel*np.mat(x[0]))
+            qsig = np.var(vel*np.asmatrix(x[0]))
             k = qsig/(snr_des)
             enc.psi_unt_std[n] = np.sqrt(k)# + eps
             
@@ -538,9 +538,9 @@ def from_file_to_FACosEnc(plot=False):
         for n in range(n_units):
             s2 = spk[:, n] #Spikes: 
             x = np.linalg.lstsq(vel, s2[:, np.newaxis]) #Regress Spikes against Velocities
-            qnoise = np.var(s2[:, np.newaxis] - vel*np.mat(x[0])) #Residuals
+            qnoise = np.var(s2[:, np.newaxis] - vel*np.asmatrix(x[0])) #Residuals
             #Explained Variance vs. Residual Variance: 
-            qsig = np.var(vel*np.mat(x[0]))
+            qsig = np.var(vel*np.asmatrix(x[0]))
             snr_sim.append(qsig/qnoise)
 
         if plot:
@@ -572,9 +572,9 @@ def test_sim_enc():
         for n in range(n_units):
             s2 = spk[:, n] #Spikes: 
             x = np.linalg.lstsq(s2[:, np.newaxis], vel) #Regress Spikes against Velocities
-            q = s2[:, np.newaxis] - vel*np.mat(x[0].T) #Residuals
+            q = s2[:, np.newaxis] - vel*np.asmatrix(x[0].T) #Residuals
             #Explained Variance vs. Residual Variance: 
-            ev = np.var(vel*np.mat(x[0].T))
+            ev = np.var(vel*np.asmatrix(x[0].T))
             snr = ev/np.var(q)
             axi.plot(snr, match_data[n][2], '.')
         axi.set_xlim([0, 1.5])

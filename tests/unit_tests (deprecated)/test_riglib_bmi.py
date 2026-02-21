@@ -29,10 +29,10 @@ class TestKalmanFilter(unittest.TestCase):
 
 
         p = 1.0/a**2
-        x_t = GaussianState(np.mat([0, 0]).reshape(-1,1), np.diag([p, p]))
+        x_t = GaussianState(np.asmatrix([0, 0]).reshape(-1,1), np.diag([p, p]))
 
         y = 0.1
-        y_t = np.mat([y, -y]).reshape(-1,1)
+        y_t = np.asmatrix([y, -y]).reshape(-1,1)
         x_t_est = kf._forward_infer(x_t, y_t)
 
         K_expected = 0.5
@@ -167,7 +167,7 @@ class TestGaussianState(unittest.TestCase):
 
     def test_mul_by_mat(self):
         x = GaussianState(np.zeros(2), np.diag(np.ones(2)))
-        A = np.mat(np.diag([2, 3]))
+        A = np.asmatrix(np.diag([2, 3]))
         y = A * x
         self.assertEqual(y.cov[0,0], 4)
         self.assertEqual(y.cov[1,1], 9)

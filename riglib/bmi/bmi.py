@@ -34,19 +34,19 @@ class GaussianState(object):
             if isinstance(cov, float):
                 self.mean = mean
             else:
-                self.mean = mean * np.mat(np.ones([cov.shape[0], 1]))
+                self.mean = mean * np.asmatrix(np.ones([cov.shape[0], 1]))
 
         elif isinstance(mean, np.ndarray):
             if np.ndim(mean) == 1:
                 mean = mean.reshape(-1,1)
-            self.mean = np.mat(mean)
+            self.mean = np.asmatrix(mean)
         else:
             raise Exception(str(type(mean)))
 
         # Covariance
         assert cov.shape[0] == cov.shape[1] # Square matrix
         if isinstance(cov, np.ndarray):
-            cov = np.mat(cov)
+            cov = np.asmatrix(cov)
         self.cov = cov
 
     def __rmul__(self, other):
@@ -63,7 +63,7 @@ class GaussianState(object):
         elif isinstance(other, np.ndarray):
             # This never actually happens for an array because of how numpy implements array multiplication..
             # (but if it did the following would be logical)
-            other = np.mat(other)
+            other = np.asmatrix(other)
             mu = other*self.mean
             cov = other*self.cov*other.T
         else:
@@ -195,10 +195,10 @@ class GaussianStateHMM(object):
         ## Initialize the BMI state, assuming
         nS = self.n_states() # number of state variables
         if init_state is None:
-            init_state = np.mat( np.zeros([nS, 1]) )
+            init_state = np.asmatrix( np.zeros([nS, 1]) )
             if self.include_offset: init_state[-1,0] = 1
         if init_cov is None:
-            init_cov = np.mat( np.zeros([nS, nS]) )
+            init_cov = np.asmatrix( np.zeros([nS, nS]) )
         self.state = GaussianState(init_state, init_cov)
         self.init_noise_models()
 
@@ -793,7 +793,7 @@ class Decoder(object):
             neural_obs[self.zeromeanunits] = self.mFR[self.zeromeanunits]
 
         # re-format as a column matrix
-        neural_obs = np.mat(neural_obs.reshape(-1,1))
+        neural_obs = np.asmatrix(neural_obs.reshape(-1,1))
 
         x = self.filt.state.mean
 
@@ -809,7 +809,7 @@ class Decoder(object):
                 orth_comp = self.filt.state.mean[self.drives_neurons,:] - targ_comp
 
                 if type(assist_level) is np.ndarray:
-                    tmp = np.mat(np.zeros((len(self.filt.state.mean)))).T
+                    tmp = np.asmatrix(np.zeros((len(self.filt.state.mean)))).T
                     tmp[:7, :] = self.filt.state.mean[:7, 0]
                     assist_level_ix = kwargs['assist_level_ix']
                     for ia, al in enumerate(assist_level):
@@ -826,7 +826,7 @@ class Decoder(object):
                 assist_level_ix = kwargs['assist_level_ix']
                 for ia, al in enumerate(assist_level):
                     tmp[assist_level_ix[ia]] = (1-al)*self.filt.state.mean[assist_level_ix[ia]] + al*x_assist[assist_level_ix[ia]]
-                self.filt.state.mean = np.mat(tmp).T
+                self.filt.state.mean = np.asmatrix(tmp).T
 
             else:
                 self.filt.state.mean = (1-assist_level)*self.filt.state.mean + assist_level * x_assist.reshape(-1,1)
