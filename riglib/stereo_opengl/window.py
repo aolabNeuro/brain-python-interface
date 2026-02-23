@@ -428,7 +428,8 @@ class Window2DIn3D(traits.HasTraits):
     overlay_plane_pos = traits.Tuple((0, 0, 0), desc='2D plane position (x, y, z) in the 3D world')
     overlay_plane_color = traits.Tuple((0, 0, 0, 1), desc='Base RGBA color for the overlay plane')
     overlay_plane_rot_x = traits.Float(90, desc='Overlay plane rotation about x-axis in degrees')
-
+    environment_background = traits.Tuple((0, 0, 0, 1), desc='RGBA background color for the environment')
+    
     def _get_renderer(self):
         near = 1
         far = 1024
@@ -449,9 +450,10 @@ class Window2DIn3D(traits.HasTraits):
             self.fov,
             near,
             far,
+            root=self.environment_world,
             overlay_size=overlay_size,
-            overlay_root=self.world,
             overlay_screen_cm=self.screen_cm,
+            overlay_clear_color=self.background,
         )
 
     def screen_init(self):
@@ -464,6 +466,7 @@ class Window2DIn3D(traits.HasTraits):
         self.screen_plane.rotate_x(self.overlay_plane_rot_x).translate(*plane_pos)
 
         self.environment_world.rotate_x(-90)
+        glClearColor(*self.environment_background)
 
     def add_environment_model(self, model):
         if self.environment_world is None:
@@ -486,14 +489,6 @@ class Window2DIn3D(traits.HasTraits):
         self.add_environment_model(plane)
         return plane
 
-    def draw_world(self):
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-        self.renderer.draw(self.environment_world, overlay_root=self.world, modelview=self.modelview)
-        pygame.display.flip()
-        self.renderer.draw_done()
-
-    def requeue(self):
-        self.renderer._queue_render(self.environment_world)
     
 class FakeWindow(Window):
     '''

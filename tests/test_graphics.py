@@ -71,7 +71,6 @@ class Test2(Window2DIn3D, Window):
         #arm4j.set_joint_pos([0,0,np.pi/2,np.pi/2])
         #arm4j.get_endpoint_pos()
         self.add_environment_model(Grid(50))
-        self.add_model(Grid(50))
         self.add_model(moon)
         self.add_model(planet)
         self.add_model(apriltag)
@@ -135,5 +134,8 @@ class Test2(Window2DIn3D, Window):
 
 if __name__ == "__main__":
     win = Test2(window_size=(1000, 800), fullscreen=False, stereo_mode='projection',
-                screen_dist=50, screen_half_height=22.5)
+                screen_dist=50, screen_half_height=22.5, 
+                background=(0.5,0.5,0.5,1),
+                overlay_plane_pos=(0,-10,0),
+                overlay_plane_rot_x=0)
     win.run()

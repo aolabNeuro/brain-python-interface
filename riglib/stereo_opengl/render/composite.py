@@ -15,8 +15,8 @@ class CompositeOverlay(FBOrender):
     a ``TexPlane`` in the 3D scene.
     """
 
-    def __init__(self, window_size, fov, near, far, overlay_size=None,
-                 overlay_root=None,
+    def __init__(self, window_size, fov, near, far, 
+                 root=None, overlay_size=None,
                  overlay_projection=None, overlay_modelview=None,
                  overlay_clear_color=(0., 0., 0., 0.), overlay_screen_cm=None,
                  overlay_near=1, overlay_far=1024, **kwargs):
@@ -38,7 +38,7 @@ class CompositeOverlay(FBOrender):
         self.overlay_projection = overlay_projection
         self.overlay_modelview = np.eye(4) if overlay_modelview is None else overlay_modelview
         self.overlay_clear_color = overlay_clear_color
-        self.overlay_root = overlay_root
+        self.root = root
 
         texture_opts = {'anisotropic_filtering': 4}
         self.overlay_fbo = FBO(["color0", "depth"], size=self.overlay_size, texture_opts=texture_opts)
@@ -101,15 +101,15 @@ class CompositeOverlay(FBOrender):
         glViewport(*original_viewport)
         glClearColor(*original_clear_color)
 
-    def draw(self, root, overlay_root=None, overlay_shader=None,
+    def draw(self, overlay_root, root=None, overlay_shader=None,
              overlay_apply_default=False, overlay_requeue=False,
              overlay_p_matrix=None, overlay_modelview=None, overlay_kwargs=None,
              **kwargs):
         if overlay_kwargs is None:
             overlay_kwargs = {}
 
-        if overlay_root is None:
-            overlay_root = self.overlay_root
+        if root is None:
+            root = self.root
 
         if overlay_root is not None:
             self.draw_overlay(
