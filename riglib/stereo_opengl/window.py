@@ -10,12 +10,12 @@ from OpenGL.GL import *
 from ..experiment import LogExperiment
 from ..experiment import traits
 
-from .render import stereo, render, ssao, shadow_map
+from .render import stereo, render, ssao, shadow_map, composite
 from .models import Group
 from .xfm import Quaternion, Transform
 from .primitives import Sphere, Cube, Chain
 from .environment import Box, Grid
-from .primitives import Cylinder, Sphere, Cone
+from .primitives import Cylinder, Sphere, Cone, TexPlane
 import socket
 
 try:
@@ -415,6 +415,85 @@ class Window2D():
     def _get_renderer(self):
         glCullFace(GL_BACK)
         return render.Renderer2D(self.screen_cm)
+
+
+class Window2DIn3D(traits.HasTraits):
+    '''
+    Mixin providing two scene graphs:
+    - ``world``: rendered on a 2D plane in the 3D environment
+    - ``environment_world``: rendered in 3D to the main window
+    '''
+    overlay_size = traits.Tuple((1000, 1000), desc='Offscreen overlay render size in pixels; defaults to window size')
+    overlay_plane_size = traits.Tuple((30, 30), desc='2D plane size (width_cm, height_cm) in the 3D world')
+    overlay_plane_pos = traits.Tuple((0, 0, 0), desc='2D plane position (x, y, z) in the 3D world')
+    overlay_plane_color = traits.Tuple((0, 0, 0, 1), desc='Base RGBA color for the overlay plane')
+    overlay_plane_rot_x = traits.Float(90, desc='Overlay plane rotation about x-axis in degrees')
+
+    def _get_renderer(self):
+        near = 1
+        far = 1024
+
+        if getattr(self, 'environment_world', None) is None:
+            self.environment_world = Group([])
+            self.environment_world.init()
+        if not hasattr(self, '_environment_model_cache'):
+            self._environment_model_cache = []
+        for model in self._environment_model_cache:
+            model.init()
+            self.environment_world.add(model)
+        self._environment_model_cache = []
+
+        overlay_size = self.overlay_size
+        return composite.CompositeOverlay(
+            self.window_size,
+            self.fov,
+            near,
+            far,
+            overlay_size=overlay_size,
+            overlay_root=self.world,
+            overlay_screen_cm=self.screen_cm,
+        )
+
+    def screen_init(self):
+        super().screen_init()
+        self._overlay_initialized = True
+
+        width, height = self.overlay_plane_size
+        plane_pos = np.array(self.overlay_plane_pos) - np.array([width/2, 0, height/2])  # adjust position so that plane is centered on specified pos
+        self.screen_plane = self.make_overlay_plane(width, height, color=self.overlay_plane_color)
+        self.screen_plane.rotate_x(self.overlay_plane_rot_x).translate(*plane_pos)
+
+        self.environment_world.rotate_x(-90)
+
+    def add_environment_model(self, model):
+        if self.environment_world is None:
+            #world doesn't exist yet, add the model to cache
+            self._environment_model_cache.append(model)
+        else:
+            #We're already running, initialize the model and add it to the world
+            model.init()
+            self.environment_world.add(model)
+
+    def make_overlay_plane(self, width, height, **kwargs):
+        plane = TexPlane(
+            width,
+            height,
+            tex=self.renderer.overlay_texture,
+            specular_color=(0, 0, 0, 0),
+            **kwargs,
+        )
+        plane.init()
+        self.add_environment_model(plane)
+        return plane
+
+    def draw_world(self):
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        self.renderer.draw(self.environment_world, overlay_root=self.world, modelview=self.modelview)
+        pygame.display.flip()
+        self.renderer.draw_done()
+
+    def requeue(self):
+        self.renderer._queue_render(self.environment_world)
     
 class FakeWindow(Window):
     '''
