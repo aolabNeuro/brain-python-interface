@@ -41,25 +41,25 @@ def calc_F(scale_factor):
     w_v = 3*tau_scale**2/2;
     w_r = 1e6*tau_scale**4;
     
-    Q = np.mat(np.diag([w_x, w_x, w_x, w_v, w_v, w_v, 0]))
-    R = np.mat(np.diag([w_r, w_r, w_r]))
+    Q = np.asmatrix(np.diag([w_x, w_x, w_x, w_v, w_v, w_v, 0]))
+    R = np.asmatrix(np.diag([w_r, w_r, w_r]))
     F = feedback_controllers.LQRController.dlqr(A, B, Q, R, eps=1e-15)
     return F
 
 def calc_traj(A, B, F, n_steps=10000):
-    x = np.mat(np.zeros([A.shape[0], n_steps]))
-    x[:,0] = np.mat([10., 0, 0, 0, 0, 0, 1]).reshape(-1,1) # start at (10,0,0) with zero vel
+    x = np.asmatrix(np.zeros([A.shape[0], n_steps]))
+    x[:,0] = np.asmatrix([10., 0, 0, 0, 0, 0, 1]).reshape(-1,1) # start at (10,0,0) with zero vel
 
-    target_state = np.mat([0., 0, 0, 0, 0, 0, 1]).reshape(-1,1)
+    target_state = np.asmatrix([0., 0, 0, 0, 0, 0, 1]).reshape(-1,1)
 
     for k in range(1, n_steps):
         x[:,k] = (A-B*F)*x[:,k-1] + B*F*(target_state - x[:,k-1])
     return x
 
 def _calc(A, B, F, n_steps=10000):
-    x = np.mat([10., 0, 0, 0, 0, 0, 1]).reshape(-1,1) # start at (10,0,0) with zero vel
+    x = np.asmatrix([10., 0, 0, 0, 0, 0, 1]).reshape(-1,1) # start at (10,0,0) with zero vel
 
-    target_state = np.mat([0., 0, 0, 0, 0, 0, 1]).reshape(-1,1)
+    target_state = np.asmatrix([0., 0, 0, 0, 0, 0, 1]).reshape(-1,1)
 
     idx = 0
     while x[0,0] > 1.2:

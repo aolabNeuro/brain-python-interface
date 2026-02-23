@@ -51,7 +51,7 @@ class TestPPFReconstruction(bmimultitasks.BMIControlMulti):
         ## fake_decoder = train._train_PPFDecoder_sim_known_beta(
         ##         init_beta, units=units, dist_units=state_units)
         decoder = train.load_PPFDecoder_from_mat_file(self.kwargs_init.pop('data_fname'))
-        #decoder.filt.C = np.mat(init_beta) #fake_decoder.filt.C
+        #decoder.filt.C = np.asmatrix(init_beta) #fake_decoder.filt.C
         #decoder.n_subbins = 3
         #decoder.bmicount = 0
         self.decoder = decoder
@@ -68,7 +68,7 @@ class TestPPFReconstruction(bmimultitasks.BMIControlMulti):
             alpha = F_int[0,0]
             beta = F_int[0,2]
             I = np.eye(3)
-            F = np.mat(np.hstack([alpha*I, beta*I, np.zeros([3,1])]))
+            F = np.asmatrix(np.hstack([alpha*I, beta*I, np.zeros([3,1])]))
             self.learner.F_dict['target'] = F
             self.learner.F_dict['hold'] = F
 

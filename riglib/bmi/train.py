@@ -1040,8 +1040,8 @@ def train_KFDecoder_abstract(ssm, kin, neural_features, units, update_rate, tsli
     # Compute sufficient stats for C and Q matrices (used for RML CLDA)
     from .clda import KFRML
     n_features, n_states = C.shape
-    R = np.mat(np.zeros([n_states, n_states]))
-    S = np.mat(np.zeros([n_features, n_states]))
+    R = np.asmatrix(np.zeros([n_states, n_states]))
+    S = np.asmatrix(np.zeros([n_features, n_states]))
     R_small, S_small, T, ESS = KFRML.compute_suff_stats(kin[ssm.train_inds, :], neural_features)
 
     R[np.ix_(ssm.drives_obs_inds, ssm.drives_obs_inds)] = R_small
@@ -1139,7 +1139,7 @@ def train_PPFDecoder_abstract(ssm, kin, neural_features, units, update_rate, tsl
     # Compute sufficient stats for C matrix (used for RML CLDA)
     from .clda import KFRML
     n_features, n_states = C.shape
-    S = np.mat(np.zeros([n_features, n_states]))
+    S = np.asmatrix(np.zeros([n_features, n_states]))
     S_small, = decoder.compute_suff_stats(kin[ssm.train_inds, :], neural_features)
 
     S[:,ssm.drives_obs_inds] = S_small
@@ -1286,7 +1286,7 @@ def rand_KFDecoder(ssm, units, dt=0.1):
     sdFR = 1
     decoder = kfdecoder.KFDecoder(kf, units, ssm, mFR=mFR, sdFR=sdFR, binlen=binlen)
 
-    decoder.kf.R = np.mat(np.identity(decoder.kf.C.shape[1]))
+    decoder.kf.R = np.asmatrix(np.identity(decoder.kf.C.shape[1]))
     decoder.kf.S = decoder.kf.C
     decoder.kf.T = decoder.kf.Q + decoder.kf.S*decoder.kf.S.T
     decoder.kf.ESS = 3000.
@@ -1319,7 +1319,7 @@ def make_fixed_kf_decoder(units, ssm, C, dt=0.1):
     sdFR = 1
     decoder = kfdecoder.KFDecoder(kf, units, ssm, mFR=mFR, sdFR=sdFR, binlen=binlen)
 
-    decoder.kf.R = np.mat(np.identity(decoder.kf.C.shape[1]))
+    decoder.kf.R = np.asmatrix(np.identity(decoder.kf.C.shape[1]))
     decoder.kf.S = decoder.kf.C
     decoder.kf.T = decoder.kf.Q + decoder.kf.S*decoder.kf.S.T
     decoder.kf.ESS = 3000.
@@ -1392,8 +1392,8 @@ def rescale_KFDecoder_units(dec, scale_factor=10):
     nS = dec.kf.W.shape[0]
     S_diag = np.ones(nS)
     S_diag[inds] = scale_factor
-    S = np.mat(np.diag(S_diag))
-    #S = np.mat(np.diag([1., 1, 1, 10, 10, 10, 1]))
+    S = np.asmatrix(np.diag(S_diag))
+    #S = np.asmatrix(np.diag([1., 1, 1, 10, 10, 10, 1]))
     dec.kf.C *= S
     dec.kf.W *= S.I * S.I
     try:
@@ -1426,7 +1426,7 @@ def _train_PPFDecoder_sim_known_beta(beta, units, dt=0.005, dist_units='m'):
     beta[:,3:6] *= units_mult
 
     # Control input matrix for SSM for control inputs
-    I = np.mat(np.eye(3))
+    I = np.asmatrix(np.eye(3))
     B = np.vstack([0*I, dt*1000 * I, np.zeros([1,3])])
 
     # instantiate Decoder
@@ -1436,8 +1436,8 @@ def _train_PPFDecoder_sim_known_beta(beta, units, dt=0.005, dist_units='m'):
     n_stoch_states = len(np.nonzero(ssm.drives_obs)[0])
     n_units = len(units)
     dec.H = np.dstack([np.eye(3)*100] * n_units).transpose(2, 0, 1)
-    dec.M = np.mat(np.ones([n_units, n_stoch_states])) * np.exp(-1.6)
-    dec.S = np.mat(np.ones([n_units, n_stoch_states])) * np.exp(-1.6)
+    dec.M = np.asmatrix(np.ones([n_units, n_stoch_states])) * np.exp(-1.6)
+    dec.S = np.asmatrix(np.ones([n_units, n_stoch_states])) * np.exp(-1.6)
 
     # Force decoder to run at max 60 Hz
     dec.bminum = 0

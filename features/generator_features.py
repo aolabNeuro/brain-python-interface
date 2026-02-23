@@ -361,15 +361,19 @@ class IncrementalRotation(traits.HasTraits):
 
 class HideLeftTrajectory(traits.HasTraits):
     '''
-    Cover left side of tracking task screen with a black box. 
-    This will cover the 'lookbehind' of the target trajectory. 
+    Hide the left side of the 1d target trajectory. 
+    This will make only the 'lookahead' of the trajectory visible. The 'lookbehind' will be blacked out.
     Useful for task with bumpers.
     '''
 
-    def _start_trajectory(self):
-        super()._start_trajectory()
-        if self.frame_index == 0:
-            self.box.show()
+    def setup_start_wait(self):
+        super().setup_start_wait()
+        self.trajectory.update_mask(self.lookahead, self.lookahead*2+1) # frame indices to show 
+        # a total of lookahead*2+1 frames spans the screen width: lookahead index is at center with n_lookahead frames on either side
+                                    
+    def update_frame(self):
+        self.trajectory.update_mask(self.lookahead+self.frame_index, self.lookahead*2+1+self.frame_index) # frame indices to show
+        super().update_frame() # frame_index is incremented at the end of update_frame(), so need to update trajectory mask before this
 
 class ReadysetMedley(traits.HasTraits):
 
@@ -421,3 +425,43 @@ class ReadysetColorChange(traits.HasTraits):
 
     def _end_tooslow_penalty(self):
         self.sync_event('TRIAL_END')
+
+class HideCursorReturn(traits.HasTraits):
+
+    '''
+    Hide the cursor during the return to center after a reward or penalty. 
+    Display again when cursor is within some user specified distance of center of the center target.
+
+    '''
+    show_cursor_return = traits.Float(3, desc = 'Distance from center at which to turn curson on')
+
+    def _start_reward(self):
+        super()._start_reward()
+        self.plant_visible = False 
+    
+    def _while_target(self):
+
+        if self.calc_trial_num() > 0: #skip logic for very first trial of block 
+            if self.target_index == 0: 
+                cursor_pos = self.plant.get_endpoint_pos()
+                dist_from_center = np.linalg.norm(cursor_pos - self.targs[self.target_index])
+                if dist_from_center < self.show_cursor_return:
+                    self.plant_visible = True
+                else:
+                    self.plant_visible = False
+    
+    def _start_hold_penalty(self):
+        super()._start_hold_penalty()
+        self.plant_visible = False
+
+    def _start_timeout_penalty(self):
+        super()._start_timeout_penalty()
+        self.plant_visible = False
+    
+    def _start_delay_penalty(self):
+        super()._start_delay_penalty()
+        self.plant_visible = False  
+
+    def _start_tooslow_penalty(self):
+        super()._start_tooslow_penalty()
+        self.plant_visible = False
