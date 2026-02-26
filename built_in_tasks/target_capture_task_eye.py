@@ -651,8 +651,8 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
     hand_RTs_thr_seq = traits.Float(0.55, desc="Accepted reach RTs in sequence trials")
     tooslow_penalty_time = traits.Float(0.5, desc="Length of penalty time for too slow reach RTs in both simultaneous and sequence trials")
     sequence_target_color = traits.OptionsList("orange", *target_colors, desc="Color of the hand target in sequence trials", bmi3d_input_options=list(target_colors.keys()))
-
-    hidden_traits = ['sequence_target_color']
+    sequence_gocue_color = traits.OptionsList("pink", *target_colors, desc="Color of go cue in sequence trials", bmi3d_input_options=list(target_colors.keys()))
+    hidden_traits = ['sequence_target_color', 'sequence_gocue_color']
 
     status = dict(
         wait = dict(start_trial="target", start_pause="pause"),
@@ -1001,6 +1001,7 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
         
         elif self.target_index == 1 and self.is_sequence: # This is a go cue for hand
             self.targets_hand[self.hand_target_index].hide()
+            self.targets_eye[self.eye_target_index].cube.color = target_colors[self.sequence_gocue_color]
             self.sync_event('TARGET_OFF', self.hand_gen_indices[self.hand_target_index])   
 
     def _start_timeout_penalty(self):
