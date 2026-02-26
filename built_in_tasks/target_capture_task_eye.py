@@ -629,6 +629,450 @@ class EyeConstrainedHandCapture(HandConstrainedEyeCapture):
             # Hide the current hand target
             self.targets_hand[self.target_index].hide()
 
+class EyeHandCaptureBlock(EyeConstrainedTargetCapture):
+    '''
+    Subjects have to gaze at and reach to a target, responding to the eye or hand go cue indivisually in sequence trials.
+    They need to keep their eye position while moving the cursor to the hand target.
+    In simultaneous trials, they need to simultaneously move eye and hand to the target, responding a single go cue.
+    '''
+
+    exclude_parent_traits = ['delay_time', 'rand_delay','prob_catch_trials','short_delay_catch_trials','reward_time']
+    rand_delay_eye = traits.Tuple((0.4, 0.7), desc="Delay interval for eye in sequence trials")
+    rand_delay_eye_hand = traits.Tuple((0.4, 0.7), desc="Delay interval for eye and hand in simultaneous trials")
+    fixation_time = traits.Float(.3, desc="fixation duration during which subjects have to keep fixating the first eye target")
+    trials_block_eye = traits.Int(100, desc='Trial numbers of the block in sequence trials')
+    trials_block_eye_hand = traits.Int(100, desc='Trial numbers of the block in simultaneous trials')
+    reward_time_eye = traits.Float(.7, desc="Reward time in sequence trials")
+    reward_time_eye_hand = traits.Float(.5, desc="Reward time in simultaneous trials")
+
+    status = dict(
+        wait = dict(start_trial="target", start_pause="pause"),
+        target = dict(enter_target="target", start_pause="pause"),
+        target_eye = dict(start_pause="pause", timeout="timeout_penalty", return_init_target='init_target', gaze_target="fixation", gaze_incorrect_target="incorrect_target_penalty"),
+        target_eye_hand = dict(timeout="timeout_penalty", gaze_enter_target='hold', start_pause="pause"),
+        fixation = dict(fixation_complete="delay", leave_target="hold_penalty", fixation_break="fixation_penalty", start_pause="pause"),
+        hold = dict(hold_complete="delay", leave_target="hold_penalty",  fixation_break="fixation_penalty", start_pause="pause"),
+        delay = dict(delay_complete="targ_transition", leave_target="delay_penalty", fixation_break="fixation_penalty", start_pause="pause"),
+        targ_transition = dict(trial_complete="reward", trial_abort="wait", targ_eye_hand="target_eye_hand", targ_eye="target_eye", start_pause="pause"),
+        incorrect_target_penalty = dict(incorrect_target_penalty_end="wait", start_pause="pause", end_state=True),
+        timeout_penalty = dict(timeout_penalty_end="wait", start_pause="pause", end_state=True),
+        hold_penalty = dict(hold_penalty_end="wait", start_pause="pause", end_state=True),
+        delay_penalty = dict(delay_penalty_end="wait", start_pause="pause", end_state=True),
+        fixation_penalty = dict(fixation_penalty_end="wait", start_pause="pause", end_state=True),
+        reward = dict(reward_end="wait", start_pause="pause", stoppable=False, end_state=True),
+        pause = dict(end_pause="wait", end_state=True),
+    )
+
+    sequence_generators = ['row_target','sac_hand_2d']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Instantiate the targets
+        instantiate_targets = kwargs.pop('instantiate_targets', True)
+        if instantiate_targets:
+
+            # Target 1 and 2 are for saccade. Target 3 and target 4 are for hand
+            target1 = VirtualRectangularTarget(target_width=self.fixation_radius, target_height=self.fixation_radius/2, target_color=target_colors[self.eye_target_color])
+            target2 = VirtualRectangularTarget(target_width=self.fixation_radius, target_height=self.fixation_radius/2, target_color=target_colors[self.eye_target_color])
+            target3 = VirtualCircularTarget(target_radius=self.target_radius, target_color=target_colors[self.target_color])
+            target4 = VirtualCircularTarget(target_radius=self.target_radius, target_color=target_colors[self.target_color])
+
+            self.targets = [target1, target2]
+            self.targets_hand = [target3, target4]
+
+            self.offset_cube = np.array([0,10,self.fixation_radius/2]) # To center the cube target
+
+        # Initialize these values for report_stats
+        self.trials_all_blocks = self.trials_block_eye + self.trials_block_eye_hand
+        self.trial_count_blocks = self.reward_count % self.trials_all_blocks
+
+    def init(self):
+        self.add_dtype('is_eye_trials', bool, (1,))
+        self.add_dtype('trial', 'u4', (1,))
+        self.add_dtype('plant_visible', '?', (1,))
+        self.penalty_index = 0
+        self.pause_index = 0
+        self.total_pause_time = 0
+        self.current_pause_time = 0
+        super().init()
+        self.plant.set_endpoint_pos(np.array(self.starting_pos))
+
+    def _cycle(self):
+        self.move_effector()
+
+        ## Run graphics commands to show/hide the plant if the visibility has changed
+        self.update_plant_visibility()
+        self.task_data['plant_visible'] = self.plant_visible
+
+        ## Save plant status to HDF file
+        plant_data = self.plant.get_data_to_save()
+        for key in plant_data:
+            self.task_data[key] = plant_data[key]
+
+        # Update the trial index
+        self.task_data['trial'] = self.calc_trial_num()
+
+        super()._cycle()
+
+    def move_effector(self):
+        '''Move the end effector, if a robot or similar is being controlled'''
+        pass
+
+    def run(self):
+        '''
+        See experiment.Experiment.run for documentation.
+        '''
+        # Fire up the plant. For virtual/simulation plants, this does little/nothing.
+        self.plant.start()
+        
+        # Include some cleanup in case the parent class has errors
+        try:
+            super().run()
+        finally:
+            self.plant.stop()
+            
+    def update_report_stats(self):
+        '''
+        see experiment.Experiment.update_report_stats for docs
+        '''
+        super().update_report_stats()
+        self.reportstats['Trial #'] = self.calc_trial_num()
+        self.reportstats['Reward/min'] = np.round(self.calc_events_per_min('reward', 120.), decimals=2)
+        self.reportstats['Total pause time'] = self._time_to_string(self.total_pause_time)
+        self.reportstats['Current pause time'] = self._time_to_string(self.current_pause_time)
+
+    def _start_wait(self):
+        if self.calc_trial_num() == 0:
+
+            # Instantiate the targets here so they don't show up in any states that might come before "wait"
+            for target in self.targets_eye:
+                for model in target.graphics_models:
+                    self.add_model(model)
+                    target.hide()
+
+            for target in self.targets_hand:
+                for model in target.graphics_models:
+                    self.add_model(model)
+                    target.hide()
+
+        if self.tries == 0: # Update delay_time only in the first attempt
+            
+            # Set delay time
+            s, e = self.rand_delay_eye
+            self.delay_time_eye = random.random()*(e-s) + s
+            s, e = self.rand_delay_eye_hand
+            self.delay_time_eye_hand = random.random()*(e-s) + s
+
+            # Decide eye or eye-hand trials  
+            self.trial_count_blocks = self.calc_state_occurrences('reward') % self.trials_all_blocks
+
+            if self.trial_count_blocks < self.trials_block_eye:
+                self.is_eye_trials = True
+                self.is_eye_hand_trials = False
+                self.reward_time = self.reward_time_eye
+
+            elif self.trial_count_blocks - self.trials_block_eye < self.trials_block_eye_hand:
+                self.is_eye_trials = False
+                self.is_eye_hand_trials = True
+                self.reward_time = self.reward_time_eye_hand
+
+            self.task_data['is_eye_trials'] = self.is_eye_trials
+
+        if self.penalty_index == 0 and self.pause_index == 0: # doesn't call parent method when the state comes from the penalty or pause state
+            # Call parent method to draw the next target capture sequence from the generator
+            super()._start_wait()
+            self.tries = 0 # number of times this sequence of targets has been attempted
+
+        if self.tries==self.max_attempts: # The task goes to the next target after the number of reattempting is max attempts 
+            super()._start_wait()
+            self.tries = 0 # number of times this sequence of targets has been attempted
+
+        # index of current target presented to subject
+        self.target_index = -1
+
+        # number of targets to be acquired in this trial
+        self.chain_length = len(self.targs)
+
+        # Set index to 0 because the state may come from the penalty or pause state,
+        self.penalty_index = 0
+        self.pause_index = 0
+
+    def _start_target(self):
+        # Only show the hand target
+        if self.target_index == -1:
+            target_hand = self.targets_hand[0]
+            target_hand.move_to_position(self.targs[-1])
+            target_hand.show()
+            self.sync_event('TARGET_ON', self.gen_indices[-1]) # the hand target is on  
+
+        elif self.target_index == 0: # this is from the target state
+            target = self.targets[self.target_index]
+            target.hide()
+            self.sync_event('EYE_TARGET_OFF', self.gen_indices[self.target_index])
+
+    def _start_target_eye(self):
+        if self.target_index == -1 and not self.fixation_passed:
+            self.target_index += 1
+
+        if self.fixation_passed:
+            self.target_index += 1
+
+        # Show the eye target
+        if self.target_index == 0:
+            target = self.targets[self.target_index]
+            target.move_to_position(self.targs[self.target_index] - self.offset_cube)
+            target.show()
+            self.sync_event('EYE_TARGET_ON', self.gen_indices[self.target_index])
+
+    def _start_fixation(self):
+        self.fixation_passed = True
+        self.targets[self.target_index].cube.color = target_colors[self.fixation_target_color] # change target color in fixation state
+        self.sync_event('FIXATION', self.gen_indices[self.target_index])
+
+    def _start_delay(self):
+        # Make next target visible unless this is the final target in the trial
+        next_idx = (self.target_index + 1)
+        if next_idx < self.chain_length:
+            target = self.targets[next_idx]
+            target.move_to_position(self.targs[next_idx] - self.offset_cube)
+            target.show()
+            self.sync_event('EYE_TARGET_ON', self.gen_indices[next_idx])
+
+    def _start_targ_transition(self):
+        if self.target_index + 1 < self.chain_length:
+
+            # Hide the current target if there are more
+            self.targets[self.target_index].hide()
+            self.sync_event('EYE_TARGET_OFF', self.gen_indices[self.target_index])
+
+    def _start_timeout_penalty(self):
+        super()._start_timeout_penalty()
+        for target in self.targets_hand:
+            target.hide()
+            target.reset()
+            
+    def _start_hold_penalty(self):
+        super()._start_hold_penalty()
+        # Hide targets
+        for target in self.targets_hand:
+            target.hide()
+            target.reset()
+
+    def _start_delay_penalty(self):
+        super()._start_delay_penalty()
+        # Hide targets
+        for target in self.targets_hand:
+            target.hide()
+            target.reset()
+
+    def _start_fixation_penalty(self):
+        self._increment_tries()
+        self.sync_event('FIXATION_PENALTY') 
+        self.penalty_index = 1
+
+        # Hide targets
+        for target in self.targets:
+            target.hide()
+            target.reset()
+
+        for target in self.targets_hand:
+            target.hide()
+            target.reset()
+
+    def _end_fixation_penalty(self):
+        self.sync_event('TRIAL_END')
+
+    def _start_incorrect_target_penalty(self):
+        self._increment_tries()
+        self.sync_event('OTHER_PENALTY')
+        self.penalty_index = 1
+
+        # Hide targets
+        for target in self.targets:
+            target.hide()
+            target.reset()
+
+        for target in self.targets_hand:
+            target.cue_trial_end_failure()
+            target.show()
+
+    def _end_incorrect_target_penalty(self):
+        self.sync_event('TRIAL_END')
+
+        for target in self.targets_hand:
+            target.hide()
+            target.reset()
+
+    def _start_reward(self):
+        super()._start_reward()
+        for target in self.targets_hand:
+            target.cue_trial_end_success()
+
+    def _end_reward(self):
+        super()._end_reward()
+
+        # Hide targets
+        for target in self.targets_hand:
+            target.hide()
+            target.reset()        
+
+    def _start_pause(self):
+        self.pause_index = 1
+        self.pause_start_time = self.get_time()
+        self.total_pause_time_old = self.total_pause_time
+
+        # Hide targets
+        for target in self.targets_hand:
+            target.hide()
+            target.reset()
+
+    def _while_pause(self):
+        self.current_pause_time = self.get_time() - self.pause_start_time
+        self.total_pause_time = self.total_pause_time_old + self.current_pause_time
+
+    def _end_pause(self):
+        self.current_pause_time = 0
+
+    def _parse_next_trial(self):
+        '''Check that the generator has the required data'''
+        # 2 target positions for hand and eye. The first and second target index is for eye, and the third one is for hand
+        self.gen_indices, self.targs = self.next_trial 
+
+        # Update the data sinks with trial information
+        self.trial_record['trial'] = self.calc_trial_num()
+        for i in range(len(self.gen_indices)):
+            self.trial_record['index'] = self.gen_indices[i]
+            self.trial_record['target'] = self.targs[i]
+            self.sinks.send("trials", self.trial_record)
+
+    def _test_start_trial(self, time_in_state):
+        return True
+    
+    def _test_gaze_enter_target(self,ts):
+        '''
+        Check whether eye positions and hand cursor are within the target radius
+        ''' 
+        eye_pos = self.calibrated_eye_pos
+        eye_d = np.linalg.norm(eye_pos - self.targs[self.target_index,[0,2]])
+
+        cursor_pos = self.plant.get_endpoint_pos()
+        hand_d = np.linalg.norm(cursor_pos - self.targs[-1])
+        
+        return (eye_d <= self.fixation_radius + self.fixation_radius_buffer) and (hand_d <= self.target_radius - self.cursor_radius)
+    
+    def _test_gaze_target(self, ts):
+        '''
+        Check whether eye position is within the target radius
+        ''' 
+        eye_pos = self.calibrated_eye_pos
+        eye_d = np.linalg.norm(eye_pos - self.targs[self.target_index,[0,2]])
+
+        return eye_d <= self.fixation_radius + self.fixation_radius_buffer   
+    
+    def _test_gaze_incorrect_target(self, ts):
+        '''
+        Check whether eye position is within the different target (hand target)
+        ''' 
+        eye_pos = self.calibrated_eye_pos
+        eye_d = np.linalg.norm(eye_pos - self.targs[-1,[0,2]])
+
+        return eye_d <= self.target_radius + self.incorrect_target_radius_buffer
+    
+    def _test_fixation_break(self,ts):
+        '''
+        Triggers the fixation_penalty state when eye positions are outside fixation distance
+        '''
+        # Distance of an eye position from a target position
+        eye_pos = self.calibrated_eye_pos
+        d_eye = np.linalg.norm(eye_pos - self.targs[self.target_index,[0,2]])
+        return d_eye > self.fixation_radius + self.fixation_radius_buffer
+    
+    def _test_fixation_complete(self,ts):
+        return ts > self.fixation_time
+    
+    def _test_hold_complete(self, time_in_state):
+        return time_in_state > self.hold_time
+    
+    def _test_enter_target(self, ts):
+        '''
+        return true if the distance between center of cursor and target is smaller than the cursor radius
+        '''
+        cursor_pos = self.plant.get_endpoint_pos()
+        d = np.linalg.norm(cursor_pos - self.targs[-1]) # hand must be within the initial target
+        return d <= self.target_radius - self.cursor_radius
+
+    def _test_leave_target(self, ts):
+        '''
+        return true if cursor moves outside the exit radius
+        '''
+        cursor_pos = self.plant.get_endpoint_pos()
+        d = np.linalg.norm(cursor_pos - self.targs[-1]) # hand must be within the initial target
+        return d > self.target_radius - self.cursor_radius
+
+    def _test_return_init_target(self, ts):
+        '''
+        return true if cursor moves outside the exit radius, but only applied when the target index is 0.
+        '''
+        cursor_pos = self.plant.get_endpoint_pos()
+        d = np.linalg.norm(cursor_pos - self.targs[-1])
+        return (d > self.target_radius - self.cursor_radius) and self.target_index == 0
+
+    def _test_delay_complete(self, ts):
+        '''
+        Test whether the delay period is over. In sequence trials, there are 2 delay period for each eye and hand.
+        In simultaneous trials, there is only 1 delay period.
+        '''
+        if self.target_index == 0 and self.is_eye_trials:
+            return ts > self.delay_time_eye
+        elif self.target_index == 0 and self.is_eye_hand_trials:
+            return ts > self.delay_time_eye_hand
+        else:
+            return True
+
+    def _test_targ_eye(self,ts):
+        return self.target_index == 0 and self.is_eye_trials
+    
+    def _test_targ_eye_hand(self,ts):
+        return self.target_index == 0 and self.is_eye_hand_trials
+
+    def _test_trial_complete(self, time_in_state):
+        return self.target_index == self.chain_length-1
+    
+    def _test_trial_abort(self, time_in_state):
+        return (not self._test_trial_complete(time_in_state)) and (self.tries==self.max_attempts)
+
+    def _test_trial_incomplete(self, time_in_state):
+        return (not self._test_trial_complete(time_in_state)) and (self.tries<self.max_attempts)
+
+    def _test_timeout(self, time_in_state):
+        return time_in_state > self.timeout_time
+    
+    def _test_timeout_penalty_end(self, time_in_state):
+        return time_in_state > self.timeout_penalty_time
+
+    def _test_hold_penalty_end(self, time_in_state):
+        return time_in_state > self.hold_penalty_time
+
+    def _test_delay_penalty_end(self, time_in_state):
+        return time_in_state > self.delay_penalty_time
+
+    def _test_fixation_penalty_end(self,ts):
+        return ts > self.fixation_penalty_time
+    
+    def _test_reward_end(self, time_in_state):
+        return time_in_state > self.reward_time
+
+    def _test_incorrect_target_penalty_end(self, ts):
+        return ts > self.incorrect_target_penalty_time
+    
+    def _test_start_pause(self, time_in_state):
+        return self.pause
+
+    def _test_end_pause(self, time_in_state):
+        return not self.pause
+
+    
 class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
     '''
     Subjects have to gaze at and reach to a target, responding to the eye or hand go cue indivisually in sequence trials.
