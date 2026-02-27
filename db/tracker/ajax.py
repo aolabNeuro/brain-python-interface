@@ -336,13 +336,17 @@ def start_experiment(request, save=True, execute=True):
 
         saveid = None
         if save:
-            # tag software version using the git hash
-            import git
-            repo = git.repo.Repo(__file__, search_parent_directories=True)
-            sw_version = repo.commit().hexsha[:8]
-            repo_dirty = repo.is_dirty(index=True, working_tree=True, untracked_files=False)
-            if repo_dirty:
-                sw_version += '.dirty'
+            # tag software version using the git hash (best effort)
+            sw_version = 'unknown'
+            try:
+                import git
+                repo = git.repo.Repo(__file__, search_parent_directories=True)
+                sw_version = repo.commit().hexsha[:8]
+                repo_dirty = repo.is_dirty(index=True, working_tree=True, untracked_files=False)
+                if repo_dirty:
+                    sw_version += '.dirty'
+            except Exception as e:
+                print(f"Warning: unable to determine git software version: {e}")
             entry.sw_version = sw_version
 
             # Save the task entry to database

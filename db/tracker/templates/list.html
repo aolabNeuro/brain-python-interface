@@ -778,8 +778,8 @@
                   <!-- Report Statistics Table -->
                   <table class="option" id="report_info" v-if="statsArray.length > 0">
                     <tr v-for="stat in statsArray" :key="stat.name">
-                      <td><strong>{{ stat.name }}</strong></td>
-                      <td>{{ stat.value }}</td>
+                      <td><strong v-text="stat.name"></strong></td>
+                      <td v-text="stat.value"></td>
                     </tr>
                   </table>
                   <div v-else style="color: #999; font-style: italic;">
@@ -791,7 +791,7 @@
                     <div style="margin-bottom: 10px;">
                       <button @click="clearStdout">Clear Output</button>
                     </div>
-                    <pre id="stdout">{{ stdoutText }}</pre>
+                    <pre id="stdout" v-text="stdoutText"></pre>
                   </div>
 
                   <div class="clear"></div>

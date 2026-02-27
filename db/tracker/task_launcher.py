@@ -229,6 +229,18 @@ class TaskProcess(mp.Process):
             # Run the task's FSM loop (which includes its own main loop)
             self.task.run()
         finally:
+            # Always emit one final status message on normal/abrupt completion
+            try:
+                final_reportstats = dict(getattr(self.task, 'reportstats', {}) or {})
+                final_state = getattr(self.task, 'state', None) or 'completed'
+                self.status_queue.put({
+                    'type': 'complete',
+                    'state': final_state,
+                    'reportstats': final_reportstats,
+                })
+            except Exception as e:
+                print(f"Error sending completion status: {e}")
+
             # Cleanup after task completion
             self._cleanup()
     
@@ -443,12 +455,15 @@ class TaskTracker:
     
     def _read_responses(self):
         """Thread function: read messages from task status queue"""
-        while self.proc and self.proc.is_alive():
+        while True:
+            if self.proc is None:
+                break
             try:
                 msg = self.proc.status_queue.get(timeout=0.5)
                 self._handle_status_message(msg)
             except queue.Empty:
-                pass
+                if not self.proc.is_alive():
+                    break
             except Exception as e:
                 print(f"Error reading task status: {e}")
     
@@ -485,11 +500,15 @@ class TaskTracker:
                 print(f"Failed to broadcast task error: {e}")
         
         elif msg_type == 'complete':
-            self.status = 'complete'
+            reported_stats = msg.get('reportstats', {}) if isinstance(msg, dict) else {}
+            if isinstance(reported_stats, dict):
+                self.reportstats = reported_stats
+            self.status = 'completed'
             # broadcast the final completion state to clients as well
             try:
                 from .consumers import sync_broadcast_status
-                sync_broadcast_status('complete', self.reportstats)
+                final_state = msg.get('state', 'completed') if isinstance(msg, dict) else 'completed'
+                sync_broadcast_status(final_state, self.reportstats)
             except Exception as e:
                 print(f"Failed to broadcast completion status: {e}")
     

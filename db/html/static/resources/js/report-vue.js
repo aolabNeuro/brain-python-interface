@@ -77,17 +77,51 @@ const reportApp = {
                 this.ws.onmessage = (evt) => {
                     try {
                         const data = JSON.parse(evt.data);
-                        
+
                         if (data.type === 'task_status') {
-                            // Update report stats - Vue will automatically re-render
-                            this.reportStats = data.reportstats || {};
+                            const reportstats = data.reportstats || {};
+                            const normalized = { ...reportstats };
+                            if (data.state && typeof normalized.status === 'undefined') {
+                                normalized.status = data.state;
+                            }
+                            if (data.state && typeof normalized.state === 'undefined') {
+                                normalized.state = data.state;
+                            }
+
+                            this.reportStats = normalized;
                             if (typeof this.externalNotify === 'function') {
-                                this.externalNotify(this.reportStats);
+                                this.externalNotify(normalized);
                             }
                         } else if (data.type === 'error') {
-                            this.addMessage(`Error: ${data.message}`, 'error');
+                            const message = data.message || 'Unknown websocket error';
+                            this.addMessage(`Error: ${message}`, 'error');
+                            if (typeof this.externalNotify === 'function') {
+                                this.externalNotify({
+                                    status: 'error',
+                                    state: 'error',
+                                    msg: message,
+                                });
+                            }
                         } else if (data.type === 'stdout') {
-                            this.stdoutText += data.message + '\n';
+                            const message = data.message || '';
+                            this.stdoutText += message + '\n';
+                            if (typeof this.externalNotify === 'function') {
+                                this.externalNotify({
+                                    status: 'stdout',
+                                    msg: message,
+                                });
+                            }
+                        } else if (data && typeof data === 'object') {
+                            const normalized = { ...data };
+                            if (normalized.state && typeof normalized.status === 'undefined') {
+                                normalized.status = normalized.state;
+                            }
+                            if (!(normalized.status === 'stdout' || normalized.status === 'error')) {
+                                this.reportStats = normalized;
+                            }
+                            if (typeof this.externalNotify === 'function') {
+                                this.externalNotify(normalized);
+                            }
                         }
                     } catch (e) {
                         console.error("Error processing WebSocket message:", e);
