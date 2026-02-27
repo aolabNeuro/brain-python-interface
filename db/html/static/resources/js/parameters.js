@@ -220,7 +220,7 @@ const parametersApp = {
     }
 };
 
-// Export for use in list-vue.js
+// Export for use in list.js
 parametersRoot.parametersApp = parametersApp;
 
 /**
@@ -228,9 +228,7 @@ parametersRoot.parametersApp = parametersApp;
  * Called when task parameters are loaded/updated
  */
 parametersRoot.updateVueParameters = function(parametersDesc) {
-    if (parametersApp.instance && parametersApp.instance.updateParameters) {
-        parametersApp.instance.updateParameters(parametersDesc);
-    }
+    parametersApp.instance.updateParameters(parametersDesc);
 };
 
 /**
@@ -238,19 +236,14 @@ parametersRoot.updateVueParameters = function(parametersDesc) {
  * Called when submitting form
  */
 parametersRoot.getVueParameterValues = function() {
-    if (parametersApp.instance) {
-        return parametersApp.instance.getParameterValues();
-    }
-    return {};
+    return parametersApp.instance.getParameterValues();
 };
 
 /**
  * Bridge function to enable/disable parameter editing
  */
 parametersRoot.setVueParametersEditMode = function(enabled) {
-    if (parametersApp.instance && parametersApp.instance.setEditMode) {
-        parametersApp.instance.setEditMode(enabled);
-    }
+    parametersApp.instance.setEditMode(enabled);
 };
 
 function Parameters(editable=false) {
@@ -328,12 +321,7 @@ Parameters.prototype.append = function(desc) {
 };
 
 Parameters.prototype.show_all_attrs = function() {
-    var showAll = false;
-    if (typeof parametersApp !== 'undefined' && parametersApp.instance) {
-        showAll = !!parametersApp.instance.showAllParams;
-    } else if ($('#show_params').length > 0) {
-        showAll = $('#show_params').prop('checked');
-    }
+    var showAll = !!parametersApp.instance.showAllParams;
 
     for (var name in this.hidden_parameters) {
         if (showAll)
@@ -740,11 +728,9 @@ function get_param_input(input_obj) {
 }
 
 Parameters.prototype.to_json = function() {
-    if (typeof parametersRoot !== 'undefined' && typeof parametersRoot.getVueParameterValues === 'function') {
-        var vueValues = parametersRoot.getVueParameterValues();
-        if (vueValues && typeof vueValues === 'object' && Object.keys(vueValues).length > 0) {
-            return vueValues;
-        }
+    var vueValues = parametersRoot.getVueParameterValues();
+    if (vueValues && typeof vueValues === 'object' && Object.keys(vueValues).length > 0) {
+        return vueValues;
     }
 
     var jsdata = {};

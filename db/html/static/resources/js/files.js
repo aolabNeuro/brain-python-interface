@@ -1,6 +1,6 @@
 /**
  * Files compatibility module
- * Preserves the Files API used by list-vue.js
+ * Preserves the Files API used by list.js
  */
 
 const filesRoot = typeof window !== 'undefined' ? window : globalThis;

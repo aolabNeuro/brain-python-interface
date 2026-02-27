@@ -1,6 +1,6 @@
 /**
  * Sequence compatibility module
- * Replaces legacy sequence.js while preserving the Sequence API used by list-vue.js
+ * Replaces legacy sequence.js while preserving the Sequence API used by list.js
  */
 
 const sequenceRoot = typeof window !== 'undefined' ? window : globalThis;

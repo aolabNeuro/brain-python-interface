@@ -1,7 +1,7 @@
 // Use "require" only if run from command line
 if (typeof(require) !== 'undefined') {
-  Features = require('../features-vue.js').Features;
-  var $ = require('../features-vue.js').$;
+  Features = require('../features.js').Features;
+  var $ = require('../features.js').$;
 }
 
 QUnit.test("Features manipulation", function(assert) {

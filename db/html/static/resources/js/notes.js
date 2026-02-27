@@ -1,6 +1,6 @@
 /**
  * Notes compatibility module
- * Keeps the legacy Notes API while list-vue.js is incrementally decomposed.
+ * Keeps the legacy Notes API while list.js is incrementally decomposed.
  */
 
 const notesRoot = typeof window !== 'undefined' ? window : globalThis;

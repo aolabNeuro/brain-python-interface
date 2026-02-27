@@ -243,7 +243,7 @@ const reportApp = {
     }
 };
 
-// Export for use in list-vue.js
+// Export for use in list.js
 reportRoot.reportVueApp = reportApp;
 // also update the local shorthand variable so other scripts pick up the correct
 // component definition (the earlier var declaration may have captured an

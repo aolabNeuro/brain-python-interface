@@ -45,7 +45,7 @@ Let's look at stopping the task as an example. After a task is started, the web 
 
 #. 	[Javascript Magic. Since this is our JS, this actually should be filled in]
 
-#. 	In the javascript file ``$BMI3D/db/static/resources/js/list-vue.js``, the function ``TaskEntry.prototype.stop`` is executed. The line 
+#. 	In the javascript file ``$BMI3D/db/static/resources/js/list.js``, the function ``TaskEntry.prototype.stop`` is executed. The line 
 
 	.. code-block:: javascript 
 

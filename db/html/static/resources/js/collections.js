@@ -1,6 +1,6 @@
 /**
  * Vue.js based Collections Component
- * Keeps compatibility with existing Collections class usage in list-vue.js
+ * Keeps compatibility with existing Collections class usage in list.js
  */
 
 const collectionsApp = {

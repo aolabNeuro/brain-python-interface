@@ -148,3 +148,46 @@ window.setVueMetadataEditMode = function(enabled) {
         metadataApp.instance.setEditMode(enabled);
     }
 };
+
+function Metadata() {}
+
+Metadata.prototype.update = function(info) {
+    if (!metadataApp.instance || !metadataApp.instance.updateMetadata) {
+        return;
+    }
+    metadataApp.instance.updateMetadata(info);
+};
+
+Metadata.prototype.enable = function() {
+    if (!metadataApp.instance || !metadataApp.instance.setEditMode) {
+        return;
+    }
+    metadataApp.instance.setEditMode(true);
+};
+
+Metadata.prototype.disable = function() {
+    if (!metadataApp.instance || !metadataApp.instance.setEditMode) {
+        return;
+    }
+    metadataApp.instance.setEditMode(false);
+};
+
+Metadata.prototype.get_data = function () {
+    if (!metadataApp.instance || !metadataApp.instance.getMetadataValues) {
+        return {};
+    }
+    return metadataApp.instance.getMetadataValues();
+};
+
+Metadata.prototype.reset = function () {
+    if (!metadataApp.instance || !metadataApp.instance.updateMetadata) {
+        return;
+    }
+    metadataApp.instance.updateMetadata(metadataApp.instance.metadata || {});
+};
+
+window.Metadata = Metadata;
+
+if (typeof(module) !== 'undefined' && module.exports) {
+    exports.Metadata = Metadata;
+}

@@ -142,28 +142,23 @@ const featuresApp = {
     }
 };
 
-// Export for use in list-vue.js
+// Export for use in list.js
 featuresRoot.featuresApp = featuresApp;
 
 /**
  * Bridge function to initialize features from template data
- * Called from list-vue.js when TaskEntry is created
+ * Called from list.js when TaskEntry is created
  */
 featuresRoot.initializeVueFeatures = function(featuresList) {
-    if (featuresApp.instance && featuresApp.instance.initializeFeatures) {
-        featuresApp.instance.initializeFeatures(featuresList);
-    }
+    featuresApp.instance.initializeFeatures(featuresList);
 };
 
 /**
  * Bridge function to get selected features from Vue
- * Called from list-vue.js when submitting form
+ * Called from list.js when submitting form
  */
 featuresRoot.getVueSelectedFeatures = function() {
-    if (featuresApp.instance) {
-        return featuresApp.instance.getSelectedFeatureNames();
-    }
-    return [];
+    return featuresApp.instance.getSelectedFeatureNames();
 };
 
 function Features() {
@@ -171,50 +166,36 @@ function Features() {
 }
 
 Features.prototype.clear = function() {
-    if (featuresRoot.featuresApp && featuresRoot.featuresApp.instance) {
-        featuresRoot.featuresApp.instance.deselectAll();
-    }
+    featuresRoot.featuresApp.instance.deselectAll();
 };
 
 Features.prototype.select_features = function(info_feats) {
-    if (featuresRoot.featuresApp && featuresRoot.featuresApp.instance) {
-        featuresRoot.featuresApp.instance.setSelectedFeatures(info_feats);
-    }
+    featuresRoot.featuresApp.instance.setSelectedFeatures(info_feats);
 };
 
 Features.prototype.get_checked_features = function () {
     const feats = {};
-    if (featuresRoot.featuresApp && featuresRoot.featuresApp.instance) {
-        const selectedNames = featuresRoot.featuresApp.instance.getSelectedFeatureNames();
-        selectedNames.forEach(name => {
-            feats[name] = true;
-        });
-    }
+    const selectedNames = featuresRoot.featuresApp.instance.getSelectedFeatureNames();
+    selectedNames.forEach(name => {
+        feats[name] = true;
+    });
     return feats;
 };
 
 Features.prototype.disable_entry = function () {
-    if (featuresRoot.featuresApp && featuresRoot.featuresApp.instance) {
-        featuresRoot.featuresApp.instance.setDisabled(true);
-    }
+    featuresRoot.featuresApp.instance.setDisabled(true);
 };
 
 Features.prototype.enable_entry = function() {
-    if (featuresRoot.featuresApp && featuresRoot.featuresApp.instance) {
-        featuresRoot.featuresApp.instance.setDisabled(false);
-    }
+    featuresRoot.featuresApp.instance.setDisabled(false);
 };
 
 Features.prototype.bind_change_callback = function(callback) {
-    if (featuresRoot.featuresApp && featuresRoot.featuresApp.instance) {
-        featuresRoot.featuresApp.instance.bindChangeCallback(callback);
-    }
+    featuresRoot.featuresApp.instance.bindChangeCallback(callback);
 };
 
 Features.prototype.unbind_change_callback = function() {
-    if (featuresRoot.featuresApp && featuresRoot.featuresApp.instance) {
-        featuresRoot.featuresApp.instance.unbindChangeCallback();
-    }
+    featuresRoot.featuresApp.instance.unbindChangeCallback();
 };
 
 featuresRoot.Features = Features;
