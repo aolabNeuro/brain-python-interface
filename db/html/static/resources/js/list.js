@@ -335,6 +335,7 @@ function TaskEntry(idx, info) {
     // Make new widgets
     this.sequence = new Sequence();
     this.params = new Parameters();
+    this.params.syncVue = true;
     this.metadata = new Metadata();
     this.report = new Report(task_interface.trigger.bind(this));
     this.files = new Files();

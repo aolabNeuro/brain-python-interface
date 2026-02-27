@@ -668,15 +668,20 @@
                       <input type="checkbox" v-model="showAllParams"> Show All Parameters?
                     </label>
                   </div>
-                  <div style="margin-bottom: 10px;">
+                  <div style="margin-bottom: 10px; display: flex; gap: 8px; align-items: center;">
                     <input v-model="searchQuery"
                            type="text"
                            placeholder="Search parameters..."
-                           style="width: 100%; padding: 5px; margin-bottom: 5px;">
+                           style="width: 130px; padding: 5px; margin-bottom: 5px;">
+                    <select v-model="sortMode" style="padding: 5px; margin-bottom: 5px; min-width: 140px;">
+                      <option value="default">Default order</option>
+                      <option value="alpha_asc">Name A-Z</option>
+                      <option value="alpha_desc">Name Z-A</option>
+                    </select>
                   </div>
                   <table class="parameters_table" v-if="filteredVisibleCount > 0">
                     <tbody>
-                      <tr v-for="(param, name) in filteredVisibleParams" :key="name" class="param_row">
+                      <tr v-for="([name, param]) in sortedFilteredVisibleParams" :key="name" class="param_row">
                         <td class="param_label">
                           <label :for="'param_' + name" v-text="param.label || name"></label>
                         </td>

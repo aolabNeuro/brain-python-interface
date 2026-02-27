@@ -22,6 +22,7 @@ const parametersApp = {
             parameters: {},  // Map of param_name -> {value, type, desc, options, inputs, etc}
             showAllParams: false,
             searchQuery: '',
+            sortMode: 'default',
             editMode: false,
         };
     },
@@ -33,12 +34,10 @@ const parametersApp = {
             if (this.showAllParams) {
                 return this.parameters;
             }
-            // Show only non-hidden parameters
-            // Parameters with hidden='hidden' should be hidden unless showAllParams is true
+            // Show only non-hidden parameters unless showAllParams is enabled
             return Object.fromEntries(
                 Object.entries(this.parameters).filter(([name, param]) => {
-                    const hiddenVal = String(param.hidden || '').toLowerCase();
-                    return !(hiddenVal === 'hidden' || hiddenVal === 'true' || hiddenVal === '1');
+                    return !this.isParamHidden(param);
                 })
             );
         },
@@ -80,10 +79,58 @@ const parametersApp = {
          */
         filteredVisibleCount() {
             return Object.keys(this.filteredVisibleParams).length;
+        },
+
+        /**
+         * Filtered parameters as a sorted array for stable rendering order control
+         */
+        sortedFilteredVisibleParams() {
+            const entries = Object.entries(this.filteredVisibleParams);
+
+            if (this.sortMode === 'default') {
+                return entries;
+            }
+
+            const sorted = entries.sort(([nameA, paramA], [nameB, paramB]) => {
+                const labelA = String(paramA?.label || nameA || '');
+                const labelB = String(paramB?.label || nameB || '');
+                return labelA.localeCompare(labelB, undefined, { sensitivity: 'base', numeric: true });
+            });
+
+            if (this.sortMode === 'alpha_desc') {
+                sorted.reverse();
+            }
+
+            return sorted;
         }
     },
 
     methods: {
+        isParamHidden(param) {
+            if (!param || param.hidden === undefined || param.hidden === null) {
+                return false;
+            }
+
+            if (typeof param.hidden === 'boolean') {
+                return param.hidden;
+            }
+
+            if (typeof param.hidden === 'number') {
+                return param.hidden !== 0;
+            }
+
+            const hiddenVal = String(param.hidden).trim().toLowerCase();
+            if (hiddenVal === '') {
+                return false;
+            }
+
+            if (['visible', 'false', '0', 'no', 'off'].includes(hiddenVal)) {
+                return false;
+            }
+
+            return ['hidden', 'true', '1', 'yes', 'on'].includes(hiddenVal);
+        },
+
         /**
          * Update parameters from descriptor object
          * Format: {param_name: {value, type, desc, options, default, ...}}
@@ -250,12 +297,13 @@ function Parameters(editable=false) {
     this.obj = document.createElement("table");
     this.traits = {};
     this.editable = editable;
+    this.syncVue = false;
 }
 
 Parameters.prototype.update = function(desc) {
     if (!desc || typeof desc !== 'object') {
         console.warn("Parameters.update called with invalid desc:", desc);
-        if (typeof parametersRoot !== 'undefined' && typeof parametersRoot.updateVueParameters === 'function') {
+        if (this.syncVue && typeof parametersRoot !== 'undefined' && typeof parametersRoot.updateVueParameters === 'function') {
             parametersRoot.updateVueParameters({});
         }
         return;
@@ -289,7 +337,7 @@ Parameters.prototype.update = function(desc) {
     this.append(desc);
     this.show_all_attrs();
 
-    if (typeof parametersRoot !== 'undefined' && typeof parametersRoot.updateVueParameters === 'function') {
+    if (this.syncVue && typeof parametersRoot !== 'undefined' && typeof parametersRoot.updateVueParameters === 'function') {
         parametersRoot.updateVueParameters(desc);
     }
 };
@@ -321,7 +369,7 @@ Parameters.prototype.append = function(desc) {
 };
 
 Parameters.prototype.show_all_attrs = function() {
-    var showAll = !!parametersApp.instance.showAllParams;
+    var showAll = this.syncVue ? !!parametersApp.instance.showAllParams : false;
 
     for (var name in this.hidden_parameters) {
         if (showAll)
@@ -332,14 +380,14 @@ Parameters.prototype.show_all_attrs = function() {
 };
 
 Parameters.prototype.enable = function() {
-    if (typeof parametersRoot !== 'undefined' && typeof parametersRoot.setVueParametersEditMode === 'function') {
+    if (this.syncVue && typeof parametersRoot !== 'undefined' && typeof parametersRoot.setVueParametersEditMode === 'function') {
         parametersRoot.setVueParametersEditMode(true);
     }
     $(this.obj).find("input, select, checkbox").removeAttr("disabled");
 };
 
 Parameters.prototype.disable = function() {
-    if (typeof parametersRoot !== 'undefined' && typeof parametersRoot.setVueParametersEditMode === 'function') {
+    if (this.syncVue && typeof parametersRoot !== 'undefined' && typeof parametersRoot.setVueParametersEditMode === 'function') {
         parametersRoot.setVueParametersEditMode(false);
     }
     $(this.obj).find("input, select, checkbox").attr("disabled", "disabled");
@@ -728,9 +776,11 @@ function get_param_input(input_obj) {
 }
 
 Parameters.prototype.to_json = function() {
-    var vueValues = parametersRoot.getVueParameterValues();
-    if (vueValues && typeof vueValues === 'object' && Object.keys(vueValues).length > 0) {
-        return vueValues;
+    if (this.syncVue) {
+        var vueValues = parametersRoot.getVueParameterValues();
+        if (vueValues && typeof vueValues === 'object' && Object.keys(vueValues).length > 0) {
+            return vueValues;
+        }
     }
 
     var jsdata = {};
