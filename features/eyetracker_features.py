@@ -4,8 +4,10 @@ Features for the eyetracker system
 
 import tempfile
 import time
+import traceback
 import numpy as np
 import tables
+from db import dbfunctions as db
 from riglib import calibrations
 from riglib.experiment import traits
 from riglib.gpio import ArduinoGPIO
@@ -44,21 +46,28 @@ class EyeCalibration(traits.HasTraits):
         
         # proc_exp # preprocess cursor data only
         taskid = self.taskid_for_eye_calibration
-        hdf_dir = '/storage/hdf'
-        hdf_file = glob.glob(os.path.join(hdf_dir, f'*{taskid}*'))[0]
-        ecube_file = glob.glob(f'/media/NeuroAcq/*{taskid}*')[0]
-        files = {}
-        files['hdf'] = hdf_file
-        files['ecube'] = ecube_file
-        self.eye_center = np.zeros((4,))
+        try:
+            entry = db.get_task_entries_by_id([taskid])[0]
+        except:
+            traceback.print_exc()
+            raise ValueError(f"Taskid {taskid} not found in database")
+        files = entry.get_data_files_dict_absolute()
         print(files)
+        
+        self.eye_center = np.zeros((4,))
 
         if not self.keyboard_control:
-            bmi3d_data, bmi3d_metadata = aopy.preproc.proc_exp(hdf_dir, files, 'hoge', 'hoge', overwrite=True, save_res=False)
+            try:
+                bmi3d_data, bmi3d_metadata = aopy.preproc.proc_exp('', files, 'hoge', 'hoge', overwrite=True, save_res=False)
+            except:
+                traceback.print_exc()
+                raise ValueError(f"Error processing hdf file for taskid {taskid}")
 
             # load raw eye data
             # raw_eye_data, raw_eye_metadata = aopy.preproc.parse_oculomatic(hdf_dir, files, debug=False)
-            eye_interp = aopy.data.get_interp_kinematics(bmi3d_data,bmi3d_metadata,datatype='eye',samplerate=bmi3d_metadata['cursor_interp_samplerate'])
+            samplerate = 1000
+            eye_interp = aopy.data.get_interp_task_data(bmi3d_data,bmi3d_metadata,datatype='eye',
+                                                        samplerate=samplerate, remove_nan=False)
 
             # calculate coefficients to calibrate eye data
             events = bmi3d_data['events']
@@ -66,7 +75,7 @@ class EyeCalibration(traits.HasTraits):
             if not self.eye_target_calibration:
                 self.eye_coeff,_,_,_ = aopy.preproc.calc_eye_calibration\
                     (bmi3d_data['cursor_interp'],bmi3d_metadata['cursor_interp_samplerate'],\
-                    eye_interp[:,:4], bmi3d_metadata['cursor_interp_samplerate'],events['timestamp'], events['code'],return_datapoints=True)
+                    eye_interp[:,:2], bmi3d_metadata['cursor_interp_samplerate'],events['timestamp'], events['code'],return_datapoints=True)
 
             else:
                 def get_target_locations(data, target_indices):
@@ -88,15 +97,15 @@ class EyeCalibration(traits.HasTraits):
                 
                 # Get eye_pos data when subjects gaze at the center. Target position doesn't matter for this computation
                 if self.center_eye_data:
-                    _, _, eye_center = aopy.preproc.calc_eye_target_calibration(eye_interp[:,:4], \
-                        bmi3d_metadata['cursor_interp_samplerate'], events['timestamp'], events['code'], target_pos, \
+                    _, _, eye_center = aopy.preproc.calc_eye_target_calibration(eye_interp[:,:2], \
+                        samplerate, events['timestamp'], events['code'], target_pos, \
                         offset=self.offset_time_eye_calibration, duration=self.duration_eye_calibration, align_events=80, return_datapoints=True)
                     
                     self.eye_center = np.nanmedian(eye_center, axis=0)
 
                 # Calculate coefficient by linear regression between targets and centered eye positions
-                self.eye_coeff, _ = aopy.preproc.calc_eye_target_calibration(eye_interp[:,:4]-self.eye_center, \
-                        bmi3d_metadata['cursor_interp_samplerate'], events['timestamp'], events['code'], target_pos, \
+                self.eye_coeff, _ = aopy.preproc.calc_eye_target_calibration(eye_interp[:,:2]-self.eye_center, \
+                        samplerate, events['timestamp'], events['code'], target_pos, \
                         offset=self.offset_time_eye_calibration, duration=self.duration_eye_calibration)
             
             print("Calibration complete:", self.eye_coeff)
@@ -128,14 +137,17 @@ class EyeCalibration(traits.HasTraits):
         # Do calibration
         ave_pos = self.eye_pos
         if not self.keyboard_control:
-            calibrated_pos = aopy.postproc.get_calibrated_eye_data(self.eye_pos[:4]-self.eye_center, self.eye_coeff)
-            ave_pos = np.array([(calibrated_pos[0] + calibrated_pos[2])/2, (calibrated_pos[1] + calibrated_pos[3])/2])
+            ave_pos = aopy.postproc.get_calibrated_eye_data(self.eye_pos[:2]-self.eye_center, self.eye_coeff)
+            #  = np.array([(calibrated_pos[0] + calibrated_pos[2])/2, (calibrated_pos[1] + calibrated_pos[3])/2])
         
         # Save calibration
         self.calibrated_eye_pos = ave_pos
         self.task_data['calibrated_eye'] = ave_pos
 
-        super(EyeStreaming, self)._cycle()
+        if isinstance(self, PupilLabStreaming):
+            super(PupilLabStreaming, self)._cycle()
+        else:
+            super(EyeStreaming, self)._cycle()
 
         # Move the eye cursor
         if np.any(np.isnan(self.calibrated_eye_pos)):
@@ -311,6 +323,7 @@ class PupilLabStreaming(traits.HasTraits):
     surface tracking. Requires a task with the Window feature enabled.
     '''
 
+    keyboard_control = traits.Bool(False, desc="Whether to replace eye control with keyboard control")
     surface_marker_size = traits.Float(2., desc="Size in cm of apriltag surface markers")
     surface_marker_count = traits.Int(0, desc="How many surface markers to draw")
     eye_labels = ['gaze_x', 'gaze_y', 'gaze_3d_x', 'gaze_3d_y', 'gaze_3d_z', 'gaze_timestamp', 'gaze_confidence', 'eye_id',
