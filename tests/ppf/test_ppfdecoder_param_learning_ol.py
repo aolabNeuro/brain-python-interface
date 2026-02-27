@@ -64,7 +64,7 @@ beta_hist = []
 beta_cont_hist = np.zeros([n_iter, n_neurons, 3])
 beta_cont_hist[0, :, -1] = beta[:, -1]
 
-I = np.mat(np.eye(3*n_neurons))
+I = np.asmatrix(np.eye(3*n_neurons))
 R_diag_neuron = 1e-4 * np.array([0.13, 0.13, 0.06/50])
 R = np.diag(np.tile(R_diag_neuron, (n_neurons,)))
 meta_ppf = ppfdecoder.PointProcessFilter(I, R, np.zeros(3*n_neurons), dt=dt)
@@ -86,13 +86,13 @@ for n in range(1, n_iter):
         decoder_sb.update_params(new_params)
 
     #### ## Try to predict the beta of the first unit
-    #### meta_ppf.C = np.mat(beta_C.reshape(1, -1))
+    #### meta_ppf.C = np.asmatrix(beta_C.reshape(1, -1))
     #### meta_ppf_C = np.zeros([n_neurons, 3*n_neurons])
     #### for k in range(n_neurons):
     ####     meta_ppf_C[k, 3*k:3*(k+1)] = beta_C
     #### meta_ppf.C = meta_ppf_C
-    #### #obs_0 = np.mat([[spike_counts[n-1, 0]]], dtype=np.float64)
-    #### obs = np.mat(spike_counts[n-1, :].reshape(-1,1))
+    #### #obs_0 = np.asmatrix([[spike_counts[n-1, 0]]], dtype=np.float64)
+    #### obs = np.asmatrix(spike_counts[n-1, :].reshape(-1,1))
     #### beta_cont_hist[n, :] = np.array(meta_ppf(obs)).ravel().reshape(n_neurons, -1)
 
     st = time.time()

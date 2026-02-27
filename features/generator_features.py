@@ -173,6 +173,29 @@ class RandomDelay(traits.HasTraits):
             self.delay_time = random.random()*(e-s) + s
         super()._start_wait()
 
+class DiscreteRandomDelay_EyeHandSequence(traits.HasTraits):
+    '''
+    Choose delay time from three discrete blocks (short, meidum, long delay) in eye-hand sequence task
+    '''
+    
+    rand_delay_hand_lower_bound = traits.List([0,], desc="lower bound of delay time in each block for hand go cue in sequence trials")
+    rand_delay_hand_upper_bound = traits.List([0.1,], desc="upper bound of delay time in each block for hand go cue in sequence trials")
+    rand_delay_hand_probability = traits.List([1.,], desc="probablity of each block for delay time")
+    exclude_parent_traits = ['rand_delay_hand']
+
+    def _start_wait(self):
+        super()._start_wait()
+
+        if self.tries == 0:
+            if self.trial_count_blocks - self.trials_block_simultaneous < self.trials_block_sequence: # only in sequence trials
+                
+                # Set delay time for hand go cue in sequence trials
+                delays = []
+                for lower, upper in zip(self.rand_delay_hand_lower_bound, self.rand_delay_hand_upper_bound):
+                    delays.append(random.random()*(upper-lower) + lower)
+
+                self.delay_time_hand = np.random.choice(delays, p = (self.rand_delay_hand_probability))
+
 class TransparentDelayTarget(traits.HasTraits):
     '''
     Feature to make the delay period show a semi-transparent target rather than the full target. Used 
@@ -338,19 +361,19 @@ class IncrementalRotation(traits.HasTraits):
 
 class HideLeftTrajectory(traits.HasTraits):
     '''
-    Hide the left side of the tracking trajectory. 
-    This will cover the 'lookbehind' of the target trajectory. 
+    Hide the left side of the 1d target trajectory. 
+    This will make only the 'lookahead' of the trajectory visible. The 'lookbehind' will be blacked out.
     Useful for task with bumpers.
     '''
 
     def setup_start_wait(self):
         super().setup_start_wait()
-        print(self.frame_index)
-        self.trajectory.update_mask(self.lookahead+2, self.lookahead*2)
+        self.trajectory.update_mask(self.lookahead, self.lookahead*2+1) # frame indices to show 
+        # a total of lookahead*2+1 frames spans the screen width: lookahead index is at center with n_lookahead frames on either side
                                     
     def update_frame(self):
-        super().update_frame()
-        self.trajectory.update_mask(self.frame_index+self.lookahead+1, self.frame_index+2*self.lookahead)
+        self.trajectory.update_mask(self.lookahead+self.frame_index, self.lookahead*2+1+self.frame_index) # frame indices to show
+        super().update_frame() # frame_index is incremented at the end of update_frame(), so need to update trajectory mask before this
 
 class ReadysetMedley(traits.HasTraits):
 
@@ -402,3 +425,43 @@ class ReadysetColorChange(traits.HasTraits):
 
     def _end_tooslow_penalty(self):
         self.sync_event('TRIAL_END')
+
+class HideCursorReturn(traits.HasTraits):
+
+    '''
+    Hide the cursor during the return to center after a reward or penalty. 
+    Display again when cursor is within some user specified distance of center of the center target.
+
+    '''
+    show_cursor_return = traits.Float(3, desc = 'Distance from center at which to turn curson on')
+
+    def _start_reward(self):
+        super()._start_reward()
+        self.plant_visible = False 
+    
+    def _while_target(self):
+
+        if self.calc_trial_num() > 0: #skip logic for very first trial of block 
+            if self.target_index == 0: 
+                cursor_pos = self.plant.get_endpoint_pos()
+                dist_from_center = np.linalg.norm(cursor_pos - self.targs[self.target_index])
+                if dist_from_center < self.show_cursor_return:
+                    self.plant_visible = True
+                else:
+                    self.plant_visible = False
+    
+    def _start_hold_penalty(self):
+        super()._start_hold_penalty()
+        self.plant_visible = False
+
+    def _start_timeout_penalty(self):
+        super()._start_timeout_penalty()
+        self.plant_visible = False
+    
+    def _start_delay_penalty(self):
+        super()._start_delay_penalty()
+        self.plant_visible = False  
+
+    def _start_tooslow_penalty(self):
+        super()._start_tooslow_penalty()
+        self.plant_visible = False

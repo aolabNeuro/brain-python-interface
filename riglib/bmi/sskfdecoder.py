@@ -59,10 +59,10 @@ class SteadyStateKalmanFilter(bmi.GaussianStateHMM):
         ## Initialize the BMI state, assuming                                  
         nS = self.n_states                                                 
         if init_state == None:                                                 
-            init_state = np.mat( np.zeros([nS, 1]) )                           
+            init_state = np.asmatrix( np.zeros([nS, 1]) )                           
             if self.include_offset: init_state[-1,0] = 1                       
         if init_cov == None:                                                   
-            init_cov = np.mat( np.zeros([nS, nS]) )
+            init_cov = np.asmatrix( np.zeros([nS, nS]) )
         self.state = bmi.GaussianState(init_state, init_cov)                       
 
     def _pickle_init(self):
@@ -75,7 +75,7 @@ class SteadyStateKalmanFilter(bmi.GaussianStateHMM):
         -------
         '''
         nS = self.F.shape[0]
-        self.I = np.mat(np.eye(nS))
+        self.I = np.asmatrix(np.eye(nS))
 
     def get_sskf(self):
         '''
@@ -162,7 +162,7 @@ class SteadyStateKalmanFilter(bmi.GaussianStateHMM):
         Returns
         -------
         '''
-        K = np.mat(self.K)
+        K = np.asmatrix(self.K)
         n_neurons = K.shape[1]
         K_null = np.eye(n_neurons) - np.linalg.pinv(K) * K
         return K_null

@@ -53,9 +53,9 @@ class PointProcessFilter(bmi.GaussianStateHMM):
             ## This condition should only be true in the unpickling phase
             pass            
         else:
-            self.A = np.mat(A)
-            self.W = np.mat(W)
-            self.C = np.mat(C)
+            self.A = np.asmatrix(A)
+            self.W = np.asmatrix(W)
+            self.C = np.asmatrix(C)
             self.dt = dt
             self.spike_rate_dt = dt
             
@@ -149,10 +149,10 @@ class PointProcessFilter(bmi.GaussianStateHMM):
             raise Exception
         using_control_input = (Bu is not None) or (u is not None) or (x_target is not None)
         if x_target is not None:
-            x_target = np.mat(x_target[:,0].reshape(-1,1))
+            x_target = np.asmatrix(x_target[:,0].reshape(-1,1))
         target_state = x_target
 
-        obs_t = np.mat(obs_t.reshape(-1,1))
+        obs_t = np.asmatrix(obs_t.reshape(-1,1))
         C = self.C
         n_obs, n_states = C.shape
         
@@ -173,21 +173,21 @@ class PointProcessFilter(bmi.GaussianStateHMM):
         exp = np.vectorize(lambda x: np.real(cmath.exp(x)))
         lambda_predict = exp(np.array(Loglambda_predict).ravel())/dt
 
-        Q_inv = np.mat(np.diag(lambda_predict*dt))
+        Q_inv = np.asmatrix(np.diag(lambda_predict*dt))
 
         if np.linalg.cond(P_pred) > 1e5:
             P_est = P_pred;
         else:
-            P_est = (P_pred.I + C.T*np.mat(np.diag(lambda_predict*dt))*C).I
+            P_est = (P_pred.I + C.T*np.asmatrix(np.diag(lambda_predict*dt))*C).I
 
         # inflate P_est
-        P_est_full = np.mat(np.zeros([n_states, n_states]))
+        P_est_full = np.asmatrix(np.zeros([n_states, n_states]))
         P_est_full[mesh] = P_est
         P_est = P_est_full 
 
-        unpred_spikes = obs_t - np.mat(lambda_predict*dt).reshape(-1,1)
+        unpred_spikes = obs_t - np.asmatrix(lambda_predict*dt).reshape(-1,1)
 
-        x_est = np.mat(np.zeros([n_states, 1]))
+        x_est = np.asmatrix(np.zeros([n_states, 1]))
         x_est = x_pred + P_est*self.C.T*unpred_spikes
         self.neural_push = P_est*self.C.T*obs_t
         self.P_est = P_est
@@ -241,21 +241,21 @@ class PointProcessFilter(bmi.GaussianStateHMM):
             mask = ~hidden_state.mask[0,:] # NOTE THE INVERTER 
             inds = np.nonzero([ mask[k]*mask[k+1] for k in range(len(mask)-1)])[0]
     
-            X = np.mat(hidden_state[:,mask])
+            X = np.asmatrix(hidden_state[:,mask])
             T = len(np.nonzero(mask)[0])
     
-            Y = np.mat(obs[:,mask])
+            Y = np.asmatrix(obs[:,mask])
             if include_offset:
                 X = np.vstack([ X, np.ones([1,T]) ])
         else:
             num_hidden_state, T = hidden_state.shape
-            X = np.mat(hidden_state)
+            X = np.asmatrix(hidden_state)
             if include_offset:
                 X = np.vstack([ X, np.ones([1,T]) ])
                 if not drives_obs == None:
                     drives_obs = np.hstack([drives_obs, True])
                 
-            Y = np.mat(obs)
+            Y = np.asmatrix(obs)
         
         X = np.array(X)
         if not drives_obs == None:
@@ -322,7 +322,7 @@ class OneStepMPCPointProcessFilter(PointProcessFilter):
         exp = np.vectorize(lambda x: np.real(cmath.exp(x)))
         lambda_predict = exp(np.array(Loglambda_predict).ravel())/dt
 
-        Q_inv = np.mat(np.diag(lambda_predict*dt))
+        Q_inv = np.asmatrix(np.diag(lambda_predict*dt))
 
         if self.prev_obs is not None:
             y_ref = self.prev_obs
@@ -389,7 +389,7 @@ class OneStepMPCPointProcessFilterCovFb(OneStepMPCPointProcessFilter):
         exp = np.vectorize(lambda x: np.real(cmath.exp(x)))
         lambda_predict = exp(np.array(Loglambda_predict).ravel())/dt
 
-        Q_inv = np.mat(np.diag(lambda_predict*dt))
+        Q_inv = np.asmatrix(np.diag(lambda_predict*dt))
 
         from .bmi import GaussianState
         if (self.prev_obs is not None) and (self.r_scale < np.inf):
@@ -404,7 +404,7 @@ class OneStepMPCPointProcessFilterCovFb(OneStepMPCPointProcessFilter):
             
             alpha = A*state
             v = np.linalg.pinv(R + D)*(G*y_ref - D*alpha.mean)
-            I = np.mat(np.eye(D.shape[0]))
+            I = np.asmatrix(np.eye(D.shape[0]))
             C = self.C
             A = (I - G*C) * self.A
             mean = A*state.mean + G*y_ref

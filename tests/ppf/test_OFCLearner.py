@@ -24,7 +24,7 @@ kin_state[state_inds_2d, :] = cursor_kin
 
 for idx in range(1, n_iter):
     if not np.any(np.isnan(aimPos[:, idx])):
-        learner(np.mat([[0]]), kin_state[:,idx], aimPos[:,idx], -1, 'target')
+        learner(np.asmatrix([[0]]), kin_state[:,idx], aimPos[:,idx], -1, 'target')
 
 kin_data, _ = learner.get_batch()
 learner_error = intended_kin[:,:kin_data.shape[1]] - np.array(kin_data[state_inds_2d,:])
