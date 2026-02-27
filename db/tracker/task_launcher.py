@@ -18,6 +18,8 @@ import traceback
 import json
 from datetime import datetime
 
+import numpy as np
+
 from riglib import experiment
 from . import models
 from .json_param import Parameters
@@ -122,12 +124,70 @@ class TaskProcess(mp.Process):
         # Avoid duplicate saveid in params
         if 'saveid' not in params:
             params['saveid'] = self.saveid
+
+        # If a sequence_id was provided (from ajax start), reconstruct the generator here
+        if 'sequence_id' in params:
+            from . import models
+            seq_id = params.pop('sequence_id')
+            try:
+                seq = models.Sequence.objects.get(pk=seq_id)
+            except models.Sequence.DoesNotExist:
+                raise ValueError(f"Sequence id {seq_id} not found in database")
+            gen_constructor, gen_params = seq.get()
+            # if gen_constructor is a tuple returned by Sequence.get (possible for static sequences)
+            if isinstance(gen_constructor, tuple) and len(gen_constructor) == 2:
+                # shouldn't really happen since get() returns (func, params)
+                gen_constructor, gen_params = gen_constructor
+            # Build the actual generator instance
+            if hasattr(gen_constructor, '__call__'):
+                gen = gen_constructor(self.target_class, **gen_params)
+            else:
+                # if the constructor is already a generator object
+                gen = gen_constructor
+            params['gen'] = gen
+            # merge any additional parameters from sequence generator into params
+            params.update(gen_params)
+
+            # Ensure all parameters are normalized according to trait definitions
+            # (this is mainly a safety net; ajax.start_experiment already performs
+            # normalization, but other callers may not)
+            try:
+                traits = self.target_class.class_traits()
+                # the Parameters utility expects its own object; re-wrap params temporarily
+                from .json_param import Parameters
+                temp = Parameters.from_dict(params)
+                temp.trait_norm(traits)
+                params = temp.params
+            except Exception:
+                # if normalization fails for any reason, ignore and proceed; the task
+                # constructor will still report trait errors as before
+                pass
         
         # Pre-initialization hook (start recording devices, etc)
         self.target_class.pre_init(subject_name=self.subject_name, saveid=self.saveid)
         
         # Create task instance
+        # For Sequence-based tasks, params should already include a 'gen' key if a
+        # sequence was provided via sequence_id in ajax.py.  Sequence.__init__ will
+        # verify its presence and throw an error if missing.
         self.task = self.target_class(**params)
+
+        # Many Experiment subclasses require additional initialization that
+        # cannot be reliably performed in __init__ (due to multiple inheritance
+        # order).  The conventional pattern in the codebase is to call ``init()``
+        # before the main event loop starts; tests typically call it manually.
+        # The absence of this call was causing attributes such as ``penalty_index``
+        # to remain undefined, resulting in the ``AttributeError`` seen above.
+        try:
+            # ``init`` may accept args/kwargs in some subclasses; we simply call
+            # it without arguments here since any needed values should already be
+            # set as attributes by the constructors.
+            self.task.init()
+        except Exception:
+            # If init fails for any reason, log and continue; the task's own
+            # error handling will catch it later in the FSM loop.
+            import traceback as _tb
+            _tb.print_exc()
         
         # Store reference to this process in the task so _cycle can access RPC queue
         self.task._task_process = self
@@ -415,14 +475,38 @@ class TaskTracker:
         
         elif msg_type == 'error':
             self.status = 'error'
-            print(f"Task error: {msg.get('message')}")
+            err_msg = msg.get('message')
+            print(f"Task error: {err_msg}")
+            # forward the error to any connected web clients
+            try:
+                from .consumers import sync_broadcast_error
+                sync_broadcast_error(err_msg, msg.get('traceback', ''))
+            except Exception as e:
+                print(f"Failed to broadcast task error: {e}")
         
         elif msg_type == 'complete':
             self.status = 'complete'
+            # broadcast the final completion state to clients as well
+            try:
+                from .consumers import sync_broadcast_status
+                sync_broadcast_status('complete', self.reportstats)
+            except Exception as e:
+                print(f"Failed to broadcast completion status: {e}")
     
     def update_alive(self):
         """Check if the remote process is still alive, and if dead, reset"""
         if self.proc is not None and not self.proc.is_alive():
+            # broadcast an error if we were previously running
+            if self.status == 'running':
+                exitcode = self.proc.exitcode
+                err_msg = f"Task process terminated unexpectedly (exitcode={exitcode})"
+                print(err_msg)
+                try:
+                    from .consumers import sync_broadcast_error
+                    sync_broadcast_error(err_msg)
+                except Exception as e:
+                    print(f"Failed to broadcast termination error: {e}")
+                self.status = 'error'
             self.reset()
     
     def get_status(self):

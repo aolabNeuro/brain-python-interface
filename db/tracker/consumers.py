@@ -26,7 +26,7 @@ class TaskConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         """Called when a WebSocket connects"""
         self.task_group = 'tasks'
-        
+        print(f"WebSocket connect: {self.channel_name}")
         # Add to a group so we can broadcast to all clients
         await self.channel_layer.group_add(
             self.task_group,
@@ -36,6 +36,7 @@ class TaskConsumer(AsyncWebsocketConsumer):
     
     async def disconnect(self, close_code):
         """Called when a WebSocket disconnects"""
+        print(f"WebSocket disconnect: {self.channel_name} code={close_code}")
         await self.channel_layer.group_discard(
             self.task_group,
             self.channel_name
@@ -43,6 +44,7 @@ class TaskConsumer(AsyncWebsocketConsumer):
     
     async def receive(self, text_data):
         """Receive a message from the WebSocket client"""
+        print(f"WebSocket received raw: {text_data}")
         try:
             data = json.loads(text_data)
             await self.handle_message(data)

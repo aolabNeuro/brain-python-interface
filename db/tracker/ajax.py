@@ -298,12 +298,18 @@ def start_experiment(request, save=True, execute=True):
             entry.date = datetime.datetime(int(datestr[0]), int(datestr[1]), int(datestr[2]))
 
         params = Parameters.from_html(data['params'])
+        # we'll normalize traits once we know the task class below; however,
+        # store raw params for now and update after normalization if needed
         entry.params = params.to_json()
         feats = Feature.getall(feature_names)
         
         # Get the base task class with features mixed in
         task_class = task.get(feats=feature_names)
-        
+        # Normalize traits now that we know the task class (handles tuple/list conversions etc.)
+        params.trait_norm(task_class.class_traits())
+        # update the stored JSON representation with normalized values
+        entry.params = params.to_json()
+
         # Convert parameters to dict format for the task
         params_dict = params.params if isinstance(params, Parameters) else params
         
@@ -317,8 +323,9 @@ def start_experiment(request, save=True, execute=True):
             if save:
                 seq.save()
             entry.sequence = seq
-            # TODO: Handle sequence in task initialization
-            # params_dict['seq'] = seq
+            # Instead of passing the generator directly (which cannot be pickled on Windows),
+            # pass the database ID and reconstruct the generator inside the subprocess.
+            params_dict['sequence_id'] = seq.id
 
         response = dict(
             status="testing",

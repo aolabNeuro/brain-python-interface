@@ -10,6 +10,13 @@
 
 const reportRoot = typeof window !== 'undefined' ? window : globalThis;
 
+// make sure the global namespace has a placeholder for the app
+if (typeof reportRoot.reportVueApp === 'undefined') {
+    reportRoot.reportVueApp = {};
+}
+// also expose a variable for ease of access (non-strict mode will read from window)
+var reportVueApp = reportRoot.reportVueApp;
+
 // Create the Vue app for the report section
 const reportApp = {
     el: '#report_div',
@@ -204,6 +211,12 @@ const reportApp = {
 
 // Export for use in list-vue.js
 reportRoot.reportVueApp = reportApp;
+// also update the local shorthand variable so other scripts pick up the correct
+// component definition (the earlier var declaration may have captured an
+// empty placeholder object)
+if (typeof reportVueApp !== 'undefined') {
+    reportVueApp = reportApp;
+}
 
 function Report(notify_callback) {
     this.notify = notify_callback;

@@ -8,6 +8,10 @@ QUnit.test("Report tests", function(assert) {
 	var callback_info = null;
 	var report = new Report(function(info) {callback_info = info});
 
+	// sanity check: the Vue component object should have been exported
+	assert.ok(typeof reportVueApp !== 'undefined', "reportVueApp should be defined");
+	assert.ok(typeof reportVueApp.data === 'function', "reportVueApp should have a data() method");
+
 	// test update of error messages
 	var error_report = {"status":"error", "msg":"Test error message"}
 	report.update(error_report);

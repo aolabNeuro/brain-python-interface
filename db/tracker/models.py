@@ -36,11 +36,11 @@ def func_or_class_to_json(func_or_class, current_values, desc_lookup):
     Helper for translating a function or class into json parameters for the UI
     '''
     try:
-        args = inspect.getargspec(func_or_class)
+        args = inspect.getfullargspec(func_or_class)
         names, defaults = args.args, args.defaults
         if "self" in names: names.remove("self")
     except TypeError:
-        args = inspect.getargspec(func_or_class.__init__)
+        args = inspect.getfullargspec(func_or_class.__init__)
         names, defaults = args.args, args.defaults
         names.remove("self")
 
@@ -501,10 +501,10 @@ class Generator(models.Model):
 
             # The sequence/generator constructor can either be a callable or a class constructor... not aware of any uses of the class constructor
             try:
-                args = inspect.getargspec(generators[name]).args
+                args = inspect.getfullargspec(generators[name]).args
                 print(args)
             except TypeError:
-                args = inspect.getargspec(generators[name].__init__).args
+                args = inspect.getfullargspec(generators[name].__init__).args
                 args.remove("self")
 
             # A generator is determined to be static only if it takes an "exp" argument representing the Experiment class

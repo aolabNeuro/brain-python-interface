@@ -65,7 +65,7 @@ function interface_fn_running(info) {
     $("#finished_task_buttons").hide();
     $("#bmi").hide();
     this.report.activate();
-    if (reportVueApp.instance) reportVueApp.instance.activate();
+    if (typeof reportVueApp !== 'undefined' && reportVueApp.instance) reportVueApp.instance.activate();
 
     $("#report").show();
     $("#notes").show();
@@ -92,7 +92,7 @@ function interface_fn_testing(info) {
     $("#finished_task_buttons").hide();
     $("#bmi").hide();
     this.report.activate();
-    if (reportVueApp.instance) reportVueApp.instance.activate();
+    if (typeof reportVueApp !== 'undefined' && reportVueApp.instance) reportVueApp.instance.activate();
     if (window.updateVueTaskState) window.updateVueTaskState('testing');
 
     $("#report").show();

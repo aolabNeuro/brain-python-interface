@@ -183,10 +183,6 @@ table#main tbody>tr:hover {
 	background:#DDD;
 }
 
-
-table#main tr#newentry {
-	display:none;
-}
 th { text-align:left;}
 
 

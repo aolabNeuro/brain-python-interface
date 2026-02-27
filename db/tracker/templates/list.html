@@ -64,8 +64,12 @@
     const { createApp } = Vue;
     
     // Initialize report component
-    const reportApp = createApp(reportVueApp);
-    reportVueApp.instance = reportApp.mount('#report_div');
+    if (typeof reportVueApp !== 'undefined') {
+      const reportApp = createApp(reportVueApp);
+      reportVueApp.instance = reportApp.mount('#report_div');
+    } else {
+      console.warn("reportVueApp is not defined; report component will not mount");
+    }
     
     // Initialize features component
     const featuresComponentApp = createApp(featuresApp);
@@ -438,7 +442,6 @@
             <td class='colSubj'></td>
             <td class='colTask'>
               <select id='tasks'>
-                <option value="">-- Select a task --</option>
                 {% for t in tasks %}<option value='{{t.id}}'>{{ t.name }}</option>
                 {% endfor %}
               </select>

@@ -33,8 +33,8 @@ function interface_fn_completed() {
     this.controls.show();
     this.controls.deactivate();
     this.report.deactivate();
-    // Deactivate Vue.js report component
-    if (reportVueApp.instance) reportVueApp.instance.deactivate();
+    // Deactivate Vue.js report component (if available)
+    if (typeof reportVueApp !== 'undefined' && reportVueApp.instance) reportVueApp.instance.deactivate();
     this.report.set_mode("completed");
 
     // Hack fix. When you select a block from the task interface, force the 'date' column to still be white
@@ -82,8 +82,8 @@ function interface_fn_running(info) {
     $("#finished_task_buttons").hide();
     $("#bmi").hide();
     this.report.activate();
-    // Activate Vue.js report component
-    if (reportVueApp.instance) reportVueApp.instance.activate();
+    // Activate Vue.js report component (if available)
+    if (typeof reportVueApp !== 'undefined' && reportVueApp.instance) reportVueApp.instance.activate();
 
     $("#report").show()
     $("#notes").show()
@@ -389,7 +389,8 @@ function TaskEntry(idx, info) {
         this.status = "stopped";
         this.tr = $("#newentry");
         this.tr.css('display', 'table-row'); // Show the newentry row with proper table display
-        
+        this.tr.show();
+
         feats.clear();
         this.report.hide();
         this.files.hide();
