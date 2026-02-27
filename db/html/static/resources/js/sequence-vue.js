@@ -210,7 +210,6 @@ Sequence.prototype.enable = function() {
 
 Sequence.prototype.disable = function() {
     $("#seqlist, #seqparams, #seqparams input, #seqgen, #seqstatic").attr("disabled", "disabled");
-    $('#show_params').attr("disabled", false);
     $("#seqadd").hide();
 };
 

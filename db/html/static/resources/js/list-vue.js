@@ -341,7 +341,9 @@ function TaskEntry(idx, info) {
     this.controls = new Controls();
     this.controls.hide()
 
-    $("#parameters").append(this.params.obj);
+    if (!document.getElementById("parameters_vue")) {
+        $("#parameters").append(this.params.obj);
+    }
     $("#plots").empty()
 
     debug("JS constructing task entry", idx)

@@ -21,7 +21,7 @@ const parametersApp = {
         return {
             parameters: {},  // Map of param_name -> {value, type, desc, options, inputs, etc}
             showAllParams: false,
-            filteredParams: {},
+            searchQuery: '',
             editMode: false,
         };
     },
@@ -37,7 +37,8 @@ const parametersApp = {
             // Parameters with hidden='hidden' should be hidden unless showAllParams is true
             return Object.fromEntries(
                 Object.entries(this.parameters).filter(([name, param]) => {
-                    return param.hidden !== 'hidden';
+                    const hiddenVal = String(param.hidden || '').toLowerCase();
+                    return !(hiddenVal === 'hidden' || hiddenVal === 'true' || hiddenVal === '1');
                 })
             );
         },
@@ -54,6 +55,31 @@ const parametersApp = {
          */
         visibleCount() {
             return Object.keys(this.visibleParams).length;
+        },
+
+        /**
+         * Visible parameters filtered by search query
+         */
+        filteredVisibleParams() {
+            if (!this.searchQuery) {
+                return this.visibleParams;
+            }
+
+            const query = this.searchQuery.toLowerCase();
+            return Object.fromEntries(
+                Object.entries(this.visibleParams).filter(([name, param]) => {
+                    const label = String(param.label || name || '').toLowerCase();
+                    const desc = String(param.desc || '').toLowerCase();
+                    return label.includes(query) || desc.includes(query);
+                })
+            );
+        },
+
+        /**
+         * Count of visible parameters after search filter
+         */
+        filteredVisibleCount() {
+            return Object.keys(this.filteredVisibleParams).length;
         }
     },
 
@@ -236,6 +262,9 @@ function Parameters(editable=false) {
 Parameters.prototype.update = function(desc) {
     if (!desc || typeof desc !== 'object') {
         console.warn("Parameters.update called with invalid desc:", desc);
+        if (typeof parametersRoot !== 'undefined' && typeof parametersRoot.updateVueParameters === 'function') {
+            parametersRoot.updateVueParameters({});
+        }
         return;
     }
 
@@ -266,6 +295,10 @@ Parameters.prototype.update = function(desc) {
     this.hidden_parameters = [];
     this.append(desc);
     this.show_all_attrs();
+
+    if (typeof parametersRoot !== 'undefined' && typeof parametersRoot.updateVueParameters === 'function') {
+        parametersRoot.updateVueParameters(desc);
+    }
 };
 
 Parameters.prototype.append = function(desc) {
@@ -295,8 +328,15 @@ Parameters.prototype.append = function(desc) {
 };
 
 Parameters.prototype.show_all_attrs = function() {
+    var showAll = false;
+    if (typeof parametersApp !== 'undefined' && parametersApp.instance) {
+        showAll = !!parametersApp.instance.showAllParams;
+    } else if ($('#show_params').length > 0) {
+        showAll = $('#show_params').prop('checked');
+    }
+
     for (var name in this.hidden_parameters) {
-        if ($('#show_params').prop('checked'))
+        if (showAll)
             $(this.hidden_parameters[name]).show();
         else
             $(this.hidden_parameters[name]).hide();
@@ -304,10 +344,16 @@ Parameters.prototype.show_all_attrs = function() {
 };
 
 Parameters.prototype.enable = function() {
+    if (typeof parametersRoot !== 'undefined' && typeof parametersRoot.setVueParametersEditMode === 'function') {
+        parametersRoot.setVueParametersEditMode(true);
+    }
     $(this.obj).find("input, select, checkbox").removeAttr("disabled");
 };
 
 Parameters.prototype.disable = function() {
+    if (typeof parametersRoot !== 'undefined' && typeof parametersRoot.setVueParametersEditMode === 'function') {
+        parametersRoot.setVueParametersEditMode(false);
+    }
     $(this.obj).find("input, select, checkbox").attr("disabled", "disabled");
 };
 
@@ -694,6 +740,13 @@ function get_param_input(input_obj) {
 }
 
 Parameters.prototype.to_json = function() {
+    if (typeof parametersRoot !== 'undefined' && typeof parametersRoot.getVueParameterValues === 'function') {
+        var vueValues = parametersRoot.getVueParameterValues();
+        if (vueValues && typeof vueValues === 'object' && Object.keys(vueValues).length > 0) {
+            return vueValues;
+        }
+    }
+
     var jsdata = {};
 
     for (var name in this.traits) {

@@ -82,6 +82,11 @@ div#leftpane {
 	overflow:auto;
 }
 
+div#filters_vue {
+	width: 640px;
+	box-sizing: border-box;
+}
+
 .btn {
     border: none;
     color: white;

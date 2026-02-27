@@ -9,13 +9,14 @@ const filtersApp = {
     el: '#filters_vue',
     data() {
         return {
+            showFilterMenu: false,
             searchQuery: '',
             selectedTask: 'all',
             selectedSubject: 'all',
             selectedRig: 'all',
+            endDate: '',
             showTemplates: false,
             showHidden: false,
-            showAllRigs: false,
             
             // Available filter options (will be populated from page data)
             tasks: [],
@@ -33,14 +34,14 @@ const filtersApp = {
          * Get all visible table rows based on current filters
          */
         activeFilters() {
+            const defaultRig = this.defaultRig();
             return {
                 search: this.searchQuery.toLowerCase(),
                 task: this.selectedTask !== 'all' ? this.selectedTask : null,
                 subject: this.selectedSubject !== 'all' ? this.selectedSubject : null,
-                rig: this.selectedRig !== 'all' ? this.selectedRig : null,
+                rig: this.selectedRig !== defaultRig ? this.selectedRig : null,
                 templates: this.showTemplates,
                 hidden: this.showHidden,
-                allRigs: this.showAllRigs,
             };
         },
         
@@ -48,11 +49,13 @@ const filtersApp = {
          * Human-readable filter summary
          */
         filterSummary() {
+            const defaultRig = this.defaultRig();
             const filters = [];
             if (this.searchQuery) filters.push(`Search: "${this.searchQuery}"`);
             if (this.selectedTask !== 'all') filters.push(`Task: ${this.selectedTask}`);
             if (this.selectedSubject !== 'all') filters.push(`Subject: ${this.selectedSubject}`);
-            if (this.selectedRig !== 'all') filters.push(`Rig: ${this.selectedRig}`);
+            if (this.selectedRig !== defaultRig) filters.push(`Rig: ${this.selectedRig}`);
+            if (this.endDate) filters.push(`End date: ${this.endDate}`);
             
             if (filters.length === 0) return 'All filters active';
             return filters.join(' • ');
@@ -62,18 +65,45 @@ const filtersApp = {
          * Check if any filters are active
          */
         hasActiveFilters() {
+                        const defaultRig = this.defaultRig();
             return this.searchQuery || 
                    this.selectedTask !== 'all' || 
                    this.selectedSubject !== 'all' || 
-                   this.selectedRig !== 'all';
+                                         this.selectedRig !== defaultRig ||
+                     this.endDate;
         }
     },
     
     methods: {
+        defaultRig() {
+            return window.currentRigName || 'all';
+        },
+
+        syncFiltersVisibility() {
+            const root = document.getElementById('filters_vue');
+            if (root) {
+                root.style.display = this.showFilterMenu ? '' : 'none';
+            }
+        },
+
+        requestServerRefresh(reset = true) {
+            if (window.entriesStore && typeof window.entriesStore.fetchEntries === 'function') {
+                window.entriesStore.fetchEntries({ reset: reset });
+                return true;
+            }
+            return false;
+        },
+
         /**
          * Initialize filter options from available data
          */
         initializeFilters() {
+            if (window.entriesStore) {
+                this.totalEntries = 0;
+                this.visibleEntries = 0;
+                return;
+            }
+
             // Extract unique values from table rows
             const taskSet = new Set();
             const subjectSet = new Set();
@@ -192,6 +222,10 @@ const filtersApp = {
          * Apply filters to table rows
          */
         applyFilters() {
+            if (window.entriesStore) {
+                return;
+            }
+
             const rows = document.querySelectorAll('#main tbody tr');
             let visibleCount = 0;
             
@@ -221,9 +255,11 @@ const filtersApp = {
             this.searchQuery = '';
             this.selectedTask = 'all';
             this.selectedSubject = 'all';
-            this.selectedRig = 'all';
+            this.selectedRig = this.defaultRig();
+            this.endDate = '';
             this.showTemplates = false;
             this.showHidden = false;
+            if (this.requestServerRefresh(true)) return;
             this.applyFilters();
         },
         
@@ -231,6 +267,7 @@ const filtersApp = {
          * Handle search input
          */
         onSearchInput() {
+            if (this.requestServerRefresh(true)) return;
             this.applyFilters();
         },
         
@@ -238,6 +275,7 @@ const filtersApp = {
          * Handle filter selection
          */
         onFilterChange() {
+            if (this.requestServerRefresh(true)) return;
             this.applyFilters();
         },
         
@@ -246,6 +284,7 @@ const filtersApp = {
          */
         toggleHidden() {
             this.showHidden = !this.showHidden;
+            if (this.requestServerRefresh(true)) return;
             this.applyFilters();
         },
         
@@ -254,26 +293,27 @@ const filtersApp = {
          */
         toggleTemplates() {
             this.showTemplates = !this.showTemplates;
+            if (this.requestServerRefresh(true)) return;
             this.applyFilters();
         },
         
-        /**
-         * Toggle all rigs visibility
-         */
-        toggleAllRigs() {
-            this.showAllRigs = !this.showAllRigs;
-            // Reset rig filter if not showing all rigs
-            if (!this.showAllRigs) {
-                this.selectedRig = 'all';
-            }
-            this.applyFilters();
-        }
+        
     },
     
     mounted() {
         console.log("Filters Vue app mounted");
+        this.selectedRig = this.defaultRig();
+        const filtersCheckbox = document.getElementById('toggle_filters');
+        if (filtersCheckbox) {
+            this.showFilterMenu = filtersCheckbox.checked;
+        }
+        this.syncFiltersVisibility();
         this.initializeFilters();
         this.applyFilters();
+
+        if (window.entriesStore) {
+            return;
+        }
         
         // Watch for table updates (when new rows are added via AJAX)
         const observer = new MutationObserver(() => {
@@ -293,16 +333,17 @@ const filtersApp = {
     
     watch: {
         // Watch for external changes to the checkbox states
+        showFilterMenu(newVal) {
+            const checkbox = document.getElementById('toggle_filters');
+            if (checkbox) checkbox.checked = newVal;
+            this.syncFiltersVisibility();
+        },
         showHidden(newVal) {
             const checkbox = document.getElementById('toggle_visible');
             if (checkbox) checkbox.checked = newVal;
         },
         showTemplates(newVal) {
             const checkbox = document.getElementById('toggle_templates');
-            if (checkbox) checkbox.checked = newVal;
-        },
-        showAllRigs(newVal) {
-            const checkbox = document.getElementById('toggle_rigs');
             if (checkbox) checkbox.checked = newVal;
         }
     }
@@ -316,18 +357,19 @@ window.filtersApp = filtersApp;
  */
 window.syncExternalFilters = function() {
     if (filtersApp.instance) {
+        const filtersCheckbox = document.getElementById('toggle_filters');
         const visibleCheckbox = document.getElementById('toggle_visible');
         const templatesCheckbox = document.getElementById('toggle_templates');
-        const rigsCheckbox = document.getElementById('toggle_rigs');
+
+        if (filtersCheckbox) {
+            filtersApp.instance.showFilterMenu = filtersCheckbox.checked;
+        }
         
         if (visibleCheckbox) {
             filtersApp.instance.showHidden = visibleCheckbox.checked;
         }
         if (templatesCheckbox) {
             filtersApp.instance.showTemplates = templatesCheckbox.checked;
-        }
-        if (rigsCheckbox) {
-            filtersApp.instance.showAllRigs = rigsCheckbox.checked;
         }
     }
 };

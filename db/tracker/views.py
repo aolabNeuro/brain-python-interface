@@ -10,6 +10,7 @@ import os
 from django.template import RequestContext
 from django.shortcuts import render
 from django.http import HttpResponse
+from django.http import JsonResponse
 
 from .task_launcher import _task_tracker
 
@@ -117,6 +118,7 @@ def list_exp_history(request, **kwargs):
 
     fields = _list_exp_history(**kwargs)
     fields['hostname'] = request.get_host()
+    fields['current_rig'] = rig_settings['name']
 
     # Check if a task is currently running
     _task_tracker.update_alive()
@@ -128,6 +130,118 @@ def list_exp_history(request, **kwargs):
 
     resp = render(request, 'list.html', fields)
     return resp
+
+
+def list_exp_entries_api(request, dbname='default'):
+    from . import models
+    from django.db.models import Q
+
+    def _as_bool(name, default=False):
+        raw = request.GET.get(name)
+        if raw is None:
+            return default
+        return str(raw).lower() in ('1', 'true', 'yes', 'on')
+
+    try:
+        limit = int(request.GET.get('limit', 100))
+    except Exception:
+        limit = 100
+    try:
+        offset = int(request.GET.get('offset', 0))
+    except Exception:
+        offset = 0
+
+    limit = max(1, min(limit, 500))
+    offset = max(0, offset)
+
+    show_hidden = _as_bool('show_hidden', False)
+    show_all_rigs = _as_bool('show_all_rigs', False)
+    task_name = request.GET.get('task')
+    subject_name = request.GET.get('subject')
+    rig_name = request.GET.get('rig')
+    end_date = (request.GET.get('end_date') or '').strip()
+    search = (request.GET.get('search') or '').strip()
+
+    filter_kwargs = {}
+    if not show_hidden:
+        filter_kwargs['visible'] = True
+    if not show_all_rigs:
+        filter_kwargs['rig_name'] = rig_settings['name']
+    if task_name:
+        filter_kwargs['task__name'] = task_name
+    if subject_name:
+        filter_kwargs['subject__name'] = subject_name
+    if rig_name:
+        filter_kwargs['rig_name'] = rig_name
+
+    entries_qs = models.TaskEntry.objects.using(dbname).filter(template=False, **filter_kwargs).select_related('subject', 'task').order_by('-date')
+
+    if end_date:
+        try:
+            parsed_end_date = datetime.datetime.strptime(end_date, '%Y-%m-%d').date()
+            entries_qs = entries_qs.filter(date__date__lte=parsed_end_date)
+        except ValueError:
+            pass
+
+    if search:
+        entries_qs = entries_qs.filter(
+            Q(entry_name__icontains=search) |
+            Q(task__name__icontains=search) |
+            Q(subject__name__icontains=search)
+        )
+
+    total = entries_qs.count()
+    page_entries = list(entries_qs[offset:offset + limit])
+
+    def _serialize_entry(entry):
+        return dict(
+            id=entry.id,
+            ui_id=entry.ui_id,
+            date=entry.date.strftime('%Y-%m-%d'),
+            time=entry.date.strftime('%H:%M:%S'),
+            rig_name=entry.rig_name,
+            subject=entry.subject.name if entry.subject else '',
+            task=entry.task.name if entry.task else '',
+            desc=entry.desc or '',
+            visible=bool(entry.visible),
+            template=bool(entry.template),
+            entry_name=entry.entry_name or '',
+        )
+
+    task_options = list(models.Task.objects.using(dbname).filter(visible=True).order_by('name').values_list('name', flat=True))
+    subject_options = list(models.Subject.objects.using(dbname).order_by('name').values_list('name', flat=True))
+    rig_options = list(models.TaskEntry.objects.using(dbname).values_list('rig_name', flat=True).distinct().order_by('rig_name'))
+
+    payload = dict(
+        entries=[_serialize_entry(entry) for entry in page_entries],
+        total=total,
+        offset=offset,
+        limit=limit,
+        has_more=(offset + len(page_entries)) < total,
+        filter_options=dict(
+            tasks=task_options,
+            subjects=subject_options,
+            rigs=rig_options,
+        ),
+    )
+    return JsonResponse(payload)
+
+
+def list_exp_templates_api(request, dbname='default'):
+    from . import models
+
+    templates_qs = models.TaskEntry.objects.using(dbname).filter(template=True).select_related('task').order_by('-date')
+    templates = [
+        dict(
+            id=t.id,
+            entry_name=t.entry_name or t.ui_id,
+            task=t.task.name if t.task else '',
+            visible=bool(t.visible),
+        )
+        for t in templates_qs
+    ]
+
+    return JsonResponse(dict(templates=templates))
 
 def setup_subjects(request):
     """view for experimenter to add new subjects"""
