@@ -39,7 +39,7 @@ class TargetTracking(Sequence):
         tracking_in = dict(traj_complete="tracking_in_ramp", trial_complete="reward", leave_target="tracking_out", start_pause="pause"),
         tracking_out = dict(traj_complete="tracking_out_ramp", trial_complete="reward", enter_target="tracking_in", tracking_out_timeout="tracking_out_penalty", start_pause="pause"),
         
-        timeout_penalty = dict(timeout_penalty_end="wait", start_pause="pause", end_state=True),
+        timeout_penalty = dict(timeout_penalty_end="wait", timeout_penalty_end_retry = "wait_retry", start_pause="pause", end_state=True),
         hold_penalty = dict(hold_penalty_end="wait", hold_penalty_end_retry="wait_retry", start_pause="pause", end_state=True),
         tracking_out_penalty = dict(tracking_out_penalty_end="wait", start_pause="pause", end_state=True),
         reward = dict(reward_end="wait", start_pause="pause", stoppable=False, end_state=True),
@@ -343,7 +343,10 @@ class TargetTracking(Sequence):
         return time_in_state > self.tracking_out_time
 
     def _test_timeout_penalty_end(self, time_in_state):
-        return time_in_state > self.timeout_penalty_time
+        return time_in_state > self.timeout_penalty_time and (self.tries == self.max_hold_attempts)
+
+    def _test_timeout_penalty_end_retry(self, time_in_state):
+        return (time_in_state > self.timeout_penalty_time) and (self.tries < self.max_hold_attempts)
 
     def _test_hold_penalty_end(self, time_in_state):
         return (time_in_state > self.hold_penalty_time) and (self.tries==self.max_hold_attempts)
