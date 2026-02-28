@@ -6,6 +6,7 @@ import random
 import os
 
 from .target_graphics import *
+from riglib.stereo_opengl.window import Window
 from .target_capture_task import ScreenTargetCapture
 from riglib.experiment import traits, Sequence
 from riglib import plants
@@ -643,7 +644,7 @@ class EyeConstrainedHandCapture(HandConstrainedEyeCapture):
             # Hide the current hand target
             self.targets_hand[self.target_index].hide()
 
-class EyeHandCaptureBlock(Sequence):
+class EyeHandCaptureBlock(Sequence, Window):
     '''
     Subjects have to gaze at and reach to a target, responding to the eye or hand go cue indivisually in sequence trials.
     They need to keep their eye position while moving the cursor to the hand target.
@@ -682,14 +683,17 @@ class EyeHandCaptureBlock(Sequence):
 
     fixation_target_color = traits.OptionsList("fixation_color", *target_colors, desc="Color of the eye target under fixation state", bmi3d_input_options=list(target_colors.keys()))
     eye_target_color = traits.OptionsList("eye_color", *target_colors, desc="Color of the eye target", bmi3d_input_options=list(target_colors.keys()))
+    limit2d = traits.Bool(True, desc="Limit cursor movement to 2D")
     hidden_traits = ['eye_target_color', 'fixation_target_color','cursor_color', \
                      'target_color', 'cursor_bounds', 'cursor_radius', 'plant_hide_rate', 'starting_pos']
 
     status = dict(
         wait = dict(start_trial="target", start_pause="pause"),
-        target = dict(enter_target="target", start_pause="pause"),
-        target_eye = dict(start_pause="pause", timeout="timeout_penalty", return_init_target='init_target', gaze_target="fixation", gaze_incorrect_target="incorrect_target_penalty"),
-        target_eye_hand = dict(timeout="timeout_penalty", gaze_enter_target='hold', start_pause="pause"),
+        target = dict(enter_target="target_eye", start_pause="pause"),
+        target_eye = dict(timeout="timeout_penalty", return_init_target='target', leave_target="hold_penalty", gaze_target="fixation", \
+                        gaze_incorrect_target="incorrect_target_penalty", start_pause="pause"),
+        target_eye_hand = dict(timeout="timeout_penalty", gaze_enter_target='hold', \
+                        gaze_incorrect_target="incorrect_target_penalty", start_pause="pause"),
         fixation = dict(fixation_complete="delay", leave_target="hold_penalty", fixation_break="fixation_penalty", start_pause="pause"),
         hold = dict(hold_complete="delay", leave_target="hold_penalty",  fixation_break="fixation_penalty", start_pause="pause"),
         delay = dict(delay_complete="targ_transition", leave_target="delay_penalty", fixation_break="fixation_penalty", start_pause="pause"),
@@ -705,11 +709,24 @@ class EyeHandCaptureBlock(Sequence):
 
     # initial state
     state = "wait"
-
     sequence_generators = ['row_target','sac_hand_2d']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        # Initialize the plant
+        if not hasattr(self, 'plant'):
+            self.plant = plantlist[self.plant_type]
+        self.plant.set_bounds(np.array(self.cursor_bounds))
+        self.plant.set_color(target_colors[self.cursor_color])
+        self.plant.set_cursor_radius(self.cursor_radius)
+        self.plant_vis_prev = True
+        self.cursor_vis_prev = True
+
+        # Add graphics models for the plant and targets to the window
+        if hasattr(self.plant, 'graphics_models'):
+            for model in self.plant.graphics_models:
+                self.add_model(model)
 
         # Instantiate the targets
         instantiate_targets = kwargs.pop('instantiate_targets', True)
@@ -725,12 +742,19 @@ class EyeHandCaptureBlock(Sequence):
             self.targets_hand = [target3, target4]
 
             self.offset_cube = np.array([0,10,self.fixation_radius/2]) # To center the cube target
+        self.target_location = np.array(self.starting_pos).copy()
+
+        # Declare any plant attributes which must be saved to the HDF file at the _cycle rate
+        for attr in self.plant.hdf_attrs:
+            self.add_dtype(*attr)
 
         # Initialize these values for report_stats
         self.trials_all_blocks = self.trials_block_eye + self.trials_block_eye_hand
         self.trial_count_blocks = self.reward_count % self.trials_all_blocks
+        self.is_eye_trials = True
 
     def init(self):
+        self.trial_dtype = np.dtype([('trial', 'u4'), ('index', 'u4'), ('target', 'f8', (3,))])
         self.add_dtype('is_eye_trials', bool, (1,))
         self.add_dtype('trial', 'u4', (1,))
         self.add_dtype('plant_visible', '?', (1,))
@@ -775,6 +799,12 @@ class EyeHandCaptureBlock(Sequence):
         finally:
             self.plant.stop()
 
+    def update_plant_visibility(self):
+        ''' Update plant visibility'''
+        if self.plant_visible != self.plant_vis_prev:
+            self.plant_vis_prev = self.plant_visible
+            self.plant.set_visibility(self.plant_visible)
+
     def _increment_tries(self):
         if self.target_index >= self.num_targets_per_attempt-1:
             self.tries += 1 # only count errors if the minimum number of targets have been acquired
@@ -809,13 +839,22 @@ class EyeHandCaptureBlock(Sequence):
         self.reportstats['Total pause time'] = self._time_to_string(self.total_pause_time)
         self.reportstats['Current pause time'] = self._time_to_string(self.current_pause_time)
 
+        self.trial_count_blocks = self.calc_state_occurrences('reward') % self.trials_all_blocks
+        if self.is_eye_trials:
+            self.reportstats['Task of this block'] = 'Saccade'
+            self.reportstats['Success trial # / Block'] = f'{self.trial_count_blocks} / {self.trials_block_eye}'
+        else:
+            self.reportstats['Task of this block'] = 'Saccade reaching'
+            self.reportstats['Success trial # / Block'] = f'{self.trial_count_blocks - self.trials_block_eye} / {self.trials_block_eye_hand}'
+
     def _start_wait(self):
         self.fixation_passed = False
+        self.chain_length = len(self.targets)
 
         if self.calc_trial_num() == 0:
 
             # Instantiate the targets here so they don't show up in any states that might come before "wait"
-            for target in self.targets_eye:
+            for target in self.targets:
                 for model in target.graphics_models:
                     self.add_model(model)
                     target.hide()
@@ -824,6 +863,15 @@ class EyeHandCaptureBlock(Sequence):
                 for model in target.graphics_models:
                     self.add_model(model)
                     target.hide()
+
+        if self.penalty_index == 0 and self.pause_index == 0: # doesn't call parent method when the state comes from the penalty or pause state
+            # Call parent method to draw the next target capture sequence from the generator
+            super()._start_wait()
+            self.tries = 0 # number of times this sequence of targets has been attempted
+
+        if self.tries==self.max_attempts: # The task goes to the next target after the number of reattempting is max attempts 
+            super()._start_wait()
+            self.tries = 0 # number of times this sequence of targets has been attempted
 
         if self.tries == 0: # Update delay_time only in the first attempt
             
@@ -848,20 +896,8 @@ class EyeHandCaptureBlock(Sequence):
 
             self.task_data['is_eye_trials'] = self.is_eye_trials
 
-        if self.penalty_index == 0 and self.pause_index == 0: # doesn't call parent method when the state comes from the penalty or pause state
-            # Call parent method to draw the next target capture sequence from the generator
-            super()._start_wait()
-            self.tries = 0 # number of times this sequence of targets has been attempted
-
-        if self.tries==self.max_attempts: # The task goes to the next target after the number of reattempting is max attempts 
-            super()._start_wait()
-            self.tries = 0 # number of times this sequence of targets has been attempted
-
         # index of current target presented to subject
         self.target_index = -1
-
-        # number of targets to be acquired in this trial
-        self.chain_length = len(self.targs)
 
         # Set index to 0 because the state may come from the penalty or pause state,
         self.penalty_index = 0
@@ -894,9 +930,25 @@ class EyeHandCaptureBlock(Sequence):
             target.show()
             self.sync_event('EYE_TARGET_ON', self.gen_indices[self.target_index])
 
-    def _start_target_eye_hand():
-        pass
-    
+    def _start_target_eye_hand(self):
+        if self.target_index == -1 and not self.fixation_passed:
+            self.target_index += 1
+
+        if self.fixation_passed:
+            self.target_index += 1
+        
+    def _while_target_eye_hand(self):
+        target = self.targets[self.target_index]
+        target.move_to_position(self.targs[self.target_index] - self.offset_cube)
+
+        eye_pos = self.calibrated_eye_pos
+        eye_d = np.linalg.norm(eye_pos - self.targs[self.target_index,[0,2]])
+        
+        if eye_d <= self.fixation_radius + self.fixation_radius_buffer:
+            self.targets[self.target_index].cube.color = target_colors[self.fixation_target_color] # change target color in fixation state
+        else:
+            self.targets[self.target_index].cube.color = target_colors[self.eye_target_color]
+
     def _start_fixation(self):
         self.fixation_passed = True
         self.targets[self.target_index].cube.color = target_colors[self.fixation_target_color] # change target color in fixation state
@@ -998,13 +1050,15 @@ class EyeHandCaptureBlock(Sequence):
         self.sync_event('OTHER_PENALTY')
         self.penalty_index = 1
 
-        for target in self.targets:
-            target.cue_trial_end_failure()
-            target.show()
+        self.targets[1].cue_trial_end_failure()
+        self.targets[1].show()
 
-        for target in self.targets_hand:
-            target.cue_trial_end_failure()
-            target.show()
+        self.targets_hand[0].cue_trial_end_failure()
+        self.targets_hand[0].show()
+        
+        if self.is_eye_hand_trials:
+            self.targets_hand[1].cue_trial_end_failure()
+            self.targets_hand[1].show()            
 
     def _end_incorrect_target_penalty(self):
         self.sync_event('TRIAL_END')
@@ -1041,9 +1095,13 @@ class EyeHandCaptureBlock(Sequence):
         self.total_pause_time_old = self.total_pause_time
 
         # Hide targets
-        for target in self.targets_hand:
+        for target in self.targets:
             target.hide()
             target.reset()
+
+        for target in self.targets_hand:
+            target.hide()
+            target.reset()    
 
     def _while_pause(self):
         self.current_pause_time = self.get_time() - self.pause_start_time
@@ -1079,12 +1137,12 @@ class EyeHandCaptureBlock(Sequence):
     
     def _test_gaze_incorrect_target(self, ts):
         '''
-        Check whether eye position is within the different target (hand target)
+        Check whether eye position is within the different target (hand target) only when target_index == 1
         ''' 
         eye_pos = self.calibrated_eye_pos
         eye_d = np.linalg.norm(eye_pos - self.targs[-1,[0,2]])
 
-        return eye_d <= self.target_radius + self.incorrect_target_radius_buffer
+        return eye_d <= self.target_radius + self.incorrect_target_radius_buffer and self.target_index == 1
     
     def _test_fixation_break(self,ts):
         '''
@@ -1182,7 +1240,83 @@ class EyeHandCaptureBlock(Sequence):
     def _test_end_pause(self, time_in_state):
         return not self.pause
 
-    
+    # Generator functions
+    @staticmethod
+    def row_target(nblocks=20, ntargets=3, dx=5.,offset1=(0,0,-2),offset2=(0,0,6.),offset3=(0,0,-7.5),origin=(0,0,0)):
+        '''
+        Generates a sequence of 3D for 2 eye targets and 1 hand target at a given distance from the origin
+
+        Parameters
+        ----------
+        nblocks : int
+            The number of ntarget pairs in the sequence.
+        ntargets : int
+            The number of equally spaced targets
+        distance : float
+            The distance in cm between targets
+        offset1 : 3-tuple
+            y location of the first eye target
+        offset2 : 3-tuple
+            y location of the second eye target
+        offset3 : 3-tuple
+            y location of the hand target
+        origin : 3-tuple
+            Location of the central targets
+
+        Returns
+        -------
+        [nblocks*ntargets x 1] array of tuples containing trial indices and [1 x 3] target coordinates
+
+        '''
+        rng = np.random.default_rng()
+        for _ in range(nblocks):
+            order = np.arange(ntargets**3)
+            rng.shuffle(order)
+            x_pos_candidate = [-dx,0,dx]
+            for t in range(ntargets**3):
+                idx = np.base_repr(order[t],3).zfill(3) # convert a decimal number to ternary
+
+                # Target index for hand target, initial eye target, final eye target
+                idx1 = int(idx[0])
+                idx2 = int(idx[1])
+                idx3 = int(idx[2])
+
+                # Get positions for each target
+                x_pos1 = x_pos_candidate[idx1]
+                x_pos2 = x_pos_candidate[idx2]
+                x_pos3 = x_pos_candidate[idx3]
+                pos1 = np.array([x_pos1,0,0]).T
+                pos2 = np.array([x_pos2,0,0]).T
+                pos3 = np.array([x_pos3,0,0]).T
+
+                yield [idx1],[idx2],[idx3],[pos1+offset1+origin],[pos2+offset2+origin],[pos3+offset3+origin]
+
+    @staticmethod
+    def sac_hand_2d(nblocks=20, ntargets=3, dx=10,offset1=(0,0,-2),offset2=(0,0,6.),offset3=(0,0,-7.5),origin=(0,0,0)):
+        '''
+        Pairs of hand targets and eye targets
+
+        Returns
+        -------
+        [nblocks*ntargets x 1] array of tuples containing trial indices and [3 x 3] target coordinates
+        '''
+
+        gen = HandConstrainedEyeCapture.row_target(nblocks=nblocks,ntargets=ntargets,dx=dx,offset1=offset1,offset2=offset2,offset3=offset3,origin=origin)
+        for _ in range(nblocks*(ntargets**3)):
+            idx1,idx2,idx3,pos1,pos2,pos3 = next(gen)
+
+            targs = np.zeros([3, 3])
+            targs[0,:] = pos1[0]
+            targs[1,:] = pos2[0]
+            targs[2,:] = pos3[0]
+
+            indices = np.zeros([3,1])
+            indices[0] = idx1[0]
+            indices[1] = idx2[0] + ntargets
+            indices[2] = idx3[0]
+
+            yield indices, targs
+
 class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
     '''
     Subjects have to gaze at and reach to a target, responding to the eye or hand go cue indivisually in sequence trials.
