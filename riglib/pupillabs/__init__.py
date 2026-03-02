@@ -14,7 +14,7 @@ eye_labels = ['gaze2d_x', 'gaze2d_y', 'gaze3d_x', 'gaze3d_y', 'gaze3d_z', 'gaze_
               'surface_timestamp',
               'le_2d_x', 'le_2d_y', 'le_diam', 'le_diam_timestamp', 'le_diam_confidence',
               're_2d_x', 're_2d_y', 're_diam', 're_diam_timestamp', 're_diam_confidence']
-gaze_options = ['gaze2d', 'le_2d', 're_2d', 'gaze3d']
+gaze_options = ['gaze2d', 'le2d', 're2d', 'gaze3d']
 gaze_options_idx = [[0,1], [9,10], [14,15], [2,3,4]]
 
 class System(DataSourceSystem):

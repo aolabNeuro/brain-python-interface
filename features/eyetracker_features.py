@@ -322,6 +322,15 @@ class EyeConstrained(ScreenTargetCapture):
     def _end_fixation_penalty(self):
         self.sync_event('TRIAL_END')
 
+def _latest_value(buffer_data):
+    if np.ndim(buffer_data) == 1:
+        buffer_data = buffer_data[:,None]
+    not_nan = np.all(~np.isnan(buffer_data), axis=1)
+    if np.any(not_nan):
+        return buffer_data[not_nan][-1]
+    else:
+        return buffer_data[-1]
+  
 class PupilLabStreaming(EyeStreaming):
     '''
     Adds eye_data from pupil labs. Optionally displays AprilTag markers on the screen for
@@ -330,7 +339,8 @@ class PupilLabStreaming(EyeStreaming):
 
     surface_marker_size = traits.Float(2., desc="Size in cm of apriltag surface markers")
     surface_marker_count = traits.Int(0, desc="How many surface markers to draw")
-    pupillabs_gaze = traits.BMI3DInputOption("gaze2d", desc="Which gaze option to use for eye position", options=gaze_options, bmi3d_input_options=gaze_options)
+    pupillabs_gaze = traits.OptionsList(gaze_options, desc="Which gaze option to use for eye position", bmi3d_options_list=gaze_options)
+    debug = traits.Bool(False, desc="Show debug info about eye streaming")
 
     exclude_parent_traits = ['binocular']
 
@@ -371,13 +381,10 @@ class PupilLabStreaming(EyeStreaming):
             return
     
         # TODO: use confidence to remove bad data
-        self.eye_pos = np.zeros((len(self.eye_mask_labels),))*np.nan
+        eye_idx = gaze_options_idx[gaze_options.index(self.pupillabs_gaze)]
+        self.eye_pos = np.zeros((len(eye_idx),))*np.nan
         self.eye_diam = np.zeros((2,))*np.nan
-        self.eye_mask = np.zeros((len(self.eye_labels),), dtype=bool)
-        self.eye_mask[np.isin(self.eye_labels, 
-            self.eye_mask_labels)] = True
-        self.add_dtype('eye', 'f8', (len(self.eye_mask_labels),))
-        self.add_dtype('calibrated_eye', 'f8', (2,))
+        self.add_dtype('eye', 'f8', (len(eye_idx),))
         self.add_dtype('eye_diam', 'f8', (2,))
         super(EyeStreaming, self).init()
 
@@ -389,51 +396,63 @@ class PupilLabStreaming(EyeStreaming):
             super()._update_eye_pos()
             return
 
-        eye_pos = self.eye_data.get()
-        if eye_pos.ndim < 2 or eye_pos.size == 0:
+        eye = self.eye_data.get()
+        if eye.ndim < 2 or eye.size == 0:
             return
         
         eye_idx = gaze_options_idx[gaze_options.index(self.pupillabs_gaze)]
-        eye_pos = eye_pos[:, eye_idx] # get only the columns corresponding to the selected gaze option
-        eye_diam = eye_pos[:, np.where(np.isin(self.eye_labels, ['le_diam', 're_diam']))] # get diameter columns
+        eye_pos = eye[:, eye_idx] # get only the columns corresponding to the selected gaze option
+        eye_diam = eye[:, np.where(np.isin(eye_labels, ['le_diam', 're_diam']))[0]] # get diameter columns
 
         # Find the last non-nan value of eye position
-        not_nan = np.all(~np.isnan(eye_pos), axis=1)
-        if np.any(not_nan):
-            eye_pos = eye_pos[not_nan]
-        else:
-            eye_pos = np.zeros((len(eye_idx),))*np.nan
-        
-        # And eye diameter
-        not_nan = np.all(~np.isnan(eye_diam), axis=1)
-        if np.any(not_nan):
-            eye_diam = eye_diam[not_nan]
-        else:
-            eye_diam = np.zeros((2,))*np.nan
+        eye_pos = _latest_value(eye_pos)
+        eye_diam = _latest_value(eye_diam)
+
+        # Prepare the gaze position depending on its source
+        if self.pupillabs_gaze == 'gaze3d':
+            eye_pos = self.convert_gaze3d_to_screen(eye_pos)[:2]
+        elif self.pupillabs_gaze == 'gaze2d':
+            eye_pos = self.convert_gaze2d_to_screen(eye_pos)[:2]
+
         self.eye_pos = eye_pos
         self.eye_diam = eye_diam
         self.task_data['eye'] = eye_pos
         self.task_data['eye_diam'] = eye_diam
 
-        # Calibrate the gaze position depending on its source
-        calibrated_eye = np.zeros((3,))*np.nan
-        if self.pupillabs_gaze == 'gaze3d':
-            calibrated_eye = self.convert_gaze3d_to_screen(eye_pos)
-        elif self.pupillabs_gaze == 'gaze2d':
-            calibrated_eye = self.convert_gaze2d_to_screen(eye_pos)
+        if self.debug:
+            if hasattr(self, 'debug_text'):
+                self.remove_model(self.debug_text.model)
+                self.debug_text.model.release()
+            screen_half_width = self.screen_half_height * self.window_size[0] / self.window_size[1]
+            gaze_ts = eye[:, np.where(np.isin(eye_labels, ['gaze_timestamp']))[0]]
+            gaze_conf = eye[:, np.where(np.isin(eye_labels, ['gaze_confidence']))[0]]
+            eye_conf = eye[:, np.where(np.isin(eye_labels, ['le_diam_confidence', 're_diam_confidence']))[0]]
+            gaze_ts = _latest_value(gaze_ts)[0]
+            gaze_conf = _latest_value(gaze_conf)[0]
+            eye_conf = _latest_value(eye_conf)
+            self.reportstats['eye pos'] = f"({eye_pos[0]:0.2f}, {eye_pos[1]:0.2f})"
+            self.reportstats['gaze_ts'] = f"{gaze_ts:0.2f}"
+            self.reportstats['gaze_conf'] = f"{gaze_conf:0.2f}"
+            self.reportstats['le_conf'] = f"{eye_conf[0]:0.2f}"
+            self.reportstats['re_conf'] = f"{eye_conf[1]:0.2f}"
+            # text = f"LE: {eye_conf[0]:0.2f}"
+            # self.debug_text = TextTarget(text, color=(1,1,1,1), height=2, 
+            #                              starting_pos=(-screen_half_width+1, 0, 0))
+            # self.add_model(self.debug_text.model)
 
-        self.calibrated_eye = calibrated_eye
-        self.task_data['calibrated_eye'] = calibrated_eye[[0,2,1]]
+    def _end_reward(self):
+        if hasattr(super(), '_end_reward'):
+            super()._end_reward()
 
-    def convert_gaze2d_to_screen(self, gaze2d):
-        x, y = (gaze2d - 0.5) * 50  # Convert from mm to cm
-        z = 0
+    def convert_gaze2d_to_screen(self, gaze2d, z=0):
+        '''
+        Convert from [0,1] norm_pos to cm with center at (0,0)
+        '''
+        x, y = (gaze2d - 0.5) * self.screen_half_height * 2 
         aspect_ratio = self.window_size[0] / self.window_size[1]
         y /= aspect_ratio
-        # y = -y  # Invert y-axis
         xyz = np.array([x, y, z, 1])  # Convert to x, z, y format
-        if not hasattr(self, 'modelview'):
-            return xyz[:3]
+        return xyz[:3]
         modelview = self.modelview.copy()
         modelview[0,3] = 0  # Set x translation to 0
         # modelview[3,3] *= -1  # Invert z-axis translation
@@ -441,6 +460,10 @@ class PupilLabStreaming(EyeStreaming):
         return xyz[:3]
 
     def convert_gaze3d_to_screen(self, gaze3d):
+        '''
+        Convert from gaze3d (vector from eye to gaze point in cm) to 
+        screen coordinates in cm with center at (0,0).
+        '''
         x, y, z = (gaze3d)
         y = -y  # Invert y-axis
         xyz = np.array([x, z, y])  # Convert to x, z, y format
@@ -480,9 +503,14 @@ class EyeCursor(traits.HasTraits):
 
     def _cycle(self):
         super()._cycle()
-        if np.any(np.isnan(self.calibrated_eye_pos)):
+
+        if hasattr(self, 'calibrated_eye') and not np.any(np.isnan(self.calibrated_eye)):
+            eye = self.calibrated_eye
+        elif hasattr(self, 'eye_pos') and not np.any(np.isnan(self.eye_pos)):
+            eye = self.eye_pos
+        else:
             return
-        self.eye_plant.set_endpoint_pos(np.array([self.calibrated_eye_pos[0], 0, self.calibrated_eye_pos[1]]))
+        self.eye_plant.set_endpoint_pos(np.array([eye[0], 0, eye[1]]))
 
 '''
 Old code not currently used in aolab
