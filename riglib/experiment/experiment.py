@@ -180,6 +180,7 @@ class Experiment(ThreadedFSM, traits.HasTraits, metaclass=ExperimentMeta):
         # Attribute for task entry dtype, used to create a numpy record array which is updated every iteration of the FSM
         # See http://docs.scipy.org/doc/numpy/user/basics.rec.html for details on how to create a record array dtype
         self.dtype = []
+        self.add_dtype('system_time', 'f8', (1,))
 
         self.cycle_count = 0
         if pygame_avail:

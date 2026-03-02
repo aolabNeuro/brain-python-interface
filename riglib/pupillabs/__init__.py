@@ -10,24 +10,28 @@ from .pupillab_timesync import measure_clock_offset
 
 from riglib.source import DataSourceSystem
 
+eye_labels = ['gaze2d_x', 'gaze2d_y', 'gaze3d_x', 'gaze3d_y', 'gaze3d_z', 'gaze_timestamp', 'gaze_confidence', 'eye_id',
+              'surface_timestamp',
+              'le_2d_x', 'le_2d_y', 'le_diam', 'le_diam_timestamp', 'le_diam_confidence',
+              're_2d_x', 're_2d_y', 're_diam', 're_diam_timestamp', 're_diam_confidence']
+gaze_options = ['gaze2d', 'le_2d', 're_2d', 'gaze3d']
+gaze_options_idx = [[0,1], [9,10], [14,15], [2,3,4]]
+
 class System(DataSourceSystem):
     '''
     Pupil-labs system for reading gaze and pupil data from Pupil Capture.
     '''
     dtype = np.dtype((float, (19,)))
     update_freq = 250
-    name = 'pupillabs'
+    name = "pupillabs"
+    ip = "128.95.215.191"
+    port = "50020"
+    local_clock = time.perf_counter
     
-    def __init__(self, ip="128.95.215.191", port="50020"):
+    def __init__(self):
         '''
         For eye tracking, need Pupil Capture running in the background (after calibration in Pupil Capture)
-        '''
-        # define a surface AOI
-        
-        # open a req port to talk to pupil
-        self.ip = ip  # remote ip or localhost
-        self.port = port # same as in the pupil remote gui
-        
+        '''      
         # # matrix for camera distortion
         camera = RadialDistortionCamera(
             resolution=(1280, 720),
@@ -67,8 +71,7 @@ class System(DataSourceSystem):
         # print('pupillab starting recording in Pupil Capture')
 
         # sync pupil internal clock with the local time 
-        local_clock = time.perf_counter
-        self.offset = measure_clock_offset(self.pupil_remote, clock_function=local_clock)
+        self.offset = measure_clock_offset(self.pupil_remote, clock_function=self.local_clock)
         print(f"\n Pupillab Clock offset (1 measurement): {self.offset} seconds")
 
         self.pupil_remote.send_string('SUB_PORT') # Request 'SUB_PORT' for reading data
@@ -150,15 +153,9 @@ class System(DataSourceSystem):
     
 class NoSurfaceTracking(System):
 
-    def __init__(self, ip="128.95.215.191", port="50020"):
+    def __init__(self):
         '''
         For eye tracking, need Pupil Capture running in the background (after calibration in Pupil Capture)
         '''
-        # define a surface AOI
-        
-        # open a req port to talk to pupil
-        self.ip = ip  # remote ip or localhost
-        self.port = port # same as in the pupil remote gui
-        
         self.mapper = None
         self.mapped_points = []

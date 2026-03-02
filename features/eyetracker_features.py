@@ -7,12 +7,13 @@ import time
 import traceback
 import numpy as np
 import tables
+from traits.trait_types import self
 from db import dbfunctions as db
 from riglib import calibrations
 from riglib.experiment import traits
 from riglib.gpio import ArduinoGPIO
 from riglib.oculomatic import oculomatic
-from riglib.pupillabs import utils
+from riglib.pupillabs import utils, eye_labels, gaze_options, gaze_options_idx
 from built_in_tasks.target_graphics import *
 from built_in_tasks.target_capture_task import ScreenTargetCapture
 from riglib.stereo_opengl.primitives import AprilTag
@@ -40,7 +41,6 @@ class EyeCalibration(traits.HasTraits):
     offset_time_eye_calibration = traits.Float(0.1, desc="Data after this offset_time is only used for eye calibration")
     duration_eye_calibration = traits.Float(0.2, desc="Data within this duration after offset_time is only used for eye calibration")
 
-
     def __init__(self, *args, **kwargs): #, start_pos, calibration):
         super(EyeCalibration,self).__init__(*args, **kwargs)
         
@@ -58,7 +58,7 @@ class EyeCalibration(traits.HasTraits):
 
         if not self.keyboard_control:
             try:
-                bmi3d_data, bmi3d_metadata = aopy.preproc.proc_exp('', files, 'hoge', 'hoge', overwrite=True, save_res=False)
+                bmi3d_data, bmi3d_metadata = aopy.preproc.proc_exp('', files, '', '', overwrite=True, save_res=False)
             except:
                 traceback.print_exc()
                 raise ValueError(f"Error processing hdf file for taskid {taskid}")
@@ -66,20 +66,22 @@ class EyeCalibration(traits.HasTraits):
             # load raw eye data
             # raw_eye_data, raw_eye_metadata = aopy.preproc.parse_oculomatic(hdf_dir, files, debug=False)
             samplerate = 1000
-            eye_interp = aopy.data.get_interp_task_data(bmi3d_data,bmi3d_metadata,datatype='eye',
+            eye_interp = aopy.data.get_interp_task_data(bmi3d_data, bmi3d_metadata, datatype='eye',
                                                         samplerate=samplerate, remove_nan=False)
 
             # calculate coefficients to calibrate eye data
             events = bmi3d_data['events']
 
             if not self.eye_target_calibration:
-                self.eye_coeff,_,_,_ = aopy.preproc.calc_eye_calibration\
-                    (bmi3d_data['cursor_interp'],bmi3d_metadata['cursor_interp_samplerate'],\
-                    eye_interp[:,:2], bmi3d_metadata['cursor_interp_samplerate'],events['timestamp'], events['code'],return_datapoints=True)
+                cursor_interp = aopy.data.get_interp_task_data(bmi3d_data, bmi3d_metadata, datatype='cursor',
+                                                        samplerate=samplerate, remove_nan=False)
+                self.eye_coeff,_,_,_ = aopy.preproc.calc_eye_calibration(
+                    cursor_interp, samplerate, eye_interp, samplerate, 
+                    events['timestamp'], events['code'], return_datapoints=True
+                )
 
             else:
                 def get_target_locations(data, target_indices):
-
                     try:
                         trials = data['trials']
                     except:
@@ -97,16 +99,18 @@ class EyeCalibration(traits.HasTraits):
                 
                 # Get eye_pos data when subjects gaze at the center. Target position doesn't matter for this computation
                 if self.center_eye_data:
-                    _, _, eye_center = aopy.preproc.calc_eye_target_calibration(eye_interp[:,:2], \
-                        samplerate, events['timestamp'], events['code'], target_pos, \
-                        offset=self.offset_time_eye_calibration, duration=self.duration_eye_calibration, align_events=80, return_datapoints=True)
-                    
+                    _, _, eye_center = aopy.preproc.calc_eye_target_calibration(
+                        eye_interp, samplerate, events['timestamp'], events['code'], target_pos,
+                        offset=self.offset_time_eye_calibration, duration=self.duration_eye_calibration, 
+                        align_events=80, return_datapoints=True
+                    )
                     self.eye_center = np.nanmedian(eye_center, axis=0)
 
                 # Calculate coefficient by linear regression between targets and centered eye positions
-                self.eye_coeff, _ = aopy.preproc.calc_eye_target_calibration(eye_interp[:,:2]-self.eye_center, \
-                        samplerate, events['timestamp'], events['code'], target_pos, \
-                        offset=self.offset_time_eye_calibration, duration=self.duration_eye_calibration)
+                self.eye_coeff, _ = aopy.preproc.calc_eye_target_calibration(
+                    eye_interp-self.eye_center, samplerate, events['timestamp'], events['code'], target_pos,
+                    offset=self.offset_time_eye_calibration, duration=self.duration_eye_calibration
+                )
             
             print("Calibration complete:", self.eye_coeff)
 
@@ -136,18 +140,17 @@ class EyeCalibration(traits.HasTraits):
 
         # Do calibration
         ave_pos = self.eye_pos
-        if not self.keyboard_control:
-            ave_pos = aopy.postproc.get_calibrated_eye_data(self.eye_pos[:2]-self.eye_center, self.eye_coeff)
-            #  = np.array([(calibrated_pos[0] + calibrated_pos[2])/2, (calibrated_pos[1] + calibrated_pos[3])/2])
-        
+        if len(self.eye_pos) >= 2 and len(self.eye_center) >= 2:
+            calibrated_pos = aopy.postproc.get_calibrated_eye_data(self.eye_pos[:4]-self.eye_center, self.eye_coeff)
+            ave_pos = np.array([(calibrated_pos[0] + calibrated_pos[2])/2, (calibrated_pos[1] + calibrated_pos[3])/2])
+        elif not self.keyboard_control:
+            ave_pos = aopy.postproc.get_calibrated_eye_data(self.eye_pos-self.eye_center, self.eye_coeff)
+
         # Save calibration
         self.calibrated_eye_pos = ave_pos
         self.task_data['calibrated_eye'] = ave_pos
 
-        if isinstance(self, PupilLabStreaming):
-            super(PupilLabStreaming, self)._cycle()
-        else:
-            super(EyeStreaming, self)._cycle()
+        super(EyeStreaming, self)._cycle()
 
         # Move the eye cursor
         if np.any(np.isnan(self.calibrated_eye_pos)):
@@ -164,7 +167,7 @@ class EyeStreaming(traits.HasTraits):
     '''
 
     keyboard_control = traits.Bool(False, desc="Whether to replace eye control with keyboard control")
-    eye_labels = ['le_x', 'le_y', 're_x', 're_y', 'le_diam', 're_diam']
+    binocular = traits.Bool(True, desc="Whether to stream binocular eye data (4D) or just left eye data (2D)")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -173,6 +176,7 @@ class EyeStreaming(traits.HasTraits):
         if self.keyboard_control:
             self.eye_data = Eye([0,0])
             self.eye_pos = np.zeros((2,))*np.nan
+            self.eye_diam = np.zeros((2,))*np.nan
         else:
             from riglib import source
             from riglib.oculomatic import System
@@ -180,13 +184,16 @@ class EyeStreaming(traits.HasTraits):
             from riglib import sink
             sink_manager = sink.SinkManager.get_instance()
             sink_manager.register(self.eye_data) # register to the sink so it can save data
-            self.eye_pos = np.zeros((6,))*np.nan
+            self.eye_pos = np.zeros((4,))*np.nan if self.binocular else np.zeros((2,))*np.nan
+            self.eye_diam = np.zeros((2,))*np.nan
 
     def init(self):
         if self.keyboard_control:
             self.add_dtype('eye', 'f8', (2,))
+            self.add_dtype('eye_diam', 'f8', (1,))
         else:
-            self.add_dtype('eye', 'f8', (6,))
+            self.add_dtype('eye', 'f8', (4,)) if self.binocular else self.add_dtype('eye', 'f8', (2,))
+            self.add_dtype('eye_diam', 'f8', (2,)) if self.binocular else self.add_dtype('eye_diam', 'f8', (1,))
         super().init()
 
     def run(self):
@@ -205,27 +212,25 @@ class EyeStreaming(traits.HasTraits):
 
     def _update_eye_pos(self):
         if not self.keyboard_control:
-            eye_pos = self.eye_data.get() # This is (n,6) array of new values since we last checked
+            eye_pos = self.eye_data.get() # This is (n,4) array of new values since we last checked
             if eye_pos.ndim < 2 or eye_pos.size == 0:
-                eye_pos = np.zeros((6,))*np.nan
+                eye_pos = np.zeros((4,))*np.nan if self.binocular else np.zeros((2,))*np.nan
+                eye_diam = np.zeros((2,))*np.nan if self.binocular else np.zeros((1,))*np.nan
             else:
-                eye_pos = eye_pos[-1,:] # the most recent position
+                eye_pos = eye_pos[-1,:4] if self.binocular else eye_pos[-1,:2] # the most recent position
+                eye_diam = eye_pos[-1,4:6] if self.binocular else eye_pos[-1,4:5]
         else:
             eye_pos = self.eye_data.get() # A list of lists of of x,y keyboard pos
             eye_pos = eye_pos[0]
+            eye_diam = 0
         self.eye_pos = eye_pos
+        self.eye_diam = eye_diam
         self.task_data['eye'] = eye_pos
+        self.task_data['eye_diam'] = eye_diam
 
     def _cycle(self):
         self._update_eye_pos()
         super()._cycle()
-
-    def cleanup_hdf(self):
-        super().cleanup_hdf()
-        if hasattr(self, "h5file"):
-            h5file = tables.open_file(self.h5file.name, mode='a')
-            h5file.root.task.attrs['eye_labels'] = self.eye_labels
-            h5file.close()
 
 class EyeConstrained(ScreenTargetCapture):
     '''
@@ -317,24 +322,25 @@ class EyeConstrained(ScreenTargetCapture):
     def _end_fixation_penalty(self):
         self.sync_event('TRIAL_END')
 
-class PupilLabStreaming(traits.HasTraits):
+class PupilLabStreaming(EyeStreaming):
     '''
     Adds eye_data from pupil labs. Optionally displays AprilTag markers on the screen for
     surface tracking. Requires a task with the Window feature enabled.
     '''
 
-    keyboard_control = traits.Bool(False, desc="Whether to replace eye control with keyboard control")
     surface_marker_size = traits.Float(2., desc="Size in cm of apriltag surface markers")
     surface_marker_count = traits.Int(0, desc="How many surface markers to draw")
-    eye_labels = ['gaze_x', 'gaze_y', 'gaze_3d_x', 'gaze_3d_y', 'gaze_3d_z', 'gaze_timestamp', 'gaze_confidence', 'eye_id',
-                  'surface_timestamp',
-                  'le_2d_x', 'le_2d_y', 'le_diam', 'le_diam_timestamp', 'le_diam_confidence',
-                  're_2d_x', 're_2d_y', 're_diam', 're_diam_timestamp', 're_diam_confidence']
-    eye_mask_labels = ['gaze_x', 'gaze_y', 'gaze_3d_x', 'gaze_3d_y', 'gaze_3d_z', 'gaze_confidence', 'le_diam', 're_diam']
+    pupillabs_gaze = traits.BMI3DInputOption("gaze2d", desc="Which gaze option to use for eye position", options=gaze_options, bmi3d_input_options=gaze_options)
+
+    exclude_parent_traits = ['binocular']
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        if self.keyboard_control:
+            super().__init__(*args, **kwargs)
+            return
         
+        super(EyeStreaming, self).__init__(*args, **kwargs)
+    
         # Add apriltag models
         centers = utils.calculate_square_positions(self.screen_half_height, self.window_size, 
                                                    self.surface_marker_count, self.surface_marker_size)
@@ -346,10 +352,13 @@ class PupilLabStreaming(traits.HasTraits):
         from riglib import source
         from riglib.pupillabs import System, NoSurfaceTracking
         if self.surface_marker_count > 0:
+            System.local_clock = self.clock.get_time
             self.eye_data = source.DataSource(System)
         else:
+            NoSurfaceTracking.local_clock = self.clock.get_time
             self.eye_data = source.DataSource(NoSurfaceTracking)
-        self.eye_pos = np.zeros((8,))*np.nan
+        self.eye_pos = np.zeros((3,))*np.nan
+        self.eye_diam = np.zeros((2,))*np.nan
         
         # Register to the sink
         from riglib import sink
@@ -357,68 +366,96 @@ class PupilLabStreaming(traits.HasTraits):
         sink_manager.register(self.eye_data)
 
     def init(self):
-        # TTODO: use confidence to remove bad data
+        if self.keyboard_control:
+            super().init()
+            return
+    
+        # TODO: use confidence to remove bad data
         self.eye_pos = np.zeros((len(self.eye_mask_labels),))*np.nan
+        self.eye_diam = np.zeros((2,))*np.nan
         self.eye_mask = np.zeros((len(self.eye_labels),), dtype=bool)
         self.eye_mask[np.isin(self.eye_labels, 
             self.eye_mask_labels)] = True
         self.add_dtype('eye', 'f8', (len(self.eye_mask_labels),))
-        super().init()
-
-    def run(self):
-        '''
-        Code to execute immediately prior to the beginning of the task FSM executing, or after the FSM has finished running. 
-        See riglib.experiment.Experiment.run(). This 'run' method starts the motiondata source and stops it after the FSM has finished running
-        '''
-        self.eye_data.start()
-        try:
-            super().run()
-        finally:
-            print("Stopping streaming eye data")
-            self.eye_data.stop()
-
-    def _start_None(self):
-        '''
-        Code to run before the 'None' state starts (i.e., the task stops)
-        '''
-        self.eye_data.stop()
-        super()._start_None()
+        self.add_dtype('calibrated_eye', 'f8', (2,))
+        self.add_dtype('eye_diam', 'f8', (2,))
+        super(EyeStreaming, self).init()
 
     def _update_eye_pos(self):
         '''
-        Set self.eye_pos to the most recent non-empty left and right eye positions and diameters.
+        Set self.eye_pos and self.eye_diam to the most recent non-empty eye positions and diameters.
         '''
-        self.task_data['eye'][:] = np.nan  # reset eye data
+        if self.keyboard_control:
+            super()._update_eye_pos()
+            return
+
         eye_pos = self.eye_data.get()
         if eye_pos.ndim < 2 or eye_pos.size == 0:
             return
+        
+        eye_idx = gaze_options_idx[gaze_options.index(self.pupillabs_gaze)]
+        eye_pos = eye_pos[:, eye_idx] # get only the columns corresponding to the selected gaze option
+        eye_diam = eye_pos[:, np.where(np.isin(self.eye_labels, ['le_diam', 're_diam']))] # get diameter columns
 
-        eye_pos = eye_pos[:, self.eye_mask]
-        if not np.any(~np.isnan(eye_pos)):
-            return
+        # Find the last non-nan value of eye position
+        not_nan = np.all(~np.isnan(eye_pos), axis=1)
+        if np.any(not_nan):
+            eye_pos = eye_pos[not_nan]
+        else:
+            eye_pos = np.zeros((len(eye_idx),))*np.nan
+        
+        # And eye diameter
+        not_nan = np.all(~np.isnan(eye_diam), axis=1)
+        if np.any(not_nan):
+            eye_diam = eye_diam[not_nan]
+        else:
+            eye_diam = np.zeros((2,))*np.nan
+        self.eye_pos = eye_pos
+        self.eye_diam = eye_diam
+        self.task_data['eye'] = eye_pos
+        self.task_data['eye_diam'] = eye_diam
 
-        val = np.nan*np.zeros((len(self.eye_mask_labels),))
-        # Iterate over each eye position and find the last non-nan value
-        for idx in range(eye_pos.shape[1]):
-            col = eye_pos[:, idx]
-            not_nan = ~np.isnan(col)
-            if np.any(not_nan):
-                val[idx] = col[not_nan][-1]
+        # Calibrate the gaze position depending on its source
+        calibrated_eye = np.zeros((3,))*np.nan
+        if self.pupillabs_gaze == 'gaze3d':
+            calibrated_eye = self.convert_gaze3d_to_screen(eye_pos)
+        elif self.pupillabs_gaze == 'gaze2d':
+            calibrated_eye = self.convert_gaze2d_to_screen(eye_pos)
 
-        self.eye_pos = val
-        self.task_data['eye'][0] = val
+        self.calibrated_eye = calibrated_eye
+        self.task_data['calibrated_eye'] = calibrated_eye[[0,2,1]]
 
-    def _cycle(self):
-        self._update_eye_pos()
-        super()._cycle()
+    def convert_gaze2d_to_screen(self, gaze2d):
+        x, y = (gaze2d - 0.5) * 50  # Convert from mm to cm
+        z = 0
+        aspect_ratio = self.window_size[0] / self.window_size[1]
+        y /= aspect_ratio
+        # y = -y  # Invert y-axis
+        xyz = np.array([x, y, z, 1])  # Convert to x, z, y format
+        if not hasattr(self, 'modelview'):
+            return xyz[:3]
+        modelview = self.modelview.copy()
+        modelview[0,3] = 0  # Set x translation to 0
+        # modelview[3,3] *= -1  # Invert z-axis translation
+        # xyz = modelview @ xyz  # Apply modelview transformation
+        return xyz[:3]
 
-    def cleanup_hdf(self):
-        super().cleanup_hdf()
-        if hasattr(self, "h5file"):
-            h5file = tables.open_file(self.h5file.name, mode='a')
-            h5file.root.task.attrs['eye_labels'] = self.eye_labels
-            h5file.root.task.attrs['eye_mask_labels'] = self.eye_mask_labels
-            h5file.close()
+    def convert_gaze3d_to_screen(self, gaze3d):
+        x, y, z = (gaze3d)
+        y = -y  # Invert y-axis
+        xyz = np.array([x, z, y])  # Convert to x, z, y format
+        cylinder_start = np.array(self.camera_position)[[0, 2, 1]]
+        cylinder_start[0] *= -1
+        cylinder_start[2] *= -1
+        w, i, j, k = self.camera_orientation
+        camera_rotation = Quaternion(w, i, j, k).to_mat() # 4,4
+        rot = np.array([[1, 0, 0, 0],
+               [0, 0, 1, 0],
+               [0, 1, 0, 0],
+               [0, 0, 0, 1]])
+        camera_rotation = rot @ camera_rotation @ rot.T  # Apply the rotation to swap y and z axes
+        eye_pos = cylinder_start + np.dot(camera_rotation[:3,:3], xyz/10)
+        return eye_pos[[0,2,1]] # convert back to x,y,z format
 
 class EyeCursor(traits.HasTraits):
     '''
@@ -436,88 +473,16 @@ class EyeCursor(traits.HasTraits):
             self.add_model(model)
 
     def init(self):
-        self.add_dtype('eye_cursor', 'f8', (2,))
         super().init()
-        self.plant.set_endpoint_pos(np.array(self.starting_pos))
-        self.cylinder = Cylinder(height=50, radius=0.25)
-        self.add_model(self.cylinder)
-        self.cube = Cube(side_len=1.5, color=(1,0,0,0.75))
-        self.add_model(self.cube)
+        self.eye_plant.set_endpoint_pos(np.array(self.starting_pos))
+        for model in self.eye_plant.graphics_models:
+            self.add_model(model)
 
     def _cycle(self):
         super()._cycle()
-        if np.any(np.isnan(self.eye_pos[:3])):
+        if np.any(np.isnan(self.calibrated_eye_pos)):
             return
-        
-        # 2D:
-        # eye pos needs to be 2d gaze
-        # x, y, z = (self.eye_pos[:3] - 0.5) * 100  # Convert from mm to cm
-        # z = 0
-        # xyz = np.array([x, y, z, 1])  # Convert to x, z, y format
-        # if not hasattr(self, 'modelview'):
-        #     print('skip')
-        #     return
-        # modelview = self.modelview.copy()
-        # modelview[0,3] = 0  # Set x translation to 0
-        # self.eye_plant.set_endpoint_pos(xyz[[0,2,1]])
-
-        # 2D:
-        x, y, z = (self.eye_pos[:3] - 0.5) * 50  # Convert from mm to cm
-        z = 0
-        aspect_ratio = self.window_size[0] / self.window_size[1]
-        y /= aspect_ratio
-
-        # y = -y  # Invert y-axis
-        xyz = np.array([x, y, z, 1])  # Convert to x, z, y format
-        if not hasattr(self, 'modelview'):
-            print('skip')
-            return
-        modelview = self.modelview.copy()
-        modelview[0,3] = 0  # Set x translation to 0
-        # modelview[3,3] *= -1  # Invert z-axis translation
-        # xyz = modelview @ xyz  # Apply modelview transformation
-        self.eye_plant.set_endpoint_pos(xyz[[0,2,1]])
-        print(f"Eye cursor position: {self.eye_plant.get_endpoint_pos()}")  # Debugging output
-
-        # 3D
-        x, y, z = (self.eye_pos[2:5])
-        y = -y  # Invert y-axis
-        xyz = np.array([x, z, y])  # Convert to x, z, y format
-        # xyz = np.array([-0.2, 1, -0.2])
-        magnitude = np.linalg.norm(xyz)
-        norm = xyz / magnitude if magnitude > 0 else np.zeros_like(xyz)
-
-
-        # draw a cylinder from the camera in this direction
-        cylinder_start = np.array(self.camera_position)[[0, 2, 1]]
-        cylinder_start[0] *= -1
-        cylinder_start[2] *= -1
-        self.cylinder.translate(*cylinder_start, reset=True)
-        self.cylinder.rotate_x(90, reset=True)  # Reset rotation to identity
-        w, i, j, k = self.camera_orientation
-        camera_rotation = Quaternion(w, i, j, k).to_mat() # 4,4
-        rot = np.array([[1, 0, 0, 0],
-               [0, 0, 1, 0],
-               [0, 1, 0, 0],
-               [0, 0, 0, 1]])
-        camera_rotation = rot @ camera_rotation @ rot.T  # Apply the rotation to swap y and z axes
-        camera_q = Quaternion.from_mat(camera_rotation)
-        self.cylinder.rotate(camera_q, reset=False)  # Apply camera rotation
-        
-        # TODO: rotation not quite right especially at large angles
-
-        # Apply eye rotation
-        theta_x = np.arctan2(norm[2], norm[1]) # tan(theta_x) = z/y
-        theta_z = -np.arctan2(norm[0], norm[1]) # x/y
-        print(f"theta_x: {np.degrees(theta_x)}, theta_z: {np.degrees(theta_z)}")  # Debugging output
-        self.cylinder.rotate_x(np.degrees(theta_x))
-        self.cylinder.rotate_z(np.degrees(theta_z))
-        # self.cylinder.detach()
-
-        # Directly draw a cube at the xyz position
-        self.cube.translate(*cylinder_start, reset=True)
-        cube_pos = np.dot(camera_rotation[:3,:3], xyz/10)
-        self.cube.translate(*cube_pos, reset=False)  # Move the cube to the eye position
+        self.eye_plant.set_endpoint_pos(np.array([self.calibrated_eye_pos[0], 0, self.calibrated_eye_pos[1]]))
 
 '''
 Old code not currently used in aolab
