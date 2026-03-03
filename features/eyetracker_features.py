@@ -66,15 +66,15 @@ class EyeCalibration(traits.HasTraits):
             # load raw eye data
             # raw_eye_data, raw_eye_metadata = aopy.preproc.parse_oculomatic(hdf_dir, files, debug=False)
             samplerate = 1000
-            eye_interp = aopy.data.get_interp_task_data(bmi3d_data, bmi3d_metadata, datatype='eye',
-                                                        samplerate=samplerate, remove_nan=False)
+            eye_interp = aopy.data.get_interp_kinematics(bmi3d_data, bmi3d_metadata, datatype='eye',
+                                                        samplerate=samplerate)[:,:4]
 
             # calculate coefficients to calibrate eye data
             events = bmi3d_data['events']
 
             if not self.eye_target_calibration:
-                cursor_interp = aopy.data.get_interp_task_data(bmi3d_data, bmi3d_metadata, datatype='cursor',
-                                                        samplerate=samplerate, remove_nan=False)
+                cursor_interp = aopy.data.get_interp_kinematics(bmi3d_data, bmi3d_metadata, datatype='cursor',
+                                                        samplerate=samplerate)
                 self.eye_coeff,_,_,_ = aopy.preproc.calc_eye_calibration(
                     cursor_interp, samplerate, eye_interp, samplerate, 
                     events['timestamp'], events['code'], return_datapoints=True
@@ -168,6 +168,7 @@ class EyeStreaming(traits.HasTraits):
 
     keyboard_control = traits.Bool(False, desc="Whether to replace eye control with keyboard control")
     binocular = traits.Bool(True, desc="Whether to stream binocular eye data (4D) or just left eye data (2D)")
+    eye_pixels_per_cm = traits.Float(51.67, desc="Conversion from eye diameter to cm")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -212,13 +213,14 @@ class EyeStreaming(traits.HasTraits):
 
     def _update_eye_pos(self):
         if not self.keyboard_control:
-            eye_pos = self.eye_data.get() # This is (n,4) array of new values since we last checked
-            if eye_pos.ndim < 2 or eye_pos.size == 0:
+            eye_data = self.eye_data.get(all=True) # This is (n,4) array of new values since we last checked
+            if eye_data.ndim < 2 or eye_data.size == 0:
                 eye_pos = np.zeros((4,))*np.nan if self.binocular else np.zeros((2,))*np.nan
                 eye_diam = np.zeros((2,))*np.nan if self.binocular else np.zeros((1,))*np.nan
             else:
-                eye_pos = eye_pos[-1,:4] if self.binocular else eye_pos[-1,:2] # the most recent position
-                eye_diam = eye_pos[-1,4:6] if self.binocular else eye_pos[-1,4:5]
+                eye_pos = eye_data[-1,:4] if self.binocular else eye_pos[-1,:2] # the most recent position
+                eye_diam = eye_data[-1,4:6] if self.binocular else eye_pos[-1,4:5]
+            eye_diam = np.array(eye_diam)/self.eye_pixels_per_cm
         else:
             eye_pos = self.eye_data.get() # A list of lists of of x,y keyboard pos
             eye_pos = eye_pos[0]
@@ -396,7 +398,7 @@ class PupilLabStreaming(EyeStreaming):
             super()._update_eye_pos()
             return
 
-        eye = self.eye_data.get()
+        eye = self.eye_data.get(all=True)
         if eye.ndim < 2 or eye.size == 0:
             return
         
@@ -406,7 +408,7 @@ class PupilLabStreaming(EyeStreaming):
 
         # Find the last non-nan value of eye position
         eye_pos = _latest_value(eye_pos)
-        eye_diam = _latest_value(eye_diam)
+        eye_diam = _latest_value(eye_diam) / self.eye_pixels_per_cm
 
         # Prepare the gaze position depending on its source
         if self.pupillabs_gaze == 'gaze3d':
@@ -504,8 +506,8 @@ class EyeCursor(traits.HasTraits):
     def _cycle(self):
         super()._cycle()
 
-        if hasattr(self, 'calibrated_eye') and not np.any(np.isnan(self.calibrated_eye)):
-            eye = self.calibrated_eye
+        if hasattr(self, 'calibrated_eye_pos') and not np.any(np.isnan(self.calibrated_eye_pos)):
+            eye = self.calibrated_eye_pos
         elif hasattr(self, 'eye_pos') and not np.any(np.isnan(self.eye_pos)):
             eye = self.eye_pos
         else:

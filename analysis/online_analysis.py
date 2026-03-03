@@ -138,12 +138,10 @@ class BehaviorAnalysisWorker(AnalysisWorker):
     calibration coefficients are available. 
     '''
    
-    def __init__(self, task_params, data_queue, calibration_dir='/var/tmp', buffer_time=1, ylim=1, px_per_cm=51.67, **kwargs):
+    def __init__(self, task_params, data_queue, calibration_dir='/var/tmp', buffer_time=5, **kwargs):
         super().__init__(task_params, data_queue, **kwargs)
         self.calibration_dir = calibration_dir
         self.buffer_time = buffer_time
-        self.ylim = ylim
-        self.px_per_cm = px_per_cm
 
     def init(self):
         super().init()
@@ -156,7 +154,7 @@ class BehaviorAnalysisWorker(AnalysisWorker):
         self.eye_coeff = np.array([[1,0],[1,0]])
         self.eye_coeff_corr = 0.5 # Don't accept anything lower than 0.5 by default
         
-        self.eye_diam = np.zeros((int(self.buffer_time*self.task_params['fps']), 3))
+        self.eye_buffer = np.zeros((int(self.buffer_time*self.task_params['fps']), 3))
 
         # Load previous calibration if it exists
         subject = self.task_params.get('subject_name', 'None')
@@ -181,14 +179,15 @@ class BehaviorAnalysisWorker(AnalysisWorker):
         self.ax.add_collection(self.circles)
 
         # Set up eye diameter figure  
-        self.diam_ax = self.fig.add_axes([0.1, 0.06, 0.8, 0.11])
-        self.diam_ax.set_ylim(0, self.ylim)
+        self.eye_ax = self.fig.add_axes([0.1, 0.06, 0.8, 0.11])
+        self.eye_ax.set_xlabel('Time (s)')
+        self.eye_ax.set_ylabel('Eye Diameter (cm)', color='green')
+        self.diam_ax = self.eye_ax.twinx()
+        self.diam_ax.set_ylabel('Eye Pos (cm)', color='blue')
         self.diam_ax.set_xlim(-self.buffer_time, 0)
-        self.diam_ax.set_xlabel('Time (s)')
-        self.diam_ax.set_ylabel('Eye Diameter (cm)')
-        self.diam_plot = self.diam_ax.plot([], [], 'green')[0]
-        self.x_plot = self.diam_ax.plot([], [], 'blue')[0]
-        self.y_plot = self.diam_ax.plot([], [], 'cyan')[0]
+        self.diam_plot = self.diam_ax.plot([], [], 'green', linewidth=0.5, alpha=0.5)[0]
+        self.x_plot = self.eye_ax.plot([], [], 'blue', linewidth=0.5, alpha=0.5)[0]
+        self.y_plot = self.eye_ax.plot([], [], 'cyan', linewidth=0.5, alpha=0.5)[0]
 
 
     def update_eye_calibration(self):
@@ -245,21 +244,17 @@ class BehaviorAnalysisWorker(AnalysisWorker):
             self.cursor_pos = np.array(values[0])[[0,2]]
         elif key == 'eye_pos':
             self.eye_pos = np.array(values[0])[:2]
+            self.temp = np.array(values[0])[:2]
+            self.eye_buffer[:,:2] = np.roll(self.eye_buffer[:,:2], -1, axis=0)
+            self.eye_buffer[-1,:2] = self.temp
 
-            # Update eye diameter
-            if self.eye_pos.size > 2:
-                self.temp = np.array(values[0])[[0,1,4]]
-                self.eye_diam = np.roll(self.eye_diam, -1, axis=0)
-                self.eye_diam[-1] = self.temp
+        elif key == 'eye_diam':
+            self.temp = np.array(values[0])[0]
+            self.eye_buffer[:,2] = np.roll(self.eye_buffer[:,2], -1, axis=0)
+            self.eye_buffer[-1,2] = self.temp
 
         elif key == 'calibrated_eye_pos':
             self.calibrated_eye_pos = np.array(values[0])[:2]
-
-            # Update eye diameter
-            if self.calibrated_eye_pos.size > 2:
-                self.temp = np.array(values[0])[[0,1,4]]
-                self.eye_diam = np.roll(self.eye_diam, -1, axis=0)
-                self.eye_diam[-1] = self.temp
 
         elif key == 'target_location':
             target_idx, target_location = values
@@ -272,25 +267,32 @@ class BehaviorAnalysisWorker(AnalysisWorker):
 
         patches = [
             plt.Circle(cursor_pos, cursor_radius), 
-            plt.Circle(eye_pos, self.eye_diam[-1, 0]/self.px_per_cm)
+            plt.Circle(eye_pos, 0.5)
         ] + [plt.Circle(pos, radius) for pos, radius, _ in targets]
         self.circles.set_paths(patches)
         colors = ['b', 'g'] + [c for _, _, c in targets]
         self.circles.set_facecolor(colors)
         self.circles.set_alpha(0.5)
 
-        # Update eye diameter plot
-        self.x_plot.set_data(np.arange(len(self.eye_diam)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
-                                self.eye_diam[:, 0])
-        self.y_plot.set_data(np.arange(len(self.eye_diam)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
-                                self.eye_diam[:, 1])
-        self.diam_plot.set_data(np.arange(len(self.eye_diam)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
-                                self.eye_diam[:, 2]/self.px_per_cm)
+        self._draw_eye()
+
+    def _draw_eye(self):
+        # Update raw eye data plot
+        self.x_plot.set_data(np.arange(len(self.eye_buffer)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
+                                self.eye_buffer[:, 0])
+        self.y_plot.set_data(np.arange(len(self.eye_buffer)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
+                                self.eye_buffer[:, 1])
+        self.eye_ax.relim()
+        self.eye_ax.autoscale_view()
+        self.diam_plot.set_data(np.arange(len(self.eye_buffer)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
+                                self.eye_buffer[:, 2])
+        self.diam_ax.relim()
+        self.diam_ax.autoscale_view()
+
 
     def cleanup(self):
 
         # Save the calibration if it was performed
-        filepath = os.path.join(self.calibration_dir, self.calibration_filename)
         if self.calibration_flag and not np.array_equal(self.eye_coeff, np.array([[1,0],[1,0]])):
             aopy.data.pkl_write(self.calibration_filename, (self.eye_coeff, self.eye_coeff_corr), self.calibration_dir)
 
@@ -323,6 +325,7 @@ class SaccadeAnalysisWorker(BehaviorAnalysisWorker):
         return self.cursor_pos, self.calibrated_eye_pos, targets
 
     def draw(self):
+        super(BehaviorAnalysisWorker, self).draw()
         cursor_pos, calibrated_eye_pos, targets = self.get_current_pos()
         cursor_radius = self.task_params.get('cursor_radius', 0.25)
         if 'fixation_radius_buffer' in self.task_params:
@@ -340,13 +343,7 @@ class SaccadeAnalysisWorker(BehaviorAnalysisWorker):
         self.circles.set_facecolor(colors)
         self.circles.set_alpha(0.5)
 
-        # Update eye diameter plot
-        self.x_plot.set_data(np.arange(len(self.eye_diam)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
-                                self.eye_diam[:, 0])
-        self.y_plot.set_data(np.arange(len(self.eye_diam)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
-                                self.eye_diam[:, 1])
-        self.diam_plot.set_data(np.arange(len(self.eye_diam)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
-                                self.eye_diam[:, 2]/self.px_per_cm)
+        self._draw_eye()
 
 class EyeHandAnalysisWorker(BehaviorAnalysisWorker):
     '''
@@ -363,7 +360,7 @@ class EyeHandAnalysisWorker(BehaviorAnalysisWorker):
         self.target_idx_trial = []
 
     def handle_data(self, key, values):
-        #super().handle_data(key, values)
+        super(BehaviorAnalysisWorker, self).handle_data(key, values)
         if key == 'sync_event':
             event_name, event_data = values
             if event_name == 'TARGET_ON':
@@ -399,11 +396,15 @@ class EyeHandAnalysisWorker(BehaviorAnalysisWorker):
             self.calibrated_eye_pos = np.array(values[0])[:2]
 
         elif key == 'eye_pos':
-            # Update eye diameter
-            if self.calibrated_eye_pos.size > 2:
-                self.temp = np.array(values[0])[[0,1,4]]
-                self.eye_diam = np.roll(self.eye_diam, -1, axis=0)
-                self.eye_diam[-1] = self.temp
+            self.eye_pos = np.array(values[0])[:2]
+            self.temp = np.array(values[0])[:2]
+            self.eye_buffer[:,:2] = np.roll(self.eye_buffer[:,:2], -1, axis=0)
+            self.eye_buffer[-1,:2] = self.temp
+
+        elif key == 'eye_diam':
+            self.temp = np.array(values[0])[0]
+            self.eye_buffer[:,2] = np.roll(self.eye_buffer[:,2], -1, axis=0)
+            self.eye_buffer[-1,2] = self.temp
 
         elif key == 'target_location':
             target_idx, target_location = values
@@ -435,6 +436,7 @@ class EyeHandAnalysisWorker(BehaviorAnalysisWorker):
         return self.cursor_pos, self.calibrated_eye_pos, eye_targets, hand_targets
 
     def draw(self):
+        super(BehaviorAnalysisWorker, self).draw()
         cursor_pos, calibrated_eye_pos, eye_targets, hand_targets = self.get_current_pos()
         cursor_radius = self.task_params.get('cursor_radius', 0.25)
         if 'fixation_radius_buffer' in self.task_params:
@@ -453,13 +455,7 @@ class EyeHandAnalysisWorker(BehaviorAnalysisWorker):
         self.circles.set_facecolor(colors)
         self.circles.set_alpha(0.5)
 
-        # Update eye diameter plot
-        self.x_plot.set_data(np.arange(len(self.eye_diam)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
-                                self.eye_diam[:, 0])
-        self.y_plot.set_data(np.arange(len(self.eye_diam)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
-                                self.eye_diam[:, 1])
-        self.diam_plot.set_data(np.arange(len(self.eye_diam)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
-                                self.eye_diam[:, 2]/self.px_per_cm)
+        self._draw_eye()
 
 class EyeHandSequenceAnalysisWorker(BehaviorAnalysisWorker):
     '''
@@ -475,6 +471,7 @@ class EyeHandSequenceAnalysisWorker(BehaviorAnalysisWorker):
         self.is_sequence = False
 
     def handle_data(self, key, values):
+        super(BehaviorAnalysisWorker, self).handle_data(key, values)
         if key == 'cycle_count':
             self.cycle_count = values[0]       
         elif key == 'sync_event':
@@ -508,12 +505,14 @@ class EyeHandSequenceAnalysisWorker(BehaviorAnalysisWorker):
             self.cursor_pos = np.array(values[0])[[0,2]]
         elif key == 'eye_pos':
             self.eye_pos = np.array(values[0])[:2]
+            self.temp = np.array(values[0])[:2]
+            self.eye_buffer[:,:2] = np.roll(self.eye_buffer[:,:2], -1, axis=0)
+            self.eye_buffer[-1,:2] = self.temp
 
-            # Update eye diameter
-            if self.eye_pos.size > 2:
-                self.temp = np.array(values[0])[[0,1,4]]
-                self.eye_diam = np.roll(self.eye_diam, -1, axis=0)
-                self.eye_diam[-1] = self.temp
+        elif key == 'eye_diam':
+            self.temp = np.array(values[0])[0]
+            self.eye_buffer[:,2] = np.roll(self.eye_buffer[:,2], -1, axis=0)
+            self.eye_buffer[-1,2] = self.temp
 
         elif key == 'calibrated_eye_pos':
             self.calibrated_eye_pos = np.array(values[0])[:2]
@@ -549,6 +548,7 @@ class EyeHandSequenceAnalysisWorker(BehaviorAnalysisWorker):
         return self.cursor_pos, self.calibrated_eye_pos, eye_targets, hand_targets
 
     def draw(self):
+        super(BehaviorAnalysisWorker, self).draw()
         cursor_pos, calibrated_eye_pos, eye_targets, hand_targets = self.get_current_pos()
         cursor_radius = self.task_params.get('cursor_radius', 0.25)
         if 'fixation_radius_buffer' in self.task_params:
@@ -568,14 +568,8 @@ class EyeHandSequenceAnalysisWorker(BehaviorAnalysisWorker):
         self.circles.set_facecolor(colors)
         self.circles.set_alpha(0.7)
 
-        # Update eye diameter plot
-        self.x_plot.set_data(np.arange(len(self.eye_diam)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
-                                self.eye_diam[:, 0])
-        self.y_plot.set_data(np.arange(len(self.eye_diam)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
-                                self.eye_diam[:, 1])
-        self.diam_plot.set_data(np.arange(len(self.eye_diam)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
-                                self.eye_diam[:, 2]/self.px_per_cm)
-        
+        self._draw_eye()
+
 
 class ERPAnalysisWorker(AnalysisWorker):
     '''
