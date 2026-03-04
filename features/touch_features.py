@@ -75,7 +75,7 @@ class TabletTouch(traits.HasTraits):
         
         # Check if the last event was a finger up
         if data[-1][0] == -1:
-            return [np.nan, np.nan, np.nan]
+            return
 
         # Otherwise get the most recent touch position
         pos = np.array(data[-1])[1:].astype(float) # get the most recent event
