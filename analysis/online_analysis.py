@@ -181,9 +181,9 @@ class BehaviorAnalysisWorker(AnalysisWorker):
         # Set up eye diameter figure  
         self.eye_ax = self.fig.add_axes([0.1, 0.06, 0.8, 0.11])
         self.eye_ax.set_xlabel('Time (s)')
-        self.eye_ax.set_ylabel('Eye Diameter (cm)', color='green')
+        self.eye_ax.set_ylabel('Eye Pos (cm)', color='blue')
         self.diam_ax = self.eye_ax.twinx()
-        self.diam_ax.set_ylabel('Eye Pos (cm)', color='blue')
+        self.diam_ax.set_ylabel('Eye Diameter (cm)', color='green')
         self.diam_ax.set_xlim(-self.buffer_time, 0)
         self.diam_plot = self.diam_ax.plot([], [], 'green', linewidth=0.5, alpha=0.5)[0]
         self.x_plot = self.eye_ax.plot([], [], 'blue', linewidth=0.5, alpha=0.5)[0]

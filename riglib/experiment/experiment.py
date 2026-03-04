@@ -408,6 +408,7 @@ class Experiment(ThreadedFSM, traits.HasTraits, metaclass=ExperimentMeta):
 
         # Send task data to any registered sinks
         if hasattr(self, 'task_data') and self.task_data is not None:
+            self.task_data['system_time'] = self.get_time()
             self.sinks.send("task", self.task_data)
 
         # Update report stats periodically
