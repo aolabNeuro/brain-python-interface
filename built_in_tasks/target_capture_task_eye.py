@@ -732,11 +732,21 @@ class EyeHandCaptureBlock(Sequence, Window):
         instantiate_targets = kwargs.pop('instantiate_targets', True)
         if instantiate_targets:
 
+            # Control transparency of targets
+            init_eye_new_color = list(target_colors[self.eye_target_color])
+            init_eye_new_color[3] = self.init_eye_target_alpha
+            init_hand_new_color = list(target_colors[self.target_color])
+            init_hand_new_color[3] = self.init_hand_target_alpha
+            goal_eye_new_color = list(target_colors[self.eye_target_color])
+            goal_eye_new_color[3] = self.goal_target_alpha
+            goal_hand_new_color = list(target_colors[self.target_color])
+            goal_hand_new_color[3] = self.goal_target_alpha
+
             # Target 1 and 2 are for saccade. Target 3 and target 4 are for hand
-            target1 = VirtualRectangularTarget(target_width=self.fixation_radius, target_height=self.fixation_radius/2, target_color=target_colors[self.eye_target_color])
-            target2 = VirtualRectangularTarget(target_width=self.fixation_radius, target_height=self.fixation_radius/2, target_color=target_colors[self.eye_target_color])
-            target3 = VirtualCircularTarget(target_radius=self.target_radius, target_color=target_colors[self.target_color])
-            target4 = VirtualCircularTarget(target_radius=self.target_radius, target_color=target_colors[self.target_color])
+            target1 = VirtualRectangularTarget(target_width=self.fixation_radius, target_height=self.fixation_radius/2, target_color=init_eye_new_color)
+            target2 = VirtualRectangularTarget(target_width=self.fixation_radius, target_height=self.fixation_radius/2, target_color=goal_eye_new_color)
+            target3 = VirtualCircularTarget(target_radius=self.target_radius, target_color=init_hand_new_color)
+            target4 = VirtualCircularTarget(target_radius=self.target_radius, target_color=goal_hand_new_color)
 
             self.targets = [target1, target2]
             self.targets_hand = [target3, target4]
