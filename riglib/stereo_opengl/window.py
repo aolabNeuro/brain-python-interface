@@ -56,7 +56,7 @@ class Window(LogExperiment):
     environment_plane_size = traits.Tuple((20, 20), desc="Size in cm of the environment plane")
     environment_plane_color = traits.Tuple((1, 1, 1, 0.25), desc="Color (rgba) of the environment plane")
     environment_plane_rotation = traits.Tuple((0, 0, 0), desc="Rotation of environment plane about (x, y, z) axes in degrees")
-    show_grid = traits.Bool(True, desc="Show a textured grid on the floor")
+    show_grid = traits.Bool(False, desc="Show a textured grid on the floor")
     grid_size = traits.Float(130, desc="Size of the grid in cm")
     grid_position = traits.Tuple((0, 0, 0), desc="Position of the grid in cm. If you want the floor of the grid to be on the floor of the world, set the z component to (grid_size - camera_offset[2])")
 
