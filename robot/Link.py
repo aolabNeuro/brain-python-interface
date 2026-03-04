@@ -89,7 +89,7 @@ class Link:
         self.Tc = None
         self.qlim = None
 
-        self._cached_tr = np.mat(np.zeros([4,4]))
+        self._cached_tr = np.asmatrix(np.zeros([4,4]))
         self._cached_tr[-1,-1] = 1
         self.prev_q = -10000
 
@@ -356,7 +356,7 @@ class Link:
         if self.convention == Link.LINK_DH:
             # standard
             if deep_copy:
-                t = np.mat([[ct, -st*ca, st*sa,  an*ct],
+                t = np.asmatrix([[ct, -st*ca, st*sa,  an*ct],
                             [st, ct*ca,  -ct*sa, an*st],
                             [0,  sa,     ca,     dn],
                             [0,  0,      0,      1]]);

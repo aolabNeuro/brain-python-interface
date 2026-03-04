@@ -5,7 +5,7 @@ from built_in_tasks.othertasks import Conditions, LaserConditions, SweptLaserCon
 from built_in_tasks.target_capture_task import ScreenTargetCapture
 from built_in_tasks.passivetasks import YouTube
 from built_in_tasks.example_task import ExampleSequenceTask
-from features.generator_features import Autostart, HideLeftTrajectory, ReadysetMedley, ReadysetColorChange
+from features.generator_features import Autostart, HideLeftTrajectory, ReadysetMedley, ReadysetColorChange, HideCursorReturn
 from features.hdf_features import SaveHDF
 from features.touch_features import MouseEmulateTouch
 from riglib.stereo_opengl.environment import Grid
@@ -20,6 +20,7 @@ import pstats
 from riglib.stereo_opengl.window import Window, Window2D
 import unittest
 import numpy as np
+import matplotlib.pyplot as plt
 import os
 import socket
 
@@ -40,9 +41,9 @@ class TestManualControlTasks(unittest.TestCase):
     @unittest.skip("")
     def test_readysetgo(self):
         seq = ManualControl.centerout_2D()
-        exp = init_exp(ReadySetGoTask, [MouseControl, Window2D], seq, early_move_time = 0.1,
-                       delay_time = 0.45, mustmv_time = 0.3, ready_freq = 320, set_freq = 360, go_freq = 400,
-                         window_size=(1200,800), 
+        exp = init_exp(ReadySetGoTask, [MouseControl, Window2D, HideCursorReturn], seq, early_move_time = 0.1,
+                       delay_time = 0.45, mustmv_time = 0.3, ready_freq = 320, set_freq = 360, go_freq = 400, 
+                         show_cursor_return = 2.5, window_size=(1200,800), 
                        fullscreen=False)
         exp.rotation = 'xzy'
         exp.run()
@@ -77,9 +78,28 @@ class TestManualControlTasks(unittest.TestCase):
     @unittest.skip("")
     def test_tracking(self):
         print("Running tracking task test")
-        seq = TrackingTask.tracking_target_debug(nblocks=1, ntrials=6, time_length=5, seed=40, sample_rate=60, ramp=1) # sample_rate needs to match fps in ScreenTargetTracking
-        exp = init_exp(TrackingTask, [MouseEmulateTouch, Window2D, MouseControl], seq) # , window_size=(1000,800)
+        seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=5, ramp=1, ramp_down=1, 
+                                                 num_primes=8, seed=42, sample_rate=60, 
+                                                 disturbance=False, boundaries=(-10,10,-10,10))
+        exp = init_exp(TrackingTask, [HideLeftTrajectory, MouseControl, Window2D], seq, window_size=(1000,800), fullscreen=False,
+                       lookahead_time=1, screen_half_height=10)
         exp.rotation = 'xzy'
+        # exp.trajectory_type = 'space'
+        exp.trajectory_amplitude = 5
+        exp.trajectory_radius = 0.2
+        exp.run()
+
+    @unittest.skip("")
+    def test_tracking_2d(self):
+        print("Running tracking task test")
+        seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=20, ramp=1, ramp_down=1, 
+                                                 num_primes=10, seed=42, sample_rate=60, dimensions=2, 
+                                                 disturbance=True, boundaries=(-10,10,-10,10), decay_rate = 0.1)
+        exp = init_exp(TrackingTask, [Window2D, MouseControl], seq, window_size=(1000,800), fullscreen=False, 
+                       limit1d=False, trajectory_amplitude=5, lookahead_time=1)
+        exp.stereo_mode = 'projection'
+        exp.rotation = 'xzy'
+        exp.trajectory_type = 'space'
         exp.run()
 
     @unittest.skip("")
@@ -102,7 +122,7 @@ class TestManualControlTasks(unittest.TestCase):
         exp.end_task()
 
     @unittest.skip("only to test progress bar")
-    def test_tracking_progress(self):
+    def test_progress_bar(self):
         seq = TrackingTask.tracking_target_debug(nblocks=1, ntrials=6, time_length=5, seed=40, sample_rate=60, ramp=1) # sample_rate needs to match fps in ScreenTargetTracking
         exp = init_exp(TrackingTask, [MouseControl, Window2D, ProgressBar], seq)
         exp.rotation = 'xzy'
@@ -162,6 +182,36 @@ class TestSeqGenerators(unittest.TestCase):
         print(idx)
         print(loc)
         print("---------------corners")
+
+    @unittest.skip("")
+    def test_tracking_2d(self):
+        seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=20, ramp=0, ramp_down=0, 
+                                                 num_primes=12, seed=42, sample_rate=60, dimensions=2, 
+                                                 disturbance=False, boundaries=(-10,10,-10,10), decay_rate = None)
+        trajectories = [t[1][0] for t in seq] # pulls out trajectory. Can use t[3] to get disturbance array
+        print("2D Test-------")
+        print(np.shape(trajectories))
+        print("2D Test-------")
+        fig, axs = plt.subplots(2,1, figsize=(10,8))
+        for idx, trial in enumerate(trajectories): 
+            ax = axs[idx]
+            trialx = np.fft.fft(trial[:,0])
+            trial_length = np.shape(trialx)[0]
+            freq = np.fft.fftfreq(trial_length, d=1./60)
+            non_neg_freq = freq[freq >= 0] #get positive frequencies 
+            non_neg_x = trialx[freq >= 0] / complex(trial_length, 0) #normalize 
+            non_neg_x[1:] = 2*non_neg_x[1:] #account for negative frequencies
+            trialy = np.fft.fft(trial[:,2])
+            non_neg_y = trialy[freq >= 0] / complex(trial_length, 0) #normalize 
+            non_neg_y[1:] = 2*non_neg_y[1:] #account for negative frequencies
+            ax.plot(non_neg_freq, np.abs(non_neg_x), 'o-', label = 'X')
+            ax.plot(non_neg_freq, np.abs(non_neg_y), 'o-', label = 'Y')
+            ax.set_title(f'Trial {idx}')
+            ax.set_xlim(0, 3)
+            ax.set_xlabel('Frequency (Hz)')
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
 
 class TestYouTube(unittest.TestCase):
 

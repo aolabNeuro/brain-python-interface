@@ -30,7 +30,7 @@ def jacob0(robot, q):
     """
 
 
-    q = np.mat(q).reshape(-1, 1)
+    q = np.asmatrix(q).reshape(-1, 1)
     Jn = jacobn(robot, q) # Jacobian from joint to wrist space
     #   convert to Jacobian in base coordinates
     # Tn = fkine(robot,q) 
@@ -73,7 +73,7 @@ def jacobn(robot, q):
                 U = L[j].tr(q[j])*U
 
             if L[j].sigma == 0: #revolute axis
-                d = np.mat([[-U[0,0]*U[1,3] + U[1,0]*U[0,3]],
+                d = np.asmatrix([[-U[0,0]*U[1,3] + U[1,0]*U[0,3]],
                             [-U[0,1]*U[1,3] + U[1,1]*U[0,3]],
                             [-U[0,2]*U[1,3] + U[1,2]*U[0,3]]])
                 delta = U[2,0:3].T   # nz  oz  az

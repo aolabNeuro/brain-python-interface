@@ -57,7 +57,7 @@ assister = assist.TentacleAssist(ssm=train.tentacle_2D_state_space, kin_chain=ch
 
 q_start = chain.inverse_kinematics(np.array([5., 0., 5.]) - shoulder_anchor, verbose=True, n_particles=500, eps=0.05, n_iter=10)
 x_init = np.hstack([q_start, np.zeros_like(q_start), 1])
-x_init = np.mat(x_init).reshape(-1, 1)
+x_init = np.asmatrix(x_init).reshape(-1, 1)
 x = [x_init]
 goal_calc = goal_calculators.PlanarMultiLinkJointGoal(train.tentacle_2D_state_space, shoulder_anchor, chain, multiproc=True, init_resp=x_init)
 
@@ -84,7 +84,7 @@ while True:
 	if error > 2:
 		goal_calc.reset()
 	# print "approx error", error
-	target_state = np.mat(target_state.reshape(-1, 1))
+	target_state = np.asmatrix(target_state.reshape(-1, 1))
 
 	current_state = x[-1]
 	Bu, weight = assister(current_state, target_state)
