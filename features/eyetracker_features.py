@@ -105,6 +105,9 @@ class EyeCalibration(traits.HasTraits):
                         align_events=80, return_datapoints=True
                     )
                     self.eye_center = np.nanmedian(eye_center, axis=0)
+                else:
+                    self.eye_center = np.zeros((eye_interp.shape[1],))
+
 
                 # Calculate coefficient by linear regression between targets and centered eye positions
                 self.eye_coeff, _ = aopy.preproc.calc_eye_target_calibration(
@@ -140,7 +143,7 @@ class EyeCalibration(traits.HasTraits):
 
         # Do calibration
         ave_pos = self.eye_pos
-        if len(self.eye_pos) >= 2 and len(self.eye_center) >= 2:
+        if len(self.eye_pos) > 2 and len(self.eye_center) > 2:
             calibrated_pos = aopy.postproc.get_calibrated_eye_data(self.eye_pos[:4]-self.eye_center, self.eye_coeff)
             ave_pos = np.array([(calibrated_pos[0] + calibrated_pos[2])/2, (calibrated_pos[1] + calibrated_pos[3])/2])
         elif not self.keyboard_control:
