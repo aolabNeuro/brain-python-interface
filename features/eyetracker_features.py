@@ -342,12 +342,14 @@ class PupilLabStreaming(EyeStreaming):
     surface tracking. Requires a task with the Window feature enabled.
     '''
 
-    surface_marker_size = traits.Float(2., desc="Size in cm of apriltag surface markers")
+    surface_marker_size = traits.Float(6., desc="Size in cm of apriltag surface markers")
     surface_marker_count = traits.Int(0, desc="How many surface markers to draw")
     pupillabs_gaze = traits.OptionsList(gaze_options, desc="Which gaze option to use for eye position", bmi3d_options_list=gaze_options)
-    debug = traits.Bool(False, desc="Show debug info about eye streaming")
+    pupillabs_confidence_threshold = traits.Float(0.5, desc="Minimum confidence for gaze position to be used")
+    pupillabs_debug = traits.Bool(False, desc="Show debug info about eye streaming")
 
     exclude_parent_traits = ['binocular']
+    hidden_traits = ['pupillabs_confidence_threshold', 'pupillabs_debug']
 
     def __init__(self, *args, **kwargs):
         if self.keyboard_control:
@@ -407,11 +409,13 @@ class PupilLabStreaming(EyeStreaming):
         
         eye_idx = gaze_options_idx[gaze_options.index(self.pupillabs_gaze)]
         eye_pos = eye[:, eye_idx] # get only the columns corresponding to the selected gaze option
+        eye_pos_confidence = eye[:, np.where(np.isin(eye_labels, ['gaze_confidence']))[0]] # get gaze confidence columns
         eye_diam = eye[:, np.where(np.isin(eye_labels, ['le_diam', 're_diam']))[0]] # get diameter columns
+        eye_diam_confidence = eye[:, np.where(np.isin(eye_labels, ['le_diam_confidence', 're_diam_confidence']))[0]] # get diameter confidence columns
 
         # Find the last non-nan value of eye position
-        eye_pos = _latest_value(eye_pos)
-        eye_diam = _latest_value(eye_diam) / self.eye_pixels_per_cm
+        eye_pos = _latest_value(eye_pos[eye_pos_confidence > self.pupillabs_confidence_threshold]) # only consider positions with high confidence
+        eye_diam = _latest_value(eye_diam[eye_diam_confidence > self.pupillabs_confidence_threshold]) / self.eye_pixels_per_cm
 
         # Prepare the gaze position depending on its source
         if self.pupillabs_gaze == 'gaze3d':
@@ -453,9 +457,9 @@ class PupilLabStreaming(EyeStreaming):
         '''
         Convert from [0,1] norm_pos to cm with center at (0,0)
         '''
-        x, y = (gaze2d - 0.5) * self.screen_half_height * 2 
+        x, y = (gaze2d - 0.5) * self.screen_half_height * 2
         aspect_ratio = self.window_size[0] / self.window_size[1]
-        y /= aspect_ratio
+        x *= aspect_ratio
         xyz = np.array([x, y, z, 1])  # Convert to x, z, y format
         return xyz[:3]
         modelview = self.modelview.copy()
