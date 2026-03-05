@@ -323,13 +323,13 @@ class TrackingAnalysisWorker(BehaviorAnalysisWorker):
         self.frame_index = -1
         self.reference = None
         self.disturbance = None
-        self.lookahead_type = self.task_params.get('lookahead_type', '1d')
+        self.lookahead_type = self.task_params.get('trajectory_type', '1d')
         self.lookahead = int(self.task_params['fps'] * self.task_params['lookahead_time']) # convert to frames
         self.lookahead_scale = (0.5 * self.task_params['screen_cm'][0]) / (self.lookahead) # cm per frame
 
         # Set up the reference and disturbance signals
-        self.ref_line, = self.ax.plot([], [], 'orange', label='Reference')
-        self.dist_line, = self.ax.plot([], [], 'red', label='Disturbance')
+        self.ref_line, = self.ax.plot([], [], 'orange', linewidth=2, alpha=0.75, label='Reference')
+        self.dist_line, = self.ax.plot([], [], 'red', linewidth=2, alpha=0.75, label='Disturbance')
         self.ax.legend()
 
     def handle_data(self, key, values):

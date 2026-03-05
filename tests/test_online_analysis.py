@@ -73,39 +73,22 @@ class TestOnlineAnalysis(unittest.TestCase):
         analysis = online_analysis.OnlineDataServer('localhost', 5000)
         analysis.start()
 
-        # Load replay data
-        import tables
-        test_dir = os.path.dirname(os.path.abspath(__file__))
-        hdf_filepath = os.path.join(test_dir, 'test_data/beig20240307_22_te15080.hdf')
-        with tables.open_file(hdf_filepath, 'r') as f:
-            task = f.root.task.read()
-            trial = f.root.trials.read()
-        seq = []
-        target = []
-        disturbance = []
-        is_disturbance = trial[0]['is_disturbance']
-        idx = 0
-        num = 0
-        for trial in trial:
-            if idx == trial['index'] and num == trial['trial']:
-                target.append(trial['target'])
-                disturbance.append(trial['disturbance'])
-            elif idx == trial['index']:
-                pass
-            else:
-                seq.append((idx, [target], is_disturbance, [disturbance], 120, 0, 0))
-                idx = trial['index']
-                num = trial['trial']
-                is_disturbance = trial['is_disturbance']
-                target = [trial['target']]
-                disturbance = [trial['disturbance']]
-        cursor = task['cursor']
-
         # Start exp 1
         os.environ['DISPLAY'] = ':0.0'
-        Exp = experiment.make(TrackingTask, feats=[Window2D, ReplayCursor, OnlineAnalysis])
-        exp = Exp(seq, fps=120, session_length=28, online_analysis_ip='localhost', online_analysis_port=5000,
-                  fullscreen=False, window_size=(800,600), replay_cursor_data=cursor, wait_time=0)
+        if False: # 2d
+            seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=20, ramp=1, ramp_down=1, 
+                                                    num_primes=10, seed=42, sample_rate=60, dimensions=2, 
+                                                    disturbance=True, boundaries=(-10,10,-10,10), decay_rate = 0.1)
+            Exp = experiment.make(TrackingTask, feats=[Window2D, MouseControl, OnlineAnalysis])
+            exp = Exp(seq, fps=120, session_length=28, online_analysis_ip='localhost', online_analysis_port=5000,
+                    fullscreen=False, window_size=(800,600), wait_time=0, trajectory_type='2d', rotation = 'xzy', limit1d=False, trajectory_amplitude=5)
+        else: # 1d
+            seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=5, ramp=1, ramp_down=1, 
+                                                 num_primes=8, seed=42, sample_rate=60, 
+                                                 disturbance=False, boundaries=(-10,10,-10,10))
+            Exp = experiment.make(TrackingTask, feats=[Window2D, MouseControl, OnlineAnalysis])
+            exp = Exp(seq, fps=120, session_length=28, online_analysis_ip='localhost', online_analysis_port=5000,
+                    fullscreen=False, window_size=(800,600), wait_time=0, rotation = 'xzy', trajectory_amplitude=5)
 
         print(exp.dtype)
         exp.init()
