@@ -1,7 +1,7 @@
 import datetime
 import time
 import json
-import socket
+import zmq
 import select
 import os
 import multiprocessing as mp
@@ -18,25 +18,44 @@ from riglib.source import MultiChanDataSource
 
 class OnlineDataWorker(threading.Thread):
     '''
-    Worker process to receive data from BMI3D.
+    Worker process to receive data from BMI3D via ZMQ.
     '''
 
-    def __init__(self, socket, result_queue):
+    def __init__(self, zmq_socket, result_queue):
         '''
-        Start the server on the specified IP address and port number.
+        Args:
+            zmq_socket (zmq.Socket): The ZMQ PULL socket from the server
+            result_queue (queue.Queue): Queue to pass data to the main server thread
         '''
-        self.sock = socket
+        self.sock = zmq_socket
         self._stop_event = threading.Event()
         self.result_queue = result_queue
         super().__init__()
 
     def run(self):
+        # We use a Poller to allow the thread to check the stop_event 
+        # without blocking indefinitely on a recv()
+        poller = zmq.Poller()
+        poller.register(self.sock, zmq.POLLIN)
+
         while not self._stop_event.is_set():
-            ready = select.select([self.sock], [], [], 0.1) # 100ms timeout to check _stop_event
-            if ready[0]:
-                data = self.sock.recv(4096)
-                key, value = data.decode('utf-8').split('%')
-                self.result_queue.put((key, [json.loads(v) for v in value.split('#')]))
+            # Check for incoming messages (100ms timeout)
+            socks = dict(poller.poll(100))
+            
+            if self.sock in socks and socks[self.sock] == zmq.POLLIN:
+                try:
+                    # Receive the full JSON object sent by the sender
+                    data = self.sock.recv_json()
+                    
+                    # Extract key and values
+                    key = data.get('key')
+                    values = data.get('values', [])
+                    
+                    # Push to the result queue just like the old version
+                    self.result_queue.put((key, values))
+                    
+                except Exception as e:
+                    print(f"ZMQ Worker Error: {e}")
 
     def stop(self):
         self._stop_event.set()
@@ -155,7 +174,8 @@ class BehaviorAnalysisWorker(AnalysisWorker):
         self.calibration_flag = True
         self.eye_coeff = np.array([[1,0],[1,0]])
         self.eye_coeff_corr = 0.5 # Don't accept anything lower than 0.5 by default
-        
+        self.bounds = self.task_params.get('cursor_bounds', (-10,10,0,0,-10,10))
+
         self.eye_diam = np.zeros((int(self.buffer_time*self.task_params['fps']), 3))
 
         # Load previous calibration if it exists
@@ -173,9 +193,8 @@ class BehaviorAnalysisWorker(AnalysisWorker):
             self.calibration_flag = False
 
         # Set up figure
-        bounds = self.task_params.get('cursor_bounds', (-10,10,0,0,-10,10))
-        self.ax.set_xlim(bounds[0], bounds[1])
-        self.ax.set_ylim(bounds[-2], bounds[-1])
+        self.ax.set_xlim(self.bounds[0], self.bounds[1])
+        self.ax.set_ylim(self.bounds[-2], self.bounds[-1])
         self.ax.set_aspect('equal')
         self.circles = PatchCollection([])
         self.ax.add_collection(self.circles)
@@ -231,9 +250,10 @@ class BehaviorAnalysisWorker(AnalysisWorker):
                 self.targets[event_data] = 1
             elif event_name == 'TARGET_OFF':
                 self.targets[event_data] = 0
-            elif event_name in ['PAUSE', 'TRIAL_END', 'HOLD_PENALTY', 'DELAY_PENALTY', 'TIMEOUT_PENALTY','FIXATION_PENALTY']:
+            elif event_name in ['PAUSE', 'TRIAL_END', 'HOLD_PENALTY', 'DELAY_PENALTY', 'OTHER_PENALTY', 'TIMEOUT_PENALTY','FIXATION_PENALTY']:
                 # Clear targets at the end of the trial
                 self.targets = {}
+                self.frame_index = -1
             elif event_name == 'REWARD':
                 # Set all active targets to reward
                 for target_idx in self.targets.keys():
@@ -293,6 +313,66 @@ class BehaviorAnalysisWorker(AnalysisWorker):
         filepath = os.path.join(self.calibration_dir, self.calibration_filename)
         if self.calibration_flag and not np.array_equal(self.eye_coeff, np.array([[1,0],[1,0]])):
             aopy.data.pkl_write(self.calibration_filename, (self.eye_coeff, self.eye_coeff_corr), self.calibration_dir)
+
+class TrackingAnalysisWorker(BehaviorAnalysisWorker):
+    '''
+    Plots cursor and target data from tracking experiments.
+    '''
+    def init(self):
+        super().init()
+        self.frame_index = -1
+        self.reference = None
+        self.disturbance = None
+        self.lookahead_type = self.task_params.get('lookahead_type', '1d')
+        self.lookahead = int(self.task_params['fps'] * self.task_params['lookahead_time']) # convert to frames
+        self.lookahead_scale = (0.5 * self.task_params['screen_cm'][0]) / (self.lookahead) # cm per frame
+
+        # Set up the reference and disturbance signals
+        self.ref_line, = self.ax.plot([], [], 'orange', label='Reference')
+        self.dist_line, = self.ax.plot([], [], 'red', label='Disturbance')
+        self.ax.legend()
+
+    def handle_data(self, key, values):
+        super().handle_data(key, values)
+        if key == 'reference_signal':
+            self.reference = np.array(values[0])
+            print('Received reference signal with shape', self.reference.shape)
+            self.target_pos[0] = self.reference[0,[0,2]]
+        elif key == 'disturbance_signal':
+            self.disturbance = np.array(values[1]) if values[0] else None
+        elif key == 'sync_event':
+            event_name, event_data = values
+            if event_name == 'TARGET_ON':
+                self.targets[0] = 1
+            elif event_name == 'TRIAL_START':
+                self.frame_index = 0
+            elif event_name == 'TRIAL_END':
+                self.frame_index = -1
+        elif key == 'cycle_count' and self.frame_index >= 0:
+            self.frame_index += 1
+            if self.frame_index < len(self.reference):
+                self.target_pos[0] = self.reference[self.frame_index,[0,2]]
+
+    def draw(self):
+        super().draw()
+        if self.frame_index >= 0:
+            start = self.frame_index
+            stop = min(len(self.reference), self.frame_index + int(self.lookahead))
+            if self.disturbance is None:
+                self.disturbance = np.zeros_like(self.reference)
+            if self.lookahead_type == '1d':
+                x_max = min(self.bounds[1], (len(self.reference)-stop+self.lookahead)*self.lookahead_scale)
+                if stop-start > 0:
+                    x = np.linspace(0, x_max, stop-start)
+                    self.ref_line.set_data(x, self.reference[start:stop,2])
+                    self.dist_line.set_data(x, self.disturbance[start:stop,2])
+            elif self.lookahead_type == '2d':
+                if stop-start > 0:
+                    self.ref_line.set_data(self.reference[start:stop,0], self.reference[start:stop,2])
+                    self.dist_line.set_data(self.disturbance[start:stop,0], self.disturbance[start:stop,2])
+        else:
+            self.ref_line.set_data([], [])
+            self.dist_line.set_data([], [])
 
 class SaccadeAnalysisWorker(BehaviorAnalysisWorker):
     '''
@@ -808,13 +888,13 @@ class OnlineDataServer(threading.Thread):
             port (int): Port number for the online analysis server
         '''
 
-        # Initialize socket
-        self.sock = socket.socket(
-            socket.AF_INET, # Internet
-              socket.SOCK_DGRAM) # UDP 
-        self.sock.bind((host_ip, port))
-        self.sock.setblocking(0)
-                
+        # Initialize ZMQ socket
+        self.zmq_context = zmq.Context()
+        self.sock = self.zmq_context.socket(zmq.PULL)
+        
+        # Bind to the port (Receiver binds, Sender connects)
+        self.sock.bind(f"tcp://{host_ip}:{port}")
+    
         # Initialize workers
         self.data_worker = None
         self.analysis_workers = []
@@ -864,6 +944,9 @@ class OnlineDataServer(threading.Thread):
         data_queue = mp.Queue()
         if self.task_params['experiment_name'] == 'ManualControl':
             self.analysis_workers.append((BehaviorAnalysisWorker(self.task_params, data_queue), data_queue))
+
+        elif self.task_params['experiment_name'] == 'TrackingTask':
+            self.analysis_workers.append((TrackingAnalysisWorker(self.task_params, data_queue), data_queue))
 
         elif self.task_params['experiment_name'] == 'EyeConstrainedManualControl':
             self.analysis_workers.append((SaccadeAnalysisWorker(self.task_params, data_queue), data_queue))
@@ -937,7 +1020,7 @@ class OnlineDataServer(threading.Thread):
                 break
 
         self._stop()
-        self.sock.close()
+        self.zmq_context.destroy()
         print('OnlineDataServer shut down.')
 
     def stop(self):

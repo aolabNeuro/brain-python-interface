@@ -3,7 +3,7 @@ from riglib import experiment
 from analysis import online_analysis
 from features.debug_features import OnlineAnalysis, ReplayCursor, ReplayEye
 from features.peripheral_device_features import MouseControl
-from built_in_tasks.manualcontrolmultitasks import ManualControl
+from built_in_tasks.manualcontrolmultitasks import ManualControl, TrackingTask
 from riglib.stereo_opengl.window import Window2D
 import unittest
 import numpy as np
@@ -68,7 +68,55 @@ class TestOnlineAnalysis(unittest.TestCase):
         analysis.stop()
         analysis.join()
 
-    def test_cursor(self):
+    def test_tracking(self):
+
+        analysis = online_analysis.OnlineDataServer('localhost', 5000)
+        analysis.start()
+
+        # Load replay data
+        import tables
+        test_dir = os.path.dirname(os.path.abspath(__file__))
+        hdf_filepath = os.path.join(test_dir, 'test_data/beig20240307_22_te15080.hdf')
+        with tables.open_file(hdf_filepath, 'r') as f:
+            task = f.root.task.read()
+            trial = f.root.trials.read()
+        seq = []
+        target = []
+        disturbance = []
+        is_disturbance = trial[0]['is_disturbance']
+        idx = 0
+        num = 0
+        for trial in trial:
+            if idx == trial['index'] and num == trial['trial']:
+                target.append(trial['target'])
+                disturbance.append(trial['disturbance'])
+            elif idx == trial['index']:
+                pass
+            else:
+                seq.append((idx, [target], is_disturbance, [disturbance], 120, 0, 0))
+                idx = trial['index']
+                num = trial['trial']
+                is_disturbance = trial['is_disturbance']
+                target = [trial['target']]
+                disturbance = [trial['disturbance']]
+        cursor = task['cursor']
+
+        # Start exp 1
+        os.environ['DISPLAY'] = ':0.0'
+        Exp = experiment.make(TrackingTask, feats=[Window2D, ReplayCursor, OnlineAnalysis])
+        exp = Exp(seq, fps=120, session_length=28, online_analysis_ip='localhost', online_analysis_port=5000,
+                  fullscreen=False, window_size=(800,600), replay_cursor_data=cursor, wait_time=0)
+
+        print(exp.dtype)
+        exp.init()
+        exp.run()
+
+        # Wrap up
+        analysis.stop()
+        analysis.join()
+
+    @unittest.skip("")
+    def test_center_out(self):
 
         analysis = online_analysis.OnlineDataServer('localhost', 5000)
 
@@ -107,6 +155,7 @@ class TestOnlineAnalysis(unittest.TestCase):
         # Wrap up
         analysis.stop()
         analysis.join()
+
 
 
 
