@@ -489,6 +489,13 @@ class PupilLabStreaming(EyeStreaming):
         eye_pos = cylinder_start + np.dot(camera_rotation[:3,:3], xyz/10)
         return eye_pos[[0,2,1]] # convert back to x,y,z format
 
+    def cleanup_hdf(self):
+        super().cleanup_hdf()
+        if hasattr(self, "h5file"):
+            h5file = tables.open_file(self.h5file.name, mode='a')
+            h5file.root.pupillabs.attrs['eye_labels'] = eye_labels
+            h5file.close()
+
 class EyeCursor(traits.HasTraits):
     '''
     Adds a virtual eye cursor to the task, which can be used to visualize eye positions.
