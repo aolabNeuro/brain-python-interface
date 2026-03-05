@@ -17,6 +17,7 @@ from riglib.stereo_opengl.primitives import AprilTag
 from riglib.stereo_opengl.xfm import Quaternion
 from .peripheral_device_features import *
 from riglib import plants
+from collections import deque
 
 import aopy
 import glob
@@ -145,6 +146,104 @@ class EyeCalibration(traits.HasTraits):
             if self.show_eye_pos:
                 self.eye_cursor.show()
 
+class AutomaticEyeCalibration(traits.HasTraits):
+    
+    trial_numbers_for_calibration = traits.Int(16, desc="how many trials are used in each calibration")
+    trial_numbers_for_auto_reward = traits.Int(8, desc="how many trials are automatic rewards")
+    offset_time_eye_calibration = traits.Float(0.1, desc="Data after this offset_time is only used for eye calibration")
+    duration_eye_calibration = traits.Float(0.2, desc="Data within this duration after offset_time is only used for eye calibration")
+    show_eye_pos = traits.Bool(False, desc="Whether to show eye positions")
+
+    def __init__(self, *args, **kwargs): #, start_pos, calibration):
+        super(AutomaticEyeCalibration,self).__init__(*args, **kwargs)
+        self.m_eye_pos = deque(maxlen = self.trial_numbers_for_calibration)
+        self.m_center_eye_pos = deque(maxlen = self.trial_numbers_for_calibration)
+        self.target_pos_calibration = deque(maxlen = self.trial_numbers_for_calibration)
+        self.eye_center = np.zeros((4,))
+        self.eye_coeff = np.vstack(([1,1,1,1], [0,0,0,0])).T
+
+        # Set up eye cursor
+        self.eye_cursor = VirtualCircularTarget(target_radius=.25, target_color=(0., 1., 0., 0.5))
+        self.calibrated_eye_pos = np.zeros((2,))*np.nan
+        for model in self.eye_cursor.graphics_models:
+            self.add_model(model)
+
+    def init(self):
+        self.add_dtype('calibrated_eye', 'f8', (2,))
+        super().init()
+
+    def _start_hold(self):
+        super()._start_hold()
+
+        self.hold_penalty_passed = False
+        self.eye_pos_tmp = []
+        self.start_hold_time = self.get_time()
+
+    def _while_hold(self):
+        super()._while_hold()
+
+        elapsed_time = self.get_time() - self.start_hold_time
+        if elapsed_time > self.offset_time_eye_calibration and elapsed_time < self.offset_time_eye_calibration + self.duration_eye_calibration:
+            self.eye_pos_tmp.append(self.eye_pos[:4])
+        
+        self.hold_penalty_passed = self.test_state_transition_event('leave_target')
+
+    def _end_hold(self):
+        super()._end_hold()
+
+        if not self.hold_penalty_passed: # Do not use eye data in trials where the hold penalty state passed
+            if self.target_index == 0:
+                self.m_center_eye_pos.append(np.nanmean(self.eye_pos_tmp, axis=0))
+
+            elif self.target_index == 1:
+                self.m_eye_pos.append(np.nanmean(self.eye_pos_tmp, axis=0))
+                self.target_pos_calibration.append(self.targs[self.target_index,[0,2]])
+
+    def _start_wait(self):
+        super()._start_wait()
+
+        if self.calc_trial_num() == 0:
+            if self.show_eye_pos:
+                self.eye_cursor.show()
+            else:
+                self.eye_cursor.hide()
+
+        if self.calc_state_occurrences('reward') < self.trial_numbers_for_auto_reward:
+            self.automatic_reward = True
+
+        else:
+            self.automatic_reward = False
+            if self.tries == 0:
+                # Perform regression
+                self.eye_center = np.nanmean(self.m_center_eye_pos, axis=0)
+                slopes, _, _ = aopy.analysis.fit_linear_regression(np.array(self.m_eye_pos)-self.eye_center, np.array(self.target_pos_calibration))
+                intercepts = np.array([0,0,0,0]) # Don't need this intercept because eye data is already centered
+
+                # Update eye coefficients
+                self.eye_coeff = np.vstack((slopes, intercepts)).T
+
+    def _cycle(self):
+        self._update_eye_pos()
+
+        # Do calibration
+        if not self.keyboard_control:
+            calibrated_pos = aopy.postproc.get_calibrated_eye_data(self.eye_pos[:4]-self.eye_center, self.eye_coeff)
+            ave_pos = np.array([(calibrated_pos[0] + calibrated_pos[2])/2, (calibrated_pos[1] + calibrated_pos[3])/2])
+        
+        # Save calibration
+        self.calibrated_eye_pos = ave_pos
+        self.task_data['calibrated_eye'] = ave_pos
+
+        super(EyeStreaming, self)._cycle()
+
+        # Move the eye cursor
+        if np.any(np.isnan(self.calibrated_eye_pos)):
+            pass
+        else:
+            self.eye_cursor.move_to_position([self.calibrated_eye_pos[0],0,self.calibrated_eye_pos[1]])
+            if self.show_eye_pos:
+                self.eye_cursor.show()
+    
 
 class EyeStreaming(traits.HasTraits):
     '''
