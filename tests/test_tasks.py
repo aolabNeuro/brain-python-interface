@@ -99,7 +99,7 @@ class TestManualControlTasks(unittest.TestCase):
                        limit1d=False, trajectory_amplitude=5, lookahead_time=1)
         exp.stereo_mode = 'projection'
         exp.rotation = 'xzy'
-        exp.trajectory_type = 'space'
+        exp.trajectory_type = '2d'
         exp.run()
 
     @unittest.skip("")
