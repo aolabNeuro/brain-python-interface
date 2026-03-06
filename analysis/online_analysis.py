@@ -586,7 +586,7 @@ class ERPAnalysisWorker(AnalysisWorker):
     '''
     bufferlen = 5 # seconds of data to keep in the buffer
 
-    def __init__(self, task_params, data_queue, update_rate=1, time_before=0.05, 
+    def __init__(self, task_params, data_queue, update_rate=1, time_before=0.1, 
                  time_after=0.1, figure_dir='/home/aolab/figures',
                  condition_idx=None, stim_sites=None, title=None, **kwargs):
         super().__init__(task_params, data_queue, update_rate=update_rate, **kwargs)
@@ -599,6 +599,9 @@ class ERPAnalysisWorker(AnalysisWorker):
         except:
             self.condition_idx = condition_idx
         self.stim_sites = stim_sites
+        if self.condition_idx is not None and len(self.stim_sites) == 0:
+            raise ValueError('Condition index provided but no stim sites were present in the experiment')
+        self.current_condition_idx = 0
 
     def init(self):
         super().init()
@@ -607,8 +610,6 @@ class ERPAnalysisWorker(AnalysisWorker):
         self.elec_pos, self.acq_ch, _ = aopy.data.load_chmap('ECoG244')
         self.clock_dch = self.task_params.get('screen_sync_dch', 40)
         self.headstage = self.task_params.get('headstage_connector', 7)
-        self.stim_site = self.task_params.get('stim_site', None)
-        self.current_condition_idx = []
         self.clock_elapsed = 0
         self.clock_times = np.array([])
         self.trigger_dch = None
@@ -616,10 +617,6 @@ class ERPAnalysisWorker(AnalysisWorker):
         self.trigger_cycles = []
         self.trigger_times = []
         self.lfp_downsample = 25
-
-        # Determine if there are multiple conditions and which one to trigger on if so
-        if self.condition_idx is not None and len(self.stim_site) == 0:
-            raise ValueError('Condition index provided but no stim sites were present in the experiment')
 
         # Determine the trigger channel and events based on the task parameters
         if 'qwalor_trigger_dch' in self.task_params:
@@ -675,15 +672,16 @@ class ERPAnalysisWorker(AnalysisWorker):
         elec_pos, acq_ch, _ = aopy.data.load_chmap('ECoG244')
         stim_pos, stim_ch, _ = aopy.data.load_chmap('Opto32')
         for pos, ch in zip(elec_pos, acq_ch):
-            self.labels.append(aopy.visualization.annotate_spatial_map(pos, ch, 'c', 12, self.ax))
+            self.labels.append(aopy.visualization.annotate_spatial_map(pos, ch, 'c', fontsize=12, ax=self.ax))
         for pos, ch in zip(stim_pos, stim_ch):
-            self.labels.append(aopy.visualization.annotate_spatial_map(pos, ch, 'm', 12, self.ax))
+            self.labels.append(aopy.visualization.annotate_spatial_map(pos, ch, 'm', fontsize=12, ax=self.ax))
+        ax_toggle = self.fig.add_axes([0.1, 0.025, 0.1, 0.025])
+        self.toggle = Button(ax_toggle, 'Labels')
         def toggle_labels(event):
+            self.toggle.color = '0.85' if self.labels[0].get_visible() else '0.5'
             for label in self.labels:
                 label.set_visible(not label.get_visible())
         toggle_labels(None)
-        ax_toggle = self.fig.add_axes([0.1, 0.025, 0.1, 0.025])
-        self.toggle = Button(ax_toggle, 'Labels')
         self.toggle.on_clicked(toggle_labels)
 
         # Add a toggle between voltage and z-score
@@ -693,12 +691,15 @@ class ERPAnalysisWorker(AnalysisWorker):
             if self.zscore:
                 self.slider.valmax = 10
                 self.slider.set_val(5)
+                self.zscore_button.color = '0.5'
             else:
                 self.slider.valmax = 1000
                 self.slider.set_val(100)
+                self.zscore_button.color = '0.85'
         self.ax_zscore = self.fig.add_axes([0.225, 0.025, 0.1, 0.025])
         self.zscore_button = Button(self.ax_zscore, 'Z-score')
         self.zscore_button.on_clicked(toggle_zscore)
+        print('finished init')
 
     def update(self):
         super().update()
@@ -720,7 +721,7 @@ class ERPAnalysisWorker(AnalysisWorker):
         # Only count triggers that occur during the specified condition if a condition index was provided
         in_condition = True
         if self.condition_idx is not None:
-            in_condition = any(idx in self.current_condition_idx for idx in self.condition_idx)
+            in_condition = self.current_condition_idx in self.condition_idx
 
         # Append new ERPs from trigger events
         fs = self.ds.source.update_freq / self.lfp_downsample
@@ -772,7 +773,7 @@ class ERPAnalysisWorker(AnalysisWorker):
         # Update the ERP
         if erp_count == 0:
             return
-        if self.erp.shape[2] < 10: # update frequently when there are few trials
+        if self.erp.shape[2] < 50: # update frequently when there are few trials
             self._update_erp_data()
         elif self.erp.shape[2] % 10 < erp_count: # only update every 10 trials after that
             self._update_erp_data()
@@ -780,7 +781,7 @@ class ERPAnalysisWorker(AnalysisWorker):
     def _update_erp_data(self):
         fs = self.ds.source.update_freq / self.lfp_downsample
         if self.zscore:
-            altcond_window = (0, self.time_after), 
+            altcond_window = (0, self.time_after)
             nullcond_window = (-self.time_before, 0)
             altcond, nullcond = aopy.analysis.latency.prepare_erp(self.erp, self.erp, fs, 
                                                                 self.time_before, self.time_after, 
@@ -1036,10 +1037,14 @@ class OnlineDataServer(threading.Thread):
 
         # Is there ecube neural data?
         if 'record_headstage' in self.task_params and self.task_params['record_headstage']:
-            stim_site = self.task_params.get('stim_site', None)
+            stim_site = self.task_params.get('stimulation_site', None)
             if stim_site is None:
+                # data_queue = mp.Queue()
+                # self.analysis_workers.append((ERPAnalysisWorker(self.task_params, data_queue), data_queue))
                 data_queue = mp.Queue()
-                self.analysis_workers.append((ERPAnalysisWorker(self.task_params, data_queue), data_queue))
+                self.analysis_workers.append((SLICAnalysisWorker(
+                    self.task_params, data_queue, condition_idx=idx, stim_sites=stim_sites, title=title
+                    ), data_queue))
             else:
                 try:
                     stim_sites = [int(stim_site)]
@@ -1048,16 +1053,17 @@ class OnlineDataServer(threading.Thread):
                 for idx, site in enumerate(stim_sites):
                     if site == -1:
                         continue
+                    print('Adding ERP and SLIC workers for stim site', site)
                     title = f"Stim site {site}"
                     data_queue = mp.Queue()
                     self.analysis_workers.append((ERPAnalysisWorker(
                         self.task_params, data_queue, condition_idx=idx, stim_sites=stim_sites, 
                         title=title), data_queue))
-                    title = f"SLIC Stim site {site}"
-                    data_queue = mp.Queue()
-                    self.analysis_workers.append((SLICAnalysisWorker(
-                        self.task_params, data_queue, condition_idx=idx, time_before=0.25, time_after=0.25, 
-                        stim_sites=stim_sites, title=title), data_queue))
+                    # title = f"SLIC Stim site {site}"
+                    # data_queue = mp.Queue()
+                    # self.analysis_workers.append((SLICAnalysisWorker(
+                    #     self.task_params, data_queue, condition_idx=[idx], stim_sites=stim_sites, 
+                    #     title=title), data_queue))
 
         # Is this a BMI task?
         if 'decoder' in self.task_params:
@@ -1127,7 +1133,7 @@ if __name__ == '__main__':
         hostname = 'localhost'
     
     if len(sys.argv) >= 3:
-        port = sys.argv[2]
+        port = int(sys.argv[2])
     else:
         port = 5000
 
@@ -1136,10 +1142,10 @@ if __name__ == '__main__':
     else:
         display = ':0'
 
-    # Spin up servernode
-    if hostname == '0.0.0.0':
-        import subprocess
-        subprocess.Popen('/home/aolab/code/bmi3d/riglib/ecube/servernode-control')
+    # # Spin up servernode
+    # if hostname == '0.0.0.0':
+    #     import subprocess
+    #     subprocess.Popen('/home/aolab/code/bmi3d/riglib/ecube/servernode-control')
 
     # Start server
     print(hostname, port, display)
