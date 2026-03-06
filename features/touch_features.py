@@ -87,66 +87,6 @@ class TabletTouch(traits.HasTraits):
 
         return [pos[0], pos[1], 0]
 
-    def move_effector(self, pos_offset=[0,0,0], vel_offset=[0,0,0]):
-        ''' 
-        Sets the 3D coordinates of the cursor. For manual control, uses
-        motiontracker / joystick / mouse data. If no data available, returns None
-        '''
-
-        # Get raw input and save it as task data
-        raw_coords = self._get_manual_position() # array of [3x1] arrays
-
-        if raw_coords is None or len(raw_coords) < 1:
-            self.no_data_counter[self.cycle_count % self._quality_window_size] = 1
-            self.update_report_stats()
-            self.task_data['manual_input'] = np.ones((3,))*np.nan
-            self.task_data['user_screen'] = np.ones((3,))*np.nan
-            
-            coords = self.prev_coords
-            print('N ', coords)
-
-        else:
-            self.task_data['manual_input'] = raw_coords.copy()
-            self.no_data_counter[self.cycle_count % self._quality_window_size] = 0
-
-            # Transform coordinates
-            coords = self._transform_coords(raw_coords)
-            self.task_data['user_screen'] = coords.copy()
-        
-            try:
-                if self.limit2d:
-                    coords[1] = 0
-                if self.limit1d:
-                    coords[1] = 0
-                    coords[0] = 0
-            except:
-                if self.limit2d:
-                    coords[1] = 0
-
-            self.prev_coords = coords
-            print('Y ', coords)
-
-        # Add cursor disturbance
-        final_coords = coords + pos_offset + vel_offset
-
-        print('final', coords, pos_offset, coords + pos_offset)
-   
-        # Set cursor position
-        if not self.velocity_control:
-            self.current_pt = final_coords
-        else: # TODO how to implement velocity control?
-            epsilon = 2*(10**-2) # Define epsilon to stabilize cursor movement
-            if sum((final_coords)**2) > epsilon:
-
-                # Add the velocity (units/s) to the position (units)
-                self.current_pt = final_coords / self.fps + self.last_pt
-            else:
-                self.current_pt = self.last_pt
-
-        self.plant.set_endpoint_pos(self.current_pt)
-        self.last_pt = self.plant.get_endpoint_pos()
-
-
 class MouseEmulateTouch(traits.HasTraits):
     '''
     Emulate a touch screen by detecting when mouse position doesn't update
