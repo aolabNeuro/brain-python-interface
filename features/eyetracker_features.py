@@ -150,7 +150,7 @@ class AutomaticEyeCalibration(traits.HasTraits):
     
     trial_numbers_for_calibration = traits.Int(16, desc="how many trials are used in each calibration")
     trial_numbers_for_auto_reward = traits.Int(8, desc="how many trials are automatic rewards")
-    offset_time_eye_calibration = traits.Float(0.1, desc="Data after this offset_time is only used for eye calibration")
+    offset_time_eye_calibration = traits.Float(0.2, desc="Data after this offset_time is only used for eye calibration")
     duration_eye_calibration = traits.Float(0.2, desc="Data within this duration after offset_time is only used for eye calibration")
     show_eye_pos = traits.Bool(False, desc="Whether to show eye positions")
 
