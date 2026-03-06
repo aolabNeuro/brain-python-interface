@@ -55,52 +55,61 @@ class EyeCalibration(traits.HasTraits):
         print(files)
 
         if not self.keyboard_control:
-            bmi3d_data, bmi3d_metadata = aopy.preproc.proc_exp(hdf_dir, files, 'hoge', 'hoge', overwrite=True, save_res=False)
 
-            # load raw eye data
-            # raw_eye_data, raw_eye_metadata = aopy.preproc.parse_oculomatic(hdf_dir, files, debug=False)
-            eye_interp = aopy.data.get_interp_kinematics(bmi3d_data,bmi3d_metadata,datatype='eye',samplerate=bmi3d_metadata['cursor_interp_samplerate'])
+            _, metadata_hdf = aopy.data.load_bmi3d_hdf_table(hdf_dir, files['hdf'], 'task')
+            # Check if coefficients are already calculated
+            if 'eye_coeff' in metadata_hdf:
+                self.eye_coeff = metadata_hdf['eye_coeff']
+                self.eye_center = metadata_hdf['eye_center']
+                print("Calibration data have been loaded:", self.eye_coeff)
 
-            # calculate coefficients to calibrate eye data
-            events = bmi3d_data['events']
-
-            if not self.eye_target_calibration:
-                self.eye_coeff,_,_,_ = aopy.preproc.calc_eye_calibration\
-                    (bmi3d_data['cursor_interp'],bmi3d_metadata['cursor_interp_samplerate'],\
-                    eye_interp[:,:4], bmi3d_metadata['cursor_interp_samplerate'],events['timestamp'], events['code'],return_datapoints=True)
-
+            # Calculate coefficients
             else:
-                def get_target_locations(data, target_indices):
+                bmi3d_data, bmi3d_metadata = aopy.preproc.proc_exp(hdf_dir, files, 'hoge', 'hoge', overwrite=True, save_res=False)
 
-                    try:
-                        trials = data['trials']
-                    except:
-                        trials = data['bmi3d_trials']
-                    locations = np.nan*np.zeros((len(target_indices), 3))
-                    for i in range(len(target_indices)):
-                        trial_idx = np.where(trials['index'] == target_indices[i])[0]
-                        if len(trial_idx) > 0:
-                            locations[i,:] = trials['target'][trial_idx[0]][[0,2,1]] # use x,y,z format
-                        else:
-                            raise ValueError(f"Target index {target_indices[i]} not found")
-                    return np.round(locations,4)
+                # load raw eye data
+                eye_interp = aopy.data.get_interp_kinematics(bmi3d_data,bmi3d_metadata,datatype='eye',samplerate=bmi3d_metadata['cursor_interp_samplerate'])
 
-                target_pos = get_target_locations(bmi3d_data, [1,2,3,4,5,6,7,8])
-                
-                # Get eye_pos data when subjects gaze at the center. Target position doesn't matter for this computation
-                if self.center_eye_data:
-                    _, _, eye_center = aopy.preproc.calc_eye_target_calibration(eye_interp[:,:4], \
-                        bmi3d_metadata['cursor_interp_samplerate'], events['timestamp'], events['code'], target_pos, \
-                        offset=self.offset_time_eye_calibration, duration=self.duration_eye_calibration, align_events=80, return_datapoints=True)
+                # calculate coefficients to calibrate eye data
+                events = bmi3d_data['events']
+
+                if not self.eye_target_calibration:
+                    self.eye_coeff,_,_,_ = aopy.preproc.calc_eye_calibration\
+                        (bmi3d_data['cursor_interp'],bmi3d_metadata['cursor_interp_samplerate'],\
+                        eye_interp[:,:4], bmi3d_metadata['cursor_interp_samplerate'],events['timestamp'], events['code'],return_datapoints=True)
+
+                else:
+                    def get_target_locations(data, target_indices):
+
+                        try:
+                            trials = data['trials']
+                        except:
+                            trials = data['bmi3d_trials']
+                        locations = np.nan*np.zeros((len(target_indices), 3))
+                        for i in range(len(target_indices)):
+                            trial_idx = np.where(trials['index'] == target_indices[i])[0]
+                            if len(trial_idx) > 0:
+                                locations[i,:] = trials['target'][trial_idx[0]][[0,2,1]] # use x,y,z format
+                            else:
+                                raise ValueError(f"Target index {target_indices[i]} not found")
+                        return np.round(locations,4)
+
+                    target_pos = get_target_locations(bmi3d_data, [1,2,3,4,5,6,7,8])
                     
-                    self.eye_center = np.nanmedian(eye_center, axis=0)
+                    # Get eye_pos data when subjects gaze at the center. Target position doesn't matter for this computation
+                    if self.center_eye_data:
+                        _, _, eye_center = aopy.preproc.calc_eye_target_calibration(eye_interp[:,:4], \
+                            bmi3d_metadata['cursor_interp_samplerate'], events['timestamp'], events['code'], target_pos, \
+                            offset=self.offset_time_eye_calibration, duration=self.duration_eye_calibration, align_events=80, return_datapoints=True)
+                        
+                        self.eye_center = np.nanmedian(eye_center, axis=0)
 
-                # Calculate coefficient by linear regression between targets and centered eye positions
-                self.eye_coeff, _ = aopy.preproc.calc_eye_target_calibration(eye_interp[:,:4]-self.eye_center, \
-                        bmi3d_metadata['cursor_interp_samplerate'], events['timestamp'], events['code'], target_pos, \
-                        offset=self.offset_time_eye_calibration, duration=self.duration_eye_calibration)
-            
-            print("Calibration complete:", self.eye_coeff)
+                    # Calculate coefficient by linear regression between targets and centered eye positions
+                    self.eye_coeff, _ = aopy.preproc.calc_eye_target_calibration(eye_interp[:,:4]-self.eye_center, \
+                            bmi3d_metadata['cursor_interp_samplerate'], events['timestamp'], events['code'], target_pos, \
+                            offset=self.offset_time_eye_calibration, duration=self.duration_eye_calibration)
+                
+                print("Calibration complete:", self.eye_coeff)
 
         # Set up eye cursor
         self.eye_cursor = VirtualCircularTarget(target_radius=.25, target_color=(0., 1., 0., 0.5))
@@ -156,9 +165,11 @@ class AutomaticEyeCalibration(traits.HasTraits):
 
     def __init__(self, *args, **kwargs): #, start_pos, calibration):
         super(AutomaticEyeCalibration,self).__init__(*args, **kwargs)
+
         self.m_eye_pos = deque(maxlen = self.trial_numbers_for_calibration)
         self.m_center_eye_pos = deque(maxlen = self.trial_numbers_for_calibration)
         self.target_pos_calibration = deque(maxlen = self.trial_numbers_for_calibration)
+
         self.eye_center = np.zeros((4,))
         self.eye_coeff = np.vstack(([1,1,1,1], [0,0,0,0])).T
 
@@ -174,33 +185,32 @@ class AutomaticEyeCalibration(traits.HasTraits):
 
     def _start_hold(self):
         super()._start_hold()
-
-        self.hold_penalty_passed = False
-        self.eye_pos_tmp = []
         self.start_hold_time = self.get_time()
 
     def _while_hold(self):
         super()._while_hold()
 
+        # Only store eye pos between offset ~ offset + duration
         elapsed_time = self.get_time() - self.start_hold_time
         if elapsed_time > self.offset_time_eye_calibration and elapsed_time < self.offset_time_eye_calibration + self.duration_eye_calibration:
-            self.eye_pos_tmp.append(self.eye_pos[:4])
-        
-        self.hold_penalty_passed = self.test_state_transition_event('leave_target')
-
-    def _end_hold(self):
-        super()._end_hold()
-
-        if not self.hold_penalty_passed: # Do not use eye data in trials where the hold penalty state passed
             if self.target_index == 0:
-                self.m_center_eye_pos.append(np.nanmean(self.eye_pos_tmp, axis=0))
-
+                self.eye_pos_tmp0.append(self.eye_pos[:4])
             elif self.target_index == 1:
-                self.m_eye_pos.append(np.nanmean(self.eye_pos_tmp, axis=0))
-                self.target_pos_calibration.append(self.targs[self.target_index,[0,2]])
+                self.eye_pos_tmp1.append(self.eye_pos[:4])
+        
+    def _end_reward(self):
+        super()._end_reward()
+
+        # Store data only in rewarded trials
+        self.m_center_eye_pos.append(np.nanmean(self.eye_pos_tmp0, axis=0)) # eye pos for the center target
+        self.m_eye_pos.append(np.nanmean(self.eye_pos_tmp1, axis=0)) # eye pos for the peripheral target
+        self.target_pos_calibration.append(self.targs[1,[0,2]]) # peripheral target pos
 
     def _start_wait(self):
         super()._start_wait()
+
+        self.eye_pos_tmp0 = [] # to store eye pos when target_index == 0
+        self.eye_pos_tmp1 = [] # to store eye pos when target_index == 1
 
         if self.calc_trial_num() == 0:
             if self.show_eye_pos:
@@ -213,19 +223,25 @@ class AutomaticEyeCalibration(traits.HasTraits):
 
         else:
             self.automatic_reward = False
-            if self.tries == 0:
-                # Perform regression
-                self.eye_center = np.nanmean(self.m_center_eye_pos, axis=0)
-                slopes, _, _ = aopy.analysis.fit_linear_regression(np.array(self.m_eye_pos)-self.eye_center, np.array(self.target_pos_calibration))
-                intercepts = np.array([0,0,0,0]) # Don't need this intercept because eye data is already centered
+            
+            # Perform regression
+            if not self.keyboard_control:
+                if self.tries == 0:
+                
+                    self.eye_center = np.nanmean(self.m_center_eye_pos, axis=0)
+                    target_pos_tile = np.tile(np.array(self.target_pos_calibration), (1,2))
 
-                # Update eye coefficients
-                self.eye_coeff = np.vstack((slopes, intercepts)).T
+                    slopes, _, _ = aopy.analysis.fit_linear_regression(np.array(self.m_eye_pos)-self.eye_center, target_pos_tile)
+                    intercepts = np.array([0,0,0,0]) # Don't need this intercept because eye data is already centered
+
+                    # Update eye coefficients
+                    self.eye_coeff = np.vstack((slopes, intercepts)).T
 
     def _cycle(self):
         self._update_eye_pos()
 
         # Do calibration
+        ave_pos = self.eye_pos
         if not self.keyboard_control:
             calibrated_pos = aopy.postproc.get_calibrated_eye_data(self.eye_pos[:4]-self.eye_center, self.eye_coeff)
             ave_pos = np.array([(calibrated_pos[0] + calibrated_pos[2])/2, (calibrated_pos[1] + calibrated_pos[3])/2])
@@ -244,6 +260,13 @@ class AutomaticEyeCalibration(traits.HasTraits):
             if self.show_eye_pos:
                 self.eye_cursor.show()
     
+    def cleanup_hdf(self):
+        super().cleanup_hdf()
+        if hasattr(self, "h5file"):
+            h5file = tables.open_file(self.h5file.name, mode='a')
+            h5file.root.task.attrs['eye_coeff'] = self.eye_coeff
+            h5file.root.task.attrs['eye_center'] = self.eye_center
+            h5file.close()
 
 class EyeStreaming(traits.HasTraits):
     '''
