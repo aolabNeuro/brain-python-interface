@@ -416,23 +416,22 @@ class MultiSource(DataSourceSystem):
     dtype = np.dtype('float')
 
     @classmethod
-    def pre_init(cls, headstage=7, n_digital_channels=64, n_analog_channels=32, n_headstage_channels=256):
+    def pre_init(cls, n_digital_channels=64, n_analog_channels=32, n_headstage_channels=256):
         '''
         Set up servernode with all the possible channels you want to use
         '''
         conn = eCubeStream(autoshutdown=False, debug=True)
 
         # Remove all existing sources
-        subscribed = conn.listadded()
-        if len(subscribed[0]) > 0:
-            conn.remove(('Headstages', headstage))
-        if len(subscribed[1]) > 0:
-            conn.remove(('AnalogPanel',))
-        if len(subscribed[2]) > 0:
-            conn.remove(('DigitalPanel',))
+        conn.remove([('Headstages', i) for i in range(1,11)])
+        conn.remove(('AnalogPanel',))
+        conn.remove(('DigitalPanel',))
 
         # Add all available channels
-        conn.add(('Headstages', headstage, (1, n_headstage_channels)))
+        available = conn.listavailable()
+        available_hs = np.where(available[0] >= n_headstage_channels)[0] + 1
+        print(available_hs)
+        conn.add([('Headstages', int(i), (1, n_headstage_channels)) for i in available_hs])
         conn.add(('AnalogPanel', (1, n_analog_channels)))
         conn.add(('DigitalPanelAsChans', (1, n_digital_channels)))
 

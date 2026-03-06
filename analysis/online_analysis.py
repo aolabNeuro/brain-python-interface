@@ -606,6 +606,7 @@ class ERPAnalysisWorker(AnalysisWorker):
         # Initialize the data source
         self.elec_pos, self.acq_ch, _ = aopy.data.load_chmap('ECoG244')
         self.clock_dch = self.task_params.get('screen_sync_dch', 40)
+        self.headstage = self.task_params.get('headstage_connector', 7)
         self.stim_site = self.task_params.get('stim_site', None)
         self.current_condition_idx = []
         self.clock_elapsed = 0
@@ -626,6 +627,7 @@ class ERPAnalysisWorker(AnalysisWorker):
             channels = map_channels_for_multisource(headstage_channels=self.acq_ch, 
                                                          digital_channels=[self.clock_dch, self.trigger_dch])
             print('Triggering on qwalor channel', self.trigger_dch)
+            print('Using clock channel', self.clock_dch)
         elif 'qwalor_ch1_enable' in self.task_params: # TODO: support multiple lasers
             for idx in range(1,5):
                 if self.task_params[f'qwalor_ch{idx}_enable']:
@@ -634,11 +636,13 @@ class ERPAnalysisWorker(AnalysisWorker):
             channels = map_channels_for_multisource(headstage_channels=self.acq_ch,
                                                             digital_channels=[self.clock_dch, self.trigger_dch])
             print('Triggering on qwalor channel', self.trigger_dch)
+            print('Using clock channel', self.clock_dch)
         else:
             self.trigger_events.append('TARGET_ON') # For flash
             channels = map_channels_for_multisource(headstage_channels=self.acq_ch, digital_channels=[self.clock_dch])
             print('Triggering on events', self.trigger_events)
-        self.ds = MultiChanDataSource(MultiSource, channels=channels, bufferlen=self.bufferlen)
+            print('Using clock channel', self.clock_dch)
+        self.ds = MultiChanDataSource(MultiSource, channels=channels, bufferlen=self.bufferlen, headstage=self.headstage)
         self.ds.start()
         print('datasource started')
 
@@ -968,7 +972,8 @@ class OnlineDataServer(threading.Thread):
             MultiSource.pre_init()
             print('eCube streaming initialized')
         except:
-            pass
+            print('Error initializing eCube streaming')
+            traceback.print_exc()
 
         # Initialize the server
         self._stop_event = threading.Event()
@@ -1132,9 +1137,9 @@ if __name__ == '__main__':
         display = ':0'
 
     # Spin up servernode
-    # if hostname == '0.0.0.0':
-    #     import subprocess
-    #     subprocess.Popen('/home/aolab/code/bmi3d/riglib/ecube/servernode-control')
+    if hostname == '0.0.0.0':
+        import subprocess
+        subprocess.Popen('/home/aolab/code/bmi3d/riglib/ecube/servernode-control')
 
     # Start server
     print(hostname, port, display)
