@@ -36,8 +36,9 @@ class ManualControlMixin(traits.HasTraits):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.current_pt=np.zeros([3]) #keep track of current pt
-        self.last_pt = np.array(self.starting_pos) #keep track of last pt to calc. velocity
+        self.current_pt = np.zeros([3]) # keep track of current pt
+        self.last_pt = np.array(self.starting_pos) # keep track of last pt to calc. velocity
+        self.prev_coords = None # keep track of last valid coords
         self._quality_window_size = 500 # how many cycles to accumulate quality statistics
         self.reportstats['Input quality'] = "100 %"
         if self.random_rewards:
@@ -129,7 +130,9 @@ class ManualControlMixin(traits.HasTraits):
 
             # Use last valid coords to continue showing cursor at last valid position
             coords = self.prev_coords
-            # print(coords)
+            print(coords)
+            if coords is None:
+                return
 
         else:
             # Save manual input in task data
@@ -153,11 +156,11 @@ class ManualControlMixin(traits.HasTraits):
 
             # Keep track of last valid coords
             self.prev_coords = coords
-            # print(coords)
+            print(coords)
 
         # Add cursor disturbance
         final_coords = coords + pos_offset + vel_offset
-        # print('final', coords, pos_offset, coords + pos_offset)
+        print('final', coords, pos_offset, coords + pos_offset)
    
         # Finalize cursor position
         if not self.velocity_control:

@@ -26,7 +26,6 @@ class TabletTouch(traits.HasTraits):
         from riglib import source
         TabletTouchData.udp_port = self.port_value + 5
         self.touch_data = source.DataSource(TabletTouchData)
-        self.prev_coords = None
 
         if self.port_value == 8000:
             self.tablet_ip = "192.168.0.100"
