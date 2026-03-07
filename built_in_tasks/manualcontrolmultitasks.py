@@ -130,7 +130,7 @@ class ManualControlMixin(traits.HasTraits):
 
             # Use last valid coords to continue showing cursor at last valid position
             coords = self.prev_coords
-            print(coords)
+            # print(coords)
             if coords is None:
                 return
 
@@ -156,11 +156,11 @@ class ManualControlMixin(traits.HasTraits):
 
             # Keep track of last valid coords
             self.prev_coords = coords
-            print(coords)
+            # print(coords)
 
         # Add cursor disturbance
         final_coords = coords + pos_offset + vel_offset
-        print('final', coords, pos_offset, coords + pos_offset)
+        # print('final', coords, pos_offset, coords + pos_offset)
    
         # Finalize cursor position
         if not self.velocity_control:
