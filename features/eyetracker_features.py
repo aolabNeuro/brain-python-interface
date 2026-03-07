@@ -231,8 +231,8 @@ class AutomaticEyeCalibration(traits.HasTraits):
                     self.eye_center = np.nanmean(self.m_center_eye_pos, axis=0)
                     target_pos_tile = np.tile(np.array(self.target_pos_calibration), (1,2))
 
-                    slopes, _, _ = aopy.analysis.fit_linear_regression(np.array(self.m_eye_pos)-self.eye_center, target_pos_tile)
-                    intercepts = np.array([0,0,0,0]) # Don't need this intercept because eye data is already centered
+                    slopes, intercepts, _ = aopy.analysis.fit_linear_regression(np.array(self.m_eye_pos)-self.eye_center, target_pos_tile)
+                    #intercepts = np.array([0,0,0,0]) # Don't need this intercept because eye data is already centered
 
                     # Update eye coefficients
                     self.eye_coeff = np.vstack((slopes, intercepts)).T
