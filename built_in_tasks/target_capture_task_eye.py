@@ -681,9 +681,9 @@ class EyeHandCaptureBlock(Sequence, Window):
     cursor_bounds = traits.Tuple((-10., 10., -10., 10., -10., 10.), desc='(x min, x max, y min, y max, z min, z max)')
     starting_pos = traits.Tuple((5., 0., 5.), desc='Where to initialize the cursor') 
 
-    init_eye_target_alpha = traits.Float(0.9, desc="Radius of targets in cm")
-    init_hand_target_alpha = traits.Float(0.9, desc="Radius of targets in cm")
-    goal_target_alpha = traits.Float(0.9, desc="Radius of targets in cm")
+    init_eye_target_alpha = traits.Float(1., desc="Transparency of initial eye targets")
+    init_hand_target_alpha = traits.Float(0.9, desc="Transparency of initial hand targets")
+    goal_target_alpha = traits.Float(0.75, desc="Transparency of goal targets")
 
     fixation_target_color = traits.OptionsList("fixation_color", *target_colors, desc="Color of the eye target under fixation state", bmi3d_input_options=list(target_colors.keys()))
     eye_target_color = traits.OptionsList("eye_color", *target_colors, desc="Color of the eye target", bmi3d_input_options=list(target_colors.keys()))
