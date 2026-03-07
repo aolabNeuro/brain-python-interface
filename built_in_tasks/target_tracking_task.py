@@ -103,7 +103,7 @@ class TargetTracking(Sequence):
             self.ramp_counter[-int(self.ramp_down_time*self.sample_rate):] = 2
     
     def tracking_task_start_wait(self):
-        # print(self.gen_index)
+        print(self.gen_index, self.tries)
 
         self.trial_record['trial'] = self.calc_trial_num()
         self.trial_record['index'] = self.gen_index
@@ -116,9 +116,6 @@ class TargetTracking(Sequence):
 
         # trial is not finished
         self.trial_timed_out = False
-
-        # number of times this trajectory has been attempted
-        self.tries = 0
 
         # index into trajectory
         self.frame_index = -1
@@ -142,6 +139,9 @@ class TargetTracking(Sequence):
                 self._parse_next_trial()
             except StopIteration:
                 self.end_task()
+        
+        # number of times this trajectory has been attempted
+        self.tries = 0
 
         self.tracking_task_start_wait()
 
@@ -150,6 +150,7 @@ class TargetTracking(Sequence):
         pass
 
     def _start_wait_retry(self):
+        print('retrying wait')
         self.tracking_task_start_wait()
 
     def _while_wait_retry(self):
