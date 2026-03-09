@@ -968,6 +968,9 @@ class EyeHandCaptureBlock(Sequence, Window):
         self.targets[self.target_index].cube.color = target_colors[self.fixation_target_color] # change target color in fixation state
         self.sync_event('FIXATION', self.gen_indices[self.target_index])
 
+    def _start_hold(self):
+        self.sync_event('CURSOR_ENTER_TARGET', self.gen_indices[self.target_index])
+        
     def _start_delay(self):
         # Make next target visible unless this is the final target in the trial
         next_idx = (self.target_index + 1)
