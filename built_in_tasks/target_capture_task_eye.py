@@ -681,6 +681,10 @@ class EyeHandCaptureBlock(Sequence, Window):
     cursor_bounds = traits.Tuple((-10., 10., -10., 10., -10., 10.), desc='(x min, x max, y min, y max, z min, z max)')
     starting_pos = traits.Tuple((5., 0., 5.), desc='Where to initialize the cursor') 
 
+    init_eye_target_alpha = traits.Float(1., desc="Transparency of initial eye targets")
+    init_hand_target_alpha = traits.Float(0.9, desc="Transparency of initial hand targets")
+    goal_target_alpha = traits.Float(0.75, desc="Transparency of goal targets")
+
     fixation_target_color = traits.OptionsList("fixation_color", *target_colors, desc="Color of the eye target under fixation state", bmi3d_input_options=list(target_colors.keys()))
     eye_target_color = traits.OptionsList("eye_color", *target_colors, desc="Color of the eye target", bmi3d_input_options=list(target_colors.keys()))
     limit2d = traits.Bool(True, desc="Limit cursor movement to 2D")
@@ -732,11 +736,21 @@ class EyeHandCaptureBlock(Sequence, Window):
         instantiate_targets = kwargs.pop('instantiate_targets', True)
         if instantiate_targets:
 
+            # Control transparency of targets
+            init_eye_new_color = list(target_colors[self.eye_target_color])
+            init_eye_new_color[3] = self.init_eye_target_alpha
+            init_hand_new_color = list(target_colors[self.target_color])
+            init_hand_new_color[3] = self.init_hand_target_alpha
+            goal_eye_new_color = list(target_colors[self.eye_target_color])
+            goal_eye_new_color[3] = self.goal_target_alpha
+            goal_hand_new_color = list(target_colors[self.target_color])
+            goal_hand_new_color[3] = self.goal_target_alpha
+
             # Target 1 and 2 are for saccade. Target 3 and target 4 are for hand
-            target1 = VirtualRectangularTarget(target_width=self.fixation_radius, target_height=self.fixation_radius/2, target_color=target_colors[self.eye_target_color])
-            target2 = VirtualRectangularTarget(target_width=self.fixation_radius, target_height=self.fixation_radius/2, target_color=target_colors[self.eye_target_color])
-            target3 = VirtualCircularTarget(target_radius=self.target_radius, target_color=target_colors[self.target_color])
-            target4 = VirtualCircularTarget(target_radius=self.target_radius, target_color=target_colors[self.target_color])
+            target1 = VirtualRectangularTarget(target_width=self.fixation_radius, target_height=self.fixation_radius/2, target_color=init_eye_new_color)
+            target2 = VirtualRectangularTarget(target_width=self.fixation_radius, target_height=self.fixation_radius/2, target_color=goal_eye_new_color)
+            target3 = VirtualCircularTarget(target_radius=self.target_radius, target_color=init_hand_new_color)
+            target4 = VirtualCircularTarget(target_radius=self.target_radius, target_color=goal_hand_new_color)
 
             self.targets = [target1, target2]
             self.targets_hand = [target3, target4]
@@ -954,6 +968,9 @@ class EyeHandCaptureBlock(Sequence, Window):
         self.targets[self.target_index].cube.color = target_colors[self.fixation_target_color] # change target color in fixation state
         self.sync_event('FIXATION', self.gen_indices[self.target_index])
 
+    def _start_hold(self):
+        self.sync_event('CURSOR_ENTER_TARGET', self.gen_indices[self.target_index])
+        
     def _start_delay(self):
         # Make next target visible unless this is the final target in the trial
         next_idx = (self.target_index + 1)

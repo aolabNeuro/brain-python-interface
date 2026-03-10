@@ -20,6 +20,7 @@ from riglib.stereo_opengl.primitives import AprilTag
 from riglib.stereo_opengl.xfm import Quaternion
 from .peripheral_device_features import *
 from riglib import plants
+from collections import deque
 
 import aopy
 import glob
@@ -55,6 +56,13 @@ class EyeCalibration(traits.HasTraits):
         print(files)
         
         self.eye_center = np.zeros((4,))
+        _, metadata_hdf = aopy.data.load_bmi3d_hdf_table('', files['hdf'], 'task')
+        # Check if coefficients are already calculated
+        if 'eye_coeff' in metadata_hdf:
+            self.eye_coeff = metadata_hdf['eye_coeff']
+            self.eye_center = metadata_hdf['eye_center']
+            print("Calibration data have been loaded:", self.eye_coeff)
+            return
 
         if not self.keyboard_control:
             try:
@@ -80,6 +88,8 @@ class EyeCalibration(traits.HasTraits):
                     events['timestamp'], events['code'], return_datapoints=True
                 )
 
+
+            # Calculate coefficients
             else:
                 def get_target_locations(data, target_indices):
                     try:
@@ -163,6 +173,118 @@ class EyeCalibration(traits.HasTraits):
             if self.show_eye_pos:
                 self.eye_cursor.show()
 
+class AutomaticEyeCalibration(traits.HasTraits):
+    
+    trial_numbers_for_calibration = traits.Int(16, desc="how many trials are used in each calibration")
+    trial_numbers_for_auto_reward = traits.Int(8, desc="how many trials are automatic rewards")
+    offset_time_eye_calibration = traits.Float(0.2, desc="Data after this offset_time is only used for eye calibration")
+    duration_eye_calibration = traits.Float(0.2, desc="Data within this duration after offset_time is only used for eye calibration")
+    show_eye_pos = traits.Bool(False, desc="Whether to show eye positions")
+
+    def __init__(self, *args, **kwargs): #, start_pos, calibration):
+        super(AutomaticEyeCalibration,self).__init__(*args, **kwargs)
+
+        self.m_eye_pos = deque(maxlen = self.trial_numbers_for_calibration)
+        self.m_center_eye_pos = deque(maxlen = self.trial_numbers_for_calibration)
+        self.target_pos_calibration = deque(maxlen = self.trial_numbers_for_calibration)
+
+        self.eye_center = np.zeros((4,))
+        self.eye_coeff = np.vstack(([1,1,1,1], [0,0,0,0])).T
+
+        # Set up eye cursor
+        self.eye_cursor = VirtualCircularTarget(target_radius=.25, target_color=(0., 1., 0., 0.5))
+        self.calibrated_eye_pos = np.zeros((2,))*np.nan
+        for model in self.eye_cursor.graphics_models:
+            self.add_model(model)
+
+    def init(self):
+        self.add_dtype('calibrated_eye', 'f8', (2,))
+        super().init()
+
+    def _start_hold(self):
+        super()._start_hold()
+        self.start_hold_time = self.get_time()
+
+    def _while_hold(self):
+        super()._while_hold()
+
+        # Only store eye pos between offset ~ offset + duration
+        elapsed_time = self.get_time() - self.start_hold_time
+        if elapsed_time > self.offset_time_eye_calibration and elapsed_time < self.offset_time_eye_calibration + self.duration_eye_calibration:
+            if self.target_index == 0:
+                self.eye_pos_tmp0.append(self.eye_pos[:4])
+            elif self.target_index == 1:
+                self.eye_pos_tmp1.append(self.eye_pos[:4])
+        
+    def _end_reward(self):
+        super()._end_reward()
+
+        # Store data only in rewarded trials
+        self.m_center_eye_pos.append(np.nanmean(self.eye_pos_tmp0, axis=0)) # eye pos for the center target
+        self.m_eye_pos.append(np.nanmean(self.eye_pos_tmp1, axis=0)) # eye pos for the peripheral target
+        self.target_pos_calibration.append(self.targs[1,[0,2]]) # peripheral target pos
+
+    def _start_wait(self):
+        super()._start_wait()
+
+        self.eye_pos_tmp0 = [] # to store eye pos when target_index == 0
+        self.eye_pos_tmp1 = [] # to store eye pos when target_index == 1
+
+        if self.calc_trial_num() == 0:
+            if self.show_eye_pos:
+                self.eye_cursor.show()
+            else:
+                self.eye_cursor.hide()
+
+        if self.calc_state_occurrences('reward') < self.trial_numbers_for_auto_reward:
+            self.automatic_reward = True
+
+        else:
+            self.automatic_reward = False
+            
+            # Perform regression
+            if not self.keyboard_control:
+                if self.tries == 0:
+                
+                    self.eye_center = np.nanmean(self.m_center_eye_pos, axis=0)
+                    target_pos_tile = np.tile(np.array(self.target_pos_calibration), (1,2))
+
+                    slopes, intercepts, _ = aopy.analysis.fit_linear_regression(np.array(self.m_eye_pos)-self.eye_center, target_pos_tile)
+                    #intercepts = np.array([0,0,0,0]) # Don't need this intercept because eye data is already centered
+
+                    # Update eye coefficients
+                    self.eye_coeff = np.vstack((slopes, intercepts)).T
+
+    def _cycle(self):
+        self._update_eye_pos()
+
+        # Do calibration
+        ave_pos = self.eye_pos
+        if not self.keyboard_control:
+            calibrated_pos = aopy.postproc.get_calibrated_eye_data(self.eye_pos[:4]-self.eye_center, self.eye_coeff)
+            ave_pos = np.array([(calibrated_pos[0] + calibrated_pos[2])/2, (calibrated_pos[1] + calibrated_pos[3])/2])
+        
+        # Save calibration
+        self.calibrated_eye_pos = ave_pos
+        self.task_data['calibrated_eye'] = ave_pos
+
+        super(EyeStreaming, self)._cycle()
+
+        # Move the eye cursor
+        if np.any(np.isnan(self.calibrated_eye_pos)):
+            pass
+        else:
+            self.eye_cursor.move_to_position([self.calibrated_eye_pos[0],0,self.calibrated_eye_pos[1]])
+            if self.show_eye_pos:
+                self.eye_cursor.show()
+    
+    def cleanup_hdf(self):
+        super().cleanup_hdf()
+        if hasattr(self, "h5file"):
+            h5file = tables.open_file(self.h5file.name, mode='a')
+            h5file.root.task.attrs['eye_coeff'] = self.eye_coeff
+            h5file.root.task.attrs['eye_center'] = self.eye_center
+            h5file.close()
 
 class EyeStreaming(traits.HasTraits):
     '''
