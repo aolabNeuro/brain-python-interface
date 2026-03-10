@@ -906,6 +906,10 @@ class OnlineDataServer(threading.Thread):
                 self.is_completed = True
             for _, data_queue in self.analysis_workers:
                 data_queue.put((key, values))
+        elif key == 'init' and self.is_running:
+            print('Experiment died in error, restarting')
+            self.reset()
+            self.init()
         elif key == 'init' and values[0]:
             self.is_running = True
             self.init()
