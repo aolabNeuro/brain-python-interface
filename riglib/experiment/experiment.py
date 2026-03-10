@@ -11,6 +11,7 @@ import tables
 import traceback
 import numpy as np
 from collections import OrderedDict
+import time
 
 from config.rig_defaults import rig_settings
 from . import traits
@@ -180,6 +181,7 @@ class Experiment(ThreadedFSM, traits.HasTraits, metaclass=ExperimentMeta):
         # Attribute for task entry dtype, used to create a numpy record array which is updated every iteration of the FSM
         # See http://docs.scipy.org/doc/numpy/user/basics.rec.html for details on how to create a record array dtype
         self.dtype = []
+        self.add_dtype('system_time', 'f8', (1,))
 
         self.cycle_count = 0
         if pygame_avail:
@@ -407,6 +409,7 @@ class Experiment(ThreadedFSM, traits.HasTraits, metaclass=ExperimentMeta):
 
         # Send task data to any registered sinks
         if hasattr(self, 'task_data') and self.task_data is not None:
+            self.task_data['system_time'] = time.perf_counter()
             self.sinks.send("task", self.task_data)
 
         # Update report stats periodically
