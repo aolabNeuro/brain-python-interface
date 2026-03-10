@@ -157,7 +157,7 @@ class EyeCalibration(traits.HasTraits):
             calibrated_pos = aopy.postproc.get_calibrated_eye_data(self.eye_pos[:4]-self.eye_center, self.eye_coeff)
             ave_pos = np.array([(calibrated_pos[0] + calibrated_pos[2])/2, (calibrated_pos[1] + calibrated_pos[3])/2])
         elif not self.keyboard_control:
-            ave_pos = aopy.postproc.get_calibrated_eye_data(self.eye_pos-self.eye_center, self.eye_coeff)
+            ave_pos = aopy.postproc.get_calibrated_eye_data(self.eye_pos-self.eye_center[:len(self.eye_pos)], self.eye_coeff[:len(self.eye_pos)])
 
         # Save calibration
         self.calibrated_eye_pos = ave_pos
@@ -222,7 +222,7 @@ class AutomaticEyeCalibration(traits.HasTraits):
         # Store data only in rewarded trials
         self.m_center_eye_pos.append(np.nanmean(self.eye_pos_tmp0, axis=0)) # eye pos for the center target
         self.m_eye_pos.append(np.nanmean(self.eye_pos_tmp1, axis=0)) # eye pos for the peripheral target
-        self.target_pos_calibration.append(self.targs[1,[0,2]]) # peripheral target pos
+        self.target_pos_calibration.append(np.array(self.targs)[-1,[0,2]]) # peripheral target pos
 
     def _start_wait(self):
         super()._start_wait()
@@ -247,7 +247,10 @@ class AutomaticEyeCalibration(traits.HasTraits):
                 if self.tries == 0:
                 
                     self.eye_center = np.nanmean(self.m_center_eye_pos, axis=0)
-                    target_pos_tile = np.tile(np.array(self.target_pos_calibration), (1,2))
+                    if len(self.eye_center) == 4:
+                        target_pos_tile = np.tile(np.array(self.target_pos_calibration), (1,2))
+                    else:
+                        target_pos_tile = np.array(self.target_pos_calibration)
 
                     slopes, intercepts, _ = aopy.analysis.fit_linear_regression(np.array(self.m_eye_pos)-self.eye_center, target_pos_tile)
                     #intercepts = np.array([0,0,0,0]) # Don't need this intercept because eye data is already centered
@@ -260,9 +263,11 @@ class AutomaticEyeCalibration(traits.HasTraits):
 
         # Do calibration
         ave_pos = self.eye_pos
-        if not self.keyboard_control:
+        if len(self.eye_pos) > 2 and len(self.eye_center) > 2:
             calibrated_pos = aopy.postproc.get_calibrated_eye_data(self.eye_pos[:4]-self.eye_center, self.eye_coeff)
             ave_pos = np.array([(calibrated_pos[0] + calibrated_pos[2])/2, (calibrated_pos[1] + calibrated_pos[3])/2])
+        elif not self.keyboard_control:
+            ave_pos = aopy.postproc.get_calibrated_eye_data(self.eye_pos-self.eye_center[:2], self.eye_coeff[:2])
         
         # Save calibration
         self.calibrated_eye_pos = ave_pos
@@ -491,13 +496,9 @@ class PupilLabStreaming(EyeStreaming):
         from riglib import source
         from riglib.pupillabs import System, NoSurfaceTracking
         if self.surface_marker_count > 0:
-            System.local_clock = self.clock.get_time
             self.eye_data = source.DataSource(System)
         else:
-            NoSurfaceTracking.local_clock = self.clock.get_time
             self.eye_data = source.DataSource(NoSurfaceTracking)
-        self.eye_pos = np.zeros((3,))*np.nan
-        self.eye_diam = np.zeros((2,))*np.nan
         
         # Register to the sink
         from riglib import sink
@@ -509,7 +510,6 @@ class PupilLabStreaming(EyeStreaming):
             super().init()
             return
     
-        # TODO: use confidence to remove bad data
         eye_idx = gaze_options_idx[gaze_options.index(self.pupillabs_gaze)]
         self.eye_pos = np.zeros((len(eye_idx),))*np.nan
         self.eye_diam = np.zeros((2,))*np.nan
@@ -531,9 +531,9 @@ class PupilLabStreaming(EyeStreaming):
         
         eye_idx = gaze_options_idx[gaze_options.index(self.pupillabs_gaze)]
         eye_pos = eye[:, eye_idx] # get only the columns corresponding to the selected gaze option
-        eye_pos_confidence = eye[:, np.where(np.isin(eye_labels, ['gaze_confidence']))[0]] # get gaze confidence columns
+        eye_pos_confidence = eye[:, np.where(np.isin(eye_labels, ['gaze_confidence']))[0][0]] # get gaze confidence columns
         eye_diam = eye[:, np.where(np.isin(eye_labels, ['le_diam', 're_diam']))[0]] # get diameter columns
-        eye_diam_confidence = eye[:, np.where(np.isin(eye_labels, ['le_diam_confidence', 're_diam_confidence']))[0]] # get diameter confidence columns
+        eye_diam_confidence = eye[:, np.where(np.isin(eye_labels, ['le_diam_confidence', 're_diam_confidence']))[0][0]] # get diameter confidence columns
 
         # Find the last non-nan value of eye position
         eye_pos = _latest_value(eye_pos[eye_pos_confidence > self.pupillabs_confidence_threshold]) # only consider positions with high confidence

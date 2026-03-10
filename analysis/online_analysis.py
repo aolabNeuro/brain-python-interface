@@ -147,6 +147,7 @@ class BehaviorAnalysisWorker(AnalysisWorker):
         super().init()
         self.cursor_pos = np.zeros(2)
         self.eye_pos = np.zeros(2)
+        self.calibrated_eye_pos = np.zeros(2)
         self.target_pos = {}
         self.targets = {}
         self.calibration_data = []
@@ -301,10 +302,6 @@ class SaccadeAnalysisWorker(BehaviorAnalysisWorker):
     Plots calibrated_eye, cursor, and target data from experiments that have them.
     This is for eye-related task that requires calibrated eye position
     '''
-   
-    def init(self):
-        super().init()
-        self.calibrated_eye_pos = np.zeros(2)
  
     def get_current_pos(self):
         '''
