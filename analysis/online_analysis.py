@@ -67,7 +67,7 @@ class AnalysisWorker(mp.Process):
         Do something with incoming data. By default just keeps track of the time
         '''
         if key == 'cycle_count':
-            self.cycle_count = values[0]        
+            self.cycle_count = values[0]
 
     def draw(self):
         '''

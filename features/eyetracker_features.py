@@ -163,7 +163,7 @@ class EyeCalibration(traits.HasTraits):
         self.calibrated_eye_pos = ave_pos
         self.task_data['calibrated_eye'] = ave_pos
 
-        super(EyeStreaming, self)._cycle()
+        super()._cycle()
 
         # Move the eye cursor
         if np.any(np.isnan(self.calibrated_eye_pos)):
@@ -273,7 +273,7 @@ class AutomaticEyeCalibration(traits.HasTraits):
         self.calibrated_eye_pos = ave_pos
         self.task_data['calibrated_eye'] = ave_pos
 
-        super(EyeStreaming, self)._cycle()
+        super()._cycle()
 
         # Move the eye cursor
         if np.any(np.isnan(self.calibrated_eye_pos)):
@@ -361,7 +361,8 @@ class EyeStreaming(traits.HasTraits):
         self.task_data['eye_diam'] = eye_diam
 
     def _cycle(self):
-        self._update_eye_pos()
+        if not hasattr(self, 'calibrated_eye_pos'):
+            self._update_eye_pos()
         super()._cycle()
 
 class EyeConstrained(ScreenTargetCapture):
@@ -550,7 +551,7 @@ class PupilLabStreaming(EyeStreaming):
         self.task_data['eye'] = eye_pos
         self.task_data['eye_diam'] = eye_diam
 
-        if self.debug:
+        if self.pupillabs_debug:
             if hasattr(self, 'debug_text'):
                 self.remove_model(self.debug_text.model)
                 self.debug_text.model.release()
@@ -625,16 +626,11 @@ class EyeCursor(traits.HasTraits):
     eye_cursor_color = traits.OptionsList("green", *target_colors, desc="Color of the eye cursor", bmi3d_input_options=list(target_colors.keys()))
     eye_cursor_radius = traits.Float(0.5, desc="Radius of the eye cursor in cm")
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def init(self):
+        super().init()
         self.eye_plant = plants.CursorPlant()
         self.eye_plant.set_color(target_colors[self.eye_cursor_color])
         self.eye_plant.set_cursor_radius(self.eye_cursor_radius)
-        for model in self.eye_plant.graphics_models:
-            self.add_model(model)
-
-    def init(self):
-        super().init()
         self.eye_plant.set_endpoint_pos(np.array(self.starting_pos))
         for model in self.eye_plant.graphics_models:
             self.add_model(model)
