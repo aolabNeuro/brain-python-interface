@@ -33,8 +33,8 @@ class TargetTracking(Sequence):
         trajectory = dict(enter_target="hold", timeout="timeout_penalty", start_pause="pause"),
         hold = dict(hold_complete_go_ramp="tracking_in_ramp", hold_complete_no_ramp="tracking_in", leave_target="hold_penalty", start_pause="pause"),
 
-        tracking_in_ramp = dict(ramp_complete="tracking_in", ramp_and_trial_complete="reward", leave_target="tracking_out_ramp", start_pause="pause"),
-        tracking_out_ramp = dict(ramp_complete="tracking_out", ramp_and_trial_complete="reward", enter_target="tracking_in_ramp", tracking_out_timeout="tracking_out_penalty", start_pause="pause"),
+        tracking_in_ramp = dict(ramp_up_complete="tracking_in", ramp_and_trial_complete="reward", leave_target="tracking_out_ramp", start_pause="pause"),
+        tracking_out_ramp = dict(ramp_up_complete="tracking_out", ramp_and_trial_complete="reward", enter_target="tracking_in_ramp", tracking_out_timeout="tracking_out_penalty", start_pause="pause"),
         
         tracking_in = dict(traj_complete="tracking_in_ramp", trial_complete="reward", leave_target="tracking_out", start_pause="pause"),
         tracking_out = dict(traj_complete="tracking_out_ramp", trial_complete="reward", enter_target="tracking_in", tracking_out_timeout="tracking_out_penalty", start_pause="pause"),
@@ -116,12 +116,14 @@ class TargetTracking(Sequence):
 
         # trial is not finished
         self.trial_timed_out = False
+        self.ramp_up_complete = False
 
         # number of times this trajectory has been attempted
         self.tries = 0
 
         # index into trajectory
         self.frame_index = -1
+        self.trajectory_start_time = None
 
         # number of frames in trajectory
         '''Nothing generic to do.'''
@@ -158,7 +160,7 @@ class TargetTracking(Sequence):
 
     def _start_trajectory(self):
         self.tries += 1
-        self.frame_index += 1
+        self.frame_index = 0
 
     def _while_trajectory(self):
         '''Nothing generic to do.'''
@@ -181,8 +183,8 @@ class TargetTracking(Sequence):
         pass
 
     def _start_tracking_in_ramp(self):
-        '''Nothing generic to do.'''
-        pass
+        if self.trajectory_start_time is None:
+            self.trajectory_start_time = self.get_time()
 
     def _while_tracking_in_ramp(self):
         '''Nothing generic to do.'''
@@ -205,8 +207,9 @@ class TargetTracking(Sequence):
         pass
 
     def _start_tracking_in(self):
-        '''Nothing generic to do.'''
-        pass
+        if self.trajectory_start_time is None:
+            self.trajectory_start_time = self.get_time()
+        self.ramp_up_complete = True
 
     def _while_tracking_in(self):
         '''Nothing generic to do.'''
@@ -217,8 +220,7 @@ class TargetTracking(Sequence):
         pass
 
     def _start_tracking_out(self):
-        '''Nothing generic to do.'''
-        pass
+        self.ramp_up_complete = True
 
     def _while_tracking_out(self):
         '''Nothing generic to do.'''
@@ -323,21 +325,21 @@ class TargetTracking(Sequence):
         '''Test whether the target is held long enough and whether to go straight into the trajectory'''
         return (time_in_state > self.hold_time) and (self.ramp_up_time == 0)
 
-    def _test_ramp_complete(self, time_in_state):
+    def _test_ramp_up_complete(self, time_in_state):
         '''Test whether the ramp up is finished'''
-        return self.frame_index-1 == self.ramp_up_time*self.sample_rate
+        return (not self.ramp_up_complete) & (self.frame_index-1 >= self.ramp_up_time*self.sample_rate)
 
     def _test_traj_complete(self, time_in_state):
         '''Test whether the trajectory is finished and whether there is a ramp down before the trial ends'''
-        return (self.frame_index-1 == self.trajectory_length - self.ramp_down_time*self.sample_rate) and (self.ramp_down_time > 0)
+        return (self.frame_index-1 >= self.trajectory_length - self.ramp_down_time*self.sample_rate) and (self.ramp_down_time > 0)
 
     def _test_ramp_and_trial_complete(self, time_in_state):
         '''Test whether the ramp down is finished, ending the trial'''
-        return (self.frame_index > self.trajectory_length) and (self.ramp_down_time > 0)
+        return (self.frame_index >= self.trajectory_length) and (self.ramp_down_time > 0)
     
     def _test_trial_complete(self, time_in_state):
         '''Test whether the trajectory is finished, ending the trial'''
-        return (self.frame_index > self.trajectory_length) and (self.ramp_down_time == 0)
+        return (self.frame_index >= self.trajectory_length) and (self.ramp_down_time == 0)
 
     def _test_tracking_out_timeout(self, time_in_state):
         return time_in_state > self.tracking_out_time
@@ -528,7 +530,8 @@ class ScreenTargetTracking(TargetTracking, Window):
             
         elif self.trajectory_type == '2d':
             self.trajectory.update_mask(use_frame_index, use_frame_index+self.lookahead)
-        self.frame_index += 1 # increment the frame_index for the following cycle
+        time_in_trajectory = self.get_time() - self.trajectory_start_time
+        self.frame_index = min(int(time_in_trajectory * self.sample_rate), self.trajectory_length)
 
     def setup_start_wait(self):
 
@@ -617,7 +620,7 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def setup_while_tracking(self):
         # Check whether there are no more target frames to display
-        if self.frame_index == self.trajectory_length:
+        if self.frame_index >= self.trajectory_length:
             self.trial_timed_out = True
             self.pos_offset = [0,0,0]
             self.vel_offset = [0,0,0]
