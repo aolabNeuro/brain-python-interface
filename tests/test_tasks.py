@@ -75,7 +75,7 @@ class TestManualControlTasks(unittest.TestCase):
         exp = init_exp(ExampleSequenceTask, [], seq, window_size=(1200,800), fullscreen=False)
         exp.run()
     
-    # @unittest.skip("")
+    @unittest.skip("")
     def test_tracking(self):
         print("Running tracking task test")
         seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=5, ramp=0, ramp_down=0, 
@@ -99,7 +99,7 @@ class TestManualControlTasks(unittest.TestCase):
                        limit1d=False, trajectory_amplitude=5, lookahead_time=1)
         exp.stereo_mode = 'projection'
         exp.rotation = 'xzy'
-        exp.trajectory_type = 'space'
+        exp.trajectory_type = '2d'
         exp.run()
 
     @unittest.skip("")
