@@ -41,7 +41,7 @@ class OFCEndpointAssister(FeedbackControllerAssist):
         OFCEndpointAssister instance
         '''
         F_dict = pickle.load(open('/storage/assist_params/assist_20levels_ppf.pkl'))
-        B = np.mat(np.vstack([np.zeros([3,3]), np.eye(3)*1000*1./decoding_rate, np.zeros(3)]))
+        B = np.asmatrix(np.vstack([np.zeros([3,3]), np.eye(3)*1000*1./decoding_rate, np.zeros(3)]))
         fb_ctrl = feedback_controllers.MultiModalLFC(A=B, B=B, F_dict=F_dict)
         super(OFCEndpointAssister, self).__init__(fb_ctrl, style='additive_cov')
         self.n_assist_levels = len(F_dict)
@@ -60,7 +60,7 @@ class OFCEndpointAssister(FeedbackControllerAssist):
         np.mat
         '''
         assist_level_idx = min(int(assist_level * self.n_assist_levels), self.n_assist_levels-1)
-        F = np.mat(self.fb_ctrl.F_dict[assist_level_idx])
+        F = np.asmatrix(self.fb_ctrl.F_dict[assist_level_idx])
         return F
 
 class SimpleEndpointAssister(Assister):
@@ -129,7 +129,7 @@ class SimpleEndpointAssister(Assister):
 
         assist_cursor_vel = (assist_cursor_pos-cursor_pos)/decoder_binlen
         x_assist = np.hstack([assist_cursor_pos, assist_cursor_vel, 1])
-        x_assist = np.mat(x_assist.reshape(-1,1))
+        x_assist = np.asmatrix(x_assist.reshape(-1,1))
         return x_assist
 
 class SimplePosAssister(SimpleEndpointAssister):
@@ -174,7 +174,7 @@ class SimpleEndpointAssisterLFC(feedback_controllers.MultiModalLFC):
         -------
         '''
         dt = 0.1
-        A = np.mat([[1., 0, 0, dt, 0, 0, 0],
+        A = np.asmatrix([[1., 0, 0, dt, 0, 0, 0],
                     [0., 1, 0, 0,  dt, 0, 0],
                     [0., 0, 1, 0, 0, dt, 0],
                     [0., 0, 0, 0, 0,  0, 0],
@@ -182,7 +182,7 @@ class SimpleEndpointAssisterLFC(feedback_controllers.MultiModalLFC):
                     [0., 0, 0, 0, 0,  0, 0],
                     [0., 0, 0, 0, 0,  0, 1]])
 
-        I = np.mat(np.eye(3))
+        I = np.asmatrix(np.eye(3))
         B = np.vstack([0*I, I, np.zeros([1,3])])
         F_target = np.hstack([I, 0*I, np.zeros([3,1])])
         F_hold = np.hstack([0*I, 0*I, np.zeros([3,1])])
@@ -228,8 +228,8 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
         ## elif (self.decoder.ssm == namelist.tentacle_2D_state_space) or (self.decoder.ssm == namelist.joint_2D_state_space):
         ##     # kin_chain = self.plant.kin_chain
         ##     # A, B, W = self.decoder.ssm.get_ssm_matrices(update_rate=self.decoder.binlen)
-        ##     # Q = np.mat(np.diag(np.hstack([kin_chain.link_lengths, np.zeros_like(kin_chain.link_lengths), 0])))
-        ##     # R = 10000*np.mat(np.eye(B.shape[1]))
+        ##     # Q = np.asmatrix(np.diag(np.hstack([kin_chain.link_lengths, np.zeros_like(kin_chain.link_lengths), 0])))
+        ##     # R = 10000*np.asmatrix(np.eye(B.shape[1]))
 
         ##     # fb_ctrl = LQRController(A, B, Q, R)
         ##     # self.assister = FeedbackControllerAssist(fb_ctrl, style='additive')
@@ -249,7 +249,7 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
             chain = self.plant.kin_chain
             q_start = self.plant.get_intrinsic_coordinates()
             x_init = np.hstack([q_start, np.zeros_like(q_start), 1])
-            x_init = np.mat(x_init).reshape(-1, 1)
+            x_init = np.asmatrix(x_init).reshape(-1, 1)
 
             cached = True
 

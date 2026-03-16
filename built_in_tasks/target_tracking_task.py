@@ -403,7 +403,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     trajectory_radius = traits.Float(.5, desc="Radius of targets in cm")
     trajectory_color = traits.OptionsList("gold", *target_colors, desc="Color of the trajectory", bmi3d_input_options=list(target_colors.keys()))
     trajectory_type = traits.OptionsList("1d", ["1d", "2d", "none"], desc="Type of trajectory to use", bmi3d_input_options=["1d", "2d", "none"])
-    lookahead_time = traits.Float(0.5, desc="Time in seconds to display the future trajectory")
+    lookahead_time = traits.Float(0.5, desc="Time in seconds to display the future trajectory (must be >0)")
     target_color = traits.OptionsList("yellow", *target_colors, desc="Color of the target", bmi3d_input_options=list(target_colors.keys()))
     plant_hide_rate = traits.Float(0.0, desc='If the plant is visible, specifies a percentage of trials where it will be hidden')
     plant_type = traits.OptionsList(*plantlist, bmi3d_input_options=list(plantlist.keys()))
@@ -429,7 +429,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.plant_vis_prev = True
         self.cursor_vis_prev = True
         self.lookahead = int(self.fps * self.lookahead_time) # convert to frames
-        self.lookahead_scale = (0.5 * self.screen_cm[0]) / self.lookahead # cm per frame
+        self.lookahead_scale = (0.5 * self.screen_cm[0]) / (self.lookahead) # cm per frame
         self.original_limit1d = self.limit1d # keep track of original settable trait
         
         if not self.always_1d:
@@ -445,14 +445,10 @@ class ScreenTargetTracking(TargetTracking, Window):
         if instantiate_targets:
             # This is the center target being followed by the user
             self.target = VirtualCircularTarget(target_radius=self.target_radius, target_color=target_colors[self.target_color])
-            for model in self.target.graphics_models:
-                self.add_model(model)
 
             # This is the optional progress bar (off by default)
             self.bar = VirtualRectangularTarget(target_width=1, target_height=0, target_color=(0., 1., 0., 0.75), starting_pos=[0,-15,9])
             # print('INIT TRAJ')
-            for model in self.bar.graphics_models:
-                self.add_model(model)
 
         # Declare any plant attributes which must be saved to the HDF file at the _cycle rate
         for attr in self.plant.hdf_attrs:
@@ -471,9 +467,10 @@ class ScreenTargetTracking(TargetTracking, Window):
         '''
         Calls any update functions necessary and redraws screen
         '''
+        # Use to debug indexing into reference and disturbance trajectories
         # if self.frame_index >= 0:
         #     print('FRAME ', self.frame_index, self.get_state(), self.trial_timed_out)
-        #     print(self.target.get_position()[2], self.pos_offset[2])
+        #     print(self.target.get_position()[2], self.pos_offset[2], self.trajectory.get_position()[0])
 
         self.move_effector(pos_offset=np.asarray(self.pos_offset), vel_offset=np.asarray(self.vel_offset))
 
@@ -522,13 +519,15 @@ class ScreenTargetTracking(TargetTracking, Window):
 
     def update_frame(self):
         if self.trial_timed_out:
-            use_frame_index = self.frame_index - 1
+            use_frame_index = self.trajectory_length - 1
         else:
             use_frame_index = self.frame_index
 
         self.target.move_to_position(self.targs[use_frame_index])
         if self.trajectory_type == '1d':
-            self.trajectory.move_to_position(np.array([-use_frame_index*self.lookahead_scale - self.lookahead*self.lookahead_scale,0,0])) 
+            self.trajectory.move_to_position(np.array([-use_frame_index*self.lookahead_scale - self.lookahead*self.lookahead_scale,0,0]))
+            # print(self.frame_index, use_frame_index, self.trajectory.get_position())
+            
         elif self.trajectory_type == '2d':
             self.trajectory.update_mask(use_frame_index, use_frame_index+self.lookahead)
         time_in_trajectory = self.get_time() - self.trajectory_start_time
@@ -544,21 +543,34 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.bar_width = 12        
         self.tracking_frame_index = 0
         
+        if self.calc_trial_num() == 0:
+            # Instantiate the targets here so they don't show up in any states that might come before "wait" 
+            for model in self.target.graphics_models:
+                self.add_model(model)
+                self.target.hide()
+            for model in self.bar.graphics_models:
+                self.add_model(model)
+                self.bar.hide()
+
         # Set up the next trajectory
         if hasattr(self, 'trajectory'):
             for model in self.trajectory.graphics_models:
                 self.remove_model(model)
             del self.trajectory
-        if self.trajectory_type == '1d':
+        if self.trajectory_type == '1d': # self.targs is (nframes, 3)
+            # print(self.lookahead_scale)
+            lookbehind = self.targs[0,:]*np.ones((self.lookahead, np.shape(self.targs)[1])) # (n_lookaheadframes, 3)
 
-            lookbehind = self.targs[1,:]*np.ones((self.lookahead, np.shape(self.targs)[1]))
-            next_trajectory = np.concatenate((lookbehind, self.targs), axis=0)
-            next_trajectory = np.array(np.squeeze(next_trajectory)[:,2])
+            next_trajectory = np.concatenate((lookbehind, self.targs), axis=0) #(n_lookaheadframes + nframes, 3)
+
+            next_trajectory = np.array(np.squeeze(next_trajectory)[:,2]) # (n_lookaheadframes + nframes,) only the y dim
+
             next_trajectory = np.vstack([
                 self.lookahead_scale * np.arange(len(next_trajectory)), # set the lookahead by scaling the trajectory to fit in the screen
                 np.zeros(len(next_trajectory)), 
                 next_trajectory
-            ]).T
+            ]).T # (n_lookaheadframes + nframes, 3) rows are frames, columns are bmi3d x, y, z coords
+
             self.trajectory = VirtualSnakeTarget(target_radius=self.trajectory_radius, target_color=target_colors[self.trajectory_color], trajectory=next_trajectory)
         elif self.trajectory_type == '2d':
             self.trajectory = VirtualSnakeTarget(target_radius=self.trajectory_radius, target_color=target_colors[self.trajectory_color], trajectory=self.targs)
@@ -667,6 +679,7 @@ class ScreenTargetTracking(TargetTracking, Window):
             self.target.move_to_position(self.targs[self.frame_index])
             if self.trajectory_type == '1d':
                 self.trajectory.move_to_position(np.array([-self.lookahead*self.lookahead_scale,0,0]))
+                # print(self.trajectory.get_position())
 
             self.target.show()
             if self.trajectory_type != "none":

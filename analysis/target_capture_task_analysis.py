@@ -473,12 +473,12 @@ class BMITaskEntry(ManualControlMultiTaskEntry):
     def get_decoder_state(self):
         if not hasattr(self, 'x_t'):
             if isinstance(self.decoder, kfdecoder.KFDecoder):
-                self.x_t = np.mat(self.hdf.root.task[5::6]['decoder_state'][:,:,0].T)
+                self.x_t = np.asmatrix(self.hdf.root.task[5::6]['decoder_state'][:,:,0].T)
             elif isinstance(self.decoder, ppfdecoder.PPFDecoder):
                 try:
-                    self.x_t = np.mat(np.hstack(self.hdf.root.task[:]['internal_decoder_state']))
+                    self.x_t = np.asmatrix(np.hstack(self.hdf.root.task[:]['internal_decoder_state']))
                 except:
-                    self.x_t = np.mat(np.hstack(self.hdf.root.task[:]['decoder_state']))
+                    self.x_t = np.asmatrix(np.hstack(self.hdf.root.task[:]['decoder_state']))
             else:
                 raise ValueError("decoder type?!?")
         return self.x_t
@@ -494,11 +494,11 @@ class BMITaskEntry(ManualControlMultiTaskEntry):
         (simultaneously estimate the newest motor command while refining the previous state estimate)
         '''
         if not hasattr(self, 'w'):
-            y = np.mat(self.get_spike_counts())
+            y = np.asmatrix(self.get_spike_counts())
             x = self.get_decoder_state()
             F, K = self.decoder.filt.get_sskf()
-            C = np.mat(self.decoder.filt.C)
-            A = np.mat(self.decoder.filt.A)
+            C = np.asmatrix(self.decoder.filt.C)
+            A = np.asmatrix(self.decoder.filt.A)
             self.w = y[:,1:] - C*A*x[:,:-1]
 
         return self.w
@@ -507,9 +507,9 @@ class BMITaskEntry(ManualControlMultiTaskEntry):
         '''
         steady state kalman gain times obs
         '''
-        y = np.mat(self.get_spike_counts())
+        y = np.asmatrix(self.get_spike_counts())
         F, K = self.decoder.filt.get_sskf()
-        K = np.mat(K)
+        K = np.asmatrix(K)
         Kyt = K*y
         return Kyt
 
@@ -536,8 +536,8 @@ class BMITaskEntry(ManualControlMultiTaskEntry):
 
         if not hasattr(self, 'w_t'):
             x = self.get_decoder_state()
-            A = np.mat(A)
-            w_t = np.mat(np.zeros_like(x))
+            A = np.asmatrix(A)
+            w_t = np.asmatrix(np.zeros_like(x))
             w_t[:,:-1] = x[:,1:] - A*x[:,:-1]
             self.w_t = w_t
 

@@ -39,7 +39,7 @@ for i, t in enumerate(t_vec):
     des_index_vel = 1 * sin(t)  # rad/s
     des_fing3_vel = 0           # rad/s
     des_prono_vel = 1 * cos(t)  # rad/s
-    des_vel = np.mat([des_thumb_vel, des_index_vel, des_fing3_vel, des_prono_vel]).T
+    des_vel = np.asmatrix([des_thumb_vel, des_index_vel, des_fing3_vel, des_prono_vel]).T
 
     rh.set_vel(des_vel)
 

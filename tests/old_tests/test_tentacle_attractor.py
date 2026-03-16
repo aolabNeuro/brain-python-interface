@@ -37,7 +37,7 @@ class TentacleAttractorBMIRecon(bmi_recon_tasks.BMIReconstruction):
         chain = self.plant.kin_chain
         q_start = self.plant.get_intrinsic_coordinates()
         x_init = np.hstack([q_start, np.zeros_like(q_start), 1])
-        x_init = np.mat(x_init).reshape(-1, 1)
+        x_init = np.asmatrix(x_init).reshape(-1, 1)
 
         cached = True
 

@@ -106,7 +106,7 @@ def PPF_adaptive_beta(spike_obs, int_kin, beta_est, P_params_est_old, dt):
     rates = lambda_predict*dt
     unpred_spikes = spike_obs - rates
 
-    C_xpose_C = np.mat(np.outer(int_kin, int_kin))
+    C_xpose_C = np.asmatrix(np.outer(int_kin, int_kin))
 
     P_params_est = np.zeros([n_units, 3, 3])
     beta_est_new = np.zeros([n_units, 3])
