@@ -127,6 +127,8 @@ class OnlineAnalysis(traits.HasTraits):
             self._send_online_analysis_msg('cursor', self.plant.get_endpoint_pos())
         if hasattr(self, 'eye_pos'):
             self._send_online_analysis_msg('eye_pos', self.eye_pos)
+        if hasattr(self, 'eye_diam'):
+            self._send_online_analysis_msg('eye_diam', self.eye_diam)
         if hasattr(self, 'calibrated_eye_pos'):
             self._send_online_analysis_msg('calibrated_eye_pos', self.calibrated_eye_pos)
 
