@@ -67,64 +67,64 @@ class EyeCalibration(traits.HasTraits):
         if not self.keyboard_control:
             try:
                 bmi3d_data, bmi3d_metadata = aopy.preproc.proc_exp('', files, '', '', overwrite=True, save_res=False)
+
+                # load raw eye data
+                # raw_eye_data, raw_eye_metadata = aopy.preproc.parse_oculomatic(hdf_dir, files, debug=False)
+                samplerate = 1000
+                eye_interp = aopy.data.get_interp_kinematics(bmi3d_data, bmi3d_metadata, datatype='eye',
+                                                            samplerate=samplerate)[:,:4]
+
+                # calculate coefficients to calibrate eye data
+                events = bmi3d_data['events']
+
+                if not self.eye_target_calibration:
+                    cursor_interp = aopy.data.get_interp_kinematics(bmi3d_data, bmi3d_metadata, datatype='cursor',
+                                                            samplerate=samplerate)
+                    self.eye_coeff,_,_,_ = aopy.preproc.calc_eye_calibration(
+                        cursor_interp, samplerate, eye_interp, samplerate, 
+                        events['timestamp'], events['code'], return_datapoints=True
+                    )
+
+
+                # Calculate coefficients
+                else:
+                    def get_target_locations(data, target_indices):
+                        try:
+                            trials = data['trials']
+                        except:
+                            trials = data['bmi3d_trials']
+                        locations = np.nan*np.zeros((len(target_indices), 3))
+                        for i in range(len(target_indices)):
+                            trial_idx = np.where(trials['index'] == target_indices[i])[0]
+                            if len(trial_idx) > 0:
+                                locations[i,:] = trials['target'][trial_idx[0]][[0,2,1]] # use x,y,z format
+                            else:
+                                raise ValueError(f"Target index {target_indices[i]} not found")
+                        return np.round(locations,4)
+
+                    target_pos = get_target_locations(bmi3d_data, [1,2,3,4,5,6,7,8])
+                    
+                    # Get eye_pos data when subjects gaze at the center. Target position doesn't matter for this computation
+                    if self.center_eye_data:
+                        _, _, eye_center = aopy.preproc.calc_eye_target_calibration(
+                            eye_interp, samplerate, events['timestamp'], events['code'], target_pos,
+                            offset=self.offset_time_eye_calibration, duration=self.duration_eye_calibration, 
+                            align_events=80, return_datapoints=True
+                        )
+                        self.eye_center = np.nanmedian(eye_center, axis=0)
+                    else:
+                        self.eye_center = np.zeros((eye_interp.shape[1],))
+
+
+                    # Calculate coefficient by linear regression between targets and centered eye positions
+                    self.eye_coeff, _ = aopy.preproc.calc_eye_target_calibration(
+                        eye_interp-self.eye_center, samplerate, events['timestamp'], events['code'], target_pos,
+                        offset=self.offset_time_eye_calibration, duration=self.duration_eye_calibration
+                    )
             except:
                 traceback.print_exc()
                 raise ValueError(f"Error processing hdf file for taskid {taskid}")
 
-            # load raw eye data
-            # raw_eye_data, raw_eye_metadata = aopy.preproc.parse_oculomatic(hdf_dir, files, debug=False)
-            samplerate = 1000
-            eye_interp = aopy.data.get_interp_kinematics(bmi3d_data, bmi3d_metadata, datatype='eye',
-                                                        samplerate=samplerate)[:,:4]
-
-            # calculate coefficients to calibrate eye data
-            events = bmi3d_data['events']
-
-            if not self.eye_target_calibration:
-                cursor_interp = aopy.data.get_interp_kinematics(bmi3d_data, bmi3d_metadata, datatype='cursor',
-                                                        samplerate=samplerate)
-                self.eye_coeff,_,_,_ = aopy.preproc.calc_eye_calibration(
-                    cursor_interp, samplerate, eye_interp, samplerate, 
-                    events['timestamp'], events['code'], return_datapoints=True
-                )
-
-
-            # Calculate coefficients
-            else:
-                def get_target_locations(data, target_indices):
-                    try:
-                        trials = data['trials']
-                    except:
-                        trials = data['bmi3d_trials']
-                    locations = np.nan*np.zeros((len(target_indices), 3))
-                    for i in range(len(target_indices)):
-                        trial_idx = np.where(trials['index'] == target_indices[i])[0]
-                        if len(trial_idx) > 0:
-                            locations[i,:] = trials['target'][trial_idx[0]][[0,2,1]] # use x,y,z format
-                        else:
-                            raise ValueError(f"Target index {target_indices[i]} not found")
-                    return np.round(locations,4)
-
-                target_pos = get_target_locations(bmi3d_data, [1,2,3,4,5,6,7,8])
-                
-                # Get eye_pos data when subjects gaze at the center. Target position doesn't matter for this computation
-                if self.center_eye_data:
-                    _, _, eye_center = aopy.preproc.calc_eye_target_calibration(
-                        eye_interp, samplerate, events['timestamp'], events['code'], target_pos,
-                        offset=self.offset_time_eye_calibration, duration=self.duration_eye_calibration, 
-                        align_events=80, return_datapoints=True
-                    )
-                    self.eye_center = np.nanmedian(eye_center, axis=0)
-                else:
-                    self.eye_center = np.zeros((eye_interp.shape[1],))
-
-
-                # Calculate coefficient by linear regression between targets and centered eye positions
-                self.eye_coeff, _ = aopy.preproc.calc_eye_target_calibration(
-                    eye_interp-self.eye_center, samplerate, events['timestamp'], events['code'], target_pos,
-                    offset=self.offset_time_eye_calibration, duration=self.duration_eye_calibration
-                )
-            
             print("Calibration complete:", self.eye_coeff)
 
         # Set up eye cursor
