@@ -179,3 +179,70 @@ class ReplayEye():
         self.eye_pos = pos
         if 'eye' in self.task_data.dtype.names:
             self.task_data['eye'] = pos
+
+class ReportTimingStats(traits.HasTraits):
+    '''
+    Profile the time taken in each of the _start*, _end*, _while*, and _test*, methods of 
+    the task and printing averages in the report.
+    '''
+
+    cycle_time_buffer_size = traits.Int(10, desc="Number of recent cycles to average for cycle time reporting")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.start_times = {}
+        self.end_times = {}
+        self.while_times = {}
+        self.test_times = {}
+        self.reportstats['_cycle_time'] = '0 ms'
+        self.reportstats['fsm_fn_total_time'] = '0 ms'
+
+    def _cycle(self):
+        super()._cycle()
+        if self.cycle_count % self.cycle_time_buffer_size == 0:
+            self.reportstats['_cycle_time'] = f'{1000./max(self.clock.get_fps(),1e-6):.2f} ms'
+            all_items = [list(d.values()) for d in [self.start_times, self.end_times, self.while_times, self.test_times]]
+            concat = np.vstack([i for i in all_items if len(i) > 0])
+            sum_time = np.sum(concat, axis=1)
+            self.reportstats['fsm_fn_total_time'] = f'{np.nanmean(sum_time)*1000:.2f} ms'
+
+    def test_state_transition_event(self, event):
+        start_time = self.get_time()
+        result = super().test_state_transition_event(event)
+        end_time = self.get_time()
+        if event not in self.test_times:
+            self.test_times[event] = np.full(self.cycle_time_buffer_size, np.nan)
+        self.test_times[event] = np.roll(self.test_times[event], -1)
+        self.test_times[event][-1] = end_time - start_time
+        self.reportstats[f'_test_{event}_time'] = f'{np.nanmean(self.test_times[event])*1000:.2f} ms'
+        return result
+
+    def end_state(self, state):
+        start_time = self.get_time()
+        super().end_state(state)
+        end_time = self.get_time()
+        if state not in self.end_times:
+            self.end_times[state] = np.full(self.cycle_time_buffer_size, np.nan)
+        self.end_times[state] = np.roll(self.end_times[state], -1)
+        self.end_times[state][-1] = end_time - start_time
+        self.reportstats[f'_end_{state}_time'] = f'{np.nanmean(self.end_times[state])*1000:.2f} ms'
+        
+    def start_state(self, state):
+        start_time = self.get_time()
+        super().start_state(state)
+        end_time = self.get_time()
+        if state not in self.start_times:
+            self.start_times[state] = np.full(self.cycle_time_buffer_size, np.nan)
+        self.start_times[state] = np.roll(self.start_times[state], -1)
+        self.start_times[state][-1] = end_time - start_time
+        self.reportstats[f'_start_{state}_time'] = f'{np.nanmean(self.start_times[state])*1000:.2f} ms'
+
+    def exec_state_specific_actions(self, state):
+        start_time = self.get_time()
+        super().exec_state_specific_actions(state)
+        end_time = self.get_time()
+        if state not in self.while_times:
+            self.while_times[state] = np.full(self.cycle_time_buffer_size, np.nan)
+        self.while_times[state] = np.roll(self.while_times[state], -1)
+        self.while_times[state][-1] = end_time - start_time
+        self.reportstats[f'_while_{state}_time'] = f'{np.nanmean(self.while_times[state])*1000:.2f} ms'
