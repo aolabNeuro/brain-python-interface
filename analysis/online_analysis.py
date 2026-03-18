@@ -113,7 +113,7 @@ class AnalysisWorker(mp.Process):
         plt.pause(0.1)
 
         t_update = time.perf_counter()
-        while not self._stop_event.is_set():
+        while plt.fignum_exists(self.fig.number) and (not self._stop_event.is_set()):
             if time.perf_counter() - t_update > 1./self.update_rate:
                 try:
                     self.update()
@@ -617,6 +617,7 @@ class ERPAnalysisWorker(AnalysisWorker):
         self.trigger_cycles = []
         self.trigger_times = []
         self.lfp_downsample = 25
+        self.erp_since_update = 0
 
         # Determine the trigger channel and events based on the task parameters
         if 'qwalor_trigger_dch' in self.task_params:
@@ -696,10 +697,13 @@ class ERPAnalysisWorker(AnalysisWorker):
                 self.slider.valmax = 1000
                 self.slider.set_val(100)
                 self.zscore_button.color = '0.85'
+            self.slider.ax.set_xlim(self.slider.valmin, self.slider.valmax)
+            self._update_erp_data()
+            self.draw()
+
         self.ax_zscore = self.fig.add_axes([0.225, 0.025, 0.1, 0.025])
         self.zscore_button = Button(self.ax_zscore, 'Z-score')
         self.zscore_button.on_clicked(toggle_zscore)
-        print('finished init')
 
     def update(self):
         super().update()
@@ -771,14 +775,16 @@ class ERPAnalysisWorker(AnalysisWorker):
         self.clock_elapsed = clock_elapsed_new
 
         # Update the ERP
-        if erp_count == 0:
-            return
-        if self.erp.shape[2] < 50: # update frequently when there are few trials
-            self._update_erp_data()
-        elif self.erp.shape[2] % 10 < erp_count: # only update every 10 trials after that
-            self._update_erp_data()
+        self.erp_since_update += erp_count
+        self._update_erp_data()
 
     def _update_erp_data(self):
+        if self.erp_since_update == 0:
+            return
+        if (self.erp.shape[2] > 50) and (self.erp_since_update < 10):
+            return  # only update the plot every 10 new ERPs to save on computation
+        self.erp_since_update = 0
+        
         fs = self.ds.source.update_freq / self.lfp_downsample
         if self.zscore:
             altcond_window = (0, self.time_after)
@@ -801,9 +807,9 @@ class ERPAnalysisWorker(AnalysisWorker):
             if event_name in self.trigger_events:
                 self.trigger_cycles.append(self.cycle_count)
         elif key == 'laser_conditions': # multiple lasers on each trial
-            self.current_condition_idx = values[0]
+            self.current_condition_idx = values[0][0] # pick first one for now, TODO: support multiple conditions at once
         elif key == 'laser_condition': # single laser on each trial
-            self.current_condition_idx = [values[0]]
+            self.current_condition_idx = values[0]
 
     def draw(self):
         super().draw()
@@ -839,23 +845,29 @@ class SLICAnalysisWorker(ERPAnalysisWorker):
         _, acq_ch, _ = aopy.data.load_chmap('ECoG244')
         self.stim_ch = np.where(np.isin(acq_ch, ch_near_stim))[0]
         self.taper_len = 0.06
+        self.angle_map = self.data_map.copy()
+        self.slic_map = self.data_map.copy()
 
         # Add a toggle between coherence and phase
-        self.ax_zscore.set_visible(False) # hide the z-score button
+        del self.zscore_button # hide the z-score button
         self.show_angle = False
-        self.slic_map = np.zeros((16,16))
-        self.data_map = self.slic_map
+        self.slider.valmin = 0
+        self.slider.valmax = 1
+        self.slider.set_val(0.1)
+        self.slider.ax.set_xlim(self.slider.valmin, self.slider.valmax)
         def toggle_angle(event):
             self.show_angle = not self.show_angle
             if self.show_angle:
-                self.data_map = self.angle_map
                 self.erp_im.set_cmap('YlGnBu')
                 self.erp_im.set_clim=(0, 2*np.pi),
+                self.slider.drag_active = False # disable the slider for phase
             else:
-                self.data_map = self.slic_map
                 self.erp_im.set_cmap('bwr')
                 self.erp_im.set_clim=(-self.slider.val, self.slider.val), 
                 self.erp_im.set_data(self.data_map)
+                self.slider.drag_active = True
+            self.draw()
+
         self.ax_angle = self.fig.add_axes([0.225, 0.025, 0.1, 0.025])
         self.angle_button = Button(self.ax_angle, 'Phase')
         self.angle_button.on_clicked(toggle_angle)
@@ -874,14 +886,21 @@ class SLICAnalysisWorker(ERPAnalysisWorker):
                 self.band[1] = hf
             except:
                 pass
-        axlf = self.fig.add_axes([0.525, 0.025, 0.2, 0.025])
+        axlf = self.fig.add_axes([0.525, 0.025, 0.05, 0.025])
         self.lf_text = TextBox(axlf, 'Min freq (Hz)', initial='80')
         self.lf_text.on_submit(on_lf_text_submit)
-        axhf = self.fig.add_axes([0.725, 0.025, 0.2, 0.025])
+        axhf = self.fig.add_axes([0.725, 0.025, 0.05, 0.025])
         self.hf_text = TextBox(axhf, 'Max freq (Hz)', initial='150')
         self.hf_text.on_submit(on_hf_text_submit)
+        print('finished init')
 
     def _update_erp_data(self):
+        if self.erp_since_update == 0:
+            return
+        if (self.erp_since_update < 10):
+            return  # only update the plot every 10 new ERPs to save on computation
+        self.erp_since_update = 0
+
         fs = self.ds.source.update_freq / self.lfp_downsample
         freqs, time, coh_all, angle_all = aopy.analysis.connectivity.calc_connectivity_map_coh(
             self.erp, fs, self.time_before, self.time_after, self.stim_ch, 
@@ -892,6 +911,13 @@ class SLICAnalysisWorker(ERPAnalysisWorker):
         self.angle_map = aopy.visualization.get_data_map(angle, self.elec_pos[:,0], self.elec_pos[:,1])
         slic = aopy.analysis.calc_tfr_mean(freqs, time[1:], coh_all[:,[1],:]-coh_all[:,[0],:], self.band)
         self.slic_map = aopy.visualization.get_data_map(slic, self.elec_pos[:,0], self.elec_pos[:,1])
+
+    def draw(self):
+        if self.show_angle:
+            self.data_map = self.angle_map
+        else:
+            self.data_map = self.slic_map
+        super().draw()
 
 
 class BMIAnalysisWorker(AnalysisWorker):
@@ -1037,33 +1063,24 @@ class OnlineDataServer(threading.Thread):
 
         # Is there ecube neural data?
         if 'record_headstage' in self.task_params and self.task_params['record_headstage']:
-            stim_site = self.task_params.get('stimulation_site', None)
-            if stim_site is None:
-                # data_queue = mp.Queue()
-                # self.analysis_workers.append((ERPAnalysisWorker(self.task_params, data_queue), data_queue))
+            stim_site = self.task_params.get('stimulation_site', 0)
+            try:
+                stim_sites = [int(stim_site)]
+            except:
+                stim_sites = [int(s) for s in stim_site]
+            for idx, site in enumerate(stim_sites):
+                if site == -1:
+                    continue
+                title = f"Stim site {site}"
+                data_queue = mp.Queue()
+                self.analysis_workers.append((ERPAnalysisWorker(
+                    self.task_params, data_queue, condition_idx=idx, stim_sites=stim_sites, 
+                    title=title), data_queue))
+                title = f"SLIC Stim site {site}"
                 data_queue = mp.Queue()
                 self.analysis_workers.append((SLICAnalysisWorker(
-                    self.task_params, data_queue, condition_idx=idx, stim_sites=stim_sites, title=title
-                    ), data_queue))
-            else:
-                try:
-                    stim_sites = [int(stim_site)]
-                except:
-                    stim_sites = [int(s) for s in stim_site]
-                for idx, site in enumerate(stim_sites):
-                    if site == -1:
-                        continue
-                    print('Adding ERP and SLIC workers for stim site', site)
-                    title = f"Stim site {site}"
-                    data_queue = mp.Queue()
-                    self.analysis_workers.append((ERPAnalysisWorker(
-                        self.task_params, data_queue, condition_idx=idx, stim_sites=stim_sites, 
-                        title=title), data_queue))
-                    # title = f"SLIC Stim site {site}"
-                    # data_queue = mp.Queue()
-                    # self.analysis_workers.append((SLICAnalysisWorker(
-                    #     self.task_params, data_queue, condition_idx=[idx], stim_sites=stim_sites, 
-                    #     title=title), data_queue))
+                    self.task_params, data_queue, condition_idx=idx, stim_sites=stim_sites, 
+                    title=title), data_queue))
 
         # Is this a BMI task?
         if 'decoder' in self.task_params:

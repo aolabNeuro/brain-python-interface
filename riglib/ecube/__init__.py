@@ -466,10 +466,7 @@ class MultiSource(DataSourceSystem):
         print('...started!')
     
     def stop(self):
-
-        # Stop streaming
-        if not self.conn.stop():
-            del self.conn # try to force the streaming to end by deleting the ecube connection object
+        del self.conn # try to force the streaming to end by deleting the ecube connection object
         
     def get(self):
         '''
