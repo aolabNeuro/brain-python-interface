@@ -13,7 +13,8 @@ from .generator_features import Autostart, RandomDelay, AdaptiveGenerator, Ignor
     HideLeftTrajectory, StartTrialBelowSpeedThr, ReadysetMedley, ReadysetColorChange, DiscreteRandomDelay_EyeHandSequence, HideCursorReturn
 from .peripheral_device_features import Button, Joystick, DualJoystick, Joystick_plus_TouchSensor, KeyboardControl, MouseControl, ForceControl
 from .reward_features import RewardSystem, RewardSystemPulse, TTLReward, JuiceLogging, PelletReward, JackpotRewards, ProgressBar, TrackingRewards, RewardAudio, PenaltyAudio, ScoreRewards, ConsecutiveJackpot
-from .eyetracker_features import EyeCursor, EyeData, CalibratedEyeData, PupilLabStreaming, SimulatedEyeData, FixationStart, EyeConstrained, EyeCalibration, EyeStreaming
+from .eyetracker_features import EyeCursor, EyeData, CalibratedEyeData, PupilLabStreaming, SimulatedEyeData, FixationStart, EyeConstrained, \
+    AutomaticEyeCalibration, EyeCalibration, EyeStreaming
 from .touch_features import MouseEmulateTouch
 from .phasespace_features import MotionData, MotionSimulate, MotionAutoAlign
 from .optitrack_features import Optitrack, SpheresToCylinders
@@ -105,6 +106,7 @@ built_in_features = dict(
     readyset_colorchange = ReadysetColorChange,
     random_delay_eye_hand_sequence = DiscreteRandomDelay_EyeHandSequence,
     hide_cursor_return = HideCursorReturn,
+    auto_eye_calibration = AutomaticEyeCalibration,
 )
 
 # >>> features.built_in_features['autostart'].__module__
