@@ -683,7 +683,9 @@ class EyeHandCaptureBlock(Sequence, Window):
 
     init_eye_target_alpha = traits.Float(1., desc="Transparency of initial eye targets")
     init_hand_target_alpha = traits.Float(0.9, desc="Transparency of initial hand targets")
-    goal_target_alpha = traits.Float(0.75, desc="Transparency of goal targets")
+    goal_eye_target_alpha = traits.Float(0.75, desc="Transparency of goal eye targets")
+    goal_hand_target_alpha = traits.Float(0.75, desc="Transparency of goal hand targets")
+    cursor_alpha = traits.Float(0.75, desc="Transparency of cursor")
 
     fixation_target_color = traits.OptionsList("fixation_color", *target_colors, desc="Color of the eye target under fixation state", bmi3d_input_options=list(target_colors.keys()))
     eye_target_color = traits.OptionsList("eye_color", *target_colors, desc="Color of the eye target", bmi3d_input_options=list(target_colors.keys()))
@@ -700,7 +702,7 @@ class EyeHandCaptureBlock(Sequence, Window):
                         gaze_incorrect_target="incorrect_target_penalty", start_pause="pause"),
         fixation = dict(fixation_complete="delay", leave_target="hold_penalty", fixation_break="fixation_penalty", start_pause="pause"),
         hold = dict(hold_complete="delay", leave_target="hold_penalty",  fixation_break="fixation_penalty", start_pause="pause"),
-        delay = dict(delay_complete="targ_transition", leave_target="delay_penalty", fixation_break="fixation_penalty", start_pause="pause"),
+        delay = dict(delay_complete="targ_transition", leave_target="delay_penalty", fixation_break="delay_penalty", start_pause="pause"),
         targ_transition = dict(trial_complete="reward", trial_abort="wait", targ_eye_hand="target_eye_hand", targ_eye="target_eye", start_pause="pause"),
         incorrect_target_penalty = dict(incorrect_target_penalty_end="wait", start_pause="pause", end_state=True),
         timeout_penalty = dict(timeout_penalty_end="wait", start_pause="pause", end_state=True),
@@ -722,7 +724,10 @@ class EyeHandCaptureBlock(Sequence, Window):
         if not hasattr(self, 'plant'):
             self.plant = plantlist[self.plant_type]
         self.plant.set_bounds(np.array(self.cursor_bounds))
-        self.plant.set_color(target_colors[self.cursor_color])
+
+        cursor_new_color = list(target_colors[self.cursor_color])
+        cursor_new_color[3] = self.cursor_alpha
+        self.plant.set_color(cursor_new_color)
         self.plant.set_cursor_radius(self.cursor_radius)
         self.plant_vis_prev = True
         self.cursor_vis_prev = True
@@ -742,9 +747,9 @@ class EyeHandCaptureBlock(Sequence, Window):
             init_hand_new_color = list(target_colors[self.target_color])
             init_hand_new_color[3] = self.init_hand_target_alpha
             goal_eye_new_color = list(target_colors[self.eye_target_color])
-            goal_eye_new_color[3] = self.goal_target_alpha
+            goal_eye_new_color[3] = self.goal_eye_target_alpha
             goal_hand_new_color = list(target_colors[self.target_color])
-            goal_hand_new_color[3] = self.goal_target_alpha
+            goal_hand_new_color[3] = self.goal_hand_target_alpha
 
             # Target 1 and 2 are for saccade. Target 3 and target 4 are for hand
             target1 = VirtualRectangularTarget(target_width=self.fixation_radius, target_height=self.fixation_radius/2, target_color=init_eye_new_color)
