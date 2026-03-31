@@ -296,6 +296,7 @@ class BehaviorAnalysisWorker(AnalysisWorker):
 
 class SaccadeAnalysisWorker(BehaviorAnalysisWorker):
     '''
+<<<<<<< HEAD
     Plots calibrated_eye, cursor, and target data from experiments that have them.
     This is for eye-related task that requires calibrated eye position
     '''
@@ -303,6 +304,20 @@ class SaccadeAnalysisWorker(BehaviorAnalysisWorker):
     def init(self):
         super().init()
         self.calibrated_eye_pos = np.zeros(2)
+=======
+    Plots eye, cursor, and target data from experiments that have them. Performs automatic
+    calibration of eye data to target locations when the cursor enters the target if no
+    calibration coefficients are available. 
+    '''
+   
+    def __init__(self, task_params, data_queue, calibration_dir='/var/tmp', buffer_time=1, ylim=1, px_per_cm=51.67, **kwargs):
+        super().__init__(task_params, data_queue, **kwargs)
+
+    def init(self):
+        super().init()
+        self.calibrated_eye_pos = np.zeros(2)
+        self.calibration_flag = False
+>>>>>>> 194090bde25517e7fb916c964facffc71de3e99f
  
     def get_current_pos(self):
         '''
@@ -319,7 +334,10 @@ class SaccadeAnalysisWorker(BehaviorAnalysisWorker):
             targets = [(self.target_pos[k], radius, color if v == 1 else 'green') for k, v in self.targets.items() if v]
         except:
             targets = []
+<<<<<<< HEAD
         
+=======
+>>>>>>> 194090bde25517e7fb916c964facffc71de3e99f
         return self.cursor_pos, self.calibrated_eye_pos, targets
 
     def draw(self):
@@ -329,7 +347,11 @@ class SaccadeAnalysisWorker(BehaviorAnalysisWorker):
             buffer = self.task_params['fixation_radius_buffer']
         elif 'fixation_dist' in self.task_params:
             buffer = self.task_params['fixation_dist'] - self.task_params['target_radius']
+<<<<<<< HEAD
         eye_radius = 0.1
+=======
+        eye_radius = 0.2
+>>>>>>> 194090bde25517e7fb916c964facffc71de3e99f
 
         patches1 = [plt.Circle(pos, radius+buffer) for pos, radius, _ in targets]
         patches2 = [plt.Circle(cursor_pos, cursor_radius), plt.Circle(calibrated_eye_pos, eye_radius)]
@@ -348,6 +370,7 @@ class SaccadeAnalysisWorker(BehaviorAnalysisWorker):
         self.diam_plot.set_data(np.arange(len(self.eye_diam)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
                                 self.eye_diam[:, 2]/self.px_per_cm)
 
+<<<<<<< HEAD
 class EyeHandAnalysisWorker(BehaviorAnalysisWorker):
     '''
     Plots calibrated_eye, cursor, and target data from experiments that have them. 
@@ -577,6 +600,8 @@ class EyeHandSequenceAnalysisWorker(BehaviorAnalysisWorker):
                                 self.eye_diam[:, 2]/self.px_per_cm)
         
 
+=======
+>>>>>>> 194090bde25517e7fb916c964facffc71de3e99f
 class ERPAnalysisWorker(AnalysisWorker):
     '''
     Plots ERP data from experiments with an ECoG244 array. Automatically calculates 
@@ -870,6 +895,7 @@ class OnlineDataServer(threading.Thread):
 
         elif self.task_params['experiment_name'] == 'SaccadeTask':
             self.analysis_workers.append((SaccadeAnalysisWorker(self.task_params, data_queue), data_queue))
+<<<<<<< HEAD
 
         elif self.task_params['experiment_name'] == 'HandConstrainedSaccadeTask':
             self.analysis_workers.append((EyeHandAnalysisWorker(self.task_params, data_queue), data_queue))
@@ -882,6 +908,8 @@ class OnlineDataServer(threading.Thread):
 
         elif self.task_params['experiment_name'] == 'EyeHandSequenceTask':
             self.analysis_workers.append((EyeHandSequenceAnalysisWorker(self.task_params, data_queue), data_queue))     
+=======
+>>>>>>> 194090bde25517e7fb916c964facffc71de3e99f
 
         # Is there ecube neural data?
         if 'record_headstage' in self.task_params and self.task_params['record_headstage']:

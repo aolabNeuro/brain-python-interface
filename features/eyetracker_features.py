@@ -36,9 +36,12 @@ class EyeCalibration(traits.HasTraits):
     show_eye_pos = traits.Bool(False, desc="Whether to show eye positions")
     eye_target_calibration = traits.Bool(False, desc="Whether to regress eye positions against target positions")
     center_eye_data = traits.Bool(False, desc="Whether to demean eye data with eye position for the center target")
+<<<<<<< HEAD
     offset_time_eye_calibration = traits.Float(0.1, desc="Data after this offset_time is only used for eye calibration")
     duration_eye_calibration = traits.Float(0.2, desc="Data within this duration after offset_time is only used for eye calibration")
 
+=======
+>>>>>>> 194090bde25517e7fb916c964facffc71de3e99f
 
     def __init__(self, *args, **kwargs): #, start_pos, calibration):
         super(EyeCalibration,self).__init__(*args, **kwargs)
@@ -109,7 +112,23 @@ class EyeCalibration(traits.HasTraits):
                             bmi3d_metadata['cursor_interp_samplerate'], events['timestamp'], events['code'], target_pos, \
                             offset=self.offset_time_eye_calibration, duration=self.duration_eye_calibration)
                 
+<<<<<<< HEAD
                 print("Calibration complete:", self.eye_coeff)
+=======
+                # Get eye_pos data when subjects gaze at the center. Target position doesn't matter for this computation
+                if self.center_eye_data:
+                    _, _, eye_center = aopy.preproc.calc_eye_target_calibration(eye_interp[:,:4], \
+                        bmi3d_metadata['cursor_interp_samplerate'], events['timestamp'], events['code'], target_pos, \
+                        offset=0.1, duration=0.2, align_events=80, return_datapoints=True)
+                    
+                    self.eye_center = np.nanmedian(eye_center, axis=0)
+
+                # Calculate coefficient by linear regression between targets and centered eye positions
+                self.eye_coeff, _ = aopy.preproc.calc_eye_target_calibration(eye_interp[:,:4]-self.eye_center, \
+                    bmi3d_metadata['cursor_interp_samplerate'], events['timestamp'], events['code'], target_pos)
+            
+            print("Calibration complete:", self.eye_coeff)
+>>>>>>> 194090bde25517e7fb916c964facffc71de3e99f
 
         # Set up eye cursor
         self.eye_cursor = VirtualCircularTarget(target_radius=.25, target_color=(0., 1., 0., 0.5))

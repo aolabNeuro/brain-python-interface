@@ -5,7 +5,11 @@ from built_in_tasks.othertasks import Conditions, LaserConditions, SweptLaserCon
 from built_in_tasks.target_capture_task import ScreenTargetCapture
 from built_in_tasks.passivetasks import YouTube
 from built_in_tasks.example_task import ExampleSequenceTask
+<<<<<<< HEAD
 from features.generator_features import Autostart, HideLeftTrajectory, ReadysetMedley, ReadysetColorChange, HideCursorReturn
+=======
+from features.generator_features import Autostart, HideLeftTrajectory, ReadysetMedley, ReadysetColorChange
+>>>>>>> 194090bde25517e7fb916c964facffc71de3e99f
 from features.hdf_features import SaveHDF
 from features.touch_features import MouseEmulateTouch
 from riglib.stereo_opengl.environment import Grid
@@ -41,9 +45,15 @@ class TestManualControlTasks(unittest.TestCase):
     @unittest.skip("")
     def test_readysetgo(self):
         seq = ManualControl.centerout_2D()
+<<<<<<< HEAD
         exp = init_exp(ReadySetGoTask, [MouseControl, Window2D, HideCursorReturn], seq, early_move_time = 0.1,
                        delay_time = 0.45, mustmv_time = 0.3, ready_freq = 320, set_freq = 360, go_freq = 400, 
                          show_cursor_return = 2.5, window_size=(1200,800), 
+=======
+        exp = init_exp(ReadySetGoTask, [MouseControl, Window2D], seq, early_move_time = 0.1,
+                       delay_time = 0.45, mustmv_time = 0.3, ready_freq = 320, set_freq = 360, go_freq = 400,
+                         window_size=(1200,800), 
+>>>>>>> 194090bde25517e7fb916c964facffc71de3e99f
                        fullscreen=False)
         exp.rotation = 'xzy'
         exp.run()

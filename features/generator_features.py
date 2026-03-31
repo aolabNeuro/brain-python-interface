@@ -425,6 +425,7 @@ class ReadysetColorChange(traits.HasTraits):
 
     def _end_tooslow_penalty(self):
         self.sync_event('TRIAL_END')
+<<<<<<< HEAD
 
 class HideCursorReturn(traits.HasTraits):
 
@@ -465,3 +466,5 @@ class HideCursorReturn(traits.HasTraits):
     def _start_tooslow_penalty(self):
         super()._start_tooslow_penalty()
         self.plant_visible = False
+=======
+>>>>>>> 194090bde25517e7fb916c964facffc71de3e99f
