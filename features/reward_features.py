@@ -328,10 +328,18 @@ class ProgressBar(traits.HasTraits):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self.bar_width = 12
+
+    def setup_start_wait(self):
+        super().setup_start_wait()
+
+        # Initialize counter at the start of each trial
+        self.tracking_frame_index = 0
+        
     def _while_tracking_in(self):
         super()._while_tracking_in()
         
-        # Update progress bar
+        # Increment counter and redraw progress bar
         self.tracking_frame_index += 1
         self.tracking_rate = self.tracking_frame_index/np.shape(self.targs)[0]*self.bar_width
 

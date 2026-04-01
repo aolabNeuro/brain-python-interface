@@ -531,14 +531,9 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.frame_index += 1 # increment the frame_index for the following cycle
 
     def setup_start_wait(self):
-
         # Allow 2d movement
         if not self.always_1d:
-            self.limit1d = False
-
-        # Set up for progress bar
-        self.bar_width = 12        
-        self.tracking_frame_index = 0
+            self.limit1d = False       
         
         if self.calc_trial_num() == 0:
             # Instantiate the targets here so they don't show up in any states that might come before "wait" 
