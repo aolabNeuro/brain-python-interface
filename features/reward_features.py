@@ -417,16 +417,16 @@ class TrackingRewards(traits.HasTraits):
 
 class ScoreRewards(traits.HasTraits):
     '''
-    Add a "score" to the task that awards points based on target acquisition speed. 
+    Add a "score" to the task that awards points based on some reward function. 
     The score is displayed after each reward and on the web GUI. The running score also gets
     saved as a value in the task data called 'reward_score'.
-
-    Note:
-        Only works with target acquisition tasks.
     '''
     score_display_location = traits.Tuple((10, 0, 10), desc="Location to display the score (in cm)")
     score_display_height = traits.Float(1, desc="Height of the score display (in cm)")
     score_display_color = traits.Tuple((1, 1, 1, 1), desc="Color of the score display")
+    score_function = traits.OptionsList('fixed', ['fixed', 'timed', 'cursor_error', 'hand_error'], 
+                                        desc="Function to calculate the score for each reward",
+                                        bmi3d_input_options=['fixed', 'timed', 'cursor_error', 'hand_error']
     score_timed_state = traits.String("target", desc="State to display the score after")
 
     def __init__(self, *args, **kwargs):
@@ -441,16 +441,22 @@ class ScoreRewards(traits.HasTraits):
     def _start_reward(self):
         if hasattr(super(), '_start_reward'):
             super()._start_reward()
-        timed_state = None
-        idx = -1
-        while timed_state is None and -idx-1 < len(self.state_log):
-            if self.state_log[idx][0] == self.score_timed_state:
-                timed_state = self.state_log[-1][1] - self.state_log[idx][1]
-            idx -= 1
-        if timed_state is None or timed_state == 0.:
-            score = 0.
-        else:
-            score = 10*int(10./timed_state)
+        
+        # Calculate the score
+        score = 0.
+        if self.score_timed_state != "":
+            timed_state = None
+            idx = -1
+            while timed_state is None and -idx-1 < len(self.state_log):
+                if self.state_log[idx][0] == self.score_timed_state:
+                    timed_state = self.state_log[-1][1] - self.state_log[idx][1]
+                idx -= 1
+            if timed_state is None or timed_state == 0.:
+                score = 0.
+            else:
+                score = 10*int(10./timed_state)
+        
+        # Report the score and save a running total
         self.reportstats['Score'] += score
         self.score_display = TextTarget(str(score), height=self.score_display_height, 
                                         color=self.score_display_color)
