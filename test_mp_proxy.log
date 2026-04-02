@@ -1,0 +1,72 @@
+remotely getting attribute: remote_value
+sending __getattribute__ over queue
+lock acquired for __getattribute__
+RPCProcess.run
+Received command: ('__getattribute__', ('remote_value',), {})
+Function: <method-wrapper '__getattribute__' of MockTask object at 0x100d75d90>
+Done with command: __getattribute__, output=3
+lock released for __getattribute__
+remotely getting attribute: remote_value
+sending __getattribute__ over queue
+lock acquired for __getattribute__
+Received command: ('__getattribute__', ('remote_value',), {})
+Function: <method-wrapper '__getattribute__' of MockTask object at 0x100d75d90>
+Done with command: __getattribute__, output=3
+lock released for __getattribute__
+remotely getting attribute: simple_fn
+sending __getattribute__ over queue
+lock acquired for __getattribute__
+Received command: ('__getattribute__', ('simple_fn',), {})
+Function: <method-wrapper '__getattribute__' of MockTask object at 0x100d75d90>
+Done with command: __getattribute__, output=<bound method MockTask.simple_fn of <__mp_main__.MockTask object at 0x100d75d90>>
+lock released for __getattribute__
+remotely getting attribute: simple_fn
+sending __getattribute__ over queue
+lock acquired for __getattribute__
+Received command: ('__getattribute__', ('simple_fn',), {})
+Function: <method-wrapper '__getattribute__' of MockTask object at 0x100d75d90>
+Done with command: __getattribute__, output=<bound method MockTask.simple_fn of <__mp_main__.MockTask object at 0x100d75d90>>
+lock released for __getattribute__
+RPCProcess.run: end of while loop
+RPCProcess.run
+ObjProxy.set: run_state = False
+lock acquired for __setattr__
+Received command: ('__setattr__', ('run_state', False), {})
+Function: <bound method MockTask.__setattr__ of <__mp_main__.MockTask object at 0x102b55d90>>
+Done with command: __setattr__, output=None
+lock released for __setattr__
+The target's termination condition was reached
+RPCProcess.run: end of while loop
+Finished setting remote attr run_state to False
+remotely getting attribute: incr_call_count
+sending __getattribute__ over queue
+lock acquired for __getattribute__
+RPCProcess.run
+Received command: ('__getattribute__', ('incr_call_count',), {})
+Function: <method-wrapper '__getattribute__' of MockTask object at 0x105409d90>
+Done with command: __getattribute__, output=<bound method MockTask.incr_call_count of <__mp_main__.MockTask object at 0x105409d90>>
+lock released for __getattribute__
+remotely getting attribute: incr_call_count
+sending __getattribute__ over queue
+lock acquired for __getattribute__
+Received command: ('__getattribute__', ('incr_call_count',), {})
+Function: <method-wrapper '__getattribute__' of MockTask object at 0x105409d90>
+Done with command: __getattribute__, output=<bound method MockTask.incr_call_count of <__mp_main__.MockTask object at 0x105409d90>>
+lock released for __getattribute__
+RPCProcess.run: end of while loop
+ObjProxy.set: remote_value = 4
+lock acquired for __setattr__
+RPCProcess.run
+Received command: ('__setattr__', ('remote_value', 4), {})
+Function: <bound method MockTask.__setattr__ of <__mp_main__.MockTask object at 0x102e41d90>>
+Done with command: __setattr__, output=None
+lock released for __setattr__
+Finished setting remote attr remote_value to 4
+remotely getting attribute: remote_value
+sending __getattribute__ over queue
+lock acquired for __getattribute__
+Received command: ('__getattribute__', ('remote_value',), {})
+Function: <method-wrapper '__getattribute__' of MockTask object at 0x102e41d90>
+Done with command: __getattribute__, output=4
+lock released for __getattribute__
+RPCProcess.run: end of while loop

@@ -1,10 +1,13 @@
 import time
+import queue
 import inspect
 import traceback
 import multiprocessing as mp
 import io
 
+
 class PipeWrapper(object):
+    """Legacy base class kept for backward compatibility."""
     def __init__(self, pipe=None, log_filename='', cmd_event=None, **kwargs):
         self.pipe = pipe
         self.log_filename = log_filename
@@ -25,11 +28,11 @@ class PipeWrapper(object):
                 fp.write(s)
 
 
-class FuncProxy(object):
+class FuncProxy:
     '''
-    Interface for calling functions in remote processes.
+    Interface for calling functions in remote processes via multiprocessing Queues.
     '''
-    def __init__(self, name, pipe, event, lock, log_filename=''):
+    def __init__(self, name, req_queue, resp_queue, lock, log_filename=''):
         '''
         Constructor for FuncProxy
 
@@ -37,27 +40,22 @@ class FuncProxy(object):
         ----------
         name : string
             Name of remote function to call
-        pipe : mp.Pipe instance
-            multiprocessing pipe through which to send data (function name, arguments) and receive the result
-        event : mp.Event instance
-            A flag to set which is multiprocessing-compatible (visible to both the current and the remote processes)
+        req_queue : mp.Queue
+            Queue through which to send (function name, arguments)
+        resp_queue : mp.Queue
+            Queue from which to receive the result
+        lock : mp.Lock
+            Lock to serialize concurrent calls from the same process
 
         Returns
         -------
         FuncProxy instance
         '''
-        self.pipe = pipe
         self.name = name
-        self.event = event
+        self.req_queue = req_queue
+        self.resp_queue = resp_queue
         self.lock = lock
         self.log_filename = log_filename
-
-    def log_error(self, err, mode='a'):
-        if self.log_filename != '':
-            traceback.print_exc(None, err)
-            with open(self.log_filename, mode) as fp:
-                err.seek(0)
-                fp.write(err.read())
 
     def log_str(self, s, mode="a", newline=True):
         if self.log_filename != '':
@@ -68,85 +66,91 @@ class FuncProxy(object):
 
     def __call__(self, *args, **kwargs):
         '''
-        Return the result of the remote function call
+        Return the result of the remote function call.
 
         Parameters
         ----------
-        *args, **kwargs : positional arguments, keyword arguments
-            To be passed to the remote function associated when the object was created
+        *args, **kwargs
+            Passed to the remote function
 
         Returns
         -------
         function result
         '''
         self.lock.acquire()
-        self.log_str('lock acquired')
-
-        # block until the remote process unsets the event. Acts as a lock
-        n_ticks = 0
-        while self.event.is_set() and n_ticks < 100:
-            n_ticks += 1
-            time.sleep(0.1)
-
-        if n_ticks >= 100:
-            raise Exception("Out of sync!")
-
-        # print("FuncProxy.__call__", self.name, args, kwargs)
-
-        self.pipe.send((self.name, args, kwargs))
-        self.event.set()
-        # resp = self.pipe.recv()
-        if self.pipe.poll(10):
-            resp = self.pipe.recv()
-        else:
-            raise Exception("FuncProxy: remote object failed to respond")
-
-        self.lock.release()        
-        self.log_str('lock released') 
-        return resp
+        self.log_str(f'lock acquired for {self.name}')
+        try:
+            self.req_queue.put((self.name, args, kwargs))
+            try:
+                resp = self.resp_queue.get(timeout=10)
+            except queue.Empty:
+                raise TimeoutError(
+                    f"FuncProxy: remote process did not respond to '{self.name}'"
+                )
+            if isinstance(resp, Exception):
+                raise resp
+            return resp
+        finally:
+            self.lock.release()
+            self.log_str(f'lock released for {self.name}')
 
 
-class ObjProxy(PipeWrapper):
-    def __init__(self, target_class, *args, **kwargs):
-        self.target_class = target_class
-        is_instance_method = lambda n: inspect.isfunction(getattr(self.target_class, n))
-        self.methods = set(filter(is_instance_method, dir(self.target_class)))
+class ObjProxy:
+    '''
+    Proxy for an object running in a remote process.
+    Uses multiprocessing Queues for communication, which are safe
+    for both fork and spawn process start methods.
+    '''
+    def __init__(self, target_class, req_queue, resp_queue, log_filename=''):
+        object.__setattr__(self, '_target_class', target_class)
+        object.__setattr__(self, '_req_queue', req_queue)
+        object.__setattr__(self, '_resp_queue', resp_queue)
+        object.__setattr__(self, '_log_filename', log_filename)
+        # mp.Lock is picklable, needed when this proxy is passed to spawned processes
+        object.__setattr__(self, '_lock', mp.Lock())
 
-        super().__init__(*args, **kwargs)
-        self.lock = mp.Lock()
+        is_instance_method = lambda n: inspect.isfunction(getattr(target_class, n))
+        methods = set(filter(is_instance_method, dir(target_class)))
+        object.__setattr__(self, 'methods', methods)
+
+    def log_str(self, s, mode="a", newline=True):
+        log_filename = object.__getattribute__(self, '_log_filename')
+        if log_filename != '':
+            if newline and not s.endswith("\n"):
+                s += "\n"
+            with open(log_filename, mode) as fp:
+                fp.write(s)
+
+    def _make_func_proxy(self, name):
+        req_queue = object.__getattribute__(self, '_req_queue')
+        resp_queue = object.__getattribute__(self, '_resp_queue')
+        lock = object.__getattribute__(self, '_lock')
+        log_filename = object.__getattribute__(self, '_log_filename')
+        return FuncProxy(name, req_queue, resp_queue, lock, log_filename=log_filename)
 
     def __getattr__(self, attr):
-        self.log_str("remotely getting attribute: %s\n" % attr)
-
-        methods = object.__getattribute__(self, "methods")
-        pipe = object.__getattribute__(self, "pipe")
-        cmd_event = object.__getattribute__(self, "cmd_event")
-        lock = object.__getattribute__(self, "lock")
-
+        self.log_str(f"remotely getting attribute: {attr}")
+        methods = object.__getattribute__(self, 'methods')
         if attr in methods:
-            self.log_str("returning function proxy for %s" % attr)
-            return FuncProxy(attr, pipe, cmd_event, lock, log_filename=self.log_filename)
+            self.log_str(f"returning function proxy for {attr}")
+            return self._make_func_proxy(attr)
         else:
-            self.log_str("sending __getattribute__ over pipe")
-            fn_getattr = FuncProxy("__getattribute__", pipe, cmd_event, lock, log_filename=self.log_filename)
-            return fn_getattr(attr)
+            self.log_str("sending __getattribute__ over queue")
+            return self._make_func_proxy('__getattribute__')(attr)
 
     def set(self, attr, value):
-        self.log_str("ObjProxy.setattr")
-        pipe = object.__getattribute__(self, "pipe")
-        cmd_event = object.__getattribute__(self, "cmd_event")        
-        lock = object.__getattribute__(self, "lock")
-        setattr_fn = FuncProxy('__setattr__', pipe, cmd_event, lock, log_filename=self.log_filename)
-
-        setattr_fn(attr, value)
-        self.log_str("Finished setting remote attr %s to %s" % (str(attr), str(value)))
+        self.log_str(f"ObjProxy.set: {attr} = {value}")
+        self._make_func_proxy('__setattr__')(attr, value)
+        self.log_str(f"Finished setting remote attr {attr} to {value}")
 
     def terminate(self):
-        self.pipe.send(None)
+        req_queue = object.__getattribute__(self, '_req_queue')
+        req_queue.put(None)
 
 
 class DataPipe(PipeWrapper):
     pass
+
 
 def call_from_remote(x):
     return x
@@ -154,43 +158,55 @@ def call_from_remote(x):
 def call_from_parent(x):
     return x
 
+
 class RPCProcess(mp.Process):
-    """mp.Process which implements remote procedure call (RPC) through a mp.Pipe object"""
+    """mp.Process which implements remote procedure call (RPC) via multiprocessing Queues.
+
+    Uses mp.Queue for IPC instead of mp.Pipe + mp.Event, which avoids
+    deadlocks when using the 'spawn' process start method (default on macOS).
+    """
     def __init__(self, target_class=object, target_kwargs=dict(), log_filename='', **kwargs):
         super().__init__()
-        self.cmd_pipe = None
-        self.data_pipe = None
         self.log_filename = log_filename
 
         self.target = None
         self.target_class = target_class
         self.target_kwargs = target_kwargs
 
-        self.cmd_event = mp.Event()
-        self.status = mp.Value('b', 1) # mp boolean used for terminating the remote process
+        self.status = mp.Value('b', 1)  # shared flag for terminating the remote process
+
+        # Queues for RPC – picklable and spawn-safe
+        self._req_queue = mp.Queue()
+        self._resp_queue = mp.Queue()
 
         self.target_proxy = None
         self.data_proxy = None
 
     def __getattr__(self, attr):
-        """ Redirect attribute access to the target object if the 
-        attribute can't be found in the process wrapper """
+        """Redirect attribute access to the target object when not found locally."""
         try:
-            if self.target_proxy is not None and self.status.value > 0:
+            target_proxy = object.__getattribute__(self, 'target_proxy')
+            status = object.__getattribute__(self, 'status')
+            if target_proxy is not None and status.value > 0:
                 try:
-                    return getattr(self.target_proxy, attr)
-                except:
-                    raise AttributeError("RPCProcess: could not forward getattr %s to target of type %s" % (attr, self.target_class))
+                    return getattr(target_proxy, attr)
+                except Exception:
+                    raise AttributeError(
+                        f"RPCProcess: could not forward getattr '{attr}' to target"
+                    )
             else:
                 raise AttributeError("RPCProcess: target proxy not initialized")
-        except:
-            raise AttributeError("Could not get RPCProcess attribute: %s" % attr)
+        except AttributeError:
+            raise
+        except Exception:
+            raise AttributeError(f"Could not get RPCProcess attribute: {attr}")
 
-    def log_error(self, err, mode='a'):
+    def log_error(self, err=None, mode='a'):
         if self.log_filename != '':
             with open(self.log_filename, mode) as fp:
                 traceback.print_exc(file=fp)
-                fp.write(str(err))
+                if err is not None:
+                    fp.write(str(err))
 
     def log_str(self, s, mode="a", newline=True):
         if self.log_filename != '':
@@ -206,14 +222,9 @@ class RPCProcess(mp.Process):
             if hasattr(self.target, 'start'):
                 self.target.start()
         except Exception as e:
-            print("RPCProcess.target_constr: unable to start source!")
+            print("RPCProcess.target_constr: unable to start target!")
             print(e)
-
-            import io
-            err = io.StringIO()
-            self.log_error(err, mode='a')
-            err.seek(0)
-
+            self.log_error(mode='a')
             self.status.value = -1
 
     @call_from_remote
@@ -222,13 +233,14 @@ class RPCProcess(mp.Process):
 
     @call_from_parent
     def start(self):
-        self.cmd_pipe, pipe_end2 = mp.Pipe()
-        self.data_pipe, data_pipe2 = mp.Pipe()
-
-        self.target_proxy = ObjProxy(self.target_class, pipe=pipe_end2, 
-            log_filename=self.log_filename, cmd_event=self.cmd_event)
-        self.data_proxy = DataPipe(data_pipe2)
         super().start()
+        self.target_proxy = ObjProxy(
+            self.target_class,
+            self._req_queue,
+            self._resp_queue,
+            log_filename=self.log_filename,
+        )
+        self.data_proxy = DataPipe(log_filename=self.log_filename)
         return self.target_proxy, self.data_proxy
 
     def check_run_condition(self):
@@ -242,26 +254,44 @@ class RPCProcess(mp.Process):
         self.status.value = -1
 
     def __del__(self):
-        '''Stop the process when the object is destructed'''
+        """Stop the process when the object is destructed."""
         if self.status.value > 0:
-            #self.stop() <- currently causing issues with task_wrapper. Somewhere the status is not being set properly after the task ends...
             self.status.value = -1
 
     def is_cmd_present(self):
-        return self.cmd_event.is_set()
-
-    def clear_cmd(self):
-        self.log_str("clearing")
-        self.cmd_event.clear()
+        return not self._req_queue.empty()
 
     @call_from_remote
     def loop_task(self):
         time.sleep(0.01)
 
     @call_from_remote
+    def proc_rpc_command(self):
+        try:
+            cmd = self._req_queue.get_nowait()
+        except queue.Empty:
+            return
+
+        self.log_str(f"Received command: {cmd}")
+
+        if cmd is None:
+            self.stop()
+            return
+
+        try:
+            fn_name, cmd_args, cmd_kwargs = cmd
+            fn = getattr(self.target, fn_name)
+            self.log_str(f"Function: {fn}")
+            fn_output = fn(*cmd_args, **cmd_kwargs)
+            self._resp_queue.put(fn_output)
+            self.log_str(f'Done with command: {fn_name}, output={fn_output}')
+        except Exception as e:
+            self.log_error(mode='a')
+            self._resp_queue.put(e)
+
+    @call_from_remote
     def run(self):
         self.log_str("RPCProcess.run")
-
         self.target_constr()
 
         try:
@@ -272,7 +302,6 @@ class RPCProcess(mp.Process):
 
                 if self.is_cmd_present():
                     self.proc_rpc_command()
-                    self.clear_cmd()
 
                 self.loop_task()
 
@@ -280,38 +309,12 @@ class RPCProcess(mp.Process):
             ret_status, msg = 0, ''
         except KeyboardInterrupt:
             ret_status, msg = 1, 'KeyboardInterrupt'
-        except:
-            import traceback
+        except Exception:
             traceback.print_exc()
             err = io.StringIO()
-            self.log_error(err, mode='a')
+            traceback.print_exc(file=err)
             err.seek(0)
             ret_status, msg = 1, err.read()
         finally:
             self.target_destr(ret_status, msg)
             self.status.value = -1
-
-    @call_from_remote
-    def proc_rpc_command(self):
-        cmd = self.cmd_pipe.recv()
-        self.log_str("Received command: %s" % str(cmd))
-
-        if cmd is None:
-            self.stop()
-            return 
-
-        try:
-            fn_name, cmd_args, cmd_kwargs = cmd
-            fn = getattr(self.target, fn_name)
-            self.log_str("Function: " + str(fn))
-
-            fn_output = fn(*cmd_args, **cmd_kwargs)
-            self.cmd_pipe.send(fn_output)
-
-            self.log_str('Done with command: %s, output=%s\n\n' % (fn_name, fn_output))
-        except Exception as e:
-            err = io.StringIO()
-            self.log_error(err, mode='a')
-
-            self.cmd_pipe.send(e)
-
