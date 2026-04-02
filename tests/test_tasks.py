@@ -84,7 +84,7 @@ class TestManualControlTasks(unittest.TestCase):
         exp = init_exp(TrackingTask, [HideLeftTrajectory, MouseControl, Window2D], seq, window_size=(1000,800), fullscreen=False,
                        lookahead_time=1, screen_half_height=10)
         exp.rotation = 'xzy'
-        # exp.trajectory_type = 'space'
+        exp.trajectory_type = '1d'
         exp.trajectory_amplitude = 5
         exp.trajectory_radius = 0.2
         exp.run()
@@ -112,7 +112,7 @@ class TestManualControlTasks(unittest.TestCase):
                        limit1d=False, trajectory_amplitude=5, lookahead_time=1)
         exp.stereo_mode = 'projection'
         exp.rotation = 'xzy'
-        exp.trajectory_type = '1d'
+        exp.trajectory_type = '2d'
         exp.run()
 
     @unittest.skip("")

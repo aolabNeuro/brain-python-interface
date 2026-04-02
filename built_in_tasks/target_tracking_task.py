@@ -39,7 +39,7 @@ class TargetTracking(Sequence):
         tracking_in = dict(traj_complete="tracking_in_ramp", trial_complete="reward", leave_target="tracking_out", start_pause="pause"),
         tracking_out = dict(traj_complete="tracking_out_ramp", trial_complete="reward", enter_target="tracking_in", tracking_out_timeout="tracking_out_penalty", start_pause="pause"),
         
-        timeout_penalty = dict(timeout_penalty_end="wait", start_pause="pause", end_state=True),
+        timeout_penalty = dict(timeout_penalty_end="wait", timeout_penalty_end_retry = "wait_retry", start_pause="pause", end_state=True),
         hold_penalty = dict(hold_penalty_end="wait", hold_penalty_end_retry="wait_retry", start_pause="pause", end_state=True),
         tracking_out_penalty = dict(tracking_out_penalty_end="wait", start_pause="pause", end_state=True),
         reward = dict(reward_end="wait", start_pause="pause", stoppable=False, end_state=True),
@@ -103,7 +103,7 @@ class TargetTracking(Sequence):
             self.ramp_counter[-int(self.ramp_down_time*self.sample_rate):] = 2
     
     def tracking_task_start_wait(self):
-        # print(self.gen_index)
+        print(self.gen_index, self.tries)
 
         self.trial_record['trial'] = self.calc_trial_num()
         self.trial_record['index'] = self.gen_index
@@ -116,9 +116,6 @@ class TargetTracking(Sequence):
 
         # trial is not finished
         self.trial_timed_out = False
-
-        # number of times this trajectory has been attempted
-        self.tries = 0
 
         # index into trajectory
         self.frame_index = -1
@@ -142,6 +139,9 @@ class TargetTracking(Sequence):
                 self._parse_next_trial()
             except StopIteration:
                 self.end_task()
+        
+        # number of times this trajectory has been attempted
+        self.tries = 0
 
         self.tracking_task_start_wait()
 
@@ -150,6 +150,7 @@ class TargetTracking(Sequence):
         pass
 
     def _start_wait_retry(self):
+        print('retrying wait')
         self.tracking_task_start_wait()
 
     def _while_wait_retry(self):
@@ -343,7 +344,10 @@ class TargetTracking(Sequence):
         return time_in_state > self.tracking_out_time
 
     def _test_timeout_penalty_end(self, time_in_state):
-        return time_in_state > self.timeout_penalty_time
+        return time_in_state > self.timeout_penalty_time and (self.tries == self.max_hold_attempts)
+
+    def _test_timeout_penalty_end_retry(self, time_in_state):
+        return (time_in_state > self.timeout_penalty_time) and (self.tries < self.max_hold_attempts)
 
     def _test_hold_penalty_end(self, time_in_state):
         return (time_in_state > self.hold_penalty_time) and (self.tries==self.max_hold_attempts)
