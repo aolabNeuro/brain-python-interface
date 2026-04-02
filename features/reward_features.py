@@ -327,7 +327,6 @@ class ProgressBar(traits.HasTraits):
     '''
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
         self.bar_width = 12
 
     def setup_start_wait(self):
@@ -336,12 +335,12 @@ class ProgressBar(traits.HasTraits):
         # Initialize counter at the start of each trial
         self.tracking_frame_index = 0
         
-    def _while_tracking_in(self):
-        super()._while_tracking_in()
+    def setup_while_tracking(self):
+        super().setup_while_tracking()
         
         # Increment counter and redraw progress bar
         self.tracking_frame_index += 1
-        self.tracking_rate = self.tracking_frame_index/np.shape(self.targs)[0]*self.bar_width
+        self.tracking_rate = self.tracking_frame_index/self.trajectory_length*self.bar_width # proportion of total number of frames
 
         if hasattr(self, 'bar'):
             for model in self.bar.graphics_models:
@@ -353,6 +352,12 @@ class ProgressBar(traits.HasTraits):
             self.add_model(model)
         self.bar.show()
 
+    def _start_reward(self):
+        super()._start_reward()
+
+        # Reset reward frame index
+        self.reward_frame_index = 0
+
     def _while_reward(self):
         super()._while_reward()
 
@@ -362,8 +367,11 @@ class ProgressBar(traits.HasTraits):
             del self.bar
 
         self.reward_frame_index += 1
-        reward_numframe = self.reward_time*self.fps
+        reward_numframe = self.reward_time * self.fps * 0.85 # account for lower-than-ideal frame rate
         reward_amount = self.tracking_rate - self.reward_frame_index*self.tracking_rate/reward_numframe
+        if reward_amount < 0:
+            reward_amount = 0
+
         self.bar = VirtualRectangularTarget(target_width=1.3, target_height=reward_amount, target_color=(0., 1., 0., 0.75), starting_pos=[reward_amount-self.bar_width,-15,9])
         for model in self.bar.graphics_models:
             self.add_model(model)
@@ -433,42 +441,56 @@ class ScoreRewards(traits.HasTraits):
         Only works with target acquisition tasks.
     '''
     score_display_location = traits.Tuple((10, 0, 10), desc="Location to display the score (in cm)")
-    score_display_height = traits.Float(1, desc="Height of the score display (in cm)")
+    score_display_size = traits.Int(36, desc="Font size of the score display")
     score_display_color = traits.Tuple((1, 1, 1, 1), desc="Color of the score display")
-    score_timed_state = traits.String("target", desc="State to display the score after")
+    score_multiplier = traits.Int(100, desc="Value to multiple the score by")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.reportstats['Score'] = 0
     
     def init(self):
-        self.add_dtype('reward_score', 'f8', (1,))
+        self.add_dtype('reward_score', 'int', (1,))
         super().init()
         self.task_data['reward_score'] = 0
+
+    def setup_start_wait(self):
+        super().setup_start_wait()
+
+        # Initialize counter at the start of each trial
+        self.tracking_in_counter = 0
+        
+    def _while_tracking_in(self):
+        super()._while_tracking_in()
+        
+        # Increment counter
+        self.tracking_in_counter += 1
+
+    def _while_tracking_in_ramp(self):
+        super()._while_tracking_in_ramp()
+        
+        # Increment counter
+        self.tracking_in_counter += 1
 
     def _start_reward(self):
         if hasattr(super(), '_start_reward'):
             super()._start_reward()
-        timed_state = None
-        idx = -1
-        while timed_state is None and -idx-1 < len(self.state_log):
-            if self.state_log[idx][0] == self.score_timed_state:
-                timed_state = self.state_log[-1][1] - self.state_log[idx][1]
-            idx -= 1
-        if timed_state is None or timed_state == 0.:
-            score = 0.
-        else:
-            score = 10*int(10./timed_state)
-        self.reportstats['Score'] += score
-        self.score_display = TextTarget(str(score), height=self.score_display_height, 
-                                        color=self.score_display_color)
+
+        # Set score to the proportion of the trial spent tracking inside the target
+        score = int(self.score_multiplier * self.tracking_in_counter / self.trajectory_length)
+        
+        self.reportstats['Score'] = score
+        self.task_data['reward_score'] = score
+        self.score_display = TextTarget(str(score), color=self.score_display_color,
+                                        font_size=self.score_display_size)
         self.score_display.move_to_position(self.score_display_location)
         self.add_model(self.score_display.model)
-        self.task_data['reward_score'] += score
-
+        
     def _end_reward(self):
         if hasattr(super(), '_end_reward'):
             super()._end_reward()
+
+        # Hide score at the end of each trial
         self.remove_model(self.score_display.model)
         self.score_display.model.release()
 
