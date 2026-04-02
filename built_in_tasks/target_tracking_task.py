@@ -1069,12 +1069,12 @@ class ScreenTargetTracking(TargetTracking, Window):
         return trials, trial_order
 
     @staticmethod
-    def generate_trajectory(primes, base_period, ramp = 0.0):
+    def generate_trajectory(primes, num_trials = 2, base_period = 20, sample_rate = 60, ramp = 0.0):
         '''
         Sets up variables and uses prime numbers to call the above functions and generate then trajectories
         ramp is time length for preparatory lines
         '''
-        hz = 60 # Hz -- sampling rate
+        hz = sample_rate # Hz -- sampling rate
         dt = 1/hz # sec -- sampling period
 
         T0 = base_period # sec -- base period
@@ -1095,10 +1095,15 @@ class ScreenTargetTracking(TargetTracking, Window):
 
         N = t.size # = T/dt -- number of samples
 
+        trials = dict(id = np.arange(num_trials), times=np.tile(t,(num_trials,1)), ref=np.zeros((num_trials,N)), dis=np.zeros((num_trials,N)))
+
         #trajectory = ScreenTargetTracking.calc_sum_of_sines_ramp(t, r, f, a, o/(2*np.pi))
         trajectory = ScreenTargetTracking.calc_sum_of_sines_ramp(t, r, f, a, o)
         normalized_trajectory = trajectory/np.sum(a)
-        return normalized_trajectory
+        
+        trials['ref'] = normalized_trajectory
+        trials['dis'] = normalized_trajectory*0.8
+        return trials
     
     ### Generator functions ####
     @staticmethod
@@ -1235,3 +1240,71 @@ class ScreenTargetTracking(TargetTracking, Window):
                 pts.append(trajectory)
                 yield idx, pts, disturbance, disturbance_path, None
                 idx += 1
+        
+    @staticmethod
+    def single_sine_chain(nblocks=1, ntrials=500, time_length=20, ramp=1.5, ramp_down=1.5, primes = 2, seed=40, sample_rate=120, dimensions = 1, disturbance=True, boundaries=(-10,10,-10,10)):
+        '''
+        Generates a sequence of 1D (z axis) target trajectories
+
+        Parameters
+        ----------
+        nblocks : int
+            The number of blocks in the session
+        ntrials : int
+            The number of trials in a block
+        time_length : int
+            The length of one trial in seconds
+        seed : int
+            The seed for the random generator
+        sample_rate : int
+            The sample rate of the generated trajectories
+        ramp : float
+            The length of ramp up into a trial in seconds
+        dimensions: int
+            Number of dimensions to generate trajectories for (1 or 2)
+        disturbance : boolean
+            Whether to add disturbance to the cursor (disturbance is generated regardless)
+        boundaries: 4 element tuple
+            The limits of the allowed target locations (-x, x, -z, z)
+        decay_rate: None or float
+            This generates amplitudes using a decay_rate. Used for 2d trajectories. If set to None (default), amplitudes are generated using a linear decay.
+
+        Returns
+        -------
+        idx : [nblocks*ntrials x 1] array of trial indices
+        targs : [nblocks*ntrials x 1] array of 3D target coordinates
+        disturbance : boolean
+        dis_trajectory : [nblocks*ntrials x 1] array of 3D disturbance coordinates
+        '''
+        idx = 0
+        base_period = 20
+        for block_id in range(nblocks):     
+            if dimensions == 1:            
+                trials, trial_order = ScreenTargetTracking.generate_trajectory(
+                    num_trials=ntrials, time_length=time_length, seed=seed, sample_rate=sample_rate, base_period=base_period, ramp=ramp, ramp_down=ramp_down, primes = primes)
+                for trial_id in range(ntrials):
+                    targs = []
+                    ref_trajectory = np.zeros((int((time_length+ramp+ramp_down)*sample_rate),3))
+                    dis_trajectory = ref_trajectory.copy()
+                    ref_trajectory[:,2] = trials['ref'][trial_id] 
+                    dis_trajectory[:,2] = trials['dis'][trial_id] # scale will determine lower limit of target size for perfect tracking
+                    targs.append(ref_trajectory)
+                    yield idx, targs, disturbance, dis_trajectory, sample_rate, ramp, ramp_down
+                    idx += 1
+
+            if dimensions == 2: 
+                trials, trial_order = ScreenTargetTracking.generate_2D_trajectory(
+                    num_trials=ntrials, time_length=time_length, seed=seed, sample_rate=sample_rate, base_period=base_period, ramp=ramp, ramp_down=ramp_down, num_primes=num_primes, use_disturb = disturbance)
+                for trial_id in range(ntrials):
+                    targs = []
+                    ref_trajectory = np.zeros((int((time_length+ramp+ramp_down)*sample_rate),3))
+                    dis_trajectory = ref_trajectory.copy()
+                    
+                    ref_trajectory[:,2] = trials['ref_y'][trial_id] #y is out of the screen, x is left and right and z is up and down 
+                    ref_trajectory[:,0] = trials['ref_x'][trial_id]
+
+                    dis_trajectory[:,2] = trials['dis_y'][trial_id]
+                    dis_trajectory[:,0] = trials['dis_x'][trial_id] 
+                    targs.append(ref_trajectory)
+                    yield idx, targs, disturbance, dis_trajectory, sample_rate, ramp, ramp_down
+                    idx += 1
