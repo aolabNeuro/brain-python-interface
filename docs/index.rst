@@ -23,6 +23,7 @@ Setting up and running an experiment:
     database
     tracker
     bmi
+    kfrml_clda_feature
     data_sources
     nidaq
 

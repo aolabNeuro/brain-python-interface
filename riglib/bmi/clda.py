@@ -323,6 +323,11 @@ class OFCLearner(Learner):
 
 class OFCLearnerRotateIntendedVelocity(OFCLearner):
     # Only intended for 3D cursor control with this state vector: [Px, Py, Pz, Vx, Vy, Vz, 1]
+    def __init__(self, batch_size, A, B, F_dict, *args, **kwargs):
+        self.intended_speed = kwargs.pop('intended_speed', 5.0)
+        self.position_eps = kwargs.pop('position_eps', 1e-8)
+        super(OFCLearnerRotateIntendedVelocity, self).__init__(batch_size, A, B, F_dict, *args, **kwargs)
+
     def calc_int_kin(self, current_state, target_state, decoder_output, task_state, state_order=None):
         '''
         Calculate intended kinematics as 
@@ -347,18 +352,42 @@ class OFCLearnerRotateIntendedVelocity(OFCLearner):
         np.mat of shape (N, 1)
             Estimate of intended next state for BMI
         '''
-        try:        
-            current_position = current_state[:3] # assumes the first half of states are position (besides offset)
-            target_position = target_state[:3]
-            target_velocity_norm = (target_position - current_position)/np.linalg.norm((target_position - current_position)) # Unit velocity vector towards target
+        try:
+            current_state_arr = np.asarray(current_state).reshape(-1)
+            target_state_arr = np.asarray(target_state).reshape(-1)
 
-            target_state = np.ones(7)
-            target_state[:3] = current_position # Set target state position to be the same as the current state position
-            target_state[3:6] = target_velocity_norm * np.linalg.norm(current_state[3:6])
+            if state_order is not None and len(state_order) == len(current_state_arr):
+                state_order = np.asarray(state_order)
+                pos_inds = np.where(state_order == 0)[0]
+                vel_inds = np.where(state_order == 1)[0]
+            else:
+                pos_inds = np.arange(min(3, len(current_state_arr)))
+                vel_start = min(3, len(current_state_arr))
+                vel_stop = min(vel_start + 3, len(current_state_arr))
+                vel_inds = np.arange(vel_start, vel_stop)
 
+            n_dims = min(len(pos_inds), len(vel_inds), self.B.shape[1])
+            if n_dims == 0:
+                return None
 
-            current_state = np.asmatrix(current_state).reshape(-1,1)
-            target_state = np.asmatrix(target_state).reshape(-1,1)
+            pos_inds = pos_inds[:n_dims]
+            vel_inds = vel_inds[:n_dims]
+
+            current_position = current_state_arr[pos_inds]
+            target_position = target_state_arr[pos_inds]
+            diff = target_position - current_position
+            dist = np.linalg.norm(diff)
+            if dist < self.position_eps:
+                return None
+
+            target_velocity = (diff / dist) * self.intended_speed
+
+            intended_target_state = current_state_arr.copy()
+            intended_target_state[pos_inds] = current_position
+            intended_target_state[vel_inds] = target_velocity
+
+            current_state = np.asmatrix(current_state_arr).reshape(-1,1)
+            target_state = np.asmatrix(intended_target_state).reshape(-1,1)
             F = self.F_dict[task_state]
             A = self.A
             B = self.B
@@ -730,15 +759,6 @@ class KFRML(Updater):
         if intended_kin is None or spike_counts is None or decoder is None:
             raise ValueError("must specify intended_kin, spike_counts and decoder objects for the updater to work!")
 
-        # Calculate the step size based on the half life and the number of samples to train from
-        batch_size = intended_kin.shape[1]
-        batch_time = batch_size * decoder.binlen            
-
-        if half_life is not None:
-            rho = np.exp(np.log(0.5)/(half_life/batch_time))
-        else:
-            rho = self.rho 
-
         #update driver of neurons
         try:
             drives_neurons = decoder.drives_neurons.copy()
@@ -751,6 +771,27 @@ class KFRML(Updater):
 
         x = np.asmatrix(intended_kin)
         y = np.asmatrix(spike_counts)
+
+        x_valid = np.all(np.isfinite(np.asarray(x)), axis=0)
+        y_valid = np.all(np.isfinite(np.asarray(y)), axis=0)
+        valid = np.asarray(x_valid & y_valid).ravel()
+
+        if not np.all(valid):
+            x = x[:, valid]
+            y = y[:, valid]
+            if values is not None:
+                values = np.asarray(values)[valid]
+
+        batch_size = x.shape[1]
+        if batch_size == 0:
+            return None
+
+        batch_time = batch_size * decoder.binlen
+        if half_life is not None:
+            rho = np.exp(np.log(0.5)/(half_life/batch_time))
+        else:
+            rho = self.rho
+
         #limit x to the indices that can adapt:
         #x = x[self.state_adapting_inds, :]
 
@@ -761,7 +802,7 @@ class KFRML(Updater):
             n_samples = np.sum(values)
             B = np.asmatrix(np.diag(values))
         else:
-            n_samples = spike_counts.shape[1]
+            n_samples = y.shape[1]
             B = np.asmatrix(np.eye(n_samples))
 
         if self.adapt_C_xpose_Q_inv_C:
@@ -814,8 +855,8 @@ class KFRML(Updater):
             sdFR = 1.
 
         if self.adapt_mFR_stats:
-            mFR[self.adapting_inds] = (1-rho)*np.mean(spike_counts[self.adapting_inds,:].T, axis=0) + rho*mFR_old[self.adapting_inds]
-            sdFR[self.adapting_inds] = (1-rho)*np.std(spike_counts[self.adapting_inds,:].T, axis=0) + rho*sdFR_old[self.adapting_inds]
+            mFR[self.adapting_inds] = (1-rho)*np.mean(np.asarray(y)[self.adapting_inds,:].T, axis=0) + rho*mFR_old[self.adapting_inds]
+            sdFR[self.adapting_inds] = (1-rho)*np.std(np.asarray(y)[self.adapting_inds,:].T, axis=0) + rho*sdFR_old[self.adapting_inds]
 
         C_xpose_Q_inv = C.T * np.linalg.pinv(Q)
         new_params = {'filt.C':C, 'filt.Q':Q, 'filt.C_xpose_Q_inv':C_xpose_Q_inv,
