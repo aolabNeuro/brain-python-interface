@@ -3,9 +3,9 @@ Virtual target capture tasks where cursors are controlled by physical
 motion interfaces such as joysticks
 '''
 import numpy as np
-from scipy.spatial.transform import Rotation as R
 
 from riglib.experiment import traits
+from riglib.bmi.unified_control import ManualControlInput, CoordinateMapper
 
 from .target_graphics import *
 from .target_capture_task import ScreenTargetCapture
@@ -40,6 +40,8 @@ class ManualControlMixin(traits.HasTraits):
         self.current_pt=np.zeros([3]) #keep track of current pt
         self.last_pt = np.array(self.starting_pos) #keep track of last pt to calc. velocity
         self._quality_window_size = 500 # how many cycles to accumulate quality statistics
+        self.control_input = ManualControlInput(scale=1.0, velocity_control=False)
+        self.coordinate_mapper = None
         self.reportstats['Input quality'] = "100 %"
         if self.random_rewards:
             self.reward_time_base = self.reward_time
@@ -74,24 +76,29 @@ class ManualControlMixin(traits.HasTraits):
         ''' 
         Returns transformed coordinates based on rotation, offset, and scale traits
         '''
-        offset = np.array(
-            [[1, 0, 0, 0], 
-            [0, 1, 0, 0], 
-            [0, 0, 1, 0], 
-            [self.offset[0], self.offset[1], self.offset[2], 1]]
+        if self.coordinate_mapper is None:
+            self._build_coordinate_mapper()
+
+        control_vector = self.control_input(coords)
+        return self.coordinate_mapper(control_vector)
+
+    def _build_coordinate_mapper(self):
+        scale_total = self.scale * self.exp_gain
+        offset_total = np.array(self.offset) * scale_total
+        self.coordinate_mapper = CoordinateMapper(
+            scale=scale_total,
+            offset=offset_total,
+            rotation_matrix=rotations.get(self.rotation, np.eye(3)),
+            baseline_rotation=baseline_rotations.get(self.baseline_rotation, np.eye(3)),
+            exp_rotation=exp_rotations.get(self.exp_rotation, np.eye(3)),
+            perturbation_rotations={
+                'y': self.pertubation_rotation,
+                'z': self.perturbation_rotation_z,
+                'x': self.perturbation_rotation_x,
+            }
+            ,
+            use_legacy_row_rotations=True
         )
-        scale = np.array(
-            [[self.scale, 0, 0, 0], 
-            [0, self.scale, 0, 0], 
-            [0, 0, self.scale, 0], 
-            [0, 0, 0, 1]]
-        )
-        old = np.concatenate((np.reshape(coords, -1), [1])) # manual input (3,) plus offset term
-        new = np.linalg.multi_dot((old, offset, scale, rotations[self.rotation], baseline_rotations[self.baseline_rotation], exp_rotations[self.exp_rotation])) # screen coords (3,) plus offset term
-        pertubation_rot = R.from_euler('y', self.pertubation_rotation, degrees=True) # this is perturb_rot_y
-        perturb_rot_z = R.from_euler('z', self.perturbation_rotation_z, degrees=True)
-        perturb_rot_x = R.from_euler('x', self.perturbation_rotation_x, degrees=True)
-        return np.linalg.multi_dot((new[0:3] * self.exp_gain, pertubation_rot.as_matrix(), perturb_rot_z.as_matrix(), perturb_rot_x.as_matrix()))
 
     def _get_manual_position(self):
         '''
@@ -128,6 +135,8 @@ class ManualControlMixin(traits.HasTraits):
 
         self.task_data['manual_input'] = raw_coords.copy()
         self.no_data_counter[self.cycle_count % self._quality_window_size] = 0
+
+        self._build_coordinate_mapper()
 
         # Transform coordinates
         coords = self._transform_coords(raw_coords)

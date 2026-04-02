@@ -10,11 +10,13 @@ from riglib.bmi import goal_calculators, ppfdecoder, feedback_controllers
 from riglib.bmi.bmi import BMILoop
 from riglib.bmi.assist import Assister, FeedbackControllerAssist
 from riglib.bmi.state_space_models import StateSpaceEndptVel2D, StateSpaceNLinkPlanarChain
+from riglib.bmi.unified_control import CoordinateMapper
 from riglib.experiment.experiment import control_decorator
 
 from riglib.stereo_opengl.window import WindowDispl2D
 from .target_capture_task import ScreenTargetCapture
 from .target_capture_task_xt import ScreenReachAngle
+from .rotation_matrices import rotations, baseline_rotations, exp_rotations
 from features.bmi_task_features import LinearlyDecreasingAssist
 from .target_graphics import target_colors
 
@@ -203,6 +205,16 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
     cursor_color = traits.OptionsList("orange", *target_colors, desc='Color of cursor endpoint', bmi3d_input_options=list(target_colors.keys()))
     save_zscore = traits.Bool(False, desc="save a decoder zscored from this task")
 
+    rotation = traits.OptionsList(*rotations, desc="Rotation to transform decoder output to bmi3d coordinates", bmi3d_input_options=list(rotations.keys()))
+    scale = traits.Float(1.0, desc="Scale factor for decoded control")
+    baseline_rotation = traits.OptionsList(*baseline_rotations, desc="Rotation to define the mapping between bmi3d coordinates and baseline workspace", bmi3d_input_options=list(baseline_rotations.keys()))
+    exp_rotation = traits.OptionsList(*exp_rotations, desc="Experimental rotation to manipulate the mapping between baseline workspace and screen coordinates", bmi3d_input_options=list(exp_rotations.keys()))
+    pertubation_rotation = traits.Float(0.0, desc="Experimental rotation about bmi3d y-axis in degrees")
+    perturbation_rotation_z = traits.Float(0.0, desc="Experimental rotation about bmi3d z-axis in degrees")
+    perturbation_rotation_x = traits.Float(0.0, desc="Experimental rotation about bmi3d x-axis in degrees")
+    offset = traits.Array(value=[0,0,0], desc="Offset for decoded control")
+    exp_gain = traits.Float(1.0, desc="Experimental gain scale factor to manipulate the mapping to screen coordinates")
+
     static_states = ['reward'] # states in which the decoder is not run
 
     ordered_traits = ['session_length', 'assist_level', 'assist_level_time', 'reward_time','timeout_time','timeout_penalty_time']
@@ -213,6 +225,42 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.coordinate_mapper = None
+
+    def _build_coordinate_mapper(self):
+        scale_total = self.scale * self.exp_gain
+        offset_total = np.array(self.offset) * scale_total
+        self.coordinate_mapper = CoordinateMapper(
+            scale=scale_total,
+            offset=offset_total,
+            rotation_matrix=rotations.get(self.rotation, np.eye(3)),
+            baseline_rotation=baseline_rotations.get(self.baseline_rotation, np.eye(3)),
+            exp_rotation=exp_rotations.get(self.exp_rotation, np.eye(3)),
+            perturbation_rotations={
+                'y': self.pertubation_rotation,
+                'z': self.perturbation_rotation_z,
+                'x': self.perturbation_rotation_x,
+            }
+            ,
+            use_legacy_row_rotations=True
+        )
+
+    def move_plant(self, **kwargs):
+        decoder_state = super().move_plant(**kwargs)
+
+        self._build_coordinate_mapper()
+
+        if decoder_state is None:
+            return decoder_state
+
+        apply_limit2d = getattr(self, 'limit2d', False)
+        apply_limit1d = getattr(self, 'limit1d', False)
+        world_pos = self.coordinate_mapper(decoder_state, apply_limit2d=apply_limit2d, apply_limit1d=apply_limit1d)
+
+        if hasattr(self.plant, 'set_endpoint_pos') and world_pos is not None:
+            self.plant.set_endpoint_pos(world_pos)
+
+        return decoder_state
         
     def create_assister(self):
         # Create the appropriate type of assister object

@@ -89,7 +89,7 @@ class TestManualControlTasks(unittest.TestCase):
         exp.trajectory_radius = 0.2
         exp.run()
 
-    @unittest.skip("")
+    #@unittest.skip("")
     def test_tracking_2d(self):
         print("Running tracking task test")
         seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=20, ramp=1, ramp_down=1, 
