@@ -705,7 +705,13 @@ class ScreenTargetCapture_ReadySet(ScreenTargetCapture):
         pass
     
     def _start_targ_transition(self):
+<<<<<<< HEAD
         pass 
+=======
+        super()._start_targ_transition()
+        if self.target_index == -1:   # Came from a penalty state
+            pass
+>>>>>>> 194090bde25517e7fb916c964facffc71de3e99f
 
     def _start_hold_penalty(self):
         self.pseudo_success() #run before increment trials to prevent reseting of trial index 

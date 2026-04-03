@@ -8,9 +8,13 @@ from features.laser_features import QwalorLaser, MultiQwalorLaser, SwitchedQwalo
 from features.quattrocento_features import QuattBMI
 from riglib.stereo_opengl.window import WindowWithExperimenterDisplay, Window2D
 from riglib.stereo_opengl.openxr import WindowVR
+<<<<<<< HEAD
 
 from .generator_features import Autostart, RandomDelay, AdaptiveGenerator, IgnoreCorrectness, PoissonWait, Progressbar_fixation, \
     HideLeftTrajectory, StartTrialBelowSpeedThr, ReadysetMedley, ReadysetColorChange, DiscreteRandomDelay_EyeHandSequence, HideCursorReturn
+=======
+from .generator_features import Autostart, RandomDelay, AdaptiveGenerator, IgnoreCorrectness, PoissonWait, Progressbar_fixation, HideLeftTrajectory, StartTrialBelowSpeedThr, ReadysetMedley, ReadysetColorChange
+>>>>>>> 194090bde25517e7fb916c964facffc71de3e99f
 from .peripheral_device_features import Button, Joystick, DualJoystick, Joystick_plus_TouchSensor, KeyboardControl, MouseControl, ForceControl
 from .reward_features import RewardSystem, RewardSystemPulse, TTLReward, JuiceLogging, PelletReward, JackpotRewards, ProgressBar, TrackingRewards, RewardAudio, PenaltyAudio, ScoreRewards, ConsecutiveJackpot
 from .eyetracker_features import EyeCursor, EyeData, CalibratedEyeData, PupilLabStreaming, SimulatedEyeData, FixationStart, EyeConstrained, \
@@ -104,9 +108,12 @@ built_in_features = dict(
     start_trial_below_speed_thr=StartTrialBelowSpeedThr,
     reward_system_pulse = RewardSystemPulse,
     readyset_colorchange = ReadysetColorChange,
+<<<<<<< HEAD
     random_delay_eye_hand_sequence = DiscreteRandomDelay_EyeHandSequence,
     hide_cursor_return = HideCursorReturn,
     auto_eye_calibration = AutomaticEyeCalibration,
+=======
+>>>>>>> 194090bde25517e7fb916c964facffc71de3e99f
 )
 
 # >>> features.built_in_features['autostart'].__module__
