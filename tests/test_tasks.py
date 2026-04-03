@@ -113,6 +113,7 @@ class TestManualControlTasks(unittest.TestCase):
                        limit1d=True, trajectory_amplitude=5, lookahead_time=1)
         exp.stereo_mode = 'projection'
         exp.rotation = 'xzy'
+        exp.exp_rotation = 'mirror_z'
         exp.trajectory_type = '1d'
         exp.run()
 
