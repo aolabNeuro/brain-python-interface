@@ -575,7 +575,7 @@ class ScreenTargetTracking(TargetTracking, Window):
             self.trajectory = VirtualSnakeTarget(target_radius=self.trajectory_radius, target_color=target_colors[self.trajectory_color], trajectory=next_trajectory)
         elif self.trajectory_type == '2d':
             self.trajectory = VirtualSnakeTarget(target_radius=self.trajectory_radius, target_color=target_colors[self.trajectory_color], trajectory=self.targs)
-            self.trajectory.update_mask(self.frame_index, self.frame_index+self.lookahead)
+            self.trajectory.update_mask(0, self.lookahead)
         else: # 'none'
             next_trajectory = np.zeros((self.lookahead, 3))
             self.trajectory = VirtualCircularTarget()
@@ -1242,20 +1242,26 @@ class ScreenTargetTracking(TargetTracking, Window):
                 idx += 1
         
     @staticmethod
-    def single_sine_chain(nblocks=1, ntrials=500, time_length=20, base_period = 20, ramp=1.5, ramp_down=1.5, 
-                          ref_y_freq = 0.35, ref_x_freq = 0.5, dis_y_freq = 0.1, dis_x_freq = 0.15, ref_amp = 1, dis_amp = 1, seed=40, 
-                          sample_rate=120, dimensions = 1, disturbance=True, boundaries=(-10,10,-10,10)):
+    def single_sine_chain(nblocks=1, ntrials=500, time_length=20, ramp=1.5, ramp_down=1.5, 
+                          ref_y_freq = 0.35, ref_x_freq = 0.5, dis_y_freq = 0.1, dis_x_freq = 0.15, seed=40, 
+                          sample_rate=120, dimensions = 1, disturbance=True, ref_x_phase = 0, ref_y_phase = 0):
         '''
         '''
        
-        base_period = base_period
         dt = 1/sample_rate 
         t = np.arange(0, time_length+ramp+ramp_down, dt)
         idx = 0
         N = t.size
 
+        ref_x_phase = np.rad2deg(ref_x_phase)
+        ref_y_phase = np.rad2deg(ref_y_phase)
+
         #generate phase shifts for reference and disturbance trajectories
+        
         np.random.seed(seed)
+        
+        ref_amp = 1
+        dis_amp = 1
 
         if dimensions == 2: 
             phase_shifts = 2*np.pi*np.random.rand(ntrials, 2)
@@ -1263,6 +1269,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         else:
             phase_shifts = 2*np.pi*np.random.rand(ntrials)
             phase_dis = phase_shifts*0.8
+
 
         trials = dict(
             id=np.arange(ntrials), times=np.tile(t,(ntrials,1)), ref_x=np.zeros((ntrials,N)), dis_x=np.zeros((ntrials,N)),ref_y = np.zeros((ntrials,N)), dis_y = np.zeros((ntrials,N))) 
@@ -1276,7 +1283,8 @@ class ScreenTargetTracking(TargetTracking, Window):
 
 
                 if dimensions == 1:
-                    ref_phase = phase_shifts[trial_id]
+                    
+                    ref_phase = ref_y_phase
                     dis_phase = phase_dis[trial_id]
 
                     ref_traj, A_ref = ScreenTargetTracking.calc_sum_of_sines_ramp(t, ramp, ramp_down, np.array([ref_y_freq]), np.array([ref_amp]), np.array([ref_phase]))
@@ -1287,8 +1295,6 @@ class ScreenTargetTracking(TargetTracking, Window):
 
                 elif dimensions == 2: 
 
-                    ref_x_phase = phase_shifts[trial_id][0]
-                    ref_y_phase = phase_shifts[trial_id][1]
                     dis_x_phase = phase_dis[trial_id][0]
                     dis_y_phase = phase_dis[trial_id][1]
 
