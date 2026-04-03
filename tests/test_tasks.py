@@ -103,10 +103,10 @@ class TestManualControlTasks(unittest.TestCase):
         exp.trajectory_type = '2d'
         exp.run()
 
-    #@unittest.skip("")
+    @unittest.skip("")
     def test_sine_trajectory(self):
         print("Running tracking task test")
-        seq = TrackingTask.single_sine_chain(nblocks=1, ntrials=500, time_length=20, base_period = 20, ramp=1, ramp_down=0, 
+        seq = TrackingTask.single_sine_chain(nblocks=2, ntrials=2, time_length=20, base_period = 20, ramp=1, ramp_down=0, 
                           ref_y_freq = 0.35, ref_x_freq = 0.5, dis_y_freq = 0.85, dis_x_freq = 0.15, ref_amp = 1, dis_amp = 1, seed=40, 
                           sample_rate=60, dimensions = 1, disturbance=True, boundaries=(-10,10,-10,10))
         exp = init_exp(TrackingTask, [Window2D, MouseControl], seq, window_size=(1000,800), fullscreen=False, 
@@ -226,6 +226,37 @@ class TestSeqGenerators(unittest.TestCase):
         plt.legend()
         plt.tight_layout()
         plt.show()
+
+    @unittest.skip("")
+    def test_single_sine(self):
+        seq = TrackingTask.single_sine_chain(nblocks=1, ntrials=2, time_length=20, base_period = 20, ramp=1, ramp_down=0, 
+                          ref_y_freq = 0.35, ref_x_freq = 0.5, dis_y_freq = 0.85, dis_x_freq = 0.15, ref_amp = 1, dis_amp = 1, seed=40, 
+                          sample_rate=60, dimensions = 1, disturbance=True, boundaries=(-10,10,-10,10))
+        trajectories = [t[1][0] for t in seq] # pulls out trajectory. Can use t[3] to get disturbance array
+        print("Test-------")
+        print(np.shape(trajectories))
+        print("Test-------")
+        fig, axs = plt.subplots(2,1, figsize=(10,8))
+        for idx, trial in enumerate(trajectories): 
+            ax = axs[idx] 
+            trialx = np.fft.fft(trial[60:,0]) #ignore ramp period for FFT
+            trial_length = np.shape(trialx)[0]
+            freq = np.fft.fftfreq(trial_length, d=1./60)
+            non_neg_freq = freq[freq >= 0] #get positive frequencies 
+            non_neg_x = trialx[freq >= 0] / complex(trial_length, 0) #normalize 
+            non_neg_x[1:] = 2*non_neg_x[1:] #account for negative frequencies
+            trialy = np.fft.fft(trial[60:,2]) #ignore ramp period for FFT
+            non_neg_y = trialy[freq >= 0] / complex(trial_length, 0) #normalize 
+            non_neg_y[1:] = 2*non_neg_y[1:] #account for negative frequencies
+            ax.plot(non_neg_freq, np.abs(non_neg_x), 'o-', label = 'X')
+            ax.plot(non_neg_freq, np.abs(non_neg_y), 'o-', label = 'Y')
+            ax.set_title(f'Trial {idx}')
+            ax.set_xlim(0, 3)
+            ax.set_xlabel('Frequency (Hz)')
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
+
 
 class TestYouTube(unittest.TestCase):
 
