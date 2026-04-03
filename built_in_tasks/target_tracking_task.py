@@ -392,7 +392,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     limit1d = traits.Bool(True, desc="Limit cursor movement to 1D")
 
     sequence_generators = [
-        'tracking_target_chain', 'tracking_target_debug', 'tracking_target_training'
+        'tracking_target_chain', 'tracking_target_debug', 'tracking_target_training', 'single_sine_chain'
     ]
 
     hidden_traits = ['cursor_color', 'trajectory_color', 'cursor_bounds', 'cursor_radius', 'plant_hide_rate', 'starting_pos']

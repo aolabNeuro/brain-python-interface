@@ -107,8 +107,8 @@ class TestManualControlTasks(unittest.TestCase):
     def test_sine_trajectory(self):
         print("Running tracking task test")
         seq = TrackingTask.single_sine_chain(nblocks=2, ntrials=2, time_length=20, base_period = 20, ramp=1, ramp_down=0, 
-                          ref_y_freq = 0.35, ref_x_freq = 0.5, dis_y_freq = 0.85, dis_x_freq = 0.15, ref_amp = 1, dis_amp = 1, seed=40, 
-                          sample_rate=60, dimensions = 1, disturbance=True, boundaries=(-10,10,-10,10))
+                          ref_y_freq = 0.35, ref_x_freq = 0.5, dis_y_freq = 0.85, dis_x_freq = 0.15, seed=40, 
+                          sample_rate=60, dimensions = 1, disturbance=True)
         exp = init_exp(TrackingTask, [Window2D, MouseControl], seq, window_size=(1000,800), fullscreen=False, 
                        limit1d=True, trajectory_amplitude=5, lookahead_time=1)
         exp.stereo_mode = 'projection'
@@ -231,8 +231,8 @@ class TestSeqGenerators(unittest.TestCase):
     @unittest.skip("")
     def test_single_sine(self):
         seq = TrackingTask.single_sine_chain(nblocks=1, ntrials=2, time_length=20, base_period = 20, ramp=1, ramp_down=0, 
-                          ref_y_freq = 0.35, ref_x_freq = 0.5, dis_y_freq = 0.85, dis_x_freq = 0.15, ref_amp = 1, dis_amp = 1, seed=40, 
-                          sample_rate=60, dimensions = 1, disturbance=True, boundaries=(-10,10,-10,10))
+                          ref_y_freq = 0.35, ref_x_freq = 0.5, dis_y_freq = 0.85, dis_x_freq = 0.15, seed=40, 
+                          sample_rate=60, dimensions = 1, disturbance=True)
         trajectories = [t[1][0] for t in seq] # pulls out trajectory. Can use t[3] to get disturbance array
         print("Test-------")
         print(np.shape(trajectories))
