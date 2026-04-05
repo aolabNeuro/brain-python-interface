@@ -1335,9 +1335,13 @@ class EyeHandCaptureBlock(Sequence, Window):
             yield indices, targs
 
 class EyeHandCaptureBlock_sequence(EyeHandCaptureBlock):
+    '''
+    This task is similar to the EyeHandCaptureBlock. In eye trials, the task structure is exactly the same as the EyeHandCaptureBlock.
+    For eye-hand trials, subjects need to move their eyes first, then move their arm while keeping their fixation on the eye target.
+    '''
 
-    fixation_time1 = traits.Float(.2, desc="fixation duration for the first target")
-    fixation_time2 = traits.Float(.2, desc="fixation duration for the second target. This is only for eye_hand_trials")
+    fixation_time1 = traits.Float(.2, desc="First fixation duration. This is both for eye_trials nad eye_hand_trials")
+    fixation_time2 = traits.Float(.2, desc="Second fixation duration. This is only for eye_hand_trials")
     exclude_parent_traits = ['fixation_time']
 
     status = dict(
@@ -1365,9 +1369,10 @@ class EyeHandCaptureBlock_sequence(EyeHandCaptureBlock):
         self.hand_target_index = -1
 
     def _start_target_hand(self):
+        # Hide hand target to show the go cue for hand movement
         if self.is_eye_hand_trials and self.target_index == 1:
             self.hand_target_index = 1
-            self.targets_hand[self.hand_target_index-1].hide() # go cue for hand target
+            self.targets_hand[self.hand_target_index-1].hide()
             self.sync_event('TARGET_OFF', self.gen_indices[self.target_index])
 
     def _start_targ_transition(self):
@@ -1395,7 +1400,7 @@ class EyeHandCaptureBlock_sequence(EyeHandCaptureBlock):
     
     def _test_leave_target(self, ts):
         '''
-        return true if cursor moves outside the exit radius
+        return true if cursor moves outside the hand target radius
         '''
         cursor_pos = self.plant.get_endpoint_pos()
         d = np.linalg.norm(cursor_pos - self.targs[self.hand_target_index])
@@ -1403,7 +1408,7 @@ class EyeHandCaptureBlock_sequence(EyeHandCaptureBlock):
     
     def _test_pass_target_hand(self, ts):
         '''
-        pass target_hand state when trials are eye_trials
+        whether to pass target_hand state when trials are eye_trials and the target index is 0
         '''
         if self.is_eye_trials:
             return True
