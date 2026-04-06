@@ -11,7 +11,7 @@ from .target_graphics import *
 from .target_capture_task import ScreenTargetCapture
 from .target_capture_task_xt import ScreenReachAngle, ScreenReachLine, SequenceCapture, ScreenTargetCapture_ReadySet
 from .target_capture_task_eye import EyeConstrainedTargetCapture, HandConstrainedEyeCapture, EyeConstrainedHandCapture, \
-    EyeHandSequenceCapture, ScreenTargetCapture_Saccade, EyeHandCaptureBlock
+    EyeHandSequenceCapture, ScreenTargetCapture_Saccade, EyeHandCaptureBlock, EyeHandCaptureBlock_sequence
 from .target_tracking_task import ScreenTargetTracking
 from .rotation_matrices import *
 
@@ -222,6 +222,12 @@ class EyeHandConstrainedReachingTask(ManualControlMixin, EyeHandCaptureBlock):
     '''
     Saccade and reaching task. The initial eye and hand positions are different. Subjects move their eyes or both eyes and hand to the goal target
     depending on trial blocks
+    '''
+    pass
+
+class EyeHandConstrainedSequentialReachingTask(ManualControlMixin, EyeHandCaptureBlock_sequence):
+    '''
+    Saccade and reaching task. The task structure is similar to EyeHandCaputureBlock, but Subjects need to move their eyes and hand sequentially.
     '''
     pass
 
