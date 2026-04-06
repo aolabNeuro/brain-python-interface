@@ -102,19 +102,51 @@ class TestManualControlTasks(unittest.TestCase):
         exp.trajectory_type = '2d'
         exp.run()
 
-    @unittest.skip("")
-    def test_tracking_moon(self):
+    #@unittest.skip("")
+    def test_tracking_moon_ref(self):
         print("Running tracking task test")
-        seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=20, ramp=1, ramp_down=1, 
+        seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=9, ramp=1, ramp_down=0, 
                                                  num_primes=10, seed=42, sample_rate=60, dimensions=2, 
-                                                 disturbance=True, boundaries=(-10,10,-10,10), decay_rate = 0.1)
-        exp = init_exp(TrackingTask, [Window2D, MouseControl, SpheresToImages], seq, window_size=(1000,800), fullscreen=False, 
-                       limit1d=False, trajectory_amplitude=5, lookahead_time=1,
+                                                 disturbance=True, boundaries=(-10,10,-10,10), decay_rate = None)
+        exp = init_exp(TrackingTask, [Window2D, MouseControl, SpheresToImages, ProgressBar, ScoreRewards], seq, window_size=(1280,720), fullscreen=True, 
+                       limit1d=False, trajectory_amplitude=6, disturbance_amplitude = 0, lookahead_time=1, reward_time = 4, 
+                       score_display_location = (-200,0,7), score_multiplier = 10000, cursor_radius = 1, tracking_out_time = 8, 
                        cursor_color='black', target_color='black')
         exp.stereo_mode = 'projection'
         exp.rotation = 'xzy'
         exp.trajectory_type = '2d'
         exp.run()
+    
+    #@unittest.skip("")
+    def test_tracking_moon_disturbance(self):
+        
+        seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=9, ramp=1, ramp_down=0,
+                                                 num_primes=10, seed=42, sample_rate=60, dimensions=2,
+                                                 disturbance=True, boundaries=(-10,10,-10,10), decay_rate = None)
+        exp = init_exp(TrackingTask, [Window2D, MouseControl, SpheresToImages, ProgressBar, ScoreRewards], seq, window_size=(1280,720), fullscreen=True,
+                       limit1d=False, trajectory_amplitude=0, disturbance_amplitude = 2, lookahead_time=1, reward_time = 4, 
+                       score_display_location = (-200,0,7), score_multiplier = 10000, cursor_radius = 1, tracking_out_time = 8, 
+                       cursor_color='black', target_color='black')
+        exp.stereo_mode = 'projection'
+        exp.rotation = 'xzy'
+        exp.trajectory_type = '2d'
+        exp.run()
+
+    #@unittest.skip("")
+    def test_tracking_moon(self):
+
+        seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=9, ramp=1, ramp_down=0,
+                                                 num_primes=10, seed=42, sample_rate=60, dimensions=2,
+                                                 disturbance=True, boundaries=(-10,10,-10,10), decay_rate = None)
+        exp = init_exp(TrackingTask, [Window2D, MouseControl, SpheresToImages, ProgressBar, ScoreRewards], seq, window_size=(1280,720), fullscreen=True,
+                       limit1d=False, trajectory_amplitude=6, disturbance_amplitude = 2, lookahead_time=1, reward_time = 4, 
+                       score_display_location = (-2,0,7), score_multiplier = 10000, cursor_radius = 1, tracking_out_time = 8, 
+                       cursor_color='black', target_color='black')
+        exp.stereo_mode = 'projection'
+        exp.rotation = 'xzy'
+        exp.trajectory_type = '2d'
+        exp.run()
+
 
     @unittest.skip("")
     def test_sequence(self):

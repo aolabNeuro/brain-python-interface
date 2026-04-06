@@ -247,10 +247,10 @@ class SpheresToImages():
         '''
         Hijack spheres and switch them for images.
         '''
-        if isinstance(model, Sphere) and model.radius > 0.5:
-            texture = Texture('/Users/leoscholl/Downloads/moon.png', wrap_x=GL_REPEAT, wrap_y=GL_REPEAT)
+        if isinstance(model, Sphere) and model.radius > 1.0:
+            texture = Texture('features/images/moon.png', wrap_x=GL_REPEAT, wrap_y=GL_REPEAT)
         elif isinstance(model, Sphere):
-            texture = Texture('/Users/leoscholl/Downloads/ship.png', wrap_x=GL_REPEAT, wrap_y=GL_REPEAT)
+            texture = Texture('features/images/ship.png', wrap_x=GL_REPEAT, wrap_y=GL_REPEAT)
         else:
             super().add_model(model)
             return

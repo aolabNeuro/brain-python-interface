@@ -502,6 +502,7 @@ class ScoreRewards(traits.HasTraits):
                                         font_size=self.score_display_size)
         self.score_display.move_to_position(self.score_display_location)
         self.add_model(self.score_display.model)
+        print('Score: %d' % score) #print score to terminal 
         
     def _end_reward(self):
         if hasattr(super(), '_end_reward'):
@@ -510,6 +511,7 @@ class ScoreRewards(traits.HasTraits):
         # Hide score at the end of each trial
         self.remove_model(self.score_display.model)
         self.score_display.model.release()
+        self.state = None 
 
 """"" BELOW THIS IS ALL THE OLD CODE ASSOCIATED WITH REWARD FEATURES"""
 
