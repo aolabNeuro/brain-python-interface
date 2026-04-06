@@ -334,9 +334,26 @@ class ProgressBar(traits.HasTraits):
 
         # Initialize counter at the start of each trial
         self.tracking_frame_index = 0
+
+    def _while_tracking_in(self):
+        super()._while_tracking_in()
         
-    def setup_while_tracking(self):
-        super().setup_while_tracking()
+        # Increment counter and redraw progress bar
+        self.tracking_frame_index += 1
+        self.tracking_rate = self.tracking_frame_index/self.trajectory_length*self.bar_width # proportion of total number of frames
+
+        if hasattr(self, 'bar'):
+            for model in self.bar.graphics_models:
+                self.remove_model(model)
+            del self.bar
+
+        self.bar = VirtualRectangularTarget(target_width=1.3, target_height=self.tracking_rate, target_color=(0., 1., 0., 0.75), starting_pos=[self.tracking_rate-self.bar_width,-15,9])
+        for model in self.bar.graphics_models:
+            self.add_model(model)
+        self.bar.show()
+
+    def _while_tracking_in_ramp(self):
+        super()._while_tracking_in_ramp()
         
         # Increment counter and redraw progress bar
         self.tracking_frame_index += 1
