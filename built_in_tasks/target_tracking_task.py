@@ -392,7 +392,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     limit1d = traits.Bool(True, desc="Limit cursor movement to 1D")
 
     sequence_generators = [
-        'tracking_target_chain', 'tracking_target_debug', 'tracking_target_training', 'single_sine_chain'
+        'tracking_target_chain', 'tracking_target_debug', 'tracking_target_training', 'single_sine_chain', 'circle_chain', 'figure8_chain'
     ]
 
     hidden_traits = ['cursor_color', 'trajectory_color', 'cursor_bounds', 'cursor_radius', 'plant_hide_rate', 'starting_pos']
@@ -1246,6 +1246,44 @@ class ScreenTargetTracking(TargetTracking, Window):
                           ref_y_freq = 0.35, ref_x_freq = 0.5, dis_y_freq = 0.1, dis_x_freq = 0.15, seed=40, 
                           sample_rate=120, dimensions = 1, disturbance=True, ref_x_phase = 0, ref_y_phase = 0):
         '''
+        Generates a single sine wave for the target trajectory  
+
+        Parameters
+        ----------
+        nblocks : int
+            The number of tracking trials in the sequence.
+        ntrials : int
+            The number trials in a block
+        time_length : int
+            Lenght of each trial 
+        ramp: float 
+            Ramp up time 
+        ramp_down: float
+            Ramp down time
+        ref_y_freq: float
+            Frequency of the reference trajectory in the y dimension
+        ref_x_freq: float
+            Frequency of the reference trajectory in the x dimension (only used if dimensions = 2)
+        dis_y_freq: float
+            Frequency of the disturbance trajectory in the y dimension
+        dis_x_freq: float
+            Frequency of the disturbance trajectory in the x dimension (only used if dimensions = 2)
+        seed: int
+            The seed for the random generator
+        sample_rate: int
+            The sample rate of the generated trajectories
+        dimensions: int
+            Number of dimensions to generate trajectories for (1 or 2)
+        disturbance: boolean
+            Whether to add disturbance to the cursor 
+        ref_x_phase: float
+            Phase of the reference trajectory in the x dimension 
+        ref_y_phase: float
+            Phase of the reference trajectory in the y dimension
+  
+        Returns
+        -------
+        [nblocks*ntrials x 1] array of tuples containing trial indices and [time_length*60 x 3] target coordinates
         '''
        
         dt = 1/sample_rate 
@@ -1253,8 +1291,8 @@ class ScreenTargetTracking(TargetTracking, Window):
         idx = 0
         N = t.size
 
-        ref_x_phase = np.rad2deg(ref_x_phase)
-        ref_y_phase = np.rad2deg(ref_y_phase)
+        ref_x_phase = np.deg2rad(ref_x_phase) #convert phase to degrees
+        ref_y_phase = np.deg2rad(ref_y_phase) #convert phase to degrees
 
         #generate phase shifts for reference and disturbance trajectories
         
@@ -1310,4 +1348,113 @@ class ScreenTargetTracking(TargetTracking, Window):
 
                 yield idx, [ref_trajectory], disturbance, dis_trajectory, sample_rate, ramp, ramp_down
                 idx += 1
-            
+
+    @staticmethod
+    def circle_chain(nblocks=1, ntrials=500, time_length=20, ramp=1.5, ramp_down=1.5, 
+                          ref_freq = 0.5,  dis_y_freq = 0.1, dis_x_freq = 0.15, seed=40, 
+                          sample_rate=120, disturbance=True):
+        
+        '''
+        Generate circle trajectory for the target trajectory 
+        '''
+
+        dt = 1/sample_rate 
+        t = np.arange(0, time_length+ramp+ramp_down, dt)
+        idx = 0
+        N = t.size
+
+        ref_x_phase = 0 #convert phase to degrees
+        ref_y_phase = -np.pi/2 #convert degrees to radians  
+
+        #generate phase shifts for reference and disturbance trajectories
+        
+        np.random.seed(seed)
+        
+        ref_amp = 1
+        dis_amp = 1
+
+        phase_shifts = 2*np.pi*np.random.rand(ntrials, 2)
+        phase_dis = phase_shifts*0.8
+       
+
+        trials = dict(
+            id=np.arange(ntrials), times=np.tile(t,(ntrials,1)), ref_x=np.zeros((ntrials,N)), dis_x=np.zeros((ntrials,N)),ref_y = np.zeros((ntrials,N)), dis_y = np.zeros((ntrials,N))) 
+        
+        for block_id in range(nblocks):  
+
+            for trial_id in range(ntrials):
+                targs = [] 
+                ref_trajectory = np.zeros((int((time_length+ramp+ramp_down)*sample_rate),3))
+                dis_trajectory = ref_trajectory.copy()
+
+                dis_x_phase = phase_dis[trial_id][0]
+                dis_y_phase = phase_dis[trial_id][1]
+
+                ref_x_traj, A_ref_x = ScreenTargetTracking.calc_sum_of_sines_ramp(t, ramp, ramp_down, np.array([ref_freq]), np.array([ref_amp]), np.array([ref_x_phase]))
+                ref_y_traj, A_ref_y = ScreenTargetTracking.calc_sum_of_sines_ramp(t, ramp, ramp_down, np.array([ref_freq]), np.array([ref_amp]), np.array([ref_y_phase]))
+                dis_x_traj, A_dis_x = ScreenTargetTracking.calc_sum_of_sines_ramp(t, ramp, ramp_down, np.array([dis_x_freq]), np.array([dis_amp]), np.array([dis_x_phase]))
+                dis_y_traj, A_dis_y = ScreenTargetTracking.calc_sum_of_sines_ramp(t, ramp, ramp_down, np.array([dis_y_freq]), np.array([dis_amp]), np.array([dis_y_phase]))
+
+                ref_trajectory[:,0] = ref_x_traj/A_ref_x
+                ref_trajectory[:,2] = ref_y_traj/A_ref_y
+                dis_trajectory[:,0] = dis_x_traj/A_dis_x
+                dis_trajectory[:,2] = dis_y_traj/A_dis_y
+
+                print(np.max(ref_x_traj), np.max(ref_y_traj))
+                print(np.min(ref_x_traj), np.min(ref_y_traj))
+
+                yield idx, [ref_trajectory], disturbance, dis_trajectory, sample_rate, ramp, ramp_down
+                idx += 1
+
+    @staticmethod
+    def figure8_chain(nblocks=1, ntrials=500, time_length=20, ramp=1.5, ramp_down=1.5, 
+                          ref_freq = 0.5,  dis_y_freq = 0.1, dis_x_freq = 0.15, seed=40, 
+                          sample_rate=120, disturbance=True, ref_phase = 0):
+        
+        '''
+        Generate figure-8 trajectory for the target trajectory 
+        '''
+
+        dt = 1/sample_rate 
+        t = np.arange(0, time_length+ramp+ramp_down, dt)
+        idx = 0
+        N = t.size
+
+
+        #generate phase shifts for reference and disturbance trajectories
+        
+        np.random.seed(seed)
+        
+        ref_amp = 1
+        dis_amp = 1
+
+        
+        phase_shifts = 2*np.pi*np.random.rand(ntrials, 2)
+        phase_dis = phase_shifts*0.8
+       
+
+        trials = dict(
+            id=np.arange(ntrials), times=np.tile(t,(ntrials,1)), ref_x=np.zeros((ntrials,N)), dis_x=np.zeros((ntrials,N)),ref_y = np.zeros((ntrials,N)), dis_y = np.zeros((ntrials,N))) 
+        
+        for block_id in range(nblocks):  
+
+            for trial_id in range(ntrials):
+                targs = [] 
+                ref_trajectory = np.zeros((int((time_length+ramp+ramp_down)*sample_rate),3))
+                dis_trajectory = ref_trajectory.copy()
+
+                dis_x_phase = phase_dis[trial_id][0]
+                dis_y_phase = phase_dis[trial_id][1]
+
+                ref_x_traj, A_ref_x = ScreenTargetTracking.calc_sum_of_sines_ramp(t, ramp, ramp_down, np.array([2*ref_freq]), np.array([ref_amp]), np.array([ref_phase]))
+                ref_y_traj, A_ref_y = ScreenTargetTracking.calc_sum_of_sines_ramp(t, ramp, ramp_down, np.array([ref_freq]), np.array([ref_amp]), np.array([ref_phase]))
+                dis_x_traj, A_dis_x = ScreenTargetTracking.calc_sum_of_sines_ramp(t, ramp, ramp_down, np.array([dis_x_freq]), np.array([dis_amp]), np.array([dis_x_phase]))
+                dis_y_traj, A_dis_y = ScreenTargetTracking.calc_sum_of_sines_ramp(t, ramp, ramp_down, np.array([dis_y_freq]), np.array([dis_amp]), np.array([dis_y_phase]))
+
+                ref_trajectory[:,0] = ref_x_traj/A_ref_x
+                ref_trajectory[:,2] = ref_y_traj/A_ref_y
+                dis_trajectory[:,0] = dis_x_traj/A_dis_x
+                dis_trajectory[:,2] = dis_y_traj/A_dis_y
+
+                yield idx, [ref_trajectory], disturbance, dis_trajectory, sample_rate, ramp, ramp_down
+                idx += 1
