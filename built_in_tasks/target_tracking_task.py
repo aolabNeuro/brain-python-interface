@@ -1291,8 +1291,8 @@ class ScreenTargetTracking(TargetTracking, Window):
         idx = 0
         N = t.size
 
-        ref_x_phase = np.deg2rad(ref_x_phase) #convert phase to degrees
-        ref_y_phase = np.deg2rad(ref_y_phase) #convert phase to degrees
+        ref_x_phase = np.deg2rad(ref_x_phase)/ (2*np.pi) #convert phase to degrees and then to cycles for calc_sum_sines
+        ref_y_phase = np.deg2rad(ref_y_phase) / (2*np.pi) #convert phase to degrees
 
         #generate phase shifts for reference and disturbance trajectories
         
@@ -1363,8 +1363,8 @@ class ScreenTargetTracking(TargetTracking, Window):
         idx = 0
         N = t.size
 
-        ref_x_phase = 0 #convert phase to degrees
-        ref_y_phase = -np.pi/2 #convert degrees to radians  
+        ref_x_phase = 0 
+        ref_y_phase = 0.25 # a quarter of a cycle out of phase (calc_sum_sines uses cylces not radians)
 
         #generate phase shifts for reference and disturbance trajectories
         
@@ -1395,14 +1395,13 @@ class ScreenTargetTracking(TargetTracking, Window):
                 dis_x_traj, A_dis_x = ScreenTargetTracking.calc_sum_of_sines_ramp(t, ramp, ramp_down, np.array([dis_x_freq]), np.array([dis_amp]), np.array([dis_x_phase]))
                 dis_y_traj, A_dis_y = ScreenTargetTracking.calc_sum_of_sines_ramp(t, ramp, ramp_down, np.array([dis_y_freq]), np.array([dis_amp]), np.array([dis_y_phase]))
 
+                #max_A = np.max(A_ref_x, A_ref_y) 
                 ref_trajectory[:,0] = ref_x_traj/A_ref_x
                 ref_trajectory[:,2] = ref_y_traj/A_ref_y
                 dis_trajectory[:,0] = dis_x_traj/A_dis_x
                 dis_trajectory[:,2] = dis_y_traj/A_dis_y
 
-                print(np.max(ref_x_traj), np.max(ref_y_traj))
-                print(np.min(ref_x_traj), np.min(ref_y_traj))
-
+                print(A_ref_x, A_ref_y)
                 yield idx, [ref_trajectory], disturbance, dis_trajectory, sample_rate, ramp, ramp_down
                 idx += 1
 
