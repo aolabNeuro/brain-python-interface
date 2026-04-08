@@ -450,17 +450,17 @@ class TrackingRewards(traits.HasTraits):
 
 class ScoreRewards(traits.HasTraits):
     '''
-    Add a "score" to the task that awards points based on target acquisition speed. 
+    Add a "score" to the task that awards points based on some reward function. 
     The score is displayed after each reward and on the web GUI. The running score also gets
     saved as a value in the task data called 'reward_score'.
-
-    Note:
-        Only works with target acquisition tasks.
     '''
     score_display_location = traits.Tuple((10, 0, 10), desc="Location to display the score (in cm)")
     score_display_size = traits.Int(36, desc="Font size of the score display")
     score_display_color = traits.Tuple((1, 1, 1, 1), desc="Color of the score display")
     score_multiplier = traits.Int(100, desc="Value to multiple the score by")
+    score_function = traits.OptionsList('timed', ['fixed', 'timed'], 
+                                        desc="Function to calculate the score for each reward",
+                                        bmi3d_input_options=['fixed', 'timed'])
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -493,19 +493,37 @@ class ScoreRewards(traits.HasTraits):
         if hasattr(super(), '_start_reward'):
             super()._start_reward()
 
-        # Set score to the proportion of the trial spent tracking inside the target
-        score = int(self.score_multiplier * self.tracking_in_counter / self.trajectory_length)
-        
-        self.reportstats['Score'] = score
-        self.task_data['reward_score'] = score
-        self.score_display = TextTarget(str(score), color=self.score_display_color,
-                                        font_size=self.score_display_size)
+        score = 0
+        if self.score_function == 'fixed':
+            score = self.score_multiplier
+        elif hasattr(self, 'tracking_in_counter') and hasattr(self, 'trajectory_length'):
+            # Set score to the proportion of the trial spent tracking inside the target
+            score = int(self.score_multiplier * self.tracking_in_counter / self.trajectory_length)
+        else:
+            # Calculate the score based on the time in the "target" state
+            timed_state = None
+            idx = -1
+            while timed_state is None and -idx-1 < len(self.state_log):
+                if self.state_log[idx][0] == "target":
+                    timed_state = self.state_log[-1][1] - self.state_log[idx][1]
+                idx -= 1
+            if timed_state is None or timed_state == 0.:
+                score = 0.
+            else:
+                score = int(self.score_multiplier / timed_state) 
+                
+        # Report the score and save a running total
+        self.reportstats['Score'] += score
+        self.task_data['reward_score'] += score
+        self.score_display = TextTarget(str(score),
+                                        font_size=self.score_display_size,
+                                        color=self.score_display_color)
         self.score_display.move_to_position(self.score_display_location)
         self.add_model(self.score_display.model)
-        print()
-        print('----------------')
-        print('Score: %d' % score) #print score to terminal 
-        print('----------------')
+        # print()
+        # print('----------------')
+        # print('Score: %d' % score) #print score to terminal 
+        # print('----------------')
 
     def _end_reward(self):
         if hasattr(super(), '_end_reward'):

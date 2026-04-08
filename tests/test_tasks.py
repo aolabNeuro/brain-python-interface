@@ -58,7 +58,7 @@ class TestManualControlTasks(unittest.TestCase):
         exp.rotation = 'xzy'
         exp.run()
 
-    @unittest.skip("")
+    # @unittest.skip("")
     def test_exp(self):
         seq = ManualControl.centerout_2D()
         exp = init_exp(ManualControl, [MouseControl, Window2D, ScoreRewards], seq, window_size=(1200,800), fullscreen=False)
@@ -245,7 +245,7 @@ class DemoTracking(unittest.TestCase):
         exp.trajectory_type = '2d'
         exp.run()
 
-    @unittest.skip("")
+    #@unittest.skip("")
     def test_tracking_moon(self):
 
         seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=9, ramp=1, ramp_down=0,
