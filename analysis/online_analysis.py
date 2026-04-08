@@ -11,8 +11,10 @@ import traceback
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.collections import PatchCollection
-from matplotlib.widgets import Button, Slider, Cursor
+from matplotlib.widgets import Button, Slider, Cursor, TextBox
 import aopy
+import traits
+from traits.trait_types import self
 from riglib.ecube import MultiSource, map_channels_for_multisource
 from riglib.source import MultiChanDataSource
 
@@ -111,7 +113,7 @@ class AnalysisWorker(mp.Process):
         plt.pause(0.1)
 
         t_update = time.perf_counter()
-        while not self._stop_event.is_set():
+        while plt.fignum_exists(self.fig.number) and (not self._stop_event.is_set()):
             if time.perf_counter() - t_update > 1./self.update_rate:
                 try:
                     self.update()
@@ -584,12 +586,22 @@ class ERPAnalysisWorker(AnalysisWorker):
     '''
     bufferlen = 5 # seconds of data to keep in the buffer
 
-    def __init__(self, task_params, data_queue, update_rate=1, time_before=0.05, 
-                 time_after=0.1, figure_dir='/home/aolab/figures', **kwargs):
+    def __init__(self, task_params, data_queue, update_rate=1, time_before=0.1, 
+                 time_after=0.1, figure_dir='/home/aolab/figures',
+                 condition_idx=None, stim_sites=None, title=None, **kwargs):
         super().__init__(task_params, data_queue, update_rate=update_rate, **kwargs)
         self.time_before = time_before
         self.time_after = time_after
         self.figure_dir = figure_dir
+        self.title = title
+        try:
+            self.condition_idx = [int(condition_idx)]
+        except:
+            self.condition_idx = condition_idx
+        self.stim_sites = stim_sites
+        if self.condition_idx is not None and len(self.stim_sites) == 0:
+            raise ValueError('Condition index provided but no stim sites were present in the experiment')
+        self.current_condition_idx = 0
 
     def init(self):
         super().init()
@@ -597,6 +609,7 @@ class ERPAnalysisWorker(AnalysisWorker):
         # Initialize the data source
         self.elec_pos, self.acq_ch, _ = aopy.data.load_chmap('ECoG244')
         self.clock_dch = self.task_params.get('screen_sync_dch', 40)
+        self.headstage = self.task_params.get('headstage_connector', 7)
         self.clock_elapsed = 0
         self.clock_times = np.array([])
         self.trigger_dch = None
@@ -604,15 +617,30 @@ class ERPAnalysisWorker(AnalysisWorker):
         self.trigger_cycles = []
         self.trigger_times = []
         self.lfp_downsample = 25
+        self.erp_since_update = 0
 
+        # Determine the trigger channel and events based on the task parameters
         if 'qwalor_trigger_dch' in self.task_params:
             self.trigger_dch = self.task_params['qwalor_trigger_dch']
             channels = map_channels_for_multisource(headstage_channels=self.acq_ch, 
                                                          digital_channels=[self.clock_dch, self.trigger_dch])
+            print('Triggering on qwalor channel', self.trigger_dch)
+            print('Using clock channel', self.clock_dch)
+        elif 'qwalor_ch1_enable' in self.task_params: # TODO: support multiple lasers
+            for idx in range(1,5):
+                if self.task_params[f'qwalor_ch{idx}_enable']:
+                    self.trigger_dch = self.task_params[f'qwalor_ch{idx}_trigger_dch']
+                    break
+            channels = map_channels_for_multisource(headstage_channels=self.acq_ch,
+                                                            digital_channels=[self.clock_dch, self.trigger_dch])
+            print('Triggering on qwalor channel', self.trigger_dch)
+            print('Using clock channel', self.clock_dch)
         else:
             self.trigger_events.append('TARGET_ON') # For flash
             channels = map_channels_for_multisource(headstage_channels=self.acq_ch, digital_channels=[self.clock_dch])
-        self.ds = MultiChanDataSource(MultiSource, channels=channels, bufferlen=self.bufferlen)
+            print('Triggering on events', self.trigger_events)
+            print('Using clock channel', self.clock_dch)
+        self.ds = MultiChanDataSource(MultiSource, channels=channels, bufferlen=self.bufferlen, headstage=self.headstage)
         self.ds.start()
         print('datasource started')
 
@@ -626,6 +654,8 @@ class ERPAnalysisWorker(AnalysisWorker):
                                                  cmap='bwr', ax=self.ax)
         self.erp_im.set_clim(-100, 100)
         self.erp_text = self.ax.text(0.75, 1.05, '.', ha='center', va='center', fontsize=12, transform=self.ax.transAxes)
+        if self.title is not None:
+            self.ax.set_title(self.title)
 
         # Add a slider to control the range
         ax_slider = self.fig.add_axes([0.225, 0.075, 0.6, 0.03])
@@ -643,16 +673,37 @@ class ERPAnalysisWorker(AnalysisWorker):
         elec_pos, acq_ch, _ = aopy.data.load_chmap('ECoG244')
         stim_pos, stim_ch, _ = aopy.data.load_chmap('Opto32')
         for pos, ch in zip(elec_pos, acq_ch):
-            self.labels.append(aopy.visualization.annotate_spatial_map(pos, ch, 'c', 12, self.ax))
+            self.labels.append(aopy.visualization.annotate_spatial_map(pos, ch, 'c', fontsize=12, ax=self.ax))
         for pos, ch in zip(stim_pos, stim_ch):
-            self.labels.append(aopy.visualization.annotate_spatial_map(pos, ch, 'm', 12, self.ax))
+            self.labels.append(aopy.visualization.annotate_spatial_map(pos, ch, 'm', fontsize=12, ax=self.ax))
+        ax_toggle = self.fig.add_axes([0.1, 0.025, 0.1, 0.025])
+        self.toggle = Button(ax_toggle, 'Labels')
         def toggle_labels(event):
+            self.toggle.color = '0.85' if self.labels[0].get_visible() else '0.5'
             for label in self.labels:
                 label.set_visible(not label.get_visible())
         toggle_labels(None)
-        ax_toggle = self.fig.add_axes([0.1, 0.025, 0.1, 0.025])
-        self.toggle = Button(ax_toggle, 'Labels')
         self.toggle.on_clicked(toggle_labels)
+
+        # Add a toggle between voltage and z-score
+        self.zscore = False
+        def toggle_zscore(event):
+            self.zscore = not self.zscore
+            if self.zscore:
+                self.slider.valmax = 10
+                self.slider.set_val(5)
+                self.zscore_button.color = '0.5'
+            else:
+                self.slider.valmax = 1000
+                self.slider.set_val(100)
+                self.zscore_button.color = '0.85'
+            self.slider.ax.set_xlim(self.slider.valmin, self.slider.valmax)
+            self._update_erp_data()
+            self.draw()
+
+        self.ax_zscore = self.fig.add_axes([0.225, 0.025, 0.1, 0.025])
+        self.zscore_button = Button(self.ax_zscore, 'Z-score')
+        self.zscore_button.on_clicked(toggle_zscore)
 
     def update(self):
         super().update()
@@ -671,27 +722,36 @@ class ERPAnalysisWorker(AnalysisWorker):
             timestamps, edges = aopy.utils.detect_edges(trigger_data, self.ds.source.update_freq, rising=True, falling=False)   
             self.trigger_times = np.concatenate((self.trigger_times, timestamps + clock_elapsed_prev)).tolist()
 
+        # Only count triggers that occur during the specified condition if a condition index was provided
+        in_condition = True
+        if self.condition_idx is not None:
+            in_condition = self.current_condition_idx in self.condition_idx
+
         # Append new ERPs from trigger events
         fs = self.ds.source.update_freq / self.lfp_downsample
         nt = 2./self.update_rate # seconds
         npts = int(nt * self.ds.source.update_freq)
         lfp = self.ds.get(npts, map_channels_for_multisource(headstage_channels=self.acq_ch))
         lfp = np.array(lfp)[:,::self.lfp_downsample].T # reshape and downsample (nt, nch)
+        erp_count = 0
         ignored_trigger_cycles = []
         while len(self.trigger_cycles) > 0:
             cycle = self.trigger_cycles.pop()
             if cycle >= len(self.clock_times):
-                ignored_trigger_cycles.append(cycle)
+                ignored_trigger_cycles.append(cycle) # future cycle we haven't seen yet, check back on the next update
                 continue
             time = self.clock_times[cycle]
             if time + self.time_after > clock_elapsed_new:
-                ignored_trigger_cycles.append(cycle)
+                ignored_trigger_cycles.append(cycle) # future trigger we haven't seen yet, check back on the next update
                 continue
             elif time - self.time_before < clock_elapsed_new - nt:
-                print('missed cycle', cycle, 'at time', time)
+                print('missed cycle', cycle, 'at time', time) # missed trigger we don't have any data for, just skip it
                 continue
+            if not in_condition:
+                continue # trigger occurred outside of the specified condition, ignore it
             erp = aopy.analysis.calc_erp(lfp, [time - clock_elapsed_new + nt], self.time_before, self.time_after, fs)
             self.erp = np.concatenate((self.erp, erp), axis=2)
+            erp_count += 1
         self.trigger_cycles = ignored_trigger_cycles
 
         # Check for new digital triggers
@@ -699,22 +759,46 @@ class ERPAnalysisWorker(AnalysisWorker):
         while len(self.trigger_times) > 0:
             time = self.trigger_times.pop()
             if time + self.time_after > clock_elapsed_new:
-                ignored_trigger_times.append(time)
+                ignored_trigger_times.append(time) # future trigger we haven't seen yet, check back on the next update
                 continue
             elif time - self.time_before < clock_elapsed_new - nt:
-                print('missed trigger', time)
+                print('missed trigger', time) # missed trigger we don't have any data for, just skip it
                 continue
+            if not in_condition:
+                continue # trigger occurred outside of the specified condition, ignore it
             erp = aopy.analysis.calc_erp(lfp, [time - clock_elapsed_new + nt], self.time_before, self.time_after, fs)
             self.erp = np.concatenate((self.erp, erp), axis=2)
+            erp_count += 1
         self.trigger_times = ignored_trigger_times
 
         # Update the total elapsed time
         self.clock_elapsed = clock_elapsed_new
 
         # Update the ERP
+        self.erp_since_update += erp_count
+        self._update_erp_data()
+
+    def _update_erp_data(self):
+        if self.erp_since_update == 0:
+            return
+        if (self.erp.shape[2] > 50) and (self.erp_since_update < 10):
+            return  # only update the plot every 10 new ERPs to save on computation
+        self.erp_since_update = 0
+        
         fs = self.ds.source.update_freq / self.lfp_downsample
-        max_erp = aopy.analysis.get_max_erp(self.erp, self.time_before, self.time_after, fs, trial_average=True)
-        self.data_map = aopy.visualization.get_data_map(max_erp*1.907348633e-7*1e6, self.elec_pos[:,0], self.elec_pos[:,1])
+        if self.zscore:
+            altcond_window = (0, self.time_after)
+            nullcond_window = (-self.time_before, 0)
+            altcond, nullcond = aopy.analysis.latency.prepare_erp(self.erp, self.erp, fs, 
+                                                                self.time_before, self.time_after, 
+                                                                nullcond_window, altcond_window)[:2]
+            z_erp = np.std(nullcond, axis=0)
+            sd_erp = (altcond - np.mean(nullcond, axis=0)) / z_erp
+            max_erp = aopy.analysis.get_max_erp(sd_erp, 0, self.time_after, fs, trial_average=True)
+        else:
+            max_erp = aopy.analysis.get_max_erp(self.erp, self.time_before, self.time_after, fs, trial_average=True)
+            max_erp *= 1.907348633e-7*1e6 # convert to microvolts
+        self.data_map = aopy.visualization.get_data_map(max_erp, self.elec_pos[:,0], self.elec_pos[:,1])
 
     def handle_data(self, key, values):
         super().handle_data(key, values)
@@ -722,6 +806,10 @@ class ERPAnalysisWorker(AnalysisWorker):
             event_name, event_data = values
             if event_name in self.trigger_events:
                 self.trigger_cycles.append(self.cycle_count)
+        elif key == 'laser_conditions': # multiple lasers on each trial
+            self.current_condition_idx = values[0][0] # pick first one for now, TODO: support multiple conditions at once
+        elif key == 'laser_condition': # single laser on each trial
+            self.current_condition_idx = values[0]
 
     def draw(self):
         super().draw()
@@ -733,15 +821,104 @@ class ERPAnalysisWorker(AnalysisWorker):
         Cleanup tasks after the experiment ends, e.g. saving the figure.
         '''
         self.ds.stop()      
-        # TO-DO: implenent saving figures
         subject = self.task_params.get('subject_name', 'None')
         te_id = self.task_params.get('te_id', 'None')
         if te_id == 'None':
             return
         date = datetime.date.today()
-        filename = f'online_erp_{subject}_{te_id}_{date}.png'
+        if self.title is not None:
+            filename = f'online_erp_{self.title.replace(" ", "_")}_{subject}_{te_id}_{date}.png'
+        else:
+            filename = f'online_erp_{subject}_{te_id}_{date}.png'
         plt.figure(self.fig)
         aopy.visualization.savefig(self.figure_dir, filename, transparent=False)
+
+class SLICAnalysisWorker(ERPAnalysisWorker):
+    '''
+    Plots SLIC connectivity from experiments with an ECoG244 array recordings.
+    '''
+    def init(self):
+        super().init()
+        self.erp_im.set_clim(-0.1, 0.1)
+        stim_site = self.stim_sites[self.condition_idx[0]]
+        ch_near_stim = aopy.analysis.connectivity.get_acq_ch_near_stimulation_site(stim_site)
+        _, acq_ch, _ = aopy.data.load_chmap('ECoG244')
+        self.stim_ch = np.where(np.isin(acq_ch, ch_near_stim))[0]
+        self.taper_len = 0.06
+        self.angle_map = self.data_map.copy()
+        self.slic_map = self.data_map.copy()
+
+        # Add a toggle between coherence and phase
+        del self.zscore_button # hide the z-score button
+        self.show_angle = False
+        self.slider.valmin = 0
+        self.slider.valmax = 1
+        self.slider.set_val(0.1)
+        self.slider.ax.set_xlim(self.slider.valmin, self.slider.valmax)
+        def toggle_angle(event):
+            self.show_angle = not self.show_angle
+            if self.show_angle:
+                self.erp_im.set_cmap('YlGnBu')
+                self.erp_im.set_clim=(0, 2*np.pi),
+                self.slider.drag_active = False # disable the slider for phase
+            else:
+                self.erp_im.set_cmap('bwr')
+                self.erp_im.set_clim=(-self.slider.val, self.slider.val), 
+                self.erp_im.set_data(self.data_map)
+                self.slider.drag_active = True
+            self.draw()
+
+        self.ax_angle = self.fig.add_axes([0.225, 0.025, 0.1, 0.025])
+        self.angle_button = Button(self.ax_angle, 'Phase')
+        self.angle_button.on_clicked(toggle_angle)
+
+        # Add text boxes to enter the frequency band of interest
+        self.band = [80, 150]
+        def on_lf_text_submit(text):
+            try:
+                lf = float(text)
+                self.band[0] = lf
+            except:
+                pass
+        def on_hf_text_submit(text):
+            try:
+                hf = float(text)
+                self.band[1] = hf
+            except:
+                pass
+        axlf = self.fig.add_axes([0.525, 0.025, 0.05, 0.025])
+        self.lf_text = TextBox(axlf, 'Min freq (Hz)', initial='80')
+        self.lf_text.on_submit(on_lf_text_submit)
+        axhf = self.fig.add_axes([0.725, 0.025, 0.05, 0.025])
+        self.hf_text = TextBox(axhf, 'Max freq (Hz)', initial='150')
+        self.hf_text.on_submit(on_hf_text_submit)
+        print('finished init')
+
+    def _update_erp_data(self):
+        if self.erp_since_update == 0:
+            return
+        if (self.erp_since_update < 10):
+            return  # only update the plot every 10 new ERPs to save on computation
+        self.erp_since_update = 0
+
+        fs = self.ds.source.update_freq / self.lfp_downsample
+        freqs, time, coh_all, angle_all = aopy.analysis.connectivity.calc_connectivity_map_coh(
+            self.erp, fs, self.time_before, self.time_after, self.stim_ch, 
+            window=(-self.taper_len,self.taper_len), n=self.taper_len, step=self.taper_len, 
+            parallel=False, verbose=False
+        )
+        angle = aopy.analysis.calc_tfr_mean(freqs, time[1:], angle_all[:,[1],:], self.band)
+        self.angle_map = aopy.visualization.get_data_map(angle, self.elec_pos[:,0], self.elec_pos[:,1])
+        slic = aopy.analysis.calc_tfr_mean(freqs, time[1:], coh_all[:,[1],:]-coh_all[:,[0],:], self.band)
+        self.slic_map = aopy.visualization.get_data_map(slic, self.elec_pos[:,0], self.elec_pos[:,1])
+
+    def draw(self):
+        if self.show_angle:
+            self.data_map = self.angle_map
+        else:
+            self.data_map = self.slic_map
+        super().draw()
+
 
 class BMIAnalysisWorker(AnalysisWorker):
     '''
@@ -822,7 +999,8 @@ class OnlineDataServer(threading.Thread):
             MultiSource.pre_init()
             print('eCube streaming initialized')
         except:
-            pass
+            print('Error initializing eCube streaming')
+            traceback.print_exc()
 
         # Initialize the server
         self._stop_event = threading.Event()
@@ -859,7 +1037,7 @@ class OnlineDataServer(threading.Thread):
         Once the experiment is initialized but before it starts, we spin up the analysis processes
         based on what kind of experiment is running.
         '''
-        # Always start with the behavior analysis worker
+        # Open the behavior analysis worker
         print('init in state', self.state)
         data_queue = mp.Queue()
         if self.task_params['experiment_name'] == 'ManualControl':
@@ -885,8 +1063,24 @@ class OnlineDataServer(threading.Thread):
 
         # Is there ecube neural data?
         if 'record_headstage' in self.task_params and self.task_params['record_headstage']:
-            data_queue = mp.Queue()
-            self.analysis_workers.append((ERPAnalysisWorker(self.task_params, data_queue), data_queue))
+            stim_site = self.task_params.get('stimulation_site', 0)
+            try:
+                stim_sites = [int(stim_site)]
+            except:
+                stim_sites = [int(s) for s in stim_site]
+            for idx, site in enumerate(stim_sites):
+                if site == -1:
+                    continue
+                title = f"Stim site {site}"
+                data_queue = mp.Queue()
+                self.analysis_workers.append((ERPAnalysisWorker(
+                    self.task_params, data_queue, condition_idx=idx, stim_sites=stim_sites, 
+                    title=title), data_queue))
+                title = f"SLIC Stim site {site}"
+                data_queue = mp.Queue()
+                self.analysis_workers.append((SLICAnalysisWorker(
+                    self.task_params, data_queue, condition_idx=idx, stim_sites=stim_sites, 
+                    title=title), data_queue))
 
         # Is this a BMI task?
         if 'decoder' in self.task_params:
@@ -956,7 +1150,7 @@ if __name__ == '__main__':
         hostname = 'localhost'
     
     if len(sys.argv) >= 3:
-        port = sys.argv[2]
+        port = int(sys.argv[2])
     else:
         port = 5000
 
@@ -965,7 +1159,7 @@ if __name__ == '__main__':
     else:
         display = ':0'
 
-    # Spin up servernode
+    # # Spin up servernode
     # if hostname == '0.0.0.0':
     #     import subprocess
     #     subprocess.Popen('/home/aolab/code/bmi3d/riglib/ecube/servernode-control')
