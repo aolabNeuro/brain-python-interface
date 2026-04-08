@@ -514,7 +514,6 @@ class ScoreRewards(traits.HasTraits):
         # Hide score at the end of each trial
         self.remove_model(self.score_display.model)
         self.score_display.model.release()
-        self.end_task() # for demo purposes, end the task after one trial
 
 """"" BELOW THIS IS ALL THE OLD CODE ASSOCIATED WITH REWARD FEATURES"""
 
