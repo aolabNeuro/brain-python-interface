@@ -89,6 +89,7 @@ class TargetTracking(Sequence):
         # yield idx, targs, disturbance, dis_trajectory, sample_rate, ramp, ramp_down :
         self.gen_index, self.targs, self.disturbance_trial, self.disturbance_path, self.sample_rate, self.ramp_up_time, self.ramp_down_time = self.next_trial # targs and disturbance are same length
 
+
         self.targs = np.squeeze(self.targs,axis=0)
         self.disturbance_path = np.squeeze(self.disturbance_path)
 
@@ -535,14 +536,9 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.frame_index += 1 # increment the frame_index for the following cycle
 
     def setup_start_wait(self):
-
         # Allow 2d movement
         if not self.always_1d:
-            self.limit1d = False
-
-        # Set up for progress bar
-        self.bar_width = 12        
-        self.tracking_frame_index = 0
+            self.limit1d = False       
         
         if self.calc_trial_num() == 0:
             # Instantiate the targets here so they don't show up in any states that might come before "wait" 
@@ -803,7 +799,6 @@ class ScreenTargetTracking(TargetTracking, Window):
 
         # Cue successful trial
         self.target.cue_trial_end_success()
-        self.reward_frame_index = 0
 
         # use next generated trial using other freq set
         self.repeat_freq_set = False

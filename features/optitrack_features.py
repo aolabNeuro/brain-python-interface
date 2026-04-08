@@ -8,7 +8,9 @@ import time
 import numpy as np
 import os
 from config.rig_defaults import optitrack as defaults
-from riglib.stereo_opengl.primitives import Cylinder, Sphere
+from OpenGL.GL import GL_REPEAT
+from riglib.stereo_opengl.primitives import Cylinder, Sphere, Disk, TexSphere
+from riglib.stereo_opengl.textures import Texture, TexModel
 
 ########################################################################################################
 # Optitrack datasources
@@ -234,6 +236,36 @@ class SpheresToCylinders():
         d = np.linalg.norm(cursor_pos[[0,2]] - self.targs[self.target_index][[0,2]])
         rad = self.target_radius - self.cursor_radius
         return d > rad
+
+
+class SpheresToImages():
+    '''
+    Convert spheres to textured disks facing the camera.
+    '''
+
+    def add_model(self, model):
+        '''
+        Hijack spheres and switch them for images.
+        '''
+        if isinstance(model, Sphere) and model.radius > 1.0:
+            texture = Texture('features/images/moon.png', wrap_x=GL_REPEAT, wrap_y=GL_REPEAT)
+        elif isinstance(model, Sphere):
+            texture = Texture('features/images/ship.png', wrap_x=GL_REPEAT, wrap_y=GL_REPEAT)
+        else:
+            super().add_model(model)
+            return
+        tmp_model = TexSphere(model.radius, color=[0, 0, 0, 1], specular_color=[0, 0, 0, 0], 
+                                    tex=texture, texture_mapping='planar')
+        model.__class__ = TexSphere
+        model.verts = tmp_model.verts
+        model.polys = tmp_model.polys
+        model.tcoords = tmp_model.tcoords
+        model.normals = tmp_model.normals
+        model.tex = tmp_model.tex
+        model.shader = tmp_model.shader
+        model.rotate_x(90)
+        print('Switched sphere for textured disk')
+        super().add_model(model)
     
 # Helper class for natnet logging
 import logging

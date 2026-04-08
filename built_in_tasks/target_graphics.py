@@ -282,17 +282,18 @@ class VirtualTorusTarget(VirtualCircularTarget):
 
 class TextTarget():   
 
-    def __init__(self, text, color, height=1, starting_pos=np.zeros(3)):
+    def __init__(self, text, color, height=1, font_size=28, starting_pos=np.zeros(3)):
         self.text = text
         self.color = color
         self.size = height * 7.5 # scale according to how much height the font takes up
+        self.font_size = font_size
         self.position = starting_pos
         self.int_position = starting_pos
         self._pickle_init()
 
     def _pickle_init(self):
-        self.model = Text(self.size, self.text, color=self.color, justify='right', 
-                          font_size=28)
+        self.model = Text(self.size, self.text, color=self.color, justify='left', 
+                          font_size=self.font_size)
         self.graphics_models = [self.model]
         self.model.translate(*self.position)
 
