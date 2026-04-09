@@ -6,7 +6,7 @@ task/experiment by multiple inheritance.
 from features.debug_features import Profiler, OnlineAnalysis
 from features.laser_features import QwalorLaser, MultiQwalorLaser, SwitchedQwalorLaser, LaserState
 from features.quattrocento_features import QuattBMI
-from riglib.stereo_opengl.window import WindowWithExperimenterDisplay, Window2D
+from riglib.stereo_opengl.window import WindowWithExperimenterDisplay, Window2D, Window2DIn3D
 from riglib.stereo_opengl.openxr import WindowVR
 
 from .generator_features import Autostart, RandomDelay, AdaptiveGenerator, IgnoreCorrectness, PoissonWait, Progressbar_fixation, \
@@ -45,6 +45,7 @@ built_in_features = dict(
     rand_delay=RandomDelay,
     poisson_wait=PoissonWait,
     window2D=Window2D,
+    window2Din3D=Window2DIn3D,
     windowVR=WindowVR,
     cylinder_center_out=SpheresToCylinders,
     adaptive_generator=AdaptiveGenerator,
