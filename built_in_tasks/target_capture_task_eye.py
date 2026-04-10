@@ -700,7 +700,7 @@ class EyeHandCaptureBlock(Sequence, Window):
                         gaze_incorrect_target="incorrect_target_penalty", start_pause="pause"),
         fixation = dict(fixation_complete="delay", leave_target="hold_penalty", fixation_break="fixation_penalty", start_pause="pause"),
         hold = dict(hold_complete="delay", leave_target="hold_penalty",  fixation_break="fixation_penalty", start_pause="pause"),
-        delay = dict(delay_complete="targ_transition", leave_target="delay_penalty", fixation_break="fixation_penalty", start_pause="pause"),
+        delay = dict(delay_complete="targ_transition", leave_target="delay_penalty", fixation_break="delay_penalty", start_pause="pause"),
         targ_transition = dict(trial_complete="reward", trial_abort="wait", targ_eye_hand="target_eye_hand", targ_eye="target_eye", start_pause="pause"),
         incorrect_target_penalty = dict(incorrect_target_penalty_end="wait", start_pause="pause", end_state=True),
         timeout_penalty = dict(timeout_penalty_end="wait", start_pause="pause", end_state=True),
@@ -1333,6 +1333,92 @@ class EyeHandCaptureBlock(Sequence, Window):
             indices[2] = idx3[0]
 
             yield indices, targs
+
+class EyeHandCaptureBlock_sequence(EyeHandCaptureBlock):
+    '''
+    This task is similar to the EyeHandCaptureBlock. In eye trials, the task structure is exactly the same as the EyeHandCaptureBlock.
+    For eye-hand trials, subjects need to move their eyes first, then move their arm while keeping their fixation on the eye target.
+    '''
+
+    fixation_time1 = traits.Float(.2, desc="First fixation duration. This is both for eye_trials nad eye_hand_trials")
+    fixation_time2 = traits.Float(.2, desc="Second fixation duration. This is only for eye_hand_trials")
+    exclude_parent_traits = ['fixation_time']
+
+    status = dict(
+        wait = dict(start_trial="target", start_pause="pause"),
+        target = dict(enter_target="target_eye", start_pause="pause"),
+        target_eye = dict(timeout="timeout_penalty", return_init_target='target', leave_target="hold_penalty", gaze_target="fixation", \
+                        gaze_incorrect_target="incorrect_target_penalty", start_pause="pause"),
+        fixation = dict(fixation_complete="target_hand", leave_target="hold_penalty", fixation_break="fixation_penalty", start_pause="pause"),
+        target_hand = dict(timeout="timeout_penalty", pass_target_hand='delay', enter_target='hold', \
+                        fixation_break="fixation_penalty", start_pause="pause"),
+        hold = dict(hold_complete="delay", leave_target="hold_penalty",  fixation_break="fixation_penalty", start_pause="pause"),
+        delay = dict(delay_complete="targ_transition", leave_target="delay_penalty", fixation_break="delay_penalty", start_pause="pause"),
+        targ_transition = dict(trial_complete="reward", trial_abort="wait", targ_eye="target_eye", start_pause="pause"),
+        incorrect_target_penalty = dict(incorrect_target_penalty_end="wait", start_pause="pause", end_state=True),
+        timeout_penalty = dict(timeout_penalty_end="wait", start_pause="pause", end_state=True),
+        hold_penalty = dict(hold_penalty_end="wait", start_pause="pause", end_state=True),
+        delay_penalty = dict(delay_penalty_end="wait", start_pause="pause", end_state=True),
+        fixation_penalty = dict(fixation_penalty_end="wait", start_pause="pause", end_state=True),
+        reward = dict(reward_end="wait", start_pause="pause", stoppable=False, end_state=True),
+        pause = dict(end_pause="wait", end_state=True),
+    )
+
+    def _start_wait(self):
+        super()._start_wait()
+        self.hand_target_index = -1
+
+    def _start_target_hand(self):
+        # Hide hand target to show the go cue for hand movement
+        if self.is_eye_hand_trials and self.target_index == 1:
+            self.hand_target_index = 1
+            self.targets_hand[self.hand_target_index-1].hide()
+            self.sync_event('TARGET_OFF', self.gen_indices[self.target_index])
+
+    def _start_targ_transition(self):
+        if self.target_index + 1 < self.chain_length:
+
+            # Hide the current target if there are more
+            self.targets[self.target_index].hide()
+            self.sync_event('EYE_TARGET_OFF', self.gen_indices[self.target_index])
+
+    def _test_fixation_complete(self,ts):
+
+        if self.is_eye_hand_trials and self.target_index == 1:
+            return ts > self.fixation_time2
+        else:
+            return ts > self.fixation_time1
+
+    
+    def _test_enter_target(self, ts):
+        '''
+        return true if the distance between center of cursor and target is smaller than the cursor radius
+        '''
+        cursor_pos = self.plant.get_endpoint_pos()
+        d = np.linalg.norm(cursor_pos - self.targs[self.hand_target_index])
+        return d <= self.target_radius - self.cursor_radius
+    
+    def _test_leave_target(self, ts):
+        '''
+        return true if cursor moves outside the hand target radius
+        '''
+        cursor_pos = self.plant.get_endpoint_pos()
+        d = np.linalg.norm(cursor_pos - self.targs[self.hand_target_index])
+        return d > self.target_radius - self.cursor_radius
+    
+    def _test_pass_target_hand(self, ts):
+        '''
+        whether to pass target_hand state when trials are eye_trials and the target index is 0
+        '''
+        if self.is_eye_trials:
+            return True
+        elif self.target_index == 0:
+            return True
+        else:
+            return False
+
+    def _test_targ_eye(self,ts):
+        return self.target_index < self.chain_length - 1
 
 class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
     '''
