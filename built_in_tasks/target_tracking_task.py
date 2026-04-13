@@ -9,6 +9,8 @@ from riglib import plants
 from riglib.stereo_opengl.window import Window
 from .target_graphics import *
 
+import collections
+
 ## Plants
 # List of possible "plants" that a subject could control either during manual or brain control
 cursor = plants.CursorPlant()
@@ -395,7 +397,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         'tracking_target_chain', 'tracking_target_debug', 'tracking_target_training', 'single_sine_chain', 'circle_chain', 'figure8_chain'
     ]
 
-    hidden_traits = ['cursor_color', 'trajectory_color', 'cursor_bounds', 'cursor_radius', 'plant_hide_rate', 'starting_pos']
+    hidden_traits = ['cursor_color', 'trajectory_color', 'cursor_bounds', 'cursor_radius', 'plant_hide_rate', 'starting_pos', 'cursor_lag']
     targets = []
 
     is_bmi_seed = True
@@ -414,6 +416,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     cursor_color = traits.OptionsList("pink", *target_colors, desc='Color of cursor endpoint', bmi3d_input_options=list(target_colors.keys()))
     cursor_bounds = traits.Tuple((-10., 10., 0., 0., -10., 10.), desc='(x min, x max, z min, z max, y min, y max)')
     starting_pos = traits.Tuple((5., 0., 5.), desc='Where to initialize the cursor')
+    cursor_lag = traits.Float(0, desc='Number of seconds to lag the cursor position')
     fps = traits.Float(60, desc="Rate at which the FSM is called in Hz") # originally set by class Experiment
     trajectory_amplitude = traits.Float(1, desc='Scale factor applied to the trajectory')
     disturbance_amplitude = traits.Float(1, desc='Scale factors applied to the disturbance')
@@ -433,6 +436,8 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.lookahead = int(self.fps * self.lookahead_time) # convert to frames
         self.lookahead_scale = (0.5 * self.screen_cm[0]) / (self.lookahead) # cm per frame
         self.original_limit1d = self.limit1d # keep track of original settable trait
+        self.cursor_lag_frames = int(round(self.cursor_lag * self.fps)) # convert cursor lag to frames
+        self.pos_buffer = collections.deque(maxlen=max(self.cursor_lag_frames + 1, 1)) # buffer to hold past cursor positions
         
         if not self.always_1d:
             self.limit1d = False # allow 2d movement before center-hold initiation
@@ -473,6 +478,14 @@ class ScreenTargetTracking(TargetTracking, Window):
         # if self.frame_index >= 0:
         #     print('FRAME ', self.frame_index, self.get_state(), self.trial_timed_out)
         #     print(self.target.get_position()[2], self.pos_offset[2], self.trajectory.get_position()[0])
+
+        # Buffer true hand position
+        true_pos = self.plant.get_endpoint_pos().copy()
+        self._pos_buffer.append(true_pos)
+
+        # Show lagged position if buffer is full
+        if self.cursor_lag_frames > 0 and len(self._pos_buffer) > self.cursor_lag_frames:
+            self.plant.set_endpoint_pos(self._pos_buffer[0]) # set to lagged position
 
         self.move_effector(pos_offset=np.asarray(self.pos_offset), vel_offset=np.asarray(self.vel_offset))
 
