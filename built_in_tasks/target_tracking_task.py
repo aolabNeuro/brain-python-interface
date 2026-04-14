@@ -436,9 +436,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.lookahead = int(self.fps * self.lookahead_time) # convert to frames
         self.lookahead_scale = (0.5 * self.screen_cm[0]) / (self.lookahead) # cm per frame
         self.original_limit1d = self.limit1d # keep track of original settable trait
-        self.cursor_lag_frames = int(round(self.cursor_lag * self.fps)) # convert cursor lag to frames
-        self.pos_buffer = collections.deque(maxlen=max(self.cursor_lag_frames + 1, 1)) # buffer to hold past cursor positions
-        
+
         if not self.always_1d:
             self.limit1d = False # allow 2d movement before center-hold initiation
         
@@ -478,14 +476,6 @@ class ScreenTargetTracking(TargetTracking, Window):
         # if self.frame_index >= 0:
         #     print('FRAME ', self.frame_index, self.get_state(), self.trial_timed_out)
         #     print(self.target.get_position()[2], self.pos_offset[2], self.trajectory.get_position()[0])
-
-        # Buffer true hand position
-        true_pos = self.plant.get_endpoint_pos().copy()
-        self._pos_buffer.append(true_pos)
-
-        # Show lagged position if buffer is full
-        if self.cursor_lag_frames > 0 and len(self._pos_buffer) > self.cursor_lag_frames:
-            self.plant.set_endpoint_pos(self._pos_buffer[0]) # set to lagged position
 
         self.move_effector(pos_offset=np.asarray(self.pos_offset), vel_offset=np.asarray(self.vel_offset))
 
