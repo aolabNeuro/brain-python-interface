@@ -306,7 +306,7 @@ class ScreenTargetCapture(TargetCapture, Window):
         'rand_target_chain_3D', 'corners_2D', 'centerout_tabletop', 'out_2D_square', 'centerout_2D_square'
     ]
 
-    hidden_traits = ['cursor_color', 'target_color', 'cursor_bounds', 'cursor_radius', 'plant_hide_rate', 'starting_pos']
+    hidden_traits = ['cursor_color', 'target_color', 'cursor_bounds', 'cursor_radius', 'plant_hide_rate', 'starting_pos', 'cursor_lag']
 
     is_bmi_seed = True
 
@@ -320,6 +320,7 @@ class ScreenTargetCapture(TargetCapture, Window):
     cursor_color = traits.OptionsList("dark_purple", *target_colors, desc='Color of cursor endpoint', bmi3d_input_options=list(target_colors.keys()))
     cursor_bounds = traits.Tuple((-10., 10., -10., 10., -10., 10.), desc='(x min, x max, y min, y max, z min, z max)')
     starting_pos = traits.Tuple((5., 0., 5.), desc='Where to initialize the cursor') 
+    cursor_lag = traits.Float(0, desc='Number of seconds to lag the cursor position')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
