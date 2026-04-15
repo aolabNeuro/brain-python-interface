@@ -1892,6 +1892,9 @@ class ScreenTargetCapture_Saccade(ScreenTargetCapture):
     fixation_target_color = traits.OptionsList("fixation_color", *target_colors, desc="Color of the eye target under fixation state", bmi3d_input_options=list(target_colors.keys()))
     automatic_reward = traits.Bool(False, desc="Whether to deliver automatic reward")
 
+    init_eye_target_alpha = traits.Float(1., desc="Transparency of initial eye targets")
+    goal_eye_target_alpha = traits.Float(0.3, desc="Transparency of initial hand targets")
+
     sequence_generators = [
         'out_2D', 'out_2D_select', 'centerout_2D', 'centeroutback_2D', 'centerout_2D_select', 'rand_target_chain_2D', 'rand_same_target_chain_2D', 
         'rand_target_chain_3D', 'corners_2D', 'centerout_tabletop', 'out_2D_square', 'centerout_2D_square', 'row_target','sac_hand_2d'
@@ -1904,9 +1907,15 @@ class ScreenTargetCapture_Saccade(ScreenTargetCapture):
         instantiate_targets = kwargs.pop('instantiate_targets', True)
         if instantiate_targets:
 
+            # Control transparency of targets
+            new_color1 = list(target_colors[self.target_color])
+            new_color1[3] = self.init_eye_target_alpha
+            new_color2 = list(target_colors[self.target_color])
+            new_color2[3] = self.goal_eye_target_alpha
+
             # 2 targets for delay
-            target1 = VirtualRectangularTarget(target_width=self.target_radius, target_height=self.target_radius/2, target_color=target_colors[self.target_color])
-            target2 = VirtualRectangularTarget(target_width=self.target_radius, target_height=self.target_radius/2, target_color=target_colors[self.target_color])
+            target1 = VirtualRectangularTarget(target_width=self.target_radius, target_height=self.target_radius/2, target_color=new_color1)
+            target2 = VirtualRectangularTarget(target_width=self.target_radius, target_height=self.target_radius/2, target_color=new_color2)
 
             self.targets = [target1, target2]
 
