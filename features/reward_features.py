@@ -328,12 +328,21 @@ class ProgressBar(traits.HasTraits):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.bar_width = 12
+        self.bar = VirtualRectangularTarget(target_width=1, target_height=0, target_color=(0., 1., 0., 0.75), starting_pos=[0,-15,9])
 
     def setup_start_wait(self):
         super().setup_start_wait()
+        for model in self.bar.graphics_models:
+            self.add_model(model)
+            self.bar.hide()
 
         # Initialize counter at the start of each trial
         self.tracking_frame_index = 0
+
+    def setup_screen_reset(self):
+        super().setup_screen_reset()
+        self.bar.hide()
+        self.bar.reset()
 
     def _while_tracking_in(self):
         super()._while_tracking_in()
