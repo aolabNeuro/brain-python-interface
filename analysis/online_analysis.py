@@ -877,6 +877,9 @@ class OnlineDataServer(threading.Thread):
         elif self.task_params['experiment_name'] == 'EyeConstrainedReachingTask':
             self.analysis_workers.append((EyeHandAnalysisWorker(self.task_params, data_queue), data_queue))        
 
+        elif self.task_params['experiment_name'] == 'EyeHandConstrainedReachingTask':
+            self.analysis_workers.append((EyeHandAnalysisWorker(self.task_params, data_queue), data_queue))  
+
         elif self.task_params['experiment_name'] == 'EyeHandSequenceTask':
             self.analysis_workers.append((EyeHandSequenceAnalysisWorker(self.task_params, data_queue), data_queue))     
 
