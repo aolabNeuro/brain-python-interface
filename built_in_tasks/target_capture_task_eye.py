@@ -683,7 +683,8 @@ class EyeHandCaptureBlock(Sequence, Window):
 
     init_eye_target_alpha = traits.Float(1., desc="Transparency of initial eye targets")
     init_hand_target_alpha = traits.Float(0.9, desc="Transparency of initial hand targets")
-    goal_target_alpha = traits.Float(0.75, desc="Transparency of goal targets")
+    goal_eye_target_alpha = traits.Float(0.75, desc="Transparency of goal eye targets")
+    goal_hand_target_alpha = traits.Float(0.75, desc="Transparency of goal hand targets")
 
     fixation_target_color = traits.OptionsList("fixation_color", *target_colors, desc="Color of the eye target under fixation state", bmi3d_input_options=list(target_colors.keys()))
     eye_target_color = traits.OptionsList("eye_color", *target_colors, desc="Color of the eye target", bmi3d_input_options=list(target_colors.keys()))
@@ -742,9 +743,9 @@ class EyeHandCaptureBlock(Sequence, Window):
             init_hand_new_color = list(target_colors[self.target_color])
             init_hand_new_color[3] = self.init_hand_target_alpha
             goal_eye_new_color = list(target_colors[self.eye_target_color])
-            goal_eye_new_color[3] = self.goal_target_alpha
+            goal_eye_new_color[3] = self.goal_eye_target_alpha
             goal_hand_new_color = list(target_colors[self.target_color])
-            goal_hand_new_color[3] = self.goal_target_alpha
+            goal_hand_new_color[3] = self.goal_hand_target_alpha
 
             # Target 1 and 2 are for saccade. Target 3 and target 4 are for hand
             target1 = VirtualRectangularTarget(target_width=self.fixation_radius, target_height=self.fixation_radius/2, target_color=init_eye_new_color)
@@ -864,6 +865,7 @@ class EyeHandCaptureBlock(Sequence, Window):
     def _start_wait(self):
         self.fixation_passed = False
         self.chain_length = len(self.targets)
+        self.plant.cursor.attach()
 
         if self.calc_trial_num() == 0:
 
@@ -1091,6 +1093,8 @@ class EyeHandCaptureBlock(Sequence, Window):
     def _start_reward(self):
         self.targets[self.target_index].cue_trial_end_success()
         self.targets_hand[self.target_index].cue_trial_end_success()
+        self.targets_hand[0].hide()
+        self.plant.cursor.detach()
         self.sync_event('REWARD')
 
     def _end_reward(self):
@@ -1880,13 +1884,21 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
 class ScreenTargetCapture_Saccade(ScreenTargetCapture):
     '''
     Center-out saccade task. The controller for the cursor position is eye position.
-    Hand cursor is also visible. You should remove the hand cursor by setting cursor_radius to 0 as needed.
+    Hand cursor is invisible.
     '''
 
     fixation_radius_buffer = traits.Float(.5, desc="additional radius for eye target")
     target_color = traits.OptionsList("eye_color", *target_colors, desc="Color of the target", bmi3d_input_options=list(target_colors.keys()))
     fixation_target_color = traits.OptionsList("fixation_color", *target_colors, desc="Color of the eye target under fixation state", bmi3d_input_options=list(target_colors.keys()))
     automatic_reward = traits.Bool(False, desc="Whether to deliver automatic reward")
+
+    init_eye_target_alpha = traits.Float(1., desc="Transparency of initial eye targets")
+    goal_eye_target_alpha = traits.Float(0.3, desc="Transparency of initial hand targets")
+
+    sequence_generators = [
+        'out_2D', 'out_2D_select', 'centerout_2D', 'centeroutback_2D', 'centerout_2D_select', 'rand_target_chain_2D', 'rand_same_target_chain_2D', 
+        'rand_target_chain_3D', 'corners_2D', 'centerout_tabletop', 'out_2D_square', 'centerout_2D_square', 'row_target','sac_hand_2d'
+    ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1895,14 +1907,26 @@ class ScreenTargetCapture_Saccade(ScreenTargetCapture):
         instantiate_targets = kwargs.pop('instantiate_targets', True)
         if instantiate_targets:
 
+            # Control transparency of targets
+            new_color1 = list(target_colors[self.target_color])
+            new_color1[3] = self.init_eye_target_alpha
+            new_color2 = list(target_colors[self.target_color])
+            new_color2[3] = self.goal_eye_target_alpha
+
             # 2 targets for delay
-            target1 = VirtualRectangularTarget(target_width=self.target_radius, target_height=self.target_radius/2, target_color=target_colors[self.target_color])
-            target2 = VirtualRectangularTarget(target_width=self.target_radius, target_height=self.target_radius/2, target_color=target_colors[self.target_color])
+            target1 = VirtualRectangularTarget(target_width=self.target_radius, target_height=self.target_radius/2, target_color=new_color1)
+            target2 = VirtualRectangularTarget(target_width=self.target_radius, target_height=self.target_radius/2, target_color=new_color2)
 
             self.targets = [target1, target2]
 
             self.offset_cube = np.array([0,0,self.target_radius/2]) # To center the cube target
 
+    def _start_wait(self):
+        super()._start_wait()
+        # Make cursor invisible
+        self.plant.cursor.detach()
+        self.chain_length = 2
+        
     def _test_enter_target(self, ts):
         '''
         Check whether eye positions from a target are within the fixation distance
@@ -1955,3 +1979,80 @@ class ScreenTargetCapture_Saccade(ScreenTargetCapture):
         else:
             # This delay state should only last 1 cycle, don't sync anything
             pass
+
+    # Generator functions
+    @staticmethod
+    def row_target(nblocks=20, ntargets=3, dx=5.,offset1=(0,0,-2),offset2=(0,0,6.),offset3=(0,0,-7.5),origin=(0,0,0)):
+        '''
+        Generates a sequence of 3D for 2 eye targets and 1 hand target at a given distance from the origin
+
+        Parameters
+        ----------
+        nblocks : int
+            The number of ntarget pairs in the sequence.
+        ntargets : int
+            The number of equally spaced targets
+        distance : float
+            The distance in cm between targets
+        offset1 : 3-tuple
+            y location of the first eye target
+        offset2 : 3-tuple
+            y location of the second eye target
+        offset3 : 3-tuple
+            y location of the hand target
+        origin : 3-tuple
+            Location of the central targets
+
+        Returns
+        -------
+        [nblocks*ntargets x 1] array of tuples containing trial indices and [1 x 3] target coordinates
+
+        '''
+        rng = np.random.default_rng()
+        for _ in range(nblocks):
+            order = np.arange(ntargets**3)
+            rng.shuffle(order)
+            x_pos_candidate = [-dx,0,dx]
+            for t in range(ntargets**3):
+                idx = np.base_repr(order[t],3).zfill(3) # convert a decimal number to ternary
+
+                # Target index for hand target, initial eye target, final eye target
+                idx1 = int(idx[0])
+                idx2 = int(idx[1])
+                idx3 = int(idx[2])
+
+                # Get positions for each target
+                x_pos1 = x_pos_candidate[idx1]
+                x_pos2 = x_pos_candidate[idx2]
+                x_pos3 = x_pos_candidate[idx3]
+                pos1 = np.array([x_pos1,0,0]).T
+                pos2 = np.array([x_pos2,0,0]).T
+                pos3 = np.array([x_pos3,0,0]).T
+
+                yield [idx1],[idx2],[idx3],[pos1+offset1+origin],[pos2+offset2+origin],[pos3+offset3+origin]
+
+    @staticmethod
+    def sac_hand_2d(nblocks=20, ntargets=3, dx=10,offset1=(0,0,-2),offset2=(0,0,6.),offset3=(0,0,-7.5),origin=(0,0,0)):
+        '''
+        Pairs of hand targets and eye targets
+
+        Returns
+        -------
+        [nblocks*ntargets x 1] array of tuples containing trial indices and [3 x 3] target coordinates
+        '''
+
+        gen = HandConstrainedEyeCapture.row_target(nblocks=nblocks,ntargets=ntargets,dx=dx,offset1=offset1,offset2=offset2,offset3=offset3,origin=origin)
+        for _ in range(nblocks*(ntargets**3)):
+            idx1,idx2,idx3,pos1,pos2,pos3 = next(gen)
+
+            targs = np.zeros([2, 3])
+            targs[0,:] = pos1[0]
+            targs[1,:] = pos2[0]
+            #targs[2,:] = pos3[0]
+
+            indices = np.zeros([2,1])
+            indices[0] = idx1[0]
+            indices[1] = idx2[0] + ntargets
+            #indices[2] = idx3[0]
+
+            yield indices, targs
