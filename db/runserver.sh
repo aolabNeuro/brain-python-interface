@@ -44,7 +44,7 @@ elif [ "$HOST" = "booted-server" ]; then
     if [ "$DISPLAY" = ":0" ]; then
         DISPLAY=':1'
     fi
-    Xvnc $DISPLAY -securityTypes None -geometry 1920x1080 -nocursor &
+    Xvnc $DISPLAY -securityTypes None -geometry 1920x1280 -nocursor &
     eval "$(conda shell.bash hook)"
     conda activate bmi3d
 fi
