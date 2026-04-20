@@ -2,7 +2,7 @@
 Base tasks for generic point-to-point reaching
 '''
 import numpy as np
-from riglib.stereo_opengl.primitives import Cable, Sphere, Cube, Torus, Text
+from riglib.stereo_opengl.primitives import Cable, Snake, Sphere, Cube, Torus, Text
 from riglib.stereo_opengl.primitives import Cylinder, Plane, Sphere, Cube
 from riglib.stereo_opengl.models import FlatMesh, Group
 from riglib.stereo_opengl.textures import Texture, TexModel
@@ -36,6 +36,8 @@ target_colors = {
     "gold": (0.941,0.637,0.25,0.75),
     "elephant":(0.5,0.5,0.5,0.5),
     "white": (1, 1, 1, 0.75),
+    "black": (0, 0, 0, 0.75),
+    "invisible": (0, 0, 0, 0.0),
     "bright_white":  (1, 1, 1, 1),
     "eye_color": (0.7, 0.7, 0.7, 1.),
     "fixation_color": (0., 0.7, 0.7, 1),
@@ -187,7 +189,7 @@ class CableTarget(object):
         self._pickle_init()
 
     def _pickle_init(self):
-        self.cable = Cable(radius=self.target_radius,trajectory = self.trajectory, color=self.target_color)
+        self.cable = Cable(radius=self.target_radius, xyz=self.trajectory, color=self.target_color)
         self.graphics_models = [self.cable]
         self.cable.translate(*self.position)
 
@@ -239,6 +241,20 @@ class VirtualCableTarget(CableTarget):
     def get_position(self):
         return self.cable.xfm.move
 
+class VirtualSnakeTarget(VirtualCableTarget):
+
+    def _pickle_init(self):
+        self.trajectory = np.array(self.trajectory)
+        self.cable = Snake(radius=self.target_radius, trajectory=self.trajectory, color=self.target_color)
+        self.graphics_models = [self.cable]
+        self.cable.translate(*self.position)
+
+    def update_mask(self, start_frame, end_frame, inverse=False):
+        '''
+        Update the texture mask of the snake target.
+        '''
+        self.cable.update_texture(start_frame, end_frame, inverse=inverse)
+
 class VirtualTorusTarget(VirtualCircularTarget):
 
     def __init__(self, inner_radius=2, outer_radius=3, target_color=(1, 0, 0, .5), starting_pos=np.zeros(3)):
@@ -266,17 +282,18 @@ class VirtualTorusTarget(VirtualCircularTarget):
 
 class TextTarget():   
 
-    def __init__(self, text, color, height=1, starting_pos=np.zeros(3)):
+    def __init__(self, text, color, height=1, font_size=28, starting_pos=np.zeros(3)):
         self.text = text
         self.color = color
         self.size = height * 7.5 # scale according to how much height the font takes up
+        self.font_size = font_size
         self.position = starting_pos
         self.int_position = starting_pos
         self._pickle_init()
 
     def _pickle_init(self):
-        self.model = Text(self.size, self.text, color=self.color, justify='right', 
-                          font_size=28)
+        self.model = Text(self.size, self.text, color=self.color, justify='left', 
+                          font_size=self.font_size)
         self.graphics_models = [self.model]
         self.model.translate(*self.position)
 

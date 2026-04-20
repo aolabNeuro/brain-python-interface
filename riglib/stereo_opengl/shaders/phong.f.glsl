@@ -58,6 +58,8 @@ vec4 phong() {
         texcolor.rgb + basecolor.rgb,
         texcolor.a * basecolor.a
     );
+    if (frag_diffuse.a < 0.01)
+        discard;
 
     vec4 diffuse_factor
         = max(-dot(normal, mv_light_direction), 0.0) * light_diffuse;

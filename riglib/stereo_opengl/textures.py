@@ -26,11 +26,13 @@ class Texture(object):
 
         if isinstance(tex, np.ndarray):
             if tex.max() <= 1:
-                tex *= 255
-            if len(tex.shape) < 3:
-                tex = np.tile(tex, [3, 1, 1]).T
-            if tex.shape[-1] == 3:
-                tex = np.dstack([tex, np.ones(tex.shape[:-1])])
+                tex = (tex * 255).astype(np.uint8)
+            else:
+                tex = tex.astype(np.uint8)
+            if tex.ndim == 2:
+                tex = np.stack([tex]*3, axis=-1)  # grayscale → RGB
+            elif tex.shape[-1] == 1:
+                tex = np.repeat(tex, 3, axis=-1)
             size = tex.shape[:2]
             tex = tex.astype(np.uint8).tobytes()
         elif isinstance(tex, str):
