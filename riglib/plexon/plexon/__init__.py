@@ -19,7 +19,7 @@ class Spikes(DataSourceSystem):
     Client for spike data streamed from plexon system, compatible with riglib.source.DataSource
     '''
     update_freq = 40000
-    dtype = np.dtype([("ts", np.float), ("chan", np.int32), ("unit", np.int32), ("arrival_ts", np.float64)])
+    dtype = np.dtype([("ts", float), ("chan", np.int32), ("unit", np.int32), ("arrival_ts", np.float64)])
 
     def __init__(self, addr=("127.0.0.1", 6000), channels=None):
         '''

@@ -16,7 +16,7 @@ class System(DataSourceSystem):
     Optitrack DataSourceSystem collects motion tracking data via UDP packets using natnet depacketizer
     '''
     update_freq = 240 # This may not always be the case, but lower frequencies will still work, just waste space in the circular buffer
-    dtype = np.dtype((np.float, (6,)))
+    dtype = np.dtype(('float', (6,)))
 
     def start(self):
         '''

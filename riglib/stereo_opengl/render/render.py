@@ -15,21 +15,26 @@ class _textrack(object):
     pass
 
 class Renderer(object):
-    def __init__(self, window_size, fov, near, far, shaders=None, programs=None):
+    def __init__(self, window_size, fov, near, far, modelview=None, shaders=None, programs=None, light_direction=None):
         self.render_queue = None
         self.size = window_size
         self.drawpos = 0,0
         w, h = window_size
         self.projection = perspective(fov, w / h, near, far)
+        self.light_direction = light_direction or (-1., -2., -2., 0.)
+        self.modelview = np.eye(4) if modelview is None else modelview
 
         #Add the default shaders
         if shaders is None:
             shaders = dict()
             shaders['passthru'] = GL_VERTEX_SHADER, "passthrough.v.glsl"
             shaders['default'] = GL_FRAGMENT_SHADER, "default.f.glsl", "phong.f.glsl"
+            shaders['ui_passthru'] = GL_VERTEX_SHADER, "passthrough2d.v.glsl"
+            shaders['ui_default'] = GL_FRAGMENT_SHADER, "none.f.glsl"
         if programs is None:
             programs = dict()
             programs['default'] = "passthru", "default"
+            programs['ui'] = "ui_passthru", "ui_default"
 
         #compile the given shaders and the programs
         self.shaders = dict()
@@ -95,31 +100,38 @@ class Renderer(object):
         return self.texunits[tex]
     
     def reset_texunits(self):
-        maxtex = glGetIntegerv(GL_MAX_TEXTURE_COORDS)
-        #Use first texture unit as the "blank" texture
-        self.texavail = set((i, globals()['GL_TEXTURE%d'%i]) for i in range(maxtex))
-        self.texunits = dict()
-    
+        maxtex = glGetIntegerv(GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS)
+        # print(f"Max texture units: {maxtex}")
+        # glActiveTexture(GL_TEXTURE0)  # Reset to default texture unit
+        self.texavail = set((i, globals()['GL_TEXTURE%d'%i]) for i in range(1, maxtex))
+        self.texunits = dict() 
+
     def add_shader(self, name, stype, filename, *includes):
         src = []
-        main = open(os.path.join(cwd, "shaders", filename))
-        version = main.readline().strip()
+        main_path = os.path.join(cwd, "shaders", filename)
+        with open(main_path, 'r') as main:
+            version = main.readline().strip()
+            main_content = main.read()
+        
         for inc in includes:
-            incfile = open(os.path.join(cwd, "shaders", inc))
-            ver = incfile.readline().strip()
-            assert ver == version, "Version: %s, %s"%(ver, version)
-            src.append(incfile.read())
-            incfile.close()
-        src.append(main.read())
-        main.close()
-
+            inc_path = os.path.join(cwd, "shaders", inc)
+            with open(inc_path, 'r') as incfile:
+                ver = incfile.readline().strip()
+                assert ver == version, f"Version mismatch: {ver} != {version}"
+                src.append(incfile.read())
+        
+        src.append(main_content)
+        
+        full_src = "\n".join([version] + src)
         shader = glCreateShader(stype)
-        glShaderSource(shader, "\n".join(src))
+        glShaderSource(shader, full_src)
         glCompileShader(shader)
 
         if not glGetShaderiv(shader, GL_COMPILE_STATUS):
             err = glGetShaderInfoLog(shader)
             glDeleteShader(shader)
+            print(f"Shader compilation error for {filename}:")  # Debug print
+            print(err.decode('utf-8'))  # Debug print
             raise Exception(err)
         
         self.shaders[name] = shader
@@ -129,18 +141,22 @@ class Renderer(object):
         sp = ShaderProgram(shaders)
         self.programs[name] = sp
     
-    def draw(self, root, shader=None, requeue=False, **kwargs):
+    def draw(self, root, shader=None, apply_default=False, requeue=False, **kwargs):
         if self.render_queue is None or requeue:
             self._queue_render(root)
         
         if "p_matrix" not in kwargs:
             kwargs['p_matrix'] = self.projection
         if "modelview" not in kwargs:
-            kwargs['modelview'] = root._xfm.to_mat()
+            kwargs['modelview'] = self.modelview
+        if "light_direction" not in kwargs:
+            kwargs['light_direction'] = self.light_direction
         
         if shader is not None:
-            for items in list(self.render_queue.values()):
-                self.programs[shader].draw(self, items, **kwargs)
+            if apply_default: # apply this shader to all models that don't have a program specified
+                self.programs[shader].draw(self, self.render_queue['default'], **kwargs)
+            else: # apply this shader to only the models that have this shader specified
+                self.programs[shader].draw(self, self.render_queue[shader], **kwargs)
         else:
             for name, program in list(self.programs.items()):
                 program.draw(self, self.render_queue[name], **kwargs)
@@ -160,6 +176,7 @@ class Renderer2D(Renderer):
         shaders['default'] = GL_FRAGMENT_SHADER, "none.f.glsl"
         programs = dict()
         programs['default'] = "passthru", "default"
+        programs['ui'] = "passthru", "default"
         super().__init__(screen_cm, np.nan, 1, 1024, shaders=shaders, programs=programs)
         w, h = screen_cm
         self.projection = orthographic(w, h, 1, 1024)

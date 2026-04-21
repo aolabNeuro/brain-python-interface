@@ -167,5 +167,5 @@ def messages(data, **kwargs):
     for s, e in np.vstack([tidx[:-1], tidx[1:]-1]).T:
         msgs.append((times[s], names[s:e].tostring()))
 
-    return np.array(msgs, dtype=[('time', np.float), ('state', 'S256')])
+    return np.array(msgs, dtype=[('time', float), ('state', 'S256')])
 

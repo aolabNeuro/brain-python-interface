@@ -36,7 +36,7 @@ class System(object):
 
     rigidBodyCount = 1
     update_freq = 120 
-    dtype = np.dtype((np.float, (rigidBodyCount, 6))) #6 degress of freedom
+    dtype = np.dtype((float, (rigidBodyCount, 6))) #6 degress of freedom
     
     def __init__(self):
         self.rigid_body_count = 1 #for now,only one rigid body

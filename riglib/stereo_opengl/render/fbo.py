@@ -1,5 +1,17 @@
-'''Needs docs'''
+'''
+FBO (Framebuffer Object) Module
 
+An FBO is an OpenGL object that allows rendering to off-screen buffers, which can be used as textures.
+This is useful for various rendering techniques like post-processing effects, shadow mapping, or
+rendering to multiple targets simultaneously.
+
+Key components:
+- FBO: The main framebuffer object
+- Attachments: Textures or renderbuffers that store the rendered output (color, depth, stencil)
+- Render targets: The buffers that OpenGL draws into (color attachments, depth attachment, etc.)
+
+This module provides classes to create and manage FBOs, as well as utilities for rendering to them.
+'''
 
 import numpy as np
 from OpenGL.GL import *
@@ -44,7 +56,7 @@ class FBO(object):
                 if texture is None and attachment == GL_DEPTH_ATTACHMENT:
                     rb = glGenRenderbuffers(1)
                     glBindRenderbuffer(GL_RENDERBUFFER, rb)
-                    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, size[0], size[1])
+                    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, int(size[0]), int(size[1]))
                     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rb)
                 else:
                     if texture.tex is None:
@@ -76,6 +88,11 @@ class FBO(object):
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
 class FBOrender(Renderer):
+
+    def __init__(self, *args, **kwargs):
+        super(FBOrender, self).__init__(*args, **kwargs)
+        self.vao = glGenVertexArrays(1)
+
     def draw_fsquad(self, shader, **kwargs):
         ctx = self.programs[shader]
         glUseProgram(ctx.program)
@@ -85,6 +102,7 @@ class FBOrender(Renderer):
             else:
                 ctx.uniforms[name] = v
         
+        glBindVertexArray(self.vao)
         glEnableVertexAttribArray(ctx.attributes['position'])
         glBindBuffer(GL_ARRAY_BUFFER, self.fsquad_buf[0])
         glVertexAttribPointer(ctx.attributes['position'],
@@ -93,7 +111,8 @@ class FBOrender(Renderer):
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.fsquad_buf[1]);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, GLvoidp(0))
         glDisableVertexAttribArray(ctx.attributes['position'])
-    
+        glBindVertexArray(0)
+
     def draw_fsquad_to_fbo(self, fbo, shader, **kwargs):
         glBindFramebuffer(GL_FRAMEBUFFER, fbo.fbo)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT)

@@ -55,7 +55,7 @@ nidaq_sync_params.update(dict(
     sync_protocol_version = 10,
     sync_pulse_width = 0.003,
     event_sync_mask = 0xffffff,
-    event_sync_dch = range(16,24),
+    event_sync_dch = list(range(16,24)),
     screen_sync_pin = 8,
     screen_sync_dch = 24,
     screen_measure_dch = [5],
@@ -70,9 +70,10 @@ rig1_sync_params_arduino = copy.copy(nidaq_sync_params)
 rig1_sync_params_arduino.update(dict(
     sync_protocol = 'rig1_arduino',
     sync_protocol_version = 16,
+    baudrate = 115200,
     event_sync_mask = 0xfffffc,
     event_sync_data_shift = 2,
-    event_sync_dch = range(31,39),
+    event_sync_dch = list(range(31,39)),
     screen_sync_pin = 10,
     screen_sync_dch = 39,
     recording_pin = 11,
@@ -92,6 +93,18 @@ rig2_sync_params_arduino.update(dict(
     recording_dch = 52,
 ))
 arduino_sync_params = None
+human_sync_params_arduino = copy.copy(hdf_sync_params)
+human_sync_params_arduino.update(dict(
+    sync_protocol = 'human_arduino',
+    sync_protocol_version = 17,    
+    baudrate = 115200,
+    sync_pulse_width = 0.003,
+    event_sync_mask = 0x400, # For now just send the sync pulse on the first digital channel
+    event_sync_data_shift = 11,
+    screen_sync_pin = 10,
+    screen_sync_dch = 0,
+    recording_pin = 9,
+))
 
 # Rig-specific defaults
 if hostname == 'pagaiisland2':
@@ -117,9 +130,20 @@ elif hostname == 'booted-server':
     screen_half_height = 5
     default_db = 'tablet'
     secret_dbnames = ['tablet']
-elif hostname in ['moor', 'crab-eating']:
+elif hostname == 'human-bmi':
+    optitrack_address = '128.95.215.191'
+    optitrack_save_path = "D:\optitrack_data"
+    optitrack_sync_dch = 53 # 0-index
+    window_size = (1920, 1080)
+    screen_dist = 80
+    screen_half_height = 16
+    default_db = 'human'
+    secret_dbnames = ['human']
+    arduino_sync_params = human_sync_params_arduino
+elif hostname in ['moor', 'crab-eating', 'ecube']:
     default_db = 'booth'
     secret_dbnames = [
+        'human',
         'booth',
         'tablet',
         'test',

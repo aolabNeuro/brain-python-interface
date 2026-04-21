@@ -207,6 +207,7 @@ class LaserState(traits.HasTraits):
 
     laser_trigger_state = traits.String("wait", desc="State machine state that triggers laser")
     laser_end_state = traits.String("", desc="Optional state machine state that ends laser stimulation")
+    laser_trigger_target_idx = traits.Int(-1, desc="Specify the target index on which to trigger. By default (-1) trigger on all targets")
     laser_stims_per_trial = traits.Int(1, desc="Number of stimulations per laser per trial")
     laser_power = traits.List([1.,], desc="Laser power (between 0 and 1) for each active laser")
     laser_pulse_width = traits.List([0.005,], desc="List of possible pulse widths in seconds")
@@ -257,6 +258,10 @@ class LaserState(traits.HasTraits):
         if state != self.laser_trigger_state:
             return
         
+        if hasattr(self, 'target_index') and self.laser_trigger_target_idx != -1: # can't ignore the target index
+            if self.target_index != self.laser_trigger_target_idx: # wrong target index
+                return
+        
         if self.laser_rand_start:
             wait_time = np.random.exponential(self.laser_poisson_mu)
         else:
@@ -278,6 +283,10 @@ class LaserState(traits.HasTraits):
                 # Skip the pulses if we've reached the stim time limit
                 if (self.laser_max_stim_time > 0. and 
                     wait_time+width > self.laser_max_stim_time):
+                    continue
+
+                # Skip the pulse if the width is exactly zero
+                if width == 0.0:
                     continue
 
                 # Trigger digital wave

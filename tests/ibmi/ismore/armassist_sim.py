@@ -32,7 +32,7 @@ data_cmc_pos    = np.zeros((2, len(t_vec)))
 # create and start ArmAssist object (includes ArmAssist and its PIC)
 aa_tstep = 0.005
 aa_pic_tstep = 0.01
-KP = np.mat([[-10.,   0.,  0.],
+KP = np.asmatrix([[-10.,   0.,  0.],
              [  0., -20.,  0.],
              [  0.,   0., 20.]])  # P gain matrix
 TI = 0.1*np.identity(3)  # I gain matrix
@@ -56,7 +56,7 @@ for i, t in enumerate(t_vec):
     des_x_vel     = 5           # cm/s
     des_y_vel     = 5 * sin(t)  # cm/s
     des_z_ang_vel = 0           # rad/s
-    wf_dot_ref = np.mat([des_x_vel, des_y_vel, des_z_ang_vel]).T
+    wf_dot_ref = np.asmatrix([des_x_vel, des_y_vel, des_z_ang_vel]).T
 
     # aa_pic.update_reference(wf_dot_ref)
     aa.update_reference(wf_dot_ref)

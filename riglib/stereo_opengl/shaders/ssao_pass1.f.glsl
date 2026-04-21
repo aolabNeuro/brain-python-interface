@@ -1,8 +1,10 @@
-#version 110
+#version 330 core
 
-varying vec3 vnormal;
-varying vec3 vposition;
+in vec3 vnormal;
+
+out vec4 normal_out;
 
 void main() {
-    gl_FragData[0] = vec4(normalize(vnormal), 1.);
+    // Output view-space normal
+    normal_out = vec4(normalize(vnormal), 1.0);
 }

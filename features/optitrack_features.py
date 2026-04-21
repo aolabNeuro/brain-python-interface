@@ -8,6 +8,9 @@ import time
 import numpy as np
 import os
 from config.rig_defaults import optitrack as defaults
+from OpenGL.GL import GL_REPEAT
+from riglib.stereo_opengl.primitives import Cylinder, Sphere, Disk, TexSphere
+from riglib.stereo_opengl.textures import Texture, TexModel
 
 ########################################################################################################
 # Optitrack datasources
@@ -200,6 +203,70 @@ class HidePlantOnPause():
         self.plant_visible = not self.pause
         super()._cycle()
 
+class SpheresToCylinders():
+    '''
+    Convert spheres to cylinders pointing in and out of the screen up to the bounds.
+    '''
+    
+    def add_model(self, model):
+        '''
+        Hijack spheres and switch them for cylinders along the y-axis
+        '''
+        if isinstance(model, Sphere) and model.radius > 0.5:
+            height = self.cursor_bounds[3] - self.cursor_bounds[2]
+            tmp_model = Cylinder(height, model.radius, color=model.color)
+            print('Switched sphere for cylinder')
+            model.verts, model.polys, model.tcoords, model.normals = tmp_model.verts, tmp_model.polys, tmp_model.tcoords, tmp_model.normals
+            model.rotate_x(90)
+        super().add_model(model)
+
+    def _test_enter_target(self, ts):
+        '''
+        return true if the distance between center of cursor and target is smaller than the cursor radius
+        '''
+        cursor_pos = self.plant.get_endpoint_pos()
+        d = np.linalg.norm(cursor_pos[[0,2]] - self.targs[self.target_index][[0,2]])
+        return d <= (self.target_radius - self.cursor_radius)
+
+    def _test_leave_target(self, ts):
+        '''
+        return true if cursor moves outside the exit radius
+        '''
+        cursor_pos = self.plant.get_endpoint_pos()
+        d = np.linalg.norm(cursor_pos[[0,2]] - self.targs[self.target_index][[0,2]])
+        rad = self.target_radius - self.cursor_radius
+        return d > rad
+
+
+class SpheresToImages():
+    '''
+    Convert spheres to textured disks facing the camera.
+    '''
+
+    def add_model(self, model):
+        '''
+        Hijack spheres and switch them for images.
+        '''
+        if isinstance(model, Sphere) and model.radius > 1.0:
+            texture = Texture('features/images/moon.png', wrap_x=GL_REPEAT, wrap_y=GL_REPEAT)
+        elif isinstance(model, Sphere):
+            texture = Texture('features/images/ship.png', wrap_x=GL_REPEAT, wrap_y=GL_REPEAT)
+        else:
+            super().add_model(model)
+            return
+        tmp_model = TexSphere(model.radius, color=[0, 0, 0, 1], specular_color=[0, 0, 0, 0], 
+                                    tex=texture, texture_mapping='planar')
+        model.__class__ = TexSphere
+        model.verts = tmp_model.verts
+        model.polys = tmp_model.polys
+        model.tcoords = tmp_model.tcoords
+        model.normals = tmp_model.normals
+        model.tex = tmp_model.tex
+        model.shader = tmp_model.shader
+        model.rotate_x(90)
+        print('Switched sphere for textured disk')
+        super().add_model(model)
+    
 # Helper class for natnet logging
 import logging
 log_path = os.path.join(os.path.dirname(__file__), '../log/optitrack.log')

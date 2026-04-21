@@ -29,7 +29,7 @@ class DiskMatchingMixin(traits.HasTraits):
     disk_pos = traits.Tuple((0., 0., 0.), desc='Where to locate the disks') 
 
     def __init__(self, *args, **kwargs):
-        super().__init__(self, *args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.disk_cursor = VirtualCircularTarget(target_radius=0, target_color=disk_colors[self.disk_cursor_color], starting_pos=self.disk_pos)
         self.disk_target = VirtualTorusTarget() # just a placeholder
         for model in self.disk_cursor.graphics_models:

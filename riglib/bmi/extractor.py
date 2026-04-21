@@ -368,6 +368,104 @@ default_bands = []
 for freq in range(start, end, step):
     default_bands.append((freq, freq+step))
 
+class rms_emg(object):
+    '''compute RMS for emg per Si Jia code'''
+
+    feature_type = 'emg_amplitude'
+
+    def __init__(self, source, channels=[], win_len=0.2, fs=2048, **kwargs):
+        '''
+        Constructor for emg rms extractor, which extracts emg rms
+
+        Parameters
+        ----------
+        source : riglib.source.Source object
+            Object which yields new data when its 'get' method is called
+        channels : list 
+            EMG electrode indices to use for feature extraction
+
+        Returns
+        -------
+        rms extractor instance
+        '''
+        self.source = source
+        self.channels = channels
+        if source is not None:
+            self.fs = source.source.update_freq
+        else:
+            self.fs = fs
+
+        self.win_len = win_len
+
+        extractor_kwargs = dict()
+
+        extractor_kwargs['win_len']  = self.win_len
+        extractor_kwargs['fs']       = self.fs
+        self.n_pts = int(self.win_len * self.fs)
+
+        
+        extractor_kwargs['channels'] = self.channels
+        extractor_kwargs['fs']       = self.fs
+        
+        self.feature_dtype = ('emg_amplitude', 'f8', (len(channels),1))
+
+    def get_cont_samples(self, *args, **kwargs):
+        '''
+        Retreives the last n_pts number of samples for each emg channel from the data 'source'
+
+        Parameters
+        ----------
+        *args, **kwargs : optional arguments
+            Ignored for this extractor (not necessary)
+
+        Returns
+        -------
+        np.ndarray of shape ???
+        '''
+        return self.source.get(self.n_pts, self.channels)
+
+    def extract_features(self, cont_samples):
+        '''
+        Extract spectral features from a block of time series samples
+
+        Parameters
+        ----------
+        cont_samples : np.ndarray of shape (n_channels, n_samples)
+            Raw voltage time series (one per channel) from which to extract spectral features 
+
+        Returns
+        -------
+        lfp_power : np.ndarray of shape (n_channels * n_features, 1)
+            Multi-band power estimates for each channel, for each band specified when the feature extractor was instantiated.
+        '''
+        assert int(self.win_len * self.fs) == cont_samples.shape[1]
+
+        emg_amplitude = np.zeros([1,cont_samples.shape[0],])
+        for i,row in enumerate(cont_samples):
+            emg_amplitude[0,i] = np.sqrt(np.sum([i ** 2 for i in row])/cont_samples.shape[0])
+        return emg_amplitude.T
+
+    def __call__(self, start_time, *args, **kwargs):
+        '''
+        Parameters
+        ----------
+        start_time : float 
+            Absolute time from the task event loop. This is unused by LFP extractors in their current implementation
+            and only passed in to ensure that function signatures are the same across extractors.
+        *args, **kwargs : optional positional/keyword arguments
+            These are passed to the source, or ignored (not needed for this extractor).
+
+        Returns
+        -------
+        dict
+            Extracted features to be saved in the task.         
+        '''
+        cont_samples = self.get_cont_samples(*args, **kwargs)  # dims of channels x time
+        emg_amplitude = self.extract_features(cont_samples)
+
+        return dict(emg_amplitude=emg_amplitude)
+
+
 class LFPMTMPowerExtractor(object):
     '''
     Computes log power of the LFP in different frequency bands (for each 
@@ -393,8 +491,6 @@ class LFPMTMPowerExtractor(object):
         -------
         LFPMTMPowerExtractor instance
         '''
-        #self.feature_dtype = ('lfp_power', 'f8', (len(channels)*len(bands), 1))
-
         self.source = source
         self.channels = channels
         self.bands = bands
@@ -428,7 +524,6 @@ class LFPMTMPowerExtractor(object):
         extractor_kwargs['fft_freqs']      = fft_freqs
         
         self.epsilon = 1e-9
-
         if extractor_kwargs['no_mean']: #Used in lfp 1D control task
             self.feature_dtype = ('lfp_power', 'f8', (len(channels)*len(fft_freqs), 1))
         else:
@@ -495,12 +590,10 @@ class LFPMTMPowerExtractor(object):
             Multi-band power estimates for each channel, for each band specified when the feature extractor was instantiated.
         '''
         assert int(self.win_len * self.fs) == cont_samples.shape[1]
-
+        
         freqs, time, psd_est = aopy.analysis.calc_mt_tfr(cont_samples.T, *self.npk, self.fs, 1)
-
         if ('no_mean' in self.extractor_kwargs) and (self.extractor_kwargs['no_mean'] is True):
             return psd_est.reshape(psd_est.shape[0]*psd_est.shape[1], 1)
-
         else:
             # compute average power of each band of interest
             lfp_power = aopy.analysis.get_tfr_feats(freqs, psd_est, self.bands, not self.extractor_kwargs['no_log'], epsilon=self.epsilon)
@@ -508,7 +601,7 @@ class LFPMTMPowerExtractor(object):
                 return lfp_power.reshape(lfp_power.shape[0]*lfp_power.shape[1], 1)
             else:
                 return lfp_power.reshape(lfp_power.size, 1)
-
+                
     def __call__(self, start_time, *args, **kwargs):
         '''
         Parameters

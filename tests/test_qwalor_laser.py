@@ -21,6 +21,7 @@ power_list = [0.5, 0.6, 0.7, 0.8, 0.9, 1]
 
 class LaserTests(unittest.TestCase):
 
+    @unittest.skip("only run if needed")
     def test_config(self):
         packet = qwalor_laser.get_config_packet(1, 0, 0, debug=True)
         self.assertEqual(np.count_nonzero(packet), 0)
@@ -30,6 +31,12 @@ class LaserTests(unittest.TestCase):
         self.assertEqual(packet[1], 1)
         self.assertEqual(packet[2], 0xff)
         self.assertEqual(packet[3], 0x7f)
+
+    def test_laser_setup(self):
+        config_packet = qwalor_laser.get_config_packet(channel, freq, 1., mode)
+        print(config_packet)
+        link = qwalor_laser.QwalorLink.get_instance()
+        link.send(config_packet)
 
     @unittest.skip("only run if needed")
     def test_run(self):

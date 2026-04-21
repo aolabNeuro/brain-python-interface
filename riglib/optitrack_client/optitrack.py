@@ -155,5 +155,5 @@ def make(cls, client, feature, num_features=1, **kwargs):
     def init(self):
         super(self.__class__, self).__init__(client, feature, num_features, **kwargs)
     
-    dtype = np.dtype((np.float, (num_features, 3)))
+    dtype = np.dtype((float, (num_features, 3)))
     return type(cls.__name__, (cls,), dict(dtype=dtype, __init__=init))

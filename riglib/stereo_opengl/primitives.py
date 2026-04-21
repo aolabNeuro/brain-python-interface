@@ -14,6 +14,10 @@ except:
 import matplotlib.tri as mtri
 
 from .models import TriMesh
+from .textures import Texture, TexModel
+from OpenGL.GL import *
+from PIL import Image, ImageDraw, ImageFont
+import matplotlib.font_manager as fm
 
 class Plane(TriMesh):
     def __init__(self, width=1, height=1, **kwargs):
@@ -61,7 +65,10 @@ class Cube(TriMesh):
         super(Cube, self).__init__(pts, np.array(polys), 
             tcoords=tcoord, normals=normals, **kwargs)
 
-class Cylinder(TriMesh):
+class Pipe(TriMesh):
+    '''
+    Open pipe standing on the xy-plane with the z-axis as the height dimension
+    '''
     def __init__(self, height=1, radius=1, segments=36, **kwargs):
         self.height = height
         self.radius = radius
@@ -82,37 +89,133 @@ class Cylinder(TriMesh):
         n = 1./segments
         tcoord = np.vstack([tcoord*[n,1], tcoord*[n,0]])
 
-        super(Cylinder, self).__init__(pts, np.array(polys), 
+        super().__init__(pts, np.array(polys), 
             tcoords=tcoord, normals=normals, **kwargs)
+        
+class Disk(TriMesh):
+    def __init__(self, radius=1, segments=36, **kwargs):
+        pts = [[0, 0, 0]]  # Center point
+        
+        # Calculate points around the circumference
+        angle_increment = 2 * pi / (segments - 2) # not sure why this works
+        for i in range(segments):
+            x = radius * np.cos(i * angle_increment)
+            y = radius * np.sin(i * angle_increment)
+            pts.append([x, y, 0])
+
+        pts = np.array(pts)
+        
+        # Create polygons
+        polys = [(0, i, (i + 1) % segments) for i in range(segments)]
+
+        # Texture coordinates
+        tcoords = np.zeros((segments + 1, 2))
+        tcoords[1:, 0] = np.cos(np.linspace(0, 2 * np.pi, segments))
+        tcoords[1:, 1] = np.sin(np.linspace(0, 2 * np.pi, segments))
+        
+        normals = [(0, 0, 1)] * segments
+        
+        super().__init__(pts, np.array(polys), 
+                                    tcoords=tcoords, normals=np.array(normals), **kwargs)
+
+class Cylinder(TriMesh):
+    '''
+    Closed cylinder centered on the xy-plane with the z-axis as the height dimension
+
+    Args:
+        TriMesh (_type_): _description_
+    '''
+    def __init__(self, height=1, radius=1, segments=36, **kwargs):
+        self.height = height
+        self.radius = radius
+
+        body_mesh = Pipe(height, radius, segments)
+        top_mesh = Disk(radius, segments)
+        bottom_mesh = Disk(radius, segments)
+
+        # Adjust polygon indices for top and bottom based on total number of vertices
+        offset_body = len(body_mesh.verts)
+        offset_top = offset_body + len(top_mesh.verts)
+
+        total_pts = np.concatenate([body_mesh.verts + np.array([0, 0, -height/2, 0]),
+                                    top_mesh.verts + np.array([0, 0, height/2, 0]), 
+                                    bottom_mesh.verts + np.array([0, 0, -height/2, 0])])
+        total_normals = np.concatenate([body_mesh.normals, top_mesh.normals, bottom_mesh.normals])
+        total_tcoords = np.concatenate([body_mesh.tcoords, top_mesh.tcoords, bottom_mesh.tcoords])
+
+        # Update polygons to account for mesh offsets 
+        body_polys = body_mesh.polys + 0  # Keep body polygon indices the same 
+        top_polys = top_mesh.polys + offset_body
+        bottom_polys = bottom_mesh.polys + offset_top
+
+        total_polys = np.concatenate([body_polys, top_polys, bottom_polys])
+
+        # Create the final mesh with combined data
+        super().__init__(total_pts, total_polys, tcoords=total_tcoords, normals=total_normals, **kwargs)
 
 class Cable(TriMesh):
-    def __init__(self,radius=.5, trajectory = np.array([np.sin(x) for x in range(60)]), segments=12,**kwargs):
-        self.trial_trajectory = trajectory
+    def __init__(self,radius=.5, xyz = np.array([np.sin(x) for x in range(60)]), segments=12,**kwargs):
+        self.xyz = xyz
+        if np.ndim(xyz) == 1:
+            self.xyz = np.array([[x,0,xyz[x]] for x in range(len(xyz))])           
         self.center_value = [0,0,0]
         self.radius = radius
         self.segments = segments
         self.update(**kwargs)
     
     def update(self, **kwargs):
-        theta = np.linspace(0, 2*np.pi, self.segments, endpoint=False)
-        unit = np.array([np.ones(self.segments),np.cos(theta) ,np.sin(theta)]).T
-        intial = np.array([[0,0,self.trial_trajectory[x]] for x in range(len(self.trial_trajectory))])
-        self.pts = (unit*[-30/1.36,self.radius,self.radius])+intial[0]
-        for i in range(1,len(intial)):
-            self.pts = np.vstack([self.pts, (unit*[(i-30)/3,self.radius,self.radius])+intial[i]])
+        theta = np.linspace(0, 2 * np.pi, self.segments, endpoint=False)
+        circle = np.stack([np.cos(theta), np.sin(theta)], axis=1)  # (segments, 2)
 
-        self.normals = np.vstack([unit*[1,1,0], unit*[1,1,0]])
-        self.polys = []
-        for i in range(self.segments-1):
-            for j in range(len(intial)-1): 
-                self.polys.append((i+j*self.segments, i+1+j*self.segments, i+self.segments+j*self.segments))
-                self.polys.append((i+self.segments+j*self.segments, i+1+j*self.segments, i+1+self.segments+j*self.segments))
+        pts = []
+        normals = []
+        tcoords = []
+        n_path = len(self.xyz)
 
-        tcoord = np.array([np.arange(self.segments), np.ones(self.segments)]).T
-        n = 1./self.segments
-        self.tcoord = np.vstack([tcoord*[n,1], tcoord*[n,0]])
-        super(Cable, self).__init__(self.pts, np.array(self.polys), 
-            tcoords=self.tcoord, normals=self.normals, **kwargs)
+        a = np.array([0, 1, 0])  # fixed up direction
+
+        # Compute tangents along path
+        tangents = np.gradient(self.xyz, axis=0)
+        tangents = tangents / np.linalg.norm(tangents, axis=1, keepdims=True)
+
+        for i in range(n_path):
+            p = self.xyz[i]
+            t = tangents[i]
+
+            # Ring orientation
+            b = np.cross(t, a)
+            if np.linalg.norm(b) < 1e-6:
+                b = np.array([0, 0, 1])  # fallback
+            else:
+                b = b / np.linalg.norm(b)
+
+            for j in range(self.segments):
+                cx, cy = circle[j]
+                offset = self.radius * (cx * b + cy * a)
+                pts.append(p + offset)
+                normals.append(offset / np.linalg.norm(offset))
+                tcoords.append([j / self.segments, i / (n_path - 1)])
+
+        self.pts = np.array(pts)
+        self.normals = np.array(normals)
+        self.tcoord = np.array(tcoords)
+
+        # Create triangle strips between rings
+        polys = []
+        for i in range(n_path - 1):
+            for j in range(self.segments):
+                i0 = i * self.segments + j
+                i1 = i * self.segments + (j + 1) % self.segments
+                i2 = (i + 1) * self.segments + j
+                i3 = (i + 1) * self.segments + (j + 1) % self.segments
+
+                polys.append((i2, i1, i0))
+                polys.append((i3, i1, i2))
+
+        self.polys = np.array(polys)
+
+        super().__init__(self.pts, self.polys, tcoords=self.tcoord,
+                        normals=self.normals, **kwargs)
 
 class Torus(TriMesh):
     '''
@@ -169,10 +272,10 @@ class Torus(TriMesh):
         super(Torus, self).__init__(pts, np.array(polys), tcoords=tcoord, normals=normals, **kwargs)
 
 class Sphere(TriMesh):
-    def __init__(self, radius=1, segments=36, **kwargs):
+    def __init__(self, radius=1, segments=36, texture_mapping='spherical', **kwargs):
         self.radius = radius
         zvals = radius * np.cos(np.linspace(0, np.pi, num=segments))
-        circlevals = np.linspace(0, 2*pi, num=segments, endpoint=False)
+        circlevals = np.linspace(0, 2*np.pi, num=segments, endpoint=False)
 
         vertices = np.zeros(((len(zvals)-2) * len(circlevals), 3))
 
@@ -209,11 +312,22 @@ class Sphere(TriMesh):
         for i in range(segments-1):
             bottom[i+1,:] = (allpointinds[-1], lastcirc[i], lastcirc[i+1])
         triangles = np.vstack([triangles, bottom])
-        
         normals = vertices/radius
-        hcoord = np.arctan2(normals[:,1], normals[:,0])
-        vcoord = np.arctan2(normals[:,2], np.sqrt(vertices[:,0]**2 + vertices[:,1]**2))
-        tcoord = np.array([(hcoord+pi) / (2*pi), (vcoord+pi/2) / pi]).T
+        
+        if texture_mapping == 'spherical':
+            # Spherical coordinates for texture mapping
+            hcoord = np.arctan2(normals[:,1], normals[:,0])
+            vcoord = np.arctan2(normals[:,2], np.sqrt(vertices[:,0]**2 + vertices[:,1]**2))
+            tcoord = np.array([(hcoord+pi) / (2*pi), (vcoord+pi/2) / pi]).T
+
+        elif texture_mapping == 'planar':
+            # Planar texture coordinates
+            x, y, z = vertices[:,0], vertices[:,1], vertices[:,2]
+            u = 0.5 + x / (2 * radius)
+            v = 0.5 + y / (2 * radius)
+            tcoord = np.vstack([u, v]).T
+        else:
+            raise ValueError("Unsupported texture mapping type. Use 'spherical' or 'planar'.")
 
         super(Sphere, self).__init__(vertices, np.array(triangles), 
             tcoords=tcoord, normals=normals, **kwargs)
@@ -318,6 +432,121 @@ class Chain(object):
             return value
         else:
             return [value] * num_joints
+
+TexCube = type("TexCube", (Cube, TexModel), {})
+TexPlane = type("TexPlane", (Plane, TexModel), {})
+TexSphere = type("TexSphere", (Sphere, TexModel), {})
+TexCylinder = type("TexCylinder", (Cylinder, TexModel), {})
+TexPipe = type("TexPipe", (Pipe, TexModel), {})
+TexCone = type("TexCone", (Cone, TexModel), {})
+
+class Text(TexPlane):
+    '''
+    A 2D plane with text rendered on. The plane coordinates are its bottom-left corner,
+    and the text is rendered along the bottom edge of the plane, either left or right justified.
+    Text is always rendered on a square texture, so the width and height of the plane
+    are the same.
+    '''
+
+    @staticmethod
+    def find_font_file(font_name):
+        try:
+            font_prop = fm.FontProperties(fname=fm.findfont(fm.FontProperties(family=font_name)))
+            font_path = font_prop.get_file()
+            return font_path
+        except Exception as e:
+            return None
+
+    def __init__(self, height, text, font_size=28, color=[1, 1, 1, 1], justify='left', 
+                 font_name='ubuntu', texture_size=(256,256), shader='ui', **kwargs):
+        color = tuple((255*np.array(color)).astype(int))
+
+        # Create a PIL image with a transparent background
+        image = Image.new('RGBA', texture_size, (0,0,0,0))
+        draw = ImageDraw.Draw(image)
+
+        # Load a font
+        font_path = Text.find_font_file(font_name)
+        font = ImageFont.truetype(font_path, font_size)
+
+        # Draw text onto the image
+        if justify == 'left':
+            draw.text((10, texture_size[0]-10), text, font=font, 
+                      anchor='lb', fill=color)
+        else:
+            draw.text((texture_size[0]-10, texture_size[1]-10), text, font=font, 
+                    anchor='rb', fill=color)
+
+        # Convert PIL image to OpenGL texture format
+        texture_data = np.flipud(image)
+        tex = Texture(texture_data, mipmap=True, anisotropic_filtering=2)
+        width = height * texture_size[0] / texture_size[1]
+
+        super().__init__(width, height, specular_color=[0,0,0,0], tex=tex, shader=shader, **kwargs)
+        self.rotate_x(90) # Make the text face the camera
+
+class AprilTag(TexPlane):
+
+    def __init__(self, id, size, alpha=1, **kwargs):
+        filepath = f"riglib/pupillabs/tag36h11/tag36_11_{id:05d}.png"
+        apriltag = Texture(filepath, minfilter=GL_NEAREST, magfilter=GL_NEAREST)
+        super().__init__(size, size, color=[0,0,0,alpha], specular_color=[0,0,0,0], tex=apriltag, **kwargs)
+        self.rotate_x(90)
+
+class CalibrationSphere(TexSphere):
+    '''
+    A calibration target used for eye tracking with Pupil Labs cameras.
+    '''
+
+    def __init__(self, radius, alpha=1, stop=False, **kwargs):
+        if stop:
+            filepath = f"riglib/pupillabs/calibration/v0.4_stop_marker.png"
+        else:
+            filepath = f"riglib/pupillabs/calibration/v0.4_calib_marker.png"
+        apriltag = Texture(filepath, wrap_x=GL_REPEAT, wrap_y=GL_REPEAT, )
+        super().__init__(radius, color=[0,0,0,alpha], specular_color=[0,0,0,0], tex=apriltag, 
+                         texture_mapping='planar', **kwargs)
+        self.rotate_x(90)  # Make the target face the camera
+        
+class Snake(Cable, TexModel):
+    '''
+    A Cable with a gradient texture applied along its length.
+    '''
+    def __init__(self, radius=.5, trajectory=np.array([np.sin(x) for x in range(100)]), segments=12, **kwargs):
+        self.trajectory = trajectory
+        color = kwargs.pop('color', [1, 1, 1, 1])  # Default color if not provided
+        self.color = color
+        tex = self.get_texture(0, len(trajectory))
+        super().__init__(radius, trajectory, segments, tex=tex, color=[0, 0, 0, 1], **kwargs)
+        self.color = color  # Store the color for later use
+
+    def get_texture(self, start_frame, end_frame, inverse=False):
+        mask = np.zeros((len(self.trajectory)))
+        if start_frame >= len(self.trajectory):
+            start_frame = len(self.trajectory)
+        if end_frame >= len(self.trajectory):
+            end_frame = len(self.trajectory)
+        mask[start_frame:end_frame] = 1
+        if inverse:
+            mask = 1 - mask
+        mask = np.tile(mask, (4, 1)).T  # Repeat for RGBA
+        mask = self.color * mask  # Apply color
+        tex = Texture(mask.reshape((1, len(mask), 4))) # Reshape to (1, n_colors, 4)
+        return tex
+        
+    def update_texture(self, start_frame, end_frame, inverse=False):
+        '''
+        Update the texture of the snake based on the new trajectory.
+        '''
+        self.tex.delete()  # Delete the old texture
+        tex = self.get_texture(start_frame, end_frame, inverse=inverse)
+        self.tex = tex
+        self.tex.init()
+
+    def draw(self, ctx):
+        glDisable(GL_DEPTH_TEST)
+        super().draw(ctx)
+        glEnable(GL_DEPTH_TEST)
 
 ##### 2-D primitives #####
 

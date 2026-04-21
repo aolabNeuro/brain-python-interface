@@ -1,27 +1,32 @@
 import time
 from built_in_tasks.force_task import DiskMatching
-from built_in_tasks.manualcontrolmultitasks import TrackingTask, rotations, ManualControl, ScreenTargetTracking
+from built_in_tasks.manualcontrolmultitasks import TrackingTask, rotations, ManualControl, ScreenTargetTracking, ReadySetGoTask
 from built_in_tasks.othertasks import Conditions, LaserConditions, SweptLaserConditions
 from built_in_tasks.target_capture_task import ScreenTargetCapture
 from built_in_tasks.passivetasks import YouTube
-from features.generator_features import Autostart
+from built_in_tasks.example_task import ExampleSequenceTask
+from features.generator_features import Autostart, HideLeftTrajectory, ReadysetMedley, ReadysetColorChange, HideCursorReturn
 from features.hdf_features import SaveHDF
+from features.touch_features import MouseEmulateTouch
+from riglib.stereo_opengl.environment import Grid
 from riglib.stereo_opengl.window import WindowDispl2D
 from riglib import experiment
+from riglib import audio
 from features.peripheral_device_features import ForceControl, MouseControl
-from features.optitrack_features import OptitrackSimulate, Optitrack
-from features.reward_features import ProgressBar
+from features.optitrack_features import OptitrackSimulate, Optitrack, SpheresToCylinders, SpheresToImages
+from features.reward_features import ProgressBar, ScoreRewards, PenaltyAudioMulti
 import cProfile
 import pstats
 from riglib.stereo_opengl.window import Window, Window2D
 import unittest
 import numpy as np
+import matplotlib.pyplot as plt
 import os
 import socket
 
 def init_exp(base_class, feats, seq=None, **kwargs):
     hostname = socket.gethostname()
-    if hostname in ['pagaiisland2']:
+    if hostname in ['pagaiisland2', 'human-bmi']:
         os.environ['DISPLAY'] = ':0.1'
     Exp = experiment.make(base_class, feats=feats)
     if seq is not None:
@@ -34,18 +39,67 @@ def init_exp(base_class, feats, seq=None, **kwargs):
 class TestManualControlTasks(unittest.TestCase):
 
     @unittest.skip("")
+    def test_readysetgo(self):
+        seq = ManualControl.centerout_2D()
+        exp = init_exp(ReadySetGoTask, [MouseControl, Window2D, HideCursorReturn], seq, early_move_time = 0.1,
+                       delay_time = 0.45, mustmv_time = 0.3, ready_freq = 320, set_freq = 360, go_freq = 400, 
+                         show_cursor_return = 2.5, window_size=(1200,800), 
+                       fullscreen=False)
+        exp.rotation = 'xzy'
+        exp.run()
+
+    @unittest.skip("")
+    def test_readysetgo_feat(self):
+        seq = ManualControl.centerout_2D()
+        exp = init_exp(ReadySetGoTask, [MouseControl, Window2D, ReadysetMedley, ReadysetColorChange, PenaltyAudioMulti], seq, early_move_time = 0.5,
+                       display_times = [0.9, 1.5], frac_times = [0.1, 0.9], mustmv_time = 0.5, ready_freq = 320, set_freq = 360, go_freq = 400, tone_space = 1.0,
+                     window_size=(1200,800), 
+                       fullscreen=False)
+        exp.rotation = 'xzy'
+        exp.run()
+
+    @unittest.skip("")
     def test_exp(self):
         seq = ManualControl.centerout_2D()
-        exp = init_exp(ManualControl, [MouseControl, Window2D], seq)
+        exp = init_exp(ManualControl, [MouseControl, Window2D, ScoreRewards], seq, window_size=(1200,800), fullscreen=False)
         exp.rotation = 'xzy'
+        exp.stereo_mode = 'projection'
+        exp.run()
+
+    @unittest.skip("")
+    def test_example_task(self):
+        seq = ExampleSequenceTask.example_generator()
+        print('Testing example task')
+        print(seq)
+        print(hasattr(seq, '__next__'))
+        exp = init_exp(ExampleSequenceTask, [], seq, window_size=(1200,800), fullscreen=False)
         exp.run()
     
     @unittest.skip("")
     def test_tracking(self):
         print("Running tracking task test")
-        seq = TrackingTask.tracking_target_debug(nblocks=1, ntrials=6, time_length=5, seed=40, sample_rate=60, ramp=1) # sample_rate needs to match fps in ScreenTargetTracking
-        exp = init_exp(TrackingTask, [MouseControl], seq) # , window_size=(1000,800)
+        seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=5, ramp=1, ramp_down=1, 
+                                                 num_primes=8, seed=42, sample_rate=60, 
+                                                 disturbance=False, boundaries=(-10,10,-10,10))
+        exp = init_exp(TrackingTask, [HideLeftTrajectory, MouseControl, Window2D], seq, window_size=(1000,800), fullscreen=False,
+                       lookahead_time=1, screen_half_height=10)
         exp.rotation = 'xzy'
+        exp.trajectory_type = '1d'
+        exp.trajectory_amplitude = 5
+        exp.trajectory_radius = 0.2
+        exp.run()
+
+    @unittest.skip("")
+    def test_tracking_2d(self):
+        print("Running tracking task test")
+        seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=20, ramp=1, ramp_down=1, 
+                                                 num_primes=10, seed=42, sample_rate=60, dimensions=2, 
+                                                 disturbance=True, boundaries=(-10,10,-10,10), decay_rate = 0.1)
+        exp = init_exp(TrackingTask, [Window2D, MouseControl], seq, window_size=(1000,800), fullscreen=False, 
+                       limit1d=False, trajectory_amplitude=5, lookahead_time=1)
+        exp.stereo_mode = 'projection'
+        exp.rotation = 'xzy'
+        exp.trajectory_type = '2d'
         exp.run()
 
     @unittest.skip("")
@@ -56,7 +110,7 @@ class TestManualControlTasks(unittest.TestCase):
         exp.rotation = 'xzy'
         exp.run()
 
-    # @unittest.skip("")
+    @unittest.skip("")
     def test_force_task(self):
         print("Running force task test")
         exp = init_exp(DiskMatching, [ForceControl, Window2D, Autostart], None) # , window_size=(1000,800)
@@ -68,20 +122,28 @@ class TestManualControlTasks(unittest.TestCase):
         exp.end_task()
 
     @unittest.skip("only to test progress bar")
-    def test_tracking(self):
+    def test_progress_bar(self):
         seq = TrackingTask.tracking_target_debug(nblocks=1, ntrials=6, time_length=5, seed=40, sample_rate=60, ramp=1) # sample_rate needs to match fps in ScreenTargetTracking
         exp = init_exp(TrackingTask, [MouseControl, Window2D, ProgressBar], seq)
         exp.rotation = 'xzy'
         exp.run()
 
+    @unittest.skip("only to test 3d window")
+    def test_3d(self):
+        seq = ManualControl.centerout_2D()
+        exp = init_exp(ManualControl, [MouseControl, SpheresToCylinders], seq, stereo_mode='projection',
+                       rotation='xyz', window_size=(1000,800), fullscreen=False, limit2d=False)
+        exp.run()
+
+
 class TestSeqGenerators(unittest.TestCase):
 
-    # @unittest.skip("")
+    @unittest.skip("")
     def test_gen_ascending(self):
         seq = Conditions.gen_conditions(3, [1, 2], ascend=True)
         self.assertSequenceEqual(seq[0], [0, 0, 0, 1, 1, 1])
 
-    # @unittest.skip("")
+    @unittest.skip("")
     def test_gen_out_2D(self):
         seq = ScreenTargetCapture.out_2D(nblocks=1, )
         seq = list(seq)
@@ -99,15 +161,17 @@ class TestSeqGenerators(unittest.TestCase):
         self.assertAlmostEqual(loc[idx == 3, 0][0], 10)
         self.assertAlmostEqual(loc[idx == 3, 2][0], 0)
 
-    # @unittest.skip("")
+    @unittest.skip("")
     def test_dual_laser_wave(self):
         seq = LaserConditions.dual_laser_square_wave(duty_cycle_1=0.025, duty_cycle_2=0.025, phase_delay_2=0.1)
         print(seq[0])
 
+    @unittest.skip("")
     def test_swept_laser_pulse(self):
         seq = SweptLaserConditions.single_laser_pulse()
         print(seq[0])
 
+    @unittest.skip("")
     def test_corners(self):
         seq = ScreenTargetCapture.corners_2D(chain_length=3)
         seq = list(seq)
@@ -118,6 +182,83 @@ class TestSeqGenerators(unittest.TestCase):
         print(idx)
         print(loc)
         print("---------------corners")
+
+    @unittest.skip("")
+    def test_tracking_2d(self):
+        seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=20, ramp=0, ramp_down=0, 
+                                                 num_primes=12, seed=42, sample_rate=60, dimensions=2, 
+                                                 disturbance=False, boundaries=(-10,10,-10,10), decay_rate = None)
+        trajectories = [t[1][0] for t in seq] # pulls out trajectory. Can use t[3] to get disturbance array
+        print("2D Test-------")
+        print(np.shape(trajectories))
+        print("2D Test-------")
+        fig, axs = plt.subplots(2,1, figsize=(10,8))
+        for idx, trial in enumerate(trajectories): 
+            ax = axs[idx]
+            trialx = np.fft.fft(trial[:,0])
+            trial_length = np.shape(trialx)[0]
+            freq = np.fft.fftfreq(trial_length, d=1./60)
+            non_neg_freq = freq[freq >= 0] #get positive frequencies 
+            non_neg_x = trialx[freq >= 0] / complex(trial_length, 0) #normalize 
+            non_neg_x[1:] = 2*non_neg_x[1:] #account for negative frequencies
+            trialy = np.fft.fft(trial[:,2])
+            non_neg_y = trialy[freq >= 0] / complex(trial_length, 0) #normalize 
+            non_neg_y[1:] = 2*non_neg_y[1:] #account for negative frequencies
+            ax.plot(non_neg_freq, np.abs(non_neg_x), 'o-', label = 'X')
+            ax.plot(non_neg_freq, np.abs(non_neg_y), 'o-', label = 'Y')
+            ax.set_title(f'Trial {idx}')
+            ax.set_xlim(0, 3)
+            ax.set_xlabel('Frequency (Hz)')
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
+
+class DemoTracking(unittest.TestCase):
+
+    @unittest.skip("")
+    def test_tracking_moon_ref(self):
+        print("Running tracking task test")
+        seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=9, ramp=1, ramp_down=0, 
+                                                 num_primes=10, seed=42, sample_rate=60, dimensions=2, 
+                                                 disturbance=True, boundaries=(-10,10,-10,10), decay_rate = None)
+        exp = init_exp(TrackingTask, [Window2D, MouseControl, SpheresToImages, ProgressBar, ScoreRewards], seq, window_size=(1280,720), fullscreen=True, 
+                       limit1d=False, trajectory_amplitude=6, disturbance_amplitude = 0, lookahead_time=1, reward_time = 4, 
+                       score_display_location = (-200,0,7), score_multiplier = 10000, cursor_radius = 1, tracking_out_time = 8, 
+                       cursor_color='black', target_color='black')
+        exp.stereo_mode = 'projection'
+        exp.rotation = 'xzy'
+        exp.trajectory_type = '2d'
+        exp.run()
+    
+    @unittest.skip("")
+    def test_tracking_moon_disturbance(self):
+        
+        seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=9, ramp=1, ramp_down=0,
+                                                 num_primes=10, seed=42, sample_rate=60, dimensions=2,
+                                                 disturbance=True, boundaries=(-10,10,-10,10), decay_rate = None)
+        exp = init_exp(TrackingTask, [Window2D, MouseControl, SpheresToImages, ProgressBar, ScoreRewards], seq, window_size=(1280,720), fullscreen=True,
+                       limit1d=False, trajectory_amplitude=0, disturbance_amplitude = 2, lookahead_time=1, reward_time = 4, 
+                       score_display_location = (-200,0,7), score_multiplier = 10000, cursor_radius = 1, tracking_out_time = 8, 
+                       cursor_color='black', target_color='black')
+        exp.stereo_mode = 'projection'
+        exp.rotation = 'xzy'
+        exp.trajectory_type = '2d'
+        exp.run()
+
+    @unittest.skip("")
+    def test_tracking_moon(self):
+
+        seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=9, ramp=1, ramp_down=0,
+                                                 num_primes=10, seed=42, sample_rate=60, dimensions=2,
+                                                 disturbance=True, boundaries=(-10,10,-10,10), decay_rate = None)
+        exp = init_exp(TrackingTask, [Window2D, MouseControl, SpheresToImages, ProgressBar, ScoreRewards], seq, window_size=(1280,720), fullscreen=True,
+                       limit1d=False, trajectory_amplitude=6, disturbance_amplitude = 2, lookahead_time=1, reward_time = 4, 
+                       score_display_location = (-2,0,7), score_multiplier = 10000, cursor_radius = 1, tracking_out_time = 8, 
+                       cursor_color='black', target_color='black')
+        exp.stereo_mode = 'projection'
+        exp.rotation = 'xzy'
+        exp.trajectory_type = '2d'
+        exp.run()
 
 class TestYouTube(unittest.TestCase):
 

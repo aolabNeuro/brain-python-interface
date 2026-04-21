@@ -3,7 +3,7 @@ import numpy as np
 from riglib import hdfwriter, sink
 
 def test(filename, shape=(8,4), length=2**28):
-    dtype = np.dtype((np.float, shape))
+    dtype = np.dtype((float, shape))
     h5 = sink.sinks.start(hdfwriter.HDFWriter, filename=filename)
     h5.register("test", dtype)
 

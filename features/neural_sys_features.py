@@ -47,6 +47,7 @@ class CorticalData(object):
         try:
             super(CorticalData, self).run()
         finally:
+            time.sleep(0.5) # give the datasource time to stop
             self.neurondata.stop()
 
 

@@ -2,7 +2,7 @@
 Base tasks for generic point-to-point reaching
 '''
 import numpy as np
-from riglib.stereo_opengl.primitives import Cable, Sphere, Cube, Torus
+from riglib.stereo_opengl.primitives import Cable, Snake, Sphere, Cube, Torus, Text
 from riglib.stereo_opengl.primitives import Cylinder, Plane, Sphere, Cube
 from riglib.stereo_opengl.models import FlatMesh, Group
 from riglib.stereo_opengl.textures import Texture, TexModel
@@ -16,6 +16,7 @@ GREEN = (0,1,0,0.5)
 BLUE = (0.,0.,1.,0.75)
 GOLD = (1., 0.843, 0., 0.5)
 YELLOW = (1,1,0,0.75)
+ORANGE = (1,0.502,0.,0.75)
 mm_per_cm = 1./10
 
 target_colors = {
@@ -35,6 +36,11 @@ target_colors = {
     "gold": (0.941,0.637,0.25,0.75),
     "elephant":(0.5,0.5,0.5,0.5),
     "white": (1, 1, 1, 0.75),
+    "black": (0, 0, 0, 0.75),
+    "invisible": (0, 0, 0, 0.0),
+    "bright_white":  (1, 1, 1, 1),
+    "eye_color": (0.7, 0.7, 0.7, 1.),
+    "fixation_color": (0., 0.7, 0.7, 1),
 }
 
 class CircularTarget(object): 
@@ -75,6 +81,9 @@ class VirtualCircularTarget(CircularTarget):
 
     def cue_fixation(self):
         self.sphere.color = BLUE
+    
+    def cue_set_tone(self):
+        self.sphere.color = ORANGE
 
     def cue_trial_end_success(self):
         self.sphere.color = GREEN
@@ -122,28 +131,35 @@ class RectangularTarget(object):
 class VirtualRectangularTarget(RectangularTarget):
     def drive_to_new_pos(self):
         self.position = self.int_position
-        corner_pos = self.position - self.center_offset
+        corner_pos = self.position #- self.center_offset
         self.cube.translate(*corner_pos, reset=True)
-
+        
     def hide(self):
         self.cube.detach()
 
     def show(self):
         self.cube.attach()
 
+    def rotate_xaxis(self, angle, reset=False):
+        self.cube.rotate_x(angle, reset=reset)
+
+    def rotate_yaxis(self, angle, reset=False):
+        self.cube.rotate_y(angle, reset=reset)
+
+    def rotate_zaxis(self, angle, reset=False):
+        self.cube.rotate_z(angle, reset=reset)
+
     def cue_trial_start(self):
-        self.cube.color = RED
+        self.cube.color = self.target_color
         self.show()
 
     def cue_trial_end_success(self):
         self.cube.color = GREEN
 
     def cue_trial_end_failure(self):
-        self.cube.color = YELLOW
-        self.hide()
+        self.cube.color = RED
 
     def idle(self):
-        self.cube.color = RED
         self.hide()
 
     def pt_inside(self, pt):
@@ -173,7 +189,7 @@ class CableTarget(object):
         self._pickle_init()
 
     def _pickle_init(self):
-        self.cable = Cable(radius=self.target_radius,trajectory = self.trajectory, color=self.target_color)
+        self.cable = Cable(radius=self.target_radius, xyz=self.trajectory, color=self.target_color)
         self.graphics_models = [self.cable]
         self.cable.translate(*self.position)
 
@@ -225,6 +241,20 @@ class VirtualCableTarget(CableTarget):
     def get_position(self):
         return self.cable.xfm.move
 
+class VirtualSnakeTarget(VirtualCableTarget):
+
+    def _pickle_init(self):
+        self.trajectory = np.array(self.trajectory)
+        self.cable = Snake(radius=self.target_radius, trajectory=self.trajectory, color=self.target_color)
+        self.graphics_models = [self.cable]
+        self.cable.translate(*self.position)
+
+    def update_mask(self, start_frame, end_frame, inverse=False):
+        '''
+        Update the texture mask of the snake target.
+        '''
+        self.cable.update_texture(start_frame, end_frame, inverse=inverse)
+
 class VirtualTorusTarget(VirtualCircularTarget):
 
     def __init__(self, inner_radius=2, outer_radius=3, target_color=(1, 0, 0, .5), starting_pos=np.zeros(3)):
@@ -249,3 +279,28 @@ class VirtualTorusTarget(VirtualCircularTarget):
         pos = self.sphere.xfm.move
         # Not yet implmented. Hopefully not needed.
         return False
+
+class TextTarget():   
+
+    def __init__(self, text, color, height=1, font_size=28, starting_pos=np.zeros(3)):
+        self.text = text
+        self.color = color
+        self.size = height * 7.5 # scale according to how much height the font takes up
+        self.font_size = font_size
+        self.position = starting_pos
+        self.int_position = starting_pos
+        self._pickle_init()
+
+    def _pickle_init(self):
+        self.model = Text(self.size, self.text, color=self.color, justify='left', 
+                          font_size=self.font_size)
+        self.graphics_models = [self.model]
+        self.model.translate(*self.position)
+
+    def move_to_position(self, new_pos):
+        self.int_position = new_pos
+        self.drive_to_new_pos()
+
+    def drive_to_new_pos(self):
+        self.position = self.int_position
+        self.model.translate(*self.position, reset=True)

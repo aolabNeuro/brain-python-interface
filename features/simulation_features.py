@@ -75,6 +75,9 @@ class SimClock(object):
     def tick(self, *args, **kwargs):
         pass
 
+    def get_fps(self):
+        return 0.
+
 class SimClockTick(object):
     '''
     Summary: A simulation pygame.clock to use in simulations that inherit from experiment.Experiment, to overwrite
@@ -337,8 +340,8 @@ class SimKFDecoder(object):
 
         # Compute sufficient stats for C and Q matrices (used for RML CLDA)
         n_features, n_states = C.shape
-        R = np.mat(np.zeros([n_states, n_states]))
-        S = np.mat(np.zeros([n_features, n_states]))
+        R = np.asmatrix(np.zeros([n_states, n_states]))
+        S = np.asmatrix(np.zeros([n_features, n_states]))
         R_small, S_small, T, ESS = clda.KFRML.compute_suff_stats(self.init_kin_features[self.ssm.train_inds, :], self.init_neural_features)
 
         R[np.ix_(self.ssm.drives_obs_inds, self.ssm.drives_obs_inds)] = R_small

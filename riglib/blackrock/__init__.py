@@ -11,7 +11,7 @@ class Spikes(DataSourceSystem):
     '''
 
     update_freq = 30000.
-    dtype = np.dtype([("ts", np.float), 
+    dtype = np.dtype([("ts", float), 
                       ("chan", np.int32), 
                       ("unit", np.int32),
                       ("arrival_ts", np.float64)])

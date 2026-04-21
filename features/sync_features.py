@@ -38,9 +38,9 @@ class HDFSync(traits.HasTraits):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.sync_params = hdf_sync_params
-        self.sync_every_cycle = False
+        self.sync_every_cycle = True
 
-    def init(self, *args, **kwargs):
+    def init(self):
 
         # Create a record array for sync events
         if not hasattr(self, 'sinks'): # this attribute might be set in one of the other 'init' functions from other inherited classes
@@ -52,7 +52,7 @@ class HDFSync(traits.HasTraits):
         dtype = np.dtype([('time', 'u8'), ('timestamp', 'f8'), ('prev_tick', 'f8')])
         self.sinks.register("sync_clock", dtype)
         self.sync_clock_record = np.zeros((1,), dtype=dtype)
-        super().init(*args, **kwargs)
+        super().init()
 
         # Send a sync impulse to set t0
         time.sleep(self.sync_params['sync_pulse_width']*10)
@@ -66,6 +66,7 @@ class HDFSync(traits.HasTraits):
         '''
         Send a sync event on the next cycle, unless 'immediate' flag is set
         '''
+        super().sync_event(event_name, event_data=event_data, immediate=immediate)
         if self.has_sync_event:
             if self.sync_event_record['code'] == self.sync_params['event_sync_dict']['TRIAL_END'] and event_name == 'PAUSE_START':
                 pass
@@ -121,6 +122,7 @@ class HDFSync(traits.HasTraits):
             h5file = tables.open_file(self.h5file.name, mode='a')
             for param in self.sync_params.keys():
                 h5file.root.sync_events.attrs[param] = self.sync_params[param]
+                h5file.root.sync_events.attrs['t0'] = self.t0
             h5file.close()
 
 class NIDAQSync(HDFSync):
@@ -165,9 +167,9 @@ class ArduinoSync(NIDAQSync):
     
     def __init__(self, *args, **kwargs):
         super(HDFSync, self).__init__(*args, **kwargs)
-        self.sync_params = arduino_sync_params
-        self.sync_gpio = TeensyGPIO(self.sync_gpio_port)
         self.sync_every_cycle = True
+        self.sync_params = arduino_sync_params
+        self.sync_gpio = TeensyGPIO(self.sync_gpio_port, baudrate=self.sync_params['baudrate'])
 
 
 class ScreenSync(traits.HasTraits):

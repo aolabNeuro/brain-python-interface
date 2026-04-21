@@ -12,7 +12,6 @@ Owl==0.2.1
 paho_mqtt==1.5.1
 pandas==1.5.3
 Phidgets==2.1.8
-pyaudio==0.2.14
 PyAutoGUI==0.9.50
 pyFirmata==1.1.0
 pygame==2.0.0
@@ -35,3 +34,5 @@ tornado==6.1
 traits==6.1.0
 urllib3==1.26.13
 hidapi
+msgpack==0.5.6
+pyopenxr==1.1

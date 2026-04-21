@@ -2,7 +2,7 @@ import setuptools
 
 setuptools.setup(
     name="aolab-bmi3d",
-    version="1.0.4",
+    version="1.2.5",
     author="Lots of people",
     description="electrophysiology experimental rig library",
     packages=setuptools.find_packages(),
@@ -16,11 +16,12 @@ setuptools.setup(
         "celery",
         "jinja2",
         "scipy",
+        "numpy==1.26",
         "traits",
         "pandas",
         "patsy",
         "statsmodels",
-        "pygame",
+        "pygame==2.5.0",
         "PyOpenGL",
         "pylibftdi",
         "sphinx",
@@ -29,5 +30,8 @@ setuptools.setup(
         "tables",
         "h5py",
         "pymysql",
+        "matplotlib",
+        "pyfirmata",
+        "hdfwriter==0.1.4",
     ]
 )

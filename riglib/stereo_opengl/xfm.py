@@ -25,6 +25,10 @@ class Quaternion(object):
     
     def conj(self):
         return Quaternion(self.w, *(-self.vec))
+    
+    def inv(self):
+        self = self.norm()
+        return self.conj()
 
     @property
     def H(self):
@@ -202,6 +206,13 @@ class Transform(object):
             self.move += x,y,z
         return self
 
+    def rotate_q(self, q, reset=False):
+        if reset:
+            self.rotate = q
+        else:
+            self.rotate = (q * self.rotate).norm()
+        return self
+
     def rotate_x(self, rad, reset=False):
         rotate = Quaternion.from_axisangle((1,0,0), rad)
         if reset:
@@ -226,13 +237,16 @@ class Transform(object):
             self.rotate = (rotate * self.rotate).norm()
         return self
     
-    def to_mat(self):
+    def to_mat(self, reverse=False):
         scale = np.eye(4)
         scale[(0,1,2), (0,1,2)] = self.scale
         move = np.eye(4)
         move[:3, -1] = self.move
         
-        return np.dot(move, np.dot(scale, self.rotate.to_mat()))
+        if reverse:
+            return np.dot(self.rotate.to_mat(), np.dot(scale, move))
+        else:
+            return np.dot(move, np.dot(scale, self.rotate.to_mat()))
 
 def test():
     world = Transform().rotate_x(np.radians(-90))

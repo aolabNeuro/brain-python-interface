@@ -125,5 +125,5 @@ def make(sensors, inputs, cls=System, **kwargs):
         super(self.__class__, self).__init__(n_sensors=sensors, n_inputs=inputs, **kwargs)
         print('making arduino joystick2')
 
-    dtype = np.dtype([('sensors', np.float, (sensors,)), ('inputs', np.bool, (inputs,))])
+    dtype = np.dtype([('sensors', float, (sensors,)), ('inputs', np.bool, (inputs,))])
     return type(cls.__name__, (cls,), dict(dtype=dtype, __init__=init))
