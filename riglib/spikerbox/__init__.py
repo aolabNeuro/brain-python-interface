@@ -23,5 +23,8 @@ class LFP(DataSourceSystem):
         self.b.close()
     
     def get(self):
-        return self.b.get_next_ch()
+        while True:
+            ch, data = self.b.get_next_ch()
+            if ch in self.channels:
+                return ch, data
 

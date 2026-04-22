@@ -5,7 +5,7 @@ import time
 
 class SpikerBox:
 
-    def __init__(self, timeout=0.05):
+    def __init__(self, timeout=0.02, strict_init=False):
 
         self.timeout = int(timeout*1000) # convert s to ms
         self.h = hid.device()
@@ -13,17 +13,34 @@ class SpikerBox:
 
         # Ensure device starts from a known non-streaming state
         self.send_cmd("h:;")
-        time.sleep(0.02)
+        time.sleep(0.005)
         self._drain_input()
 
+        # Quick metadata query (best effort). strict_init=True enables
+        # slower but more persistent retries.
+        if strict_init:
+            info_tries, info_timeout = 5, 0.20
+            rate_tries, rate_timeout = 5, 0.20
+            retry_delay = 0.02
+        else:
+            info_tries, info_timeout = 1, 0.05
+            rate_tries, rate_timeout = 2, 0.08
+            retry_delay = 0.005
+
         # write version query data to the device
-        self.fw_ver, self.hw_type, self.hw_ver = self._query_with_retry("?:;", "FWV", "HWT", "HWV")
+        self.fw_ver, self.hw_type, self.hw_ver = self._query_with_retry(
+            "?:;", "FWV", "HWT", "HWV",
+            n_tries=info_tries, retry_delay=retry_delay, response_timeout=info_timeout
+        )
         print("Firmware version:", self.fw_ver)
         print("Hardware type:", self.hw_type)
         print("Hardware version:", self.hw_ver)
 
         # Ask for max samplerate and channels
-        samplerate, n_channels = self._query_with_retry("max:;", "MSF", "MNC")
+        samplerate, n_channels = self._query_with_retry(
+            "max:;", "MSF", "MNC",
+            n_tries=rate_tries, retry_delay=retry_delay, response_timeout=rate_timeout
+        )
         if samplerate is None or n_channels is None:
             print("SpikerBox metadata missing; using defaults samplerate=10000, channels=2")
             self.samplerate = 10000.0
@@ -40,12 +57,12 @@ class SpikerBox:
         self.ch = 1
         self.pending_samples = []
 
-    def _query_with_retry(self, cmd, *keys, n_tries=5, retry_delay=0.02):
+    def _query_with_retry(self, cmd, *keys, n_tries=5, retry_delay=0.02, response_timeout=0.1):
         resp = tuple(None for _ in keys)
         for _ in range(n_tries):
             self._drain_input()
             self.send_cmd(cmd)
-            resp = self.parse_response(*keys)
+            resp = self.parse_response(*keys, response_timeout=response_timeout)
             if all(v is not None for v in resp):
                 return resp
             time.sleep(retry_delay)
@@ -54,7 +71,7 @@ class SpikerBox:
     def _drain_input(self):
         # Remove stale packets before sending a command so parse_response
         # reads the corresponding reply.
-        for _ in range(10):
+        for _ in range(4):
             d = self.h.read(64, 1)
             if d is None or len(d) == 0:
                 break
@@ -77,7 +94,7 @@ class SpikerBox:
         data = [0x3f, 0x3e] + list(bytearray(cmd.ljust(62, "\0").encode("utf-8")))
         self.h.write(data)
 
-    def parse_response(self, *keys):
+    def parse_response(self, *keys, response_timeout=0.1):
         '''
         Response always 64 bytes long; 1st byte constant (ignored), 2nd byte payload length, then 
             the data, which is escaped with 
@@ -85,7 +102,7 @@ class SpikerBox:
             stop signal: \xff\xff\x01\x01\x81\xff
         '''
         response = {key: None for key in keys}
-        deadline = time.time() + max(0.1, 5 * float(self.timeout) / 1000.0)
+        deadline = time.time() + response_timeout
 
         while time.time() < deadline:
             d = self.h.read(64, self.timeout)

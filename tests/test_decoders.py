@@ -1,4 +1,5 @@
 from analysis import online_analysis
+from features.clda_features import CLDA_KFRML_IntendedVelocity
 from features.debug_features import OnlineAnalysis
 from riglib.bmi import lindecoder, kfdecoder, state_space_models, extractor, train
 from built_in_tasks.bmimultitasks import BMIControlMulti #, SimBMICosEncLinDec, SimBMIVelocityLinDec
@@ -31,7 +32,7 @@ class TestKFDecoder(unittest.TestCase):
         C[1, 5] = 0.1
         decoder = train.make_fixed_kf_decoder(units, ssm, C, dt=0.1)
         decoder.extractor_cls = extractor.LFPMTMPowerExtractor
-        decoder.extractor_kwargs = dict(channels=[1, 2], bands=[(90,110)], win_len=0.1, fs=1000)
+        decoder.extractor_kwargs = dict(channels=[1, 2], bands=[(0,50)], win_len=0.1, fs=10000, ref=False)
 
         import pickle
         import os
@@ -81,12 +82,14 @@ class TestKFDecoder(unittest.TestCase):
 
          # Construct a fixed decoder
         ssm = state_space_models.StateSpaceEndptVel2D()
-        units = np.array([[1, 0]])
-        C = np.zeros([1, 7])
+        units = np.array([[1, 0], [2, 0]])
+        C = np.zeros([2, 7])
         C[0, 3] = 0.1
+        C[1, 5] = 0.1
         decoder = train.make_fixed_kf_decoder(units, ssm, C, dt=0.1)
         decoder.extractor_cls = extractor.LFPMTMPowerExtractor
-        decoder.extractor_kwargs = dict(channels=[1], bands=[(10,50)], win_len=0.1, fs=1000)
+        decoder.extractor_kwargs = dict(channels=[1, 2], bands=[(50,500)], win_len=0.1, fs=10000, ref=False)
+        decoder.init_zscore(np.array([2.5, 1.7]), np.array([1., 1.]))
 
         import pickle
         import os
@@ -102,10 +105,10 @@ class TestKFDecoder(unittest.TestCase):
         analysis = online_analysis.OnlineDataServer('localhost', 5000)
         analysis.start()
 
-        feats = [SpikerBoxBMI, Window2D, SaveHDF, OnlineAnalysis]
-        kwargs = dict(decoder=decoder)
+        feats = [SpikerBoxBMI, CLDA_KFRML_IntendedVelocity, Window2D, SaveHDF, OnlineAnalysis]
+        kwargs = dict(decoder=decoder, clda_batch_time=1, clda_update_half_life=5)
 
-        seq = base_class.centerout_2D(nblocks=1, ntargets=8, distance=8)
+        seq = base_class.centerout_2D(nblocks=1, ntargets=2, distance=8)
         Exp = experiment.make(base_class, feats=feats)
         exp = Exp(seq, **kwargs)
 
@@ -116,6 +119,7 @@ class TestKFDecoder(unittest.TestCase):
         print(f"decoder units: {exp.decoder.units}")
         print(f"decoder binlen: {exp.decoder.binlen}")
         print(f"decoder call rate: {exp.decoder.call_rate}")
+        exp.enable_clda()
 
         exp.run()
 
