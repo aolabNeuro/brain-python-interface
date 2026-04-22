@@ -179,6 +179,10 @@ class RPCProcess(mp.Process):
         self._req_queue = mp.Queue()
         self._resp_queue = mp.Queue()
 
+        # One-way data channel used by DataSink/DataSource subclasses
+        # Child process reads from self.data_pipe, parent writes through data_proxy.pipe
+        self.data_pipe, self._data_send_end = mp.Pipe(duplex=False)
+
         self.target_proxy = None
         self.data_proxy = None
 
@@ -240,7 +244,7 @@ class RPCProcess(mp.Process):
             self._resp_queue,
             log_filename=self.log_filename,
         )
-        self.data_proxy = DataPipe(log_filename=self.log_filename)
+        self.data_proxy = DataPipe(pipe=self._data_send_end, log_filename=self.log_filename)
         return self.target_proxy, self.data_proxy
 
     def check_run_condition(self):

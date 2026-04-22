@@ -9,7 +9,7 @@ class LFP(DataSourceSystem):
     SpikerBox DataSourceSystem collects EMG data from USB packets. Compatible with riglib.source.MultiChanDataSource
     '''
     update_freq = 10000
-    dtype = np.dtype('float')
+    dtype = np.dtype('int16') # 16 bit signed integer, which is what the SpikerBox sends over USB
 
     def __init__(self, channels=[1,2]):
         self.b = SpikerBox() # assume we asked for the right channels!!

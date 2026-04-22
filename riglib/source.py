@@ -246,9 +246,8 @@ class MultiChanDataSource(mp.Process):
         self.slice_size = dtype.itemsize
         self.idxs = shm.RawArray('l', self.n_chan)
         self.last_read_idxs = np.zeros(self.n_chan, dtype='int')
-        rawarray = shm.RawArray('c', self.n_chan * self.max_len * self.slice_size)
-
-        self.data = np.frombuffer(rawarray, dtype).reshape((self.n_chan, self.max_len))
+        self._rawarray = shm.RawArray('c', self.n_chan * self.max_len * self.slice_size)
+        self.data = np.frombuffer(self._rawarray, dtype).reshape((self.n_chan, self.max_len))
 
         #self.fo2 = open('/storage/rawdata/test_rda_get.txt','w')
         #self.fo3 = open('/storage/rawdata/test_rda_run.txt','w')
@@ -285,7 +284,6 @@ class MultiChanDataSource(mp.Process):
         -------
         None
         '''
-        self.sinks = sink_manager = sink.SinkManager.get_instance()
         super(MultiChanDataSource, self).start(*args, **kwargs)
 
     def run(self):
@@ -293,10 +291,16 @@ class MultiChanDataSource(mp.Process):
         Main function executed by the mp.Process object. This function runs in the *remote* process, not in the main process
         '''
         print(("Starting datasource %r" % self.source))
+
+        # Rebuild NumPy view from shared memory in child process.
+        # With spawn, self.data may be deserialized as a copied ndarray.
+        self.data = np.frombuffer(self._rawarray, self.source.dtype).reshape((self.n_chan, self.max_len))
+
         if self.send_data_to_sink_manager:
             print(("Registering Supplementary HDF file for datasource %r" % self.source))
             self.register_supp_hdf()
 
+        system = None
         try:
             system = self.source(**self.source_kwargs)
             system.start()
@@ -432,7 +436,8 @@ class MultiChanDataSource(mp.Process):
             self.supp_hdf.close_data()
             print('end of supp hdf')
 
-        system.stop()
+        if system is not None:
+            system.stop()
         print(("ended datasource %r" % self.source))
 
 

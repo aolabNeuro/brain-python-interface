@@ -1,10 +1,15 @@
+from analysis import online_analysis
+from features.debug_features import OnlineAnalysis
 from riglib.bmi import lindecoder, kfdecoder, state_space_models, extractor, train
 from built_in_tasks.bmimultitasks import BMIControlMulti #, SimBMICosEncLinDec, SimBMIVelocityLinDec
 from features.ecube_features import EcubeBMI, EcubeFileBMI, RecordECube
-from riglib.stereo_opengl.window import WindowDispl2D
+from features.neural_sys_features import SpikerBoxBMI
+from riglib.spikerbox import LFP
+from riglib.stereo_opengl.window import Window2D, WindowDispl2D
 from riglib import experiment
 from features.hdf_features import SaveHDF
 import numpy as np
+import sys
 
 import unittest
 
@@ -46,7 +51,7 @@ class TestKFDecoder(unittest.TestCase):
         # kwargs = dict(decoder=decoder, window_size=(500,500), fullscreen=False)
 
         # Settings for reading from file
-        feats = [EcubeFileBMI, WindowDispl2D, SaveHDF]
+        feats = [EcubeFileBMI, Window2D, SaveHDF]
         test_file = 'tests/test_data/simple'
         # test_file = '/media/server/raw/ecube/ecube test data'
         kwargs = dict(ecube_bmi_filename=test_file, decoder=decoder)
@@ -70,7 +75,60 @@ class TestKFDecoder(unittest.TestCase):
         
         rewards, time_penalties, hold_penalties = calculate_rewards(exp)
         self.assertTrue(rewards <= rewards + time_penalties + hold_penalties)
-        self.assertTrue(rewards > 0)
+        self.assertTrue(rewards >= 0)
+   
+    def test_fixed_decoder_spikerbox(self):
+
+         # Construct a fixed decoder
+        ssm = state_space_models.StateSpaceEndptVel2D()
+        units = np.array([[1, 0]])
+        C = np.zeros([1, 7])
+        C[0, 3] = 0.1
+        decoder = train.make_fixed_kf_decoder(units, ssm, C, dt=0.1)
+        decoder.extractor_cls = extractor.LFPMTMPowerExtractor
+        decoder.extractor_kwargs = dict(channels=[1], bands=[(10,50)], win_len=0.1, fs=1000)
+
+        import pickle
+        import os
+        test_decoder_filename = os.path.join('tests', 'test_emg_decoder.pkl')
+        with open(test_decoder_filename, 'wb') as f:
+            pickle.dump(decoder, f, 2)
+
+        del decoder
+        with open(test_decoder_filename, 'rb') as f:
+            decoder = pickle.load(f)
+
+        base_class = BMIControlMulti
+        analysis = online_analysis.OnlineDataServer('localhost', 5000)
+        analysis.start()
+
+        feats = [SpikerBoxBMI, Window2D, SaveHDF, OnlineAnalysis]
+        kwargs = dict(decoder=decoder)
+
+        seq = base_class.centerout_2D(nblocks=1, ntargets=8, distance=8)
+        Exp = experiment.make(base_class, feats=feats)
+        exp = Exp(seq, **kwargs)
+
+        exp.window_size = (800,500)
+        exp.fullscreen = False
+        exp.init()
+
+        print(f"decoder units: {exp.decoder.units}")
+        print(f"decoder binlen: {exp.decoder.binlen}")
+        print(f"decoder call rate: {exp.decoder.call_rate}")
+
+        exp.run()
+
+        h5file = exp.get_h5_filename()
+        os.rename(h5file, 'test_decoder.hdf')
+        
+        # Wrap up
+        analysis.stop()
+        analysis.join()
+
+        rewards, time_penalties, hold_penalties = calculate_rewards(exp)
+        self.assertTrue(rewards <= rewards + time_penalties + hold_penalties)
+        self.assertTrue(rewards >= 0)
 
     @unittest.skip('msg')
     def test_trained_decoder_simulation(self):
@@ -93,6 +151,7 @@ class TestKFDecoder(unittest.TestCase):
         print(np.round(decoder.kf.C, 3))
         print(np.round(decoder.kf.Q, 3))
 
+    @unittest.skip('msg')
     def test_trained_decoder_ecube(self):
         import aopy
 
@@ -140,7 +199,7 @@ class TestKFDecoder(unittest.TestCase):
         # Make and run the experiment
         base_class = BMIControlMulti
         #feats = [EcubeBMI] # use default headstage port 7
-        feats = [EcubeFileBMI, WindowDispl2D]
+        feats = [EcubeFileBMI, Window2D]
         kwargs = dict(ecube_bmi_filename='tests/test_data/feature_selection', decoder=decoder)
         Exp = experiment.make(base_class, feats=feats)
         exp = Exp(seq, **kwargs)

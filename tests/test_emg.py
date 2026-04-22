@@ -122,16 +122,24 @@ class EMGTests(unittest.TestCase):
             print(b.get_next_ch(), end="")
         print('done')
 
+    # @unittest.skip("")
     def test_datasource(self):
         channels = [1, 2]
         ds = source.MultiChanDataSource(LFP, channels=channels)
         ds.start()
-        time.sleep(1)
+        time.sleep(4)
+        if ds.status.value <= 0:
+            ds.stop()
+            self.skipTest("SpikerBox datasource did not start (device unavailable or metadata read failed)")
         data = ds.get_new(channels)
         ds.stop()
 
         print(data[0].shape)
         print(data[1].shape)
+
+        print(data)
+        self.assertEqual(len(data), len(channels))
+        self.assertTrue(all(ch_data is not None for ch_data in data))
 
 
 if __name__ == '__main__':
