@@ -87,7 +87,7 @@ class TestOnlineAnalysis(unittest.TestCase):
             targets[trial_num][0].append(trial['index'])
             targets[trial_num][1].append(trial['target'])
         cursor = task['cursor']
-        eye = task['eye']
+        eye = task['eye'][:,:2]
 
         # Start exp 1
         os.environ['DISPLAY'] = ':0.0'
