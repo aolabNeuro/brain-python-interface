@@ -429,11 +429,13 @@ class MultiSource(DataSourceSystem):
 
         # Add all available channels
         available = conn.listavailable()
-        available_hs = np.where(available[0] >= n_headstage_channels)[0] + 1
-        print(available_hs)
-        conn.add([('Headstages', int(i), (1, n_headstage_channels)) for i in available_hs])
         conn.add(('AnalogPanel', (1, n_analog_channels)))
         conn.add(('DigitalPanelAsChans', (1, n_digital_channels)))
+
+        # Add available headstage channels
+        available_hs = np.where(available[0] >= n_headstage_channels)[0] + 1
+        if len(available_hs) > 0:
+            conn.add([('Headstages', int(i), (1, n_headstage_channels)) for i in available_hs])
 
         subscribed = conn.listadded() # in debug mode this prints out the added channels
 
