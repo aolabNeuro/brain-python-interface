@@ -37,8 +37,9 @@ class ManualControlMixin(traits.HasTraits):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.current_pt=np.zeros([3]) #keep track of current pt
-        self.last_pt = np.array(self.starting_pos) #keep track of last pt to calc. velocity
+        self.current_pt = np.zeros([3]) # keep track of current pt
+        self.last_pt = np.array(self.starting_pos) # keep track of last pt to calc. velocity
+        self.prev_coords = None # keep track of last valid coords
         self._quality_window_size = 500 # how many cycles to accumulate quality statistics
         self.reportstats['Input quality'] = "100 %"
         if self.random_rewards:
@@ -116,50 +117,68 @@ class ManualControlMixin(traits.HasTraits):
         motiontracker / joystick / mouse data. If no data available, returns None
         '''
 
-        # Get raw input and save it as task data
+        # Get raw input from motor effector (e.g. optitrack, mouse, tablet touch app)
         raw_coords = self._get_manual_position() # array of [3x1] arrays
 
-        if raw_coords is None or len(raw_coords) < 1:
+        if raw_coords is None or len(raw_coords) < 1: 
+            # E.g. when mocap dots are outside optitrack's detectable region or when there is no touch input to the tablet  
             self.no_data_counter[self.cycle_count % self._quality_window_size] = 1
             self.update_report_stats()
+
+            # Save manual input as NaN in task data
             self.task_data['manual_input'] = np.ones((3,))*np.nan
             self.task_data['user_screen'] = np.ones((3,))*np.nan
-            return
 
-        self.task_data['manual_input'] = raw_coords.copy()
-        self.no_data_counter[self.cycle_count % self._quality_window_size] = 0
+            # Use last valid coords to continue showing cursor at last valid position
+            coords = self.prev_coords
+            # print(coords)
+            if coords is None:
+                return
 
-        # Transform coordinates
-        coords = self._transform_coords(raw_coords)
-        self.task_data['user_screen'] = coords
+        else:
+            # Save manual input in task data
+            self.task_data['manual_input'] = raw_coords.copy()
+            self.no_data_counter[self.cycle_count % self._quality_window_size] = 0
+
+            # Transform coordinates to screen space and save in task data
+            coords = self._transform_coords(raw_coords)
+            self.task_data['user_screen'] = coords.copy()
         
-        try:
-            if self.limit2d:
-                coords[1] = 0
-            if self.limit1d:
-                coords[1] = 0
-                coords[0] = 0
-        except:
-            if self.limit2d:
-                coords[1] = 0
+            # Restrict cursor to only move along desired dimensions
+            try:
+                if self.limit2d:
+                    coords[1] = 0
+                if self.limit1d:
+                    coords[1] = 0
+                    coords[0] = 0
+            except:
+                if self.limit2d:
+                    coords[1] = 0
+
+            # Keep track of last valid coords
+            self.prev_coords = coords
+            # print(coords)
 
         # Add cursor disturbance
-        coords += pos_offset
-        coords += vel_offset
+        final_coords = coords + pos_offset + vel_offset
+        # print('final', coords, pos_offset, coords + pos_offset)
    
-        # Set cursor position
+        # Finalize cursor position
         if not self.velocity_control:
-            self.current_pt = coords
+            self.current_pt = final_coords
+        
         else: # TODO how to implement velocity control?
             epsilon = 2*(10**-2) # Define epsilon to stabilize cursor movement
-            if sum((coords)**2) > epsilon:
-
+            if sum((final_coords)**2) > epsilon:
                 # Add the velocity (units/s) to the position (units)
-                self.current_pt = coords / self.fps + self.last_pt
+                self.current_pt = final_coords / self.fps + self.last_pt
             else:
                 self.current_pt = self.last_pt
 
+        # Move cursor (plant) to finalized position
         self.plant.set_endpoint_pos(self.current_pt)
+
+        # Keep track of last valid cursor (plant) position
         self.last_pt = self.plant.get_endpoint_pos()
 
     def update_report_stats(self):
