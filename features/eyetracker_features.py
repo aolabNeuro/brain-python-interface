@@ -45,6 +45,13 @@ class EyeCalibration(traits.HasTraits):
     def __init__(self, *args, **kwargs): #, start_pos, calibration):
         super(EyeCalibration,self).__init__(*args, **kwargs)
         
+        # Set up eye cursor
+        self.eye_cursor = VirtualCircularTarget(target_radius=.25, target_color=(0., 1., 0., 0.5))
+        self.target_location = np.array(self.starting_pos).copy()
+        self.calibrated_eye_pos = np.zeros((2,))*np.nan
+        for model in self.eye_cursor.graphics_models:
+            self.add_model(model)
+
         # proc_exp # preprocess cursor data only
         taskid = self.taskid_for_eye_calibration
         try:
@@ -126,13 +133,6 @@ class EyeCalibration(traits.HasTraits):
                 raise ValueError(f"Error processing hdf file for taskid {taskid}")
 
             print("Calibration complete:", self.eye_coeff)
-
-        # Set up eye cursor
-        self.eye_cursor = VirtualCircularTarget(target_radius=.25, target_color=(0., 1., 0., 0.5))
-        self.target_location = np.array(self.starting_pos).copy()
-        self.calibrated_eye_pos = np.zeros((2,))*np.nan
-        for model in self.eye_cursor.graphics_models:
-            self.add_model(model)
         
     def init(self):
         self.add_dtype('calibrated_eye', 'f8', (2,))
