@@ -11,7 +11,7 @@ from riglib.stereo_opengl.openxr import WindowVR
 
 from .generator_features import Autostart, RandomDelay, AdaptiveGenerator, IgnoreCorrectness, PoissonWait, Progressbar_fixation, \
     HideLeftTrajectory, StartTrialBelowSpeedThr, ReadysetMedley, ReadysetColorChange, DiscreteRandomDelay_EyeHandSequence, HideCursorReturn
-from .peripheral_device_features import Button, Joystick, DualJoystick, Joystick_plus_TouchSensor, KeyboardControl, MouseControl, ForceControl
+from .peripheral_device_features import Button, Joystick, DualJoystick, Joystick_plus_TouchSensor, KeyboardControl, MouseControl, ForceControl, CthulhuTDUFeedback
 from .reward_features import RewardSystem, RewardSystemPulse, TTLReward, JuiceLogging, PelletReward, JackpotRewards, ProgressBar, TrackingRewards, RewardAudio, PenaltyAudio, ScoreRewards, ConsecutiveJackpot
 from .eyetracker_features import EyeCursor, EyeData, CalibratedEyeData, PupilLabStreaming, SimulatedEyeData, FixationStart, EyeConstrained, \
     AutomaticEyeCalibration, EyeCalibration, EyeStreaming
@@ -108,6 +108,7 @@ built_in_features = dict(
     random_delay_eye_hand_sequence = DiscreteRandomDelay_EyeHandSequence,
     hide_cursor_return = HideCursorReturn,
     auto_eye_calibration = AutomaticEyeCalibration,
+    cthulhu_display_tdu = CthulhuTDUFeedback,
 )
 
 # >>> features.built_in_features['autostart'].__module__

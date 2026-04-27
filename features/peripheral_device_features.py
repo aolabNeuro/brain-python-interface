@@ -3,6 +3,7 @@ Peripheral interface device features
 '''
 
 import types
+import time
 import numpy as np
 import pygame
 from riglib import gpio
@@ -334,3 +335,106 @@ class ForceControl():
         def get(self):
             return self.analog_read(0)
         self.joystick.get = types.MethodType(get, self.joystick)
+
+
+class CthulhuTDUFeedback(traits.HasTraits):
+    '''
+    Stream a low-resolution world image (target + cursor) to the Cthulhu TDU
+    Arduino sketch in riglib/cthulhu_display/cthulhu_display.ino.
+    '''
+    cthulhu_display_port = traits.String('/dev/cthulhu_display_tdu', desc="Serial port for Cthulhu TDU Arduino. Use 'auto' to auto-detect.")
+    cthulhu_display_baudrate = traits.Int(115200, desc='Serial baudrate for Cthulhu TDU Arduino')
+    cthulhu_display_refresh_hz = traits.Float(25.0, desc='Frame update rate to TDU')
+    cthulhu_display_grid_shape = traits.Tuple((8, 8), desc='Grid rows, cols sent over serial')
+    cthulhu_display_world_axes = traits.Tuple((0, 2), desc='Position vector indices mapped to TDU x/y')
+    cthulhu_display_cursor_sigma = traits.Float(1.2, desc='Gaussian width (cm) for cursor blob')
+    cthulhu_display_target_sigma = traits.Float(1.8, desc='Gaussian width (cm) for target blob')
+    cthulhu_display_cursor_weight = traits.Float(1.0, desc='Cursor contribution weight')
+    cthulhu_display_target_weight = traits.Float(0.8, desc='Target contribution weight')
+    cthulhu_display_smooth_alpha = traits.Float(0.35, desc='Arduino exponential smoothing alpha')
+    cthulhu_display_activation_threshold = traits.Float(0.04, desc='Arduino activation threshold (0..1)')
+    cthulhu_display_intensity = traits.Float(0.45, desc='Global TDU intensity gain (0..1)')
+
+    def init(self, *args, **kwargs):
+        super().init(*args, **kwargs)
+
+        self._cthulhu = None
+        self._cthulhu_last_send = 0.0
+        self._cthulhu_bounds = self._cthulhu_get_world_bounds()
+
+        try:
+            from riglib.cthulhu_display.cthulhu_display_tdu import CthulhuTDU
+            port = self.cthulhu_display_port
+            if str(port).strip().lower() in ['', 'auto', 'none']:
+                port = None
+            self._cthulhu = CthulhuTDU(port=port, baudrate=self.cthulhu_display_baudrate)
+            self._cthulhu.set_smoothing(self.cthulhu_display_smooth_alpha, self.cthulhu_display_activation_threshold)
+            self._cthulhu.set_intensity(self.cthulhu_display_intensity)
+            print('CthulhuTDUFeedback connected on %s' % self._cthulhu.port_name)
+        except Exception as err:
+            print('CthulhuTDUFeedback disabled (%s)' % err)
+            self._cthulhu = None
+
+    def _cthulhu_get_world_bounds(self):
+        if hasattr(self, 'cursor_bounds'):
+            x_idx, y_idx = self.cthulhu_display_world_axes
+            x_min = float(self.cursor_bounds[2 * x_idx])
+            x_max = float(self.cursor_bounds[2 * x_idx + 1])
+            y_min = float(self.cursor_bounds[2 * y_idx])
+            y_max = float(self.cursor_bounds[2 * y_idx + 1])
+            return (x_min, x_max, y_min, y_max)
+        return (-10.0, 10.0, -10.0, 10.0)
+
+    def _cthulhu_get_cursor_pos(self):
+        if hasattr(self, 'plant') and hasattr(self.plant, 'get_endpoint_pos'):
+            return self.plant.get_endpoint_pos()
+        if hasattr(self, 'decoder') and hasattr(self.decoder, 'state'):
+            return np.asarray(self.decoder.state).ravel()
+        return None
+
+    def _cthulhu_get_target_pos(self):
+        if hasattr(self, 'target_location'):
+            return np.asarray(self.target_location).ravel()
+        return None
+
+    def _cthulhu_send_world_frame(self):
+        if self._cthulhu is None:
+            return
+
+        refresh_hz = max(1.0, float(self.cthulhu_display_refresh_hz))
+        now = time.time()
+        if now - self._cthulhu_last_send < (1.0 / refresh_hz):
+            return
+
+        cursor_pos = self._cthulhu_get_cursor_pos()
+        target_pos = self._cthulhu_get_target_pos()
+
+        try:
+            self._cthulhu.send_world(
+                cursor_pos=cursor_pos,
+                target_pos=target_pos,
+                bounds=self._cthulhu_bounds,
+                grid_shape=self.cthulhu_display_grid_shape,
+                axes=self.cthulhu_display_world_axes,
+                cursor_sigma_cm=self.cthulhu_display_cursor_sigma,
+                target_sigma_cm=self.cthulhu_display_target_sigma,
+                cursor_weight=self.cthulhu_display_cursor_weight,
+                target_weight=self.cthulhu_display_target_weight,
+            )
+            self._cthulhu_last_send = now
+        except Exception as err:
+            print('CthulhuTDUFeedback send error (%s)' % err)
+            self._cthulhu = None
+
+    def _cycle(self):
+        self._cthulhu_send_world_frame()
+        super()._cycle()
+
+    def cleanup(self, database, saveid, **kwargs):
+        if self._cthulhu is not None:
+            try:
+                self._cthulhu.clear()
+                self._cthulhu.close()
+            except Exception:
+                pass
+        return super().cleanup(database, saveid, **kwargs)

@@ -12,7 +12,7 @@ from riglib.stereo_opengl.environment import Grid
 from riglib.stereo_opengl.window import WindowDispl2D
 from riglib import experiment
 from riglib import audio
-from features.peripheral_device_features import ForceControl, MouseControl
+from features.peripheral_device_features import ForceControl, MouseControl, CthulhuTDUFeedback
 from features.optitrack_features import OptitrackSimulate, Optitrack, SpheresToCylinders, SpheresToImages
 from features.reward_features import ProgressBar, ScoreRewards, PenaltyAudioMulti
 import cProfile
@@ -62,6 +62,22 @@ class TestManualControlTasks(unittest.TestCase):
     def test_exp(self):
         seq = ManualControl.centerout_2D()
         exp = init_exp(ManualControl, [MouseControl, Window2D, ScoreRewards], seq, window_size=(1200,800), fullscreen=False)
+        exp.rotation = 'xzy'
+        exp.stereo_mode = 'projection'
+        exp.run()
+
+    # @unittest.skip("Need Cthulhu display hardware connected for this to pass")
+    def test_exp_cthulhu(self):
+        seq = ManualControl.centerout_2D(nblocks=1)
+        exp = init_exp(
+            ManualControl,
+            [MouseControl, Window2D, CthulhuTDUFeedback],
+            seq,
+            window_size=(1200, 800),
+            fullscreen=False,
+            cthulhu_display_port='auto',
+        )
+        self.assertIsNotNone(exp._cthulhu)
         exp.rotation = 'xzy'
         exp.stereo_mode = 'projection'
         exp.run()
