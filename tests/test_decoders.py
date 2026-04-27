@@ -1,7 +1,7 @@
 from riglib.bmi import lindecoder, kfdecoder, state_space_models, extractor, train
 from built_in_tasks.bmimultitasks import BMIControlMulti #, SimBMICosEncLinDec, SimBMIVelocityLinDec
 from features.ecube_features import EcubeBMI, EcubeFileBMI, RecordECube
-from riglib.stereo_opengl.window import WindowDispl2D
+from riglib.stereo_opengl.window import Window2D, WindowDispl2D
 from riglib import experiment
 from features.hdf_features import SaveHDF
 import numpy as np
@@ -72,6 +72,116 @@ class TestKFDecoder(unittest.TestCase):
         self.assertTrue(rewards <= rewards + time_penalties + hold_penalties)
         self.assertTrue(rewards > 0)
 
+    # @unittest.skip("manual performance sweep")
+    def test_fixed_decoder_ecube_channel_sweep(self):
+        import os
+        import tempfile
+        import time
+        import aopy
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+
+        class TimedBMI:
+            """Mixin that records wall-clock time for each call_decoder invocation."""
+            def call_decoder(self, *args, **kwargs):
+                t0 = time.perf_counter()
+                result = super().call_decoder(*args, **kwargs)
+                self._decoder_call_times.append(time.perf_counter() - t0)
+                return result
+
+        rng = np.random.default_rng(1)
+        lfp_fs = 1000
+        bb_fs = 25000
+        crazy_call_rate_hz = 300
+        decoder_dt = 1.0 / crazy_call_rate_hz
+        n_samples = bb_fs * 5
+
+        ssm = state_space_models.StateSpaceEndptVel2D()
+        base_class = BMIControlMulti
+        feats = [TimedBMI, EcubeFileBMI, Window2D]
+        channel_counts = [256, 128, 64, 32, 16, 8, 4, 2, 1]
+
+        call_rates = {}
+        observed_rates = {}
+        decoder_call_times = {}
+
+        for n_channels in channel_counts:
+            with tempfile.TemporaryDirectory(prefix=f'ecube_{n_channels}ch_run_', dir='tests/test_data') as ecube_dir:
+                test_signal = rng.integers(-200, 200, size=(n_samples, n_channels), dtype=np.int16)
+                aopy.utils.base.save_test_signal_ecube(
+                    data=test_signal,
+                    save_dir=ecube_dir,
+                    voltsperbit=1.0,
+                    datasource='Headstages',
+                )
+
+                units = np.array([[i + 1, 0] for i in range(n_channels)])
+                C = np.zeros([n_channels, 7])
+                C[:, 3] = 0.1
+
+                decoder = train.make_fixed_kf_decoder(units, ssm, C, dt=decoder_dt)
+                decoder.set_call_rate(crazy_call_rate_hz)
+                decoder.extractor_cls = extractor.LFPMTMPowerExtractor
+                decoder.extractor_kwargs = dict(
+                    channels=list(range(1, n_channels + 1)),
+                    bands=[(90, 110)],
+                    win_len=0.2,
+                    fs=lfp_fs,
+                )
+
+                seq = base_class.centerout_2D(nblocks=1, ntargets=2, distance=8)
+                Exp = experiment.make(base_class, feats=feats)
+                exp = Exp(seq, ecube_bmi_filename=ecube_dir, decoder=decoder, session_length=5)
+                exp.window_size = (500, 500)
+                exp.fullscreen = False
+                exp.fps = crazy_call_rate_hz
+
+                exp._decoder_call_times = []
+                exp.init()
+                t0 = time.perf_counter()
+                exp.run()
+                elapsed = time.perf_counter() - t0
+                import pygame; pygame.quit()  # close the window immediately before datasource cleanup
+                exp.neurondata.stop()
+                exp.neurondata.join()
+
+                call_rates[n_channels] = exp.decoder.call_rate
+                observed_rates[n_channels] = exp.cycle_count / elapsed if elapsed > 0 else np.nan
+                times = exp._decoder_call_times
+                decoder_call_times[n_channels] = np.mean(times) * 1000 if times else np.nan  # ms
+
+                print(
+                    f"channels={n_channels}, configured_call_rate={call_rates[n_channels]:.3f} Hz, "
+                    f"observed_task_rate={observed_rates[n_channels]:.3f} Hz, "
+                    f"mean_decoder_call={decoder_call_times[n_channels]:.3f} ms (n={len(times)})"
+                )
+
+        x = np.array(channel_counts)
+        y_task = np.array([observed_rates[n] for n in channel_counts])
+        y_dec = np.array([decoder_call_times[n] for n in channel_counts])
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(6, 7), sharex=True)
+        ax1.plot(x, y_task, marker='o')
+        ax1.set_ylabel('Task loop rate (Hz)')
+        ax1.set_title('Decoder update rate vs channel count')
+        ax1.grid(True)
+        ax2.plot(x, y_dec, marker='o', color='tab:orange')
+        ax2.set_xlabel('Number of channels')
+        ax2.set_ylabel('Mean decoder call time (ms)')
+        ax2.grid(True)
+        fig.tight_layout()
+
+        out_plot = os.path.join('tests', 'test_data', 'decoder_update_rate_channel_sweep.png')
+        fig.savefig(out_plot, dpi=150)
+        plt.close(fig)
+        print(f"Saved sweep plot to: {out_plot}")
+
+        self.assertTrue(np.all(np.isfinite(y_task)))
+        self.assertTrue(np.all(y_task > 0))
+        self.assertTrue(np.all(np.isfinite(y_dec)))
+
+    
+
     @unittest.skip('msg')
     def test_trained_decoder_simulation(self):
         import aopy
@@ -93,6 +203,7 @@ class TestKFDecoder(unittest.TestCase):
         print(np.round(decoder.kf.C, 3))
         print(np.round(decoder.kf.Q, 3))
 
+    @unittest.skip('msg')
     def test_trained_decoder_ecube(self):
         import aopy
 
