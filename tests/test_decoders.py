@@ -32,7 +32,7 @@ class TestKFDecoder(unittest.TestCase):
         C[1, 5] = 0.1
         decoder = train.make_fixed_kf_decoder(units, ssm, C, dt=0.1)
         decoder.extractor_cls = extractor.LFPMTMPowerExtractor
-        decoder.extractor_kwargs = dict(channels=[1, 2], bands=[(0,50)], win_len=0.1, fs=10000, ref=False)
+        decoder.extractor_kwargs = dict(channels=[1, 2], bands=[(90,110)], win_len=0.1, fs=1000)
 
         import pickle
         import os
