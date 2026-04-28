@@ -149,7 +149,7 @@ class VideoPlayer(Window2D, Window, Experiment):
     status = dict(wait=dict(stop=None))
     state = "wait"
 
-    media_file = traits.String("", desc="Path to local video file (mp4, mov, mkv, etc.)")
+    media_file = traits.DataFile(object, desc="Visual stimulus video file", bmi3d_query_kwargs=dict(system__name='visual_stimuli'))
     audio_volume = traits.Float(1.0, desc="Playback volume from 0.0 to 1.0")
 
     def __init__(self, *args, **kwargs):
@@ -167,7 +167,13 @@ class VideoPlayer(Window2D, Window, Experiment):
         self._playback_t0 = None
 
         # Extract video metadata and prepare for playback
-        media_file = os.path.expanduser(self.media_file)
+        # media_file can be a string (for testing/CLI) or a DataFile object
+        if isinstance(self.media_file, str):
+            media_file = os.path.expanduser(self.media_file)
+        else:
+            # It's a DataFile record; get the path
+            media_file = self.media_file.get_path() if hasattr(self.media_file, 'get_path') else str(self.media_file)
+        
         if not media_file:
             raise ValueError("media_file must be set to a valid local video path")
         if not os.path.isfile(media_file):
