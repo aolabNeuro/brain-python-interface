@@ -6,13 +6,17 @@ import os
 import tables
 import time
 import subprocess
-import signal
+import tempfile
+from OpenGL.GL import GL_RGB, GL_RGB8, GL_UNSIGNED_BYTE
 
 from riglib.experiment import traits, Experiment
 from riglib.bmi.state_space_models import StateSpaceEndptVel2D
 from riglib.bmi.bmi import Decoder, BMILoop, MachineOnlyFilter
 from riglib.bmi.extractor import DummyExtractor
-from riglib.stereo_opengl.window import Window, WindowDispl2D
+from riglib.stereo_opengl.primitives import TexPlane
+from riglib.stereo_opengl.textures import Texture
+from riglib.stereo_opengl.window import Window, WindowDispl2D, Window2D
+from config.rig_defaults import window as window_defaults
 
 from built_in_tasks.manualcontrolmultitasks import ScreenTargetCapture
 from built_in_tasks.bmimultitasks import BMIControlMulti
@@ -141,35 +145,191 @@ class TargetCaptureReplay(ScreenTargetCapture):
         return super()._test_stop(ts) or self.cycle_count == len(self.replay_task)
 
 
-class YouTube(Experiment):
+class VideoPlayer(Window2D, Window, Experiment):
+    status = dict(wait=dict(stop=None))
+    state = "wait"
 
-    youtube_url = traits.String("", desc="URL pointing to a YouTube video. Only works for videos that support embedding")
+    media_file = traits.String("", desc="Path to local video file (mp4, mov, mkv, etc.)")
+    audio_volume = traits.Float(1.0, desc="Playback volume from 0.0 to 1.0")
 
-    def start_video(self):
-        self.video_process = subprocess.Popen(["bash", "../utils/start-youtube.sh", self.youtube_url])
+    def __init__(self, *args, **kwargs):
+        import cv2
+
+        self.event = None
+        self._video_capture = None
+        self._video_fps = 0.0
+        self._next_frame_idx = 0
+        self._video_finished = False
+        self._audio_path = None
+        self._audio_started = False
+        self._playback_t0 = None
+        super().__init__(*args, **kwargs)
+
+        # Extract video metadata and prepare for playback
+        media_file = os.path.expanduser(self.media_file)
+        if not media_file:
+            raise ValueError("media_file must be set to a valid local video path")
+        if not os.path.isfile(media_file):
+            raise IOError("media_file does not exist: %s" % media_file)
+
+        self._video_capture = cv2.VideoCapture(media_file)
+        if not self._video_capture.isOpened():
+            raise RuntimeError("Could not open video file: %s" % media_file)
+        self._video_fps = float(self._video_capture.get(cv2.CAP_PROP_FPS) or 0.0)
+        if self._video_fps <= 0:
+            self._video_fps = float(self.fps)
+        # Aspect ratio
+        width = int(self._video_capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(self._video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        if width > 0 and height > 0:
+            self.video_aspect = width / height
+        else:
+            self.video_aspect = self.screen_cm[0] / self.screen_cm[1]
+
+        # Extract audio
+        self._audio_path = self._extract_audio_track(media_file)
+
+
+
+    def init(self):
+        super().init()
+        
+        # Create a fullscreen plane on which to display the video frames
+        video_size = (int(self.screen_cm[0]), int(self.screen_cm[0] / self.video_aspect))
+        self.tex = Texture(
+            np.zeros((video_size[1], video_size[0], 3), dtype=np.uint8),
+            size=(video_size[0], video_size[1]),
+            iformat=GL_RGB8,
+            exformat=GL_RGB,
+            dtype=GL_UNSIGNED_BYTE,
+        )
+        self.video_surface = TexPlane(self.screen_cm[0], self.screen_cm[1], tex=self.tex, specular_color=(0,0,0,0))
+        self.video_surface.rotate_x(90).translate(-self.screen_cm[0]/2, 0, -self.screen_cm[1]/2)
+        self.add_model(self.video_surface)
+
+    def _extract_audio_track(self, media_file):
+        audio_fd, audio_path = tempfile.mkstemp(prefix="bmi3d_video_audio_", suffix=".wav")
+        os.close(audio_fd)
+
+        command = [
+            "ffmpeg",
+            "-y",
+            "-i", media_file,
+            "-vn",
+            "-acodec", "pcm_s16le",
+            "-ar", "44100",
+            "-ac", "2",
+            audio_path,
+        ]
+        result = subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if result.returncode != 0 or not os.path.exists(audio_path) or os.path.getsize(audio_path) == 0:
+            try:
+                os.remove(audio_path)
+            except OSError:
+                pass
+            return None
+        return audio_path
+
+    def _set_video_frame(self, frame):
+        import cv2
+
+        frame_rgb = np.flipud(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        frame_rgb = np.ascontiguousarray(frame_rgb, dtype=np.uint8)
+        # if (frame_rgb.shape[1], frame_rgb.shape[0]) != self.window_size:
+        #     frame_rgb = cv2.resize(frame_rgb, self.window_size)
+
+        # Create a new texture and assign it to the video surface
+        self.tex = Texture(
+            frame_rgb,
+            size=(frame_rgb.shape[1], frame_rgb.shape[0]),
+            iformat=GL_RGB8,
+            exformat=GL_RGB,
+            dtype=GL_UNSIGNED_BYTE,
+        )
+        self.video_surface.replace_texture(self.tex)
+
+    def _start_wait(self):
+        import cv2
+        import pygame
+
+        ok, first_frame = self._video_capture.read()
+        if not ok:
+            raise RuntimeError("Could not decode first frame from video")
+
+        self._next_frame_idx = 1
+        self._set_video_frame(first_frame)
+
+        if not pygame.mixer.get_init():
+            pygame.mixer.pre_init(44100, -16, 2, 2048)
+            pygame.mixer.init()
+
+        if self._audio_path is not None:
+            pygame.mixer.music.load(self._audio_path)
+            pygame.mixer.music.set_volume(np.clip(self.audio_volume, 0.0, 1.0))
+            pygame.mixer.music.play(loops=0)
+            self._audio_started = True
+        else:
+            self._audio_started = False
+            self._playback_t0 = self.get_time()
 
     def stop_video(self):
-        os.kill(self.video_process.pid, signal.SIGINT)
-        self.video_process.wait()
-        
+        import pygame
+
+        if pygame.mixer.get_init():
+            try:
+                pygame.mixer.music.stop()
+                if hasattr(pygame.mixer.music, "unload"):
+                    pygame.mixer.music.unload()
+            except Exception:
+                pass
+
+        if self._video_capture is not None:
+            self._video_capture.release()
+            self._video_capture = None
+
+        if self._audio_path is not None and os.path.exists(self._audio_path):
+            try:
+                os.remove(self._audio_path)
+            except OSError:
+                pass
+            self._audio_path = None
+
+    def _test_stop(self, ts):
+        return self._video_finished or super()._test_stop(ts)
+
+    def _start_None(self):
+        super()._start_None()
+        self.stop_video()
+
+    def _target_frame_idx(self):
+        import pygame
+
+        if self._audio_started:
+            pos_ms = pygame.mixer.music.get_pos()
+            if pos_ms < 0:
+                self._video_finished = True
+                return self._next_frame_idx
+            return int((pos_ms / 1000.0) * self._video_fps)
+
+        if self._playback_t0 is None:
+            self._playback_t0 = self.get_time()
+        elapsed = self.get_time() - self._playback_t0
+        return int(elapsed * self._video_fps)
+
     def _cycle(self):
-        try:
-            status = self.video_process.poll()
-            if status is not None:
-                self.state = None
-        except:
-            pass
         super()._cycle()
-   
-    def run(self):
-        '''
-        Code to execute immediately prior to the beginning of the task FSM executing, or after the FSM has finished running. 
-        See riglib.experiment.Experiment.run(). Starts the YouTube video and stops it after the FSM has finished running
-        '''
-        try:
-            self.start_video()
-            super().run()
-        finally:
-            print("Stopping video")
-            self.stop_video()
-            
+
+        if self._video_finished:
+            return
+
+        target_idx = self._target_frame_idx()
+
+        while self._next_frame_idx <= target_idx and not self._video_finished:
+            ok, frame = self._video_capture.read()
+            if not ok:
+                self._video_finished = True
+                break
+            self._set_video_frame(frame)
+            self._next_frame_idx += 1
+
+        self.draw_world()

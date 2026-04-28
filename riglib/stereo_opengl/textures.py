@@ -33,8 +33,9 @@ class Texture(object):
                 tex = np.stack([tex]*3, axis=-1)  # grayscale → RGB
             elif tex.shape[-1] == 1:
                 tex = np.repeat(tex, 3, axis=-1)
-            size = tex.shape[:2]
-            tex = tex.astype(np.uint8).tobytes()
+            if size is None:
+                size = (tex.shape[1], tex.shape[0])
+            tex = np.ascontiguousarray(tex.astype(np.uint8)).tobytes()
         elif isinstance(tex, str):
             im = pygame.image.load(tex)
             size = im.get_size()
@@ -72,6 +73,9 @@ class Texture(object):
 
         # Ensure width and height are integers
         width, height = int(self.size[0]), int(self.size[1])
+
+        # Avoid row-stride artifacts for RGB textures whose row width is not 4-byte aligned.
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
         
         # Create and fill texture
         glTexImage2D(
@@ -144,3 +148,8 @@ class TexModel(Model):
 
     def release(self):
         self.tex.delete()
+
+    def replace_texture(self, new_tex):
+        self.tex.delete()
+        self.tex = new_tex
+        self.tex.init()
