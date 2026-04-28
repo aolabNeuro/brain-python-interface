@@ -7,6 +7,7 @@ from built_in_tasks.passivetasks import VideoPlayer
 from built_in_tasks.example_task import ExampleSequenceTask
 from features.generator_features import Autostart, HideLeftTrajectory, ReadysetMedley, ReadysetColorChange, HideCursorReturn
 from features.hdf_features import SaveHDF
+from features.sync_features import HDFSync, ScreenSync
 from features.touch_features import MouseEmulateTouch
 from riglib.stereo_opengl.environment import Grid
 from riglib.stereo_opengl.window import Window2D
@@ -266,7 +267,7 @@ class TestVideoPlayer(unittest.TestCase):
     def test_local_video_from_downloads(self):
         
         video_file = "tests/test_data/monkeys.mp4"
-        exp = init_exp(VideoPlayer, [], media_file=video_file, fullscreen=False, window_size=(1280, 720))
+        exp = init_exp(VideoPlayer, [HDFSync, ScreenSync], media_file=video_file, fullscreen=False, window_size=(400,300))
         exp.run()
 
 if __name__ == '__main__':

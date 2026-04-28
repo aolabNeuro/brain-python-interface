@@ -263,7 +263,11 @@ class VideoPlayer(Window2D, Window, Experiment):
             self._audio_started = False
             self._playback_t0 = self.get_time()
 
-    def stop_video(self):
+    def _test_stop(self, ts):
+        return self._video_finished or super()._test_stop(ts)
+
+    def _start_None(self):
+        super()._start_None()
         import pygame
 
         # Stop audio playback
@@ -288,13 +292,6 @@ class VideoPlayer(Window2D, Window, Experiment):
             self._video_capture.release()
             self._video_capture = None
 
-    def _test_stop(self, ts):
-        return self._video_finished or super()._test_stop(ts)
-
-    def _start_None(self):
-        super()._start_None()
-        self.stop_video()
-
     def _target_frame_idx(self):
         import pygame
 
@@ -312,7 +309,7 @@ class VideoPlayer(Window2D, Window, Experiment):
         elapsed = self.get_time() - self._playback_t0
         return max(0, int(elapsed * self._video_fps))
 
-    def _cycle(self):
+    def _while_wait(self):
         if self._video_finished:
             return
 
@@ -326,5 +323,3 @@ class VideoPlayer(Window2D, Window, Experiment):
                 break
             self._set_video_frame(frame)
             self._next_frame_idx += 1
-
-        super()._cycle()
