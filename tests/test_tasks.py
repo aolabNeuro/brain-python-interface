@@ -265,7 +265,7 @@ class TestVideoPlayer(unittest.TestCase):
     # @unittest.skip("")
     def test_local_video_from_downloads(self):
         
-        video_file = "/Users/leoscholl/Downloads/test.mp4"
+        video_file = "tests/test_data/monkeys.mp4"
         exp = init_exp(VideoPlayer, [], media_file=video_file, fullscreen=False, window_size=(1280, 720))
         exp.run()
 

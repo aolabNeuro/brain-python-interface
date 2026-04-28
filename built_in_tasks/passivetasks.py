@@ -153,7 +153,9 @@ class VideoPlayer(Window2D, Window, Experiment):
     audio_volume = traits.Float(1.0, desc="Playback volume from 0.0 to 1.0")
 
     def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         import cv2
+        import pygame
 
         self.event = None
         self._video_capture = None
@@ -163,7 +165,6 @@ class VideoPlayer(Window2D, Window, Experiment):
         self._audio_path = None
         self._audio_started = False
         self._playback_t0 = None
-        super().__init__(*args, **kwargs)
 
         # Extract video metadata and prepare for playback
         media_file = os.path.expanduser(self.media_file)
@@ -188,8 +189,9 @@ class VideoPlayer(Window2D, Window, Experiment):
 
         # Extract audio
         self._audio_path = self._extract_audio_track(media_file)
-
-
+        if not pygame.mixer.get_init():
+            pygame.mixer.pre_init(44100, -16, 2, 2048)
+            pygame.mixer.init()
 
     def init(self):
         super().init()
@@ -235,34 +237,13 @@ class VideoPlayer(Window2D, Window, Experiment):
 
         frame_rgb = np.flipud(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
         frame_rgb = np.ascontiguousarray(frame_rgb, dtype=np.uint8)
-        # if (frame_rgb.shape[1], frame_rgb.shape[0]) != self.window_size:
-        #     frame_rgb = cv2.resize(frame_rgb, self.window_size)
-
-        # Create a new texture and assign it to the video surface
-        self.tex = Texture(
-            frame_rgb,
-            size=(frame_rgb.shape[1], frame_rgb.shape[0]),
-            iformat=GL_RGB8,
-            exformat=GL_RGB,
-            dtype=GL_UNSIGNED_BYTE,
-        )
-        self.video_surface.replace_texture(self.tex)
+        self.tex.update(frame_rgb, size=(frame_rgb.shape[1], frame_rgb.shape[0]))
 
     def _start_wait(self):
         import cv2
         import pygame
 
-        ok, first_frame = self._video_capture.read()
-        if not ok:
-            raise RuntimeError("Could not decode first frame from video")
-
-        self._next_frame_idx = 1
-        self._set_video_frame(first_frame)
-
-        if not pygame.mixer.get_init():
-            pygame.mixer.pre_init(44100, -16, 2, 2048)
-            pygame.mixer.init()
-
+        # Start the audio playback
         if self._audio_path is not None:
             pygame.mixer.music.load(self._audio_path)
             pygame.mixer.music.set_volume(np.clip(self.audio_volume, 0.0, 1.0))
@@ -275,6 +256,7 @@ class VideoPlayer(Window2D, Window, Experiment):
     def stop_video(self):
         import pygame
 
+        # Stop audio playback
         if pygame.mixer.get_init():
             try:
                 pygame.mixer.music.stop()
@@ -283,16 +265,18 @@ class VideoPlayer(Window2D, Window, Experiment):
             except Exception:
                 pass
 
-        if self._video_capture is not None:
-            self._video_capture.release()
-            self._video_capture = None
-
+        # Release audio file
         if self._audio_path is not None and os.path.exists(self._audio_path):
             try:
                 os.remove(self._audio_path)
             except OSError:
                 pass
             self._audio_path = None
+
+        # Release video capture
+        if self._video_capture is not None:
+            self._video_capture.release()
+            self._video_capture = None
 
     def _test_stop(self, ts):
         return self._video_finished or super()._test_stop(ts)
@@ -307,23 +291,24 @@ class VideoPlayer(Window2D, Window, Experiment):
         if self._audio_started:
             pos_ms = pygame.mixer.music.get_pos()
             if pos_ms < 0:
+                if pygame.mixer.music.get_busy():
+                    return max(0, self._next_frame_idx - 1)
                 self._video_finished = True
-                return self._next_frame_idx
-            return int((pos_ms / 1000.0) * self._video_fps)
+                return max(0, self._next_frame_idx - 1)
+            return max(0, int((pos_ms / 1000.0) * self._video_fps))
 
         if self._playback_t0 is None:
             self._playback_t0 = self.get_time()
         elapsed = self.get_time() - self._playback_t0
-        return int(elapsed * self._video_fps)
+        return max(0, int(elapsed * self._video_fps))
 
     def _cycle(self):
-        super()._cycle()
-
         if self._video_finished:
             return
 
         target_idx = self._target_frame_idx()
 
+        # Read and display video frames until we catch up to the target frame index
         while self._next_frame_idx <= target_idx and not self._video_finished:
             ok, frame = self._video_capture.read()
             if not ok:
@@ -332,4 +317,4 @@ class VideoPlayer(Window2D, Window, Experiment):
             self._set_video_frame(frame)
             self._next_frame_idx += 1
 
-        self.draw_world()
+        super()._cycle()

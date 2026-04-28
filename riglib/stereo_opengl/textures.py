@@ -45,6 +45,68 @@ class Texture(object):
         self.size = size
         self.tex = None
 
+    def update(self, tex, size=None):
+        if not isinstance(tex, np.ndarray):
+            raise TypeError("Texture.update expects a numpy ndarray")
+
+        if tex.max() <= 1:
+            tex = (tex * 255).astype(np.uint8)
+        else:
+            tex = tex.astype(np.uint8)
+
+        if tex.ndim == 2:
+            tex = np.stack([tex] * 3, axis=-1)
+        elif tex.shape[-1] == 1:
+            tex = np.repeat(tex, 3, axis=-1)
+
+        if size is None:
+            size = (tex.shape[1], tex.shape[0])
+
+        tex = np.ascontiguousarray(tex.astype(np.uint8))
+        tex_bytes = tex.tobytes()
+
+        if self.tex is None:
+            self.size = size
+            self.texstr = tex_bytes
+            self.init()
+            return
+
+        width, height = int(size[0]), int(size[1])
+        needs_realloc = tuple(size) != tuple(self.size)
+
+        glBindTexture(GL_TEXTURE_2D, self.tex)
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
+        if needs_realloc:
+            glTexImage2D(
+                GL_TEXTURE_2D,
+                0,
+                self.opts['iformat'],
+                width,
+                height,
+                0,
+                self.opts['exformat'],
+                self.opts['dtype'],
+                tex_bytes,
+            )
+            self.size = size
+        else:
+            glTexSubImage2D(
+                GL_TEXTURE_2D,
+                0,
+                0,
+                0,
+                width,
+                height,
+                self.opts['exformat'],
+                self.opts['dtype'],
+                tex_bytes,
+            )
+
+        if self.opts['mipmap']:
+            glGenerateMipmap(GL_TEXTURE_2D)
+
+        self.texstr = tex_bytes
+
     def init(self):
         if self.tex is not None:
             print(f"Texture already initialized: {self.tex}")
