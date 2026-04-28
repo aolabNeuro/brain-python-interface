@@ -179,13 +179,6 @@ class VideoPlayer(Window2D, Window, Experiment):
         self._video_fps = float(self._video_capture.get(cv2.CAP_PROP_FPS) or 0.0)
         if self._video_fps <= 0:
             self._video_fps = float(self.fps)
-        # Aspect ratio
-        width = int(self._video_capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(self._video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        if width > 0 and height > 0:
-            self.video_aspect = width / height
-        else:
-            self.video_aspect = self.screen_cm[0] / self.screen_cm[1]
 
         # Extract audio
         self._audio_path = self._extract_audio_track(media_file)
@@ -195,18 +188,35 @@ class VideoPlayer(Window2D, Window, Experiment):
 
     def init(self):
         super().init()
-        
-        # Create a fullscreen plane on which to display the video frames
-        video_size = (int(self.screen_cm[0]), int(self.screen_cm[0] / self.video_aspect))
+
+        # Keep native decode resolution for texture upload
+        video_tex_w = int(self._video_capture.get(3))
+        video_tex_h = int(self._video_capture.get(4))
+        video_aspect = video_tex_w / video_tex_h if video_tex_h > 0 else 1.0
+        if video_tex_w <= 0 or video_tex_h <= 0:
+            video_tex_w, video_tex_h = 640, int(640 / max(video_aspect, 1e-6))
+        self.video_size = (video_tex_w, video_tex_h)
+
+        # Fit video plane inside screen while preserving aspect ratio (letterbox/pillarbox)
+        screen_w = float(self.screen_cm[0])
+        screen_h = float(self.screen_cm[1])
+        screen_aspect = screen_w / screen_h
+        if video_aspect >= screen_aspect:
+            plane_w = screen_w
+            plane_h = screen_w / video_aspect
+        else:
+            plane_h = screen_h
+            plane_w = screen_h * video_aspect
+
         self.tex = Texture(
-            np.zeros((video_size[1], video_size[0], 3), dtype=np.uint8),
-            size=(video_size[0], video_size[1]),
+            np.zeros((self.video_size[1], self.video_size[0], 3), dtype=np.uint8),
+            size=(self.video_size[0], self.video_size[1]),
             iformat=GL_RGB8,
             exformat=GL_RGB,
             dtype=GL_UNSIGNED_BYTE,
         )
-        self.video_surface = TexPlane(self.screen_cm[0], self.screen_cm[1], tex=self.tex, specular_color=(0,0,0,0))
-        self.video_surface.rotate_x(90).translate(-self.screen_cm[0]/2, 0, -self.screen_cm[1]/2)
+        self.video_surface = TexPlane(plane_w, plane_h, tex=self.tex, specular_color=(0,0,0,0))
+        self.video_surface.rotate_x(90).translate(-plane_w/2, 0, -plane_h/2)
         self.add_model(self.video_surface)
 
     def _extract_audio_track(self, media_file):
