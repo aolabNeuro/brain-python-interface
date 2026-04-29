@@ -1377,7 +1377,7 @@ class EyeHandCaptureBlock_sequence(EyeHandCaptureBlock):
         if self.is_eye_hand_trials and self.target_index == 1:
             self.hand_target_index = 1
             self.targets_hand[self.hand_target_index-1].hide()
-            self.sync_event('TARGET_OFF', self.gen_indices[self.target_index])
+            self.sync_event('TARGET_OFF', self.gen_indices[self.hand_target_index-1])
 
     def _start_targ_transition(self):
         if self.target_index + 1 < self.chain_length:
