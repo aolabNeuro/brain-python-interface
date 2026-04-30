@@ -19,6 +19,8 @@ from built_in_tasks.bmimultitasks import BMIControlMulti
 
 from .target_graphics import *
 
+from .bmimultitasks import BMIControlMultiEyeConstrained
+
 bmi_ssm_options = ['Endpt2D', 'Tentacle', 'Joint2L']
 
 class EndPostureFeedbackController(BMILoop, traits.HasTraits):
@@ -47,6 +49,25 @@ class TargetCaptureVisualFeedback(EndPostureFeedbackController, BMIControlMulti)
 
     def move_effector(self):
         pass
+
+class TargetCaptureVisualFeedbackEyeConstrained(EndPostureFeedbackController, BMIControlMultiEyeConstrained):
+    assist_level = (1, 1)
+    is_bmi_seed = True
+
+    def move_effector(self):
+        pass
+
+    def _test_fixation_break(self,ts):
+        '''
+        Triggers the fixation_penalty state when eye positions are outside fixation distance
+        Only apply this to the first hold and delay period
+        '''  
+        eye_d = np.linalg.norm(self.calibrated_eye_pos)
+        return (eye_d > self.target_radius + self.fixation_radius_buffer)
+
+
+
+
 
 class TargetCaptureVFB2DWindow(TargetCaptureVisualFeedback, WindowDispl2D):
     fps = 20.
