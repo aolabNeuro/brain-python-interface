@@ -28,7 +28,7 @@ class EndPostureFeedbackController(BMILoop, traits.HasTraits):
     ssm_type = traits.OptionsList(*bmi_ssm_options, bmi3d_input_options=bmi_ssm_options)
     decoder_update_rate = traits.Float(60, desc="Assist feedback rate (Hz)")
 
-    static_states = ['wait', 'reward'] # states in which the decoder is not run
+    static_states = ['wait', 'reward', 'fixation_penalty'] # states in which the decoder is not run
 
     def load_decoder(self):
         self.ssm = StateSpaceEndptVel2D()
@@ -54,6 +54,19 @@ class TargetCaptureVisualFeedbackEyeConstrained(EndPostureFeedbackController, BM
     assist_level = (1, 1)
     is_bmi_seed = True
 
+    status = dict(
+        wait = dict(start_trial="target", start_pause="pause"),
+        target = dict(timeout="timeout_penalty", gaze_enter_target="hold", start_pause="pause", fixation_break="fixation_penalty"),
+        hold = dict(leave_target="hold_penalty", hold_complete="delay", fixation_break="fixation_penalty", start_pause="pause"),
+        delay = dict(leave_target="delay_penalty", delay_complete="targ_transition", fixation_break="fixation_penalty", start_pause="pause"),
+        targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target", start_pause="pause"),
+        timeout_penalty = dict(timeout_penalty_end="wait", start_pause="pause", end_state=True),
+        hold_penalty = dict(hold_penalty_end="wait", start_pause="pause", end_state=True),
+        delay_penalty = dict(delay_penalty_end="wait", start_pause="pause", end_state=True),
+        fixation_penalty = dict(fixation_penalty_end="wait", start_pause="pause", end_state=True),
+        reward = dict(reward_end="wait", start_pause="pause", stoppable=False, end_state=True),
+        pause = dict(end_pause="wait", end_state=True),
+    )
     def move_effector(self):
         pass
 
@@ -62,8 +75,14 @@ class TargetCaptureVisualFeedbackEyeConstrained(EndPostureFeedbackController, BM
         Triggers the fixation_penalty state when eye positions are outside fixation distance
         Only apply this to the first hold and delay period
         '''  
-        eye_d = np.linalg.norm(self.calibrated_eye_pos)
+        #eye_d = np.linalg.norm(self.calibrated_eye_pos)
+        eye_pos = self.calibrated_eye_pos
+        eye_d = np.linalg.norm(eye_pos - self.targs[self.target_index,[0,2]])
+        
         return (eye_d > self.target_radius + self.fixation_radius_buffer)
+    
+    def _start_wait(self):
+        super()._start_wait()
 
 
 
