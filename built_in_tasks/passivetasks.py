@@ -193,7 +193,9 @@ class VideoPlayer(Window2D, Window, Experiment):
             pygame.mixer.init()
 
     def init(self):
+        self.add_dtype('video_frame', 'u8', (1,))
         super().init()
+        self.task_data['video_frame'] = -1
 
         # Keep native decode resolution for texture upload
         video_tex_w = int(self._video_capture.get(3))
@@ -320,6 +322,7 @@ class VideoPlayer(Window2D, Window, Experiment):
             return
 
         target_idx = self._target_frame_idx()
+        self.task_data['video_frame'] = target_idx
 
         # Read and display video frames until we catch up to the target frame index
         while self._next_frame_idx <= target_idx and not self._video_finished:
