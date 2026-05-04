@@ -145,7 +145,7 @@ class TargetCaptureReplay(ScreenTargetCapture):
         return super()._test_stop(ts) or self.cycle_count == len(self.replay_task)
 
 
-class VideoPlayer(Window2D, Window, Experiment):
+class VideoPlayer(Window, Experiment):
     status = dict(wait=dict(stop=None))
     state = "wait"
 
