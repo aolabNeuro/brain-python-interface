@@ -146,10 +146,16 @@ class TargetCaptureReplay(ScreenTargetCapture):
 
 
 class VideoPlayer(Window, Experiment):
+    '''
+    Plays video files saved in the visual_stimuli system. To add files, place
+    them in the directory specified by the visual_stimuli system and they will be 
+    automatically registered on startup.
+    '''
     status = dict(wait=dict(stop=None))
     state = "wait"
 
-    media_file = traits.DataFile(object, desc="Visual stimulus video file", bmi3d_query_kwargs=dict(system__name='visual_stimuli'))
+    media_file = traits.DataFile(object, desc="Visual stimulus video file. Add files to the directory specified " \
+        "by the visual_stimuli system and they will be automatically registered on startup.", bmi3d_query_kwargs=dict(system__name='visual_stimuli'))
     audio_volume = traits.Float(1.0, desc="Playback volume from 0.0 to 1.0")
 
     def __init__(self, *args, **kwargs):
