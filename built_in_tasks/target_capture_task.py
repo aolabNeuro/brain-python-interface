@@ -235,7 +235,7 @@ class TargetCapture(Sequence):
             - Target held for the minimum requred time (implemented here)
             - Sensorized object moved by a certain amount
             - Sensorized object moved to the required location
-            - Manually triggered by experimenter
+            - Manually triggered by experimenterplant
         '''
         return time_in_state > self.hold_time
 
@@ -425,7 +425,6 @@ class ScreenTargetCapture(TargetCapture, Window):
     #### STATE FUNCTIONS ####
     def _start_wait(self):
         super()._start_wait()
-
         if self.calc_trial_num() == 0:
 
             # Instantiate the targets here so they don't show up in any states that might come before "wait"
