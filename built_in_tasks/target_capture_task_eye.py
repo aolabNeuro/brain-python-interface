@@ -1401,12 +1401,12 @@ class EyeHandCaptureBlock_sequence(EyeHandCaptureBlock):
             self.eye_pos_tmp0 = []
             self.eye_pos_tmp1 = []
 
-            if not self.keyboard_control and self.tries == 0:
+            if self.tries == 0:
                 if self.calc_state_occurrences('reward') > self.trials_online_eye_calib:
-                    if len(self.eye_center) == 4:
-                        target_pos_tile = np.tile(np.array(self.target_pos_calibration), (1,2))
+                    if len(self.eye_pos) == 4:
+                        target_pos_tile = np.tile(np.array(self.targ_pos_online_eye_calib), (1,2))
                     else:
-                        target_pos_tile = np.array(self.target_pos_calibration)
+                        target_pos_tile = np.array(self.targ_pos_online_eye_calib)
 
                     slopes, intercepts, _ = aopy.analysis.fit_linear_regression(np.array(self.m_eye_pos_online_eye_calib), target_pos_tile)
                     eye_coeff_test = np.vstack((slopes, intercepts)).T
