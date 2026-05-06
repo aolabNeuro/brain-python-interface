@@ -10,6 +10,9 @@ from riglib.stereo_opengl.window import Window
 from .target_capture_task import ScreenTargetCapture
 from riglib.experiment import traits, Sequence
 from riglib import plants
+from collections import deque
+import aopy
+import tables
 
 ## Plants
 # List of possible "plants" that a subject could control either during manual or brain control
@@ -651,9 +654,9 @@ class EyeHandCaptureBlock(Sequence, Window):
     In simultaneous trials, they need to simultaneously move eye and hand to the target, responding a single go cue.
     '''
 
-    trials_block_eye = traits.Int(100, desc='Trial numbers of the block in sequence trials')
-    trials_block_eye_hand = traits.Int(100, desc='Trial numbers of the block in simultaneous trials')
-    reward_time_eye = traits.Float(.7, desc="Reward time in sequence trials")
+    trials_block_eye = traits.Int(108, desc='Trial numbers of the block in sequence trials')
+    trials_block_eye_hand = traits.Int(216, desc='Trial numbers of the block in simultaneous trials')
+    reward_time_eye = traits.Float(.5, desc="Reward time in sequence trials")
     reward_time_eye_hand = traits.Float(.5, desc="Reward time in simultaneous trials")
     fixation_time = traits.Float(.3, desc="fixation duration during which subjects have to keep fixating the first eye target")
     fixation_radius = traits.Float(2.5, desc="Width of the square eye target")
@@ -867,6 +870,9 @@ class EyeHandCaptureBlock(Sequence, Window):
         self.chain_length = len(self.targets)
         self.plant.cursor.attach()
 
+        if self.trials_online_eye_calib:
+            self.eye_pos_online_eye_calib = []
+
         if self.calc_trial_num() == 0:
 
             # Instantiate the targets here so they don't show up in any states that might come before "wait"
@@ -969,6 +975,9 @@ class EyeHandCaptureBlock(Sequence, Window):
         self.fixation_passed = True
         self.targets[self.target_index].cube.color = target_colors[self.fixation_target_color] # change target color in fixation state
         self.sync_event('FIXATION', self.gen_indices[self.target_index])
+
+        if self.trials_online_eye_calib:
+            self.start_fixation_time = self.get_time()
 
     def _start_hold(self):
         self.sync_event('CURSOR_ENTER_TARGET', self.gen_indices[self.target_index])
@@ -1107,6 +1116,11 @@ class EyeHandCaptureBlock(Sequence, Window):
         for target in self.targets_hand:
             target.hide()
             target.reset()        
+
+        if self.trials_online_eye_calib:
+
+            self.targ_pos_online_eye_calib.append(np.array(self.targs)[0,[0,2]])
+            self.targ_pos_online_eye_calib.append(np.array(self.targs)[1,[0,2]])
 
     def _start_pause(self):
         self.pause_index = 1
@@ -1344,6 +1358,9 @@ class EyeHandCaptureBlock_sequence(EyeHandCaptureBlock):
     For eye-hand trials, subjects need to move their eyes first, then move their arm while keeping their fixation on the eye target.
     '''
 
+    trials_online_eye_calib = traits.Int(0, desc='Trial numbers used for online eye calibration. If 0, no online calibration is performed')
+    offset_time_online_eye_calib = traits.Float(0.1, desc="Data after this offset_time is only used for eye calibration in the fixation state")
+    duration_online_eye_calib = traits.Float(0.1, desc="Data within this duration after offset_time in the fixation state is only used for eye calibration")
     fixation_time1 = traits.Float(.2, desc="First fixation duration. This is both for eye_trials nad eye_hand_trials")
     fixation_time2 = traits.Float(.2, desc="Second fixation duration. This is only for eye_hand_trials")
     exclude_parent_traits = ['fixation_time']
@@ -1368,9 +1385,60 @@ class EyeHandCaptureBlock_sequence(EyeHandCaptureBlock):
         pause = dict(end_pause="wait", end_state=True),
     )
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if self.trials_online_eye_calib:
+            self.eye_coeff_stack = []
+            self.m_eye_pos_online_eye_calib = deque(maxlen = self.trials_online_eye_calib*2) # bacause there are 2 eye pos within a single trial
+            self.targ_pos_online_eye_calib = deque(maxlen = self.trials_online_eye_calib*2)
+
     def _start_wait(self):
         super()._start_wait()
         self.hand_target_index = -1
+
+        if self.trials_online_eye_calib:
+            self.eye_pos_tmp0 = []
+            self.eye_pos_tmp1 = []
+
+            if not self.keyboard_control and self.tries == 0:
+                if self.calc_state_occurrences('reward') > self.trials_online_eye_calib:
+                    if len(self.eye_center) == 4:
+                        target_pos_tile = np.tile(np.array(self.target_pos_calibration), (1,2))
+                    else:
+                        target_pos_tile = np.array(self.target_pos_calibration)
+
+                    slopes, intercepts, _ = aopy.analysis.fit_linear_regression(np.array(self.m_eye_pos_online_eye_calib), target_pos_tile)
+                    eye_coeff_test = np.vstack((slopes, intercepts)).T
+                    self.eye_coeff_stack.append(eye_coeff_test)
+
+    def _start_fixation(self):
+        super()._start_fixation()
+        if self.trials_online_eye_calib and self.is_eye_trials:
+            self.start_fixation_time = self.get_time()
+
+    def _while_fixation(self):
+        # Only store eye pos between offset ~ offset + duration in the fixation state of eye trials
+        if self.trials_online_eye_calib:
+            elapsed_time = self.get_time() - self.start_fixation_time
+            if elapsed_time > self.offset_time_online_eye_calib and elapsed_time < self.offset_time_online_eye_calib + self.duration_online_eye_calib:
+                if self.target_index == 0:
+                    self.eye_pos_tmp0.append(self.eye_pos[:4]) # store data regardless of whther it is eye trials or eye-hand trials
+                elif self.target_index == 1 and self.is_eye_trials:
+                    self.eye_pos_tmp1.append(self.eye_pos[:4]) # store data only from eye trials
+
+    def _start_hold(self):
+        super()._start_hold()
+        if self.trials_online_eye_calib and self.is_eye_hand_trials:
+            self.start_hold_time = self.get_time()
+
+    def _while_hold(self):
+        # Only store eye pos between offset ~ offset + duration in the hold state of eye-hand trials
+        if self.trials_online_eye_calib:
+            elapsed_time = self.get_time() - self.start_hold_time
+            if elapsed_time > self.offset_time_online_eye_calib and elapsed_time < self.offset_time_online_eye_calib + self.duration_online_eye_calib:
+                if self.target_index == 1 and self.is_eye_hand_trials:
+                    self.eye_pos_tmp1.append(self.eye_pos[:4]) # store data only from eye-hand trials
 
     def _start_target_hand(self):
         # Hide hand target to show the go cue for hand movement
@@ -1378,6 +1446,14 @@ class EyeHandCaptureBlock_sequence(EyeHandCaptureBlock):
             self.hand_target_index = 1
             self.targets_hand[self.hand_target_index-1].hide()
             self.sync_event('TARGET_OFF', self.gen_indices[self.hand_target_index-1])
+
+    def _end_reward(self):
+        super()._end_reward()
+        if self.trials_online_eye_calib:
+            self.m_eye_pos_online_eye_calib.append(np.nanmean(self.eye_pos_tmp0, axis=0))
+            self.m_eye_pos_online_eye_calib.append(np.nanmean(self.eye_pos_tmp1, axis=0))
+            self.targ_pos_online_eye_calib.append(np.array(self.targs)[0,[0,2]])
+            self.targ_pos_online_eye_calib.append(np.array(self.targs)[1,[0,2]])
 
     def _start_targ_transition(self):
         if self.target_index + 1 < self.chain_length:
@@ -1423,6 +1499,14 @@ class EyeHandCaptureBlock_sequence(EyeHandCaptureBlock):
 
     def _test_targ_eye(self,ts):
         return self.target_index < self.chain_length - 1
+
+    def cleanup_hdf(self):
+        super().cleanup_hdf()
+        if self.trials_online_eye_calib:
+            if hasattr(self, "h5file"):
+                h5file = tables.open_file(self.h5file.name, mode='a')
+                h5file.root.task.attrs['eye_coeff_stack'] = self.eye_coeff_stack
+                h5file.close()
 
 class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
     '''
