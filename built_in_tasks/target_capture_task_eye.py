@@ -770,7 +770,13 @@ class EyeHandCaptureBlock(Sequence, Window):
         # Initialize these values for report_stats
         self.trials_all_blocks = self.trials_block_eye + self.trials_block_eye_hand
         self.trial_count_blocks = self.reward_count % self.trials_all_blocks
-        self.is_eye_trials = True
+
+        if self.eye_first:
+            self.is_eye_trials = True
+            self.is_eye_hand_trials = False
+        else:
+            self.is_eye_trials = False
+            self.is_eye_hand_trials = True           
 
     def init(self):
         self.trial_dtype = np.dtype([('trial', 'u4'), ('index', 'u4'), ('target', 'f8', (3,))])
@@ -872,9 +878,6 @@ class EyeHandCaptureBlock(Sequence, Window):
         self.fixation_passed = False
         self.chain_length = len(self.targets)
         self.plant.cursor.attach()
-
-        if self.trials_online_eye_calib:
-            self.eye_pos_online_eye_calib = []
 
         if self.calc_trial_num() == 0:
 
@@ -989,9 +992,6 @@ class EyeHandCaptureBlock(Sequence, Window):
         self.fixation_passed = True
         self.targets[self.target_index].cube.color = target_colors[self.fixation_target_color] # change target color in fixation state
         self.sync_event('FIXATION', self.gen_indices[self.target_index])
-
-        if self.trials_online_eye_calib:
-            self.start_fixation_time = self.get_time()
 
     def _start_hold(self):
         self.sync_event('CURSOR_ENTER_TARGET', self.gen_indices[self.target_index])
@@ -1130,11 +1130,6 @@ class EyeHandCaptureBlock(Sequence, Window):
         for target in self.targets_hand:
             target.hide()
             target.reset()        
-
-        if self.trials_online_eye_calib:
-
-            self.targ_pos_online_eye_calib.append(np.array(self.targs)[0,[0,2]])
-            self.targ_pos_online_eye_calib.append(np.array(self.targs)[1,[0,2]])
 
     def _start_pause(self):
         self.pause_index = 1
