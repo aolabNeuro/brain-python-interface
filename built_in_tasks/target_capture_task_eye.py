@@ -13,6 +13,8 @@ from riglib import plants
 from collections import deque
 import aopy
 import tables
+import collections
+import re
 
 ## Plants
 # List of possible "plants" that a subject could control either during manual or brain control
@@ -655,18 +657,23 @@ class EyeHandCaptureBlock(Sequence, Window):
     '''
 
     eye_first = traits.Bool(True, desc="If True, eye_trials come first. If False, eye_hand_trials come first")
-    trials_block_eye = traits.Int(108, desc="Trial numbers of the block in sequence trials")
-    trials_block_eye_hand = traits.Int(216, desc="Trial numbers of the block in simultaneous trials")
-    reward_time_eye = traits.Float(.5, desc="Reward time in sequence trials")
-    reward_time_eye_hand = traits.Float(.5, desc="Reward time in simultaneous trials")
+    trials_block_eye = traits.Int(108, desc="Trial numbers of the block in eye trials")
+    trials_block_eye_hand = traits.Int(216, desc="Trial numbers of the block in eye-hand trials")
+    reward_time_eye = traits.Float(.5, desc="Reward time in eye trials")
+    reward_time_eye_hand = traits.Float(.5, desc="Reward time in eye-hand trials")
+    trials_jackpot_eye = traits.Int(0, desc="Trial numbers to get jackpot in eye trials. If 0, no jackpot reward")
+    trials_jackpot_eye_hand = traits.Int(27, desc="Trial numbers to get jackpot in eye-hand trials. If 0, no jackpot reward")
+    reward_time_jackpot_eye = traits.Float(1.0, desc="Reward time for jackpot trials in eye trials")
+    reward_time_jackpot_eye_hand = traits.Float(1.0, desc="Reward time for jackpot trials in eye-hand trials")
+
     fixation_time = traits.Float(.3, desc="fixation duration during which subjects have to keep fixating the first eye target")
     fixation_radius = traits.Float(2.5, desc="Width of the square eye target")
     fixation_radius_buffer = traits.Float(.5, desc="additional radius for eye target. fixation_radius (width) + buffer determines the break of fixation")
     fixation_penalty_time = traits.Float(1, desc="Length of penalty time for fixation break")
     hold_time = traits.Float(.2, desc="Length of hold required at targets before next target appears")
     hold_penalty_time = traits.Float(1, desc="Length of penalty time for target hold error")
-    rand_delay_eye = traits.Tuple((0.4, 0.7), desc="Delay interval for eye in sequence trials")
-    rand_delay_eye_hand = traits.Tuple((0.4, 0.7), desc="Delay interval for eye and hand in simultaneous trials")
+    rand_delay_eye = traits.Tuple((0.4, 0.7), desc="Delay interval in eye trials")
+    rand_delay_eye_hand = traits.Tuple((0.4, 0.7), desc="Delay interval in eye-hand trials")
     delay_penalty_time = traits.Float(1, desc="Length of penalty time for delay error")
     timeout_time = traits.Float(10, desc="Time allowed to go between targets")
     timeout_penalty_time = traits.Float(1, desc="Length of penalty time for timeout error")
@@ -771,6 +778,9 @@ class EyeHandCaptureBlock(Sequence, Window):
         self.trials_all_blocks = self.trials_block_eye + self.trials_block_eye_hand
         self.trial_count_blocks = self.reward_count % self.trials_all_blocks
 
+        self.reward_count_eye = 0
+        self.reward_count_eye_hand = 0
+
         if self.eye_first:
             self.is_eye_trials = True
             self.is_eye_hand_trials = False
@@ -864,7 +874,7 @@ class EyeHandCaptureBlock(Sequence, Window):
         self.reportstats['Total pause time'] = self._time_to_string(self.total_pause_time)
         self.reportstats['Current pause time'] = self._time_to_string(self.current_pause_time)
 
-        self.trial_count_blocks = self.calc_state_occurrences('reward') % self.trials_all_blocks
+        self.trial_count_blocks = self._fast_state_counts['reward'] % self.trials_all_blocks
         if self.is_eye_trials:
             self.reportstats['Task of this block'] = 'Eye'
             current_count = self.trial_count_blocks if self.eye_first else self.trial_count_blocks - self.trials_block_eye_hand
@@ -873,6 +883,9 @@ class EyeHandCaptureBlock(Sequence, Window):
             self.reportstats['Task of this block'] = 'Eye-Hand'
             current_count = self.trial_count_blocks - self.trials_block_eye if self.eye_first else self.trial_count_blocks
             self.reportstats['Success trial # / Block'] = f'{current_count} / {self.trials_block_eye_hand}'
+
+        self.reportstats['Success trial # (eye trials)'] = self.reward_count_eye
+        self.reportstats['Success trial # (eye-hand trials)'] = self.reward_count_eye_hand
 
     def _start_wait(self):
         self.fixation_passed = False
@@ -904,7 +917,7 @@ class EyeHandCaptureBlock(Sequence, Window):
         if self.tries == 0: # Update delay_time only in the first attempt
             
             # Decide eye or eye-hand trials  
-            self.trial_count_blocks = self.calc_state_occurrences('reward') % self.trials_all_blocks
+            self.trial_count_blocks = self._fast_state_counts['reward'] % self.trials_all_blocks
 
             if self.eye_first:
                 # Trial blocks changes from eye to eye-hand
@@ -932,15 +945,24 @@ class EyeHandCaptureBlock(Sequence, Window):
         if is_eye:
             self.is_eye_trials = True
             self.is_eye_hand_trials = False
-            self.reward_time = self.reward_time_eye
+
             s, e = self.rand_delay_eye
             self.delay_time_eye = random.random()*(e-s) + s
+
+            self.reward_time = self.reward_time_eye
+            if self.reward_count_eye % self.trials_jackpot_eye == self.trials_jackpot_eye-1:
+                self.reward_time = self.reward_time_jackpot_eye
+
         else:
             self.is_eye_trials = False
             self.is_eye_hand_trials = True
-            self.reward_time = self.reward_time_eye_hand
+            
             s, e = self.rand_delay_eye_hand
             self.delay_time_eye_hand = random.random()*(e-s) + s
+
+            self.reward_time = self.reward_time_eye_hand
+            if self.reward_count_eye_hand % self.trials_jackpot_eye_hand == self.trials_jackpot_eye_hand-1:
+                self.reward_time = self.reward_time_jackpot_eye_hand
 
     def _start_target(self):
         # Only show the hand target
@@ -1119,6 +1141,11 @@ class EyeHandCaptureBlock(Sequence, Window):
         self.targets_hand[0].hide()
         self.plant.cursor.detach()
         self.sync_event('REWARD')
+
+        if self.is_eye_trials:
+            self.reward_count_eye += 1
+        else:
+            self.reward_count_eye_hand += 1
 
     def _end_reward(self):
         self.sync_event('TRIAL_END')
@@ -1423,7 +1450,7 @@ class EyeHandCaptureBlock_sequence(EyeHandCaptureBlock):
 
     def _start_fixation(self):
         super()._start_fixation()
-        if self.trials_online_eye_calib and self.is_eye_trials:
+        if self.trials_online_eye_calib:
             self.start_fixation_time = self.get_time()
 
     def _while_fixation(self):
@@ -1438,7 +1465,7 @@ class EyeHandCaptureBlock_sequence(EyeHandCaptureBlock):
 
     def _start_hold(self):
         super()._start_hold()
-        if self.trials_online_eye_calib and self.is_eye_hand_trials:
+        if self.trials_online_eye_calib:
             self.start_hold_time = self.get_time()
 
     def _while_hold(self):
@@ -1446,7 +1473,7 @@ class EyeHandCaptureBlock_sequence(EyeHandCaptureBlock):
         if self.trials_online_eye_calib:
             elapsed_time = self.get_time() - self.start_hold_time
             if elapsed_time > self.offset_time_online_eye_calib and elapsed_time < self.offset_time_online_eye_calib + self.duration_online_eye_calib:
-                if self.target_index == 1 and self.is_eye_hand_trials:
+                if self.hand_target_index == 1 and self.is_eye_hand_trials:
                     self.eye_pos_tmp1.append(self.eye_pos[:4]) # store data only from eye-hand trials
 
     def _start_target_hand(self):
