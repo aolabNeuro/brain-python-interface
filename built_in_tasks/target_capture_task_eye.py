@@ -1445,8 +1445,10 @@ class EyeHandCaptureBlock_sequence(EyeHandCaptureBlock):
                         target_pos_tile = np.array(self.targ_pos_online_eye_calib)
 
                     slopes, intercepts, _ = aopy.analysis.fit_linear_regression(np.array(self.m_eye_pos_online_eye_calib), target_pos_tile)
-                    eye_coeff_test = np.vstack((slopes, intercepts)).T
-                    self.eye_coeff_stack.append(eye_coeff_test)
+                    self.eye_coeff = np.vstack((slopes, intercepts)).T
+                    self.eye_center = np.zeros((4,))
+
+                    self.eye_coeff_stack.append(self.eye_coeff)
 
     def _start_fixation(self):
         super()._start_fixation()
@@ -1541,7 +1543,7 @@ class EyeHandCaptureBlock_sequence(EyeHandCaptureBlock):
         if self.trials_online_eye_calib:
             if hasattr(self, "h5file"):
                 h5file = tables.open_file(self.h5file.name, mode='a')
-                h5file.root.task.attrs['eye_coeff_stack'] = self.eye_coeff_stack
+                h5file.root.task.attrs['eye_coeff_stack'] = np.array(self.eye_coeff_stack)
                 h5file.close()
 
 class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
