@@ -1842,8 +1842,8 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
 
                     slopes, intercepts, _ = aopy.analysis.fit_linear_regression\
                         (np.array(self.m_eye_pos_online_eye_calib)-np.mean(self.m_eye_pos_center_online_eye_calib, axis=0), target_pos_tile)
-                    self.eye_coeff_test = np.vstack((slopes, intercepts)).T
-                    self.eye_coeff_stack.append(self.eye_coeff_test)
+                    self.eye_coeff = np.vstack((slopes, intercepts)).T
+                    self.eye_coeff_stack.append(self.eye_coeff)
 
     def _set_trial_type(self, is_simultaneous):
         if is_simultaneous:
@@ -2101,7 +2101,7 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
                 h5file = tables.open_file(self.h5file.name, mode='a')
                 h5file.root.task.attrs['eye_coeff_stack'] = np.array(self.eye_coeff_stack)
                 h5file.close()
-                
+
 class ScreenTargetCapture_Saccade(ScreenTargetCapture):
     '''
     Center-out saccade task. The controller for the cursor position is eye position.
