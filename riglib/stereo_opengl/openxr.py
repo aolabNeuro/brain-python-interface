@@ -1,6 +1,7 @@
 import time
 import os
 import numpy as np
+from ctypes import byref, cast, POINTER
 from OpenGL.GL import *
 import pygame
 try:
@@ -44,6 +45,11 @@ class WindowVR(Window):
     camera_orientation = traits.Tuple((1.0, 0.0, 0.0, 0.0), desc="Orientation of the camera (w, x, y, z) as a quaternion. Only used if fixed_camera_orientation is True")
     fixed_camera_position = traits.Bool(False, desc="Fixed position of the camera")
     fixed_camera_orientation = traits.Bool(False, desc="Fixed orientation of the camera")
+    xr_runtime_json = traits.String("", desc="Optional path to OpenXR runtime JSON. If empty, uses XR_RUNTIME_JSON from the environment")
+    swapchain_color_format = traits.OptionsList("auto", "srgb8a8", "rgba8", desc="Preferred OpenXR swapchain color format")
+    vr_disable_cull_face = traits.Bool(True, desc="Disable face culling in VR to avoid black output if winding/handedness differs by runtime")
+    pose_mapping_mode = traits.OptionsList("auto", "native", "legacy", desc="How OpenXR pose is mapped into bmi3d coordinates")
+    xr_ignore_window_close = traits.Bool(True, desc="Ignore hidden OpenXR helper-window close signal to keep frame loop running")
 
     hidden_traits = ['fps', 'window_size', 'screen_dist']
 
@@ -58,8 +64,8 @@ class WindowVR(Window):
     def screen_init(self):
         from ctypes import byref, c_int32, c_void_p, cast, POINTER, pointer, Structure
 
-        # os.environ['XR_RUNTIME_JSON'] = '/usr/share/openxr/1/openxr_monado.json'
-        os.environ['XR_RUNTIME_JSON'] = '/home/aolab/.config/openxr/1/active_runtime.json'
+        if self.xr_runtime_json:
+            os.environ['XR_RUNTIME_JSON'] = self.xr_runtime_json
         pygame.init()
         self.clock = Clock()
         self.fps = 90
@@ -131,7 +137,25 @@ class WindowVR(Window):
         )
         context.graphics.initialize_resources()
         swapchain_formats = xr.enumerate_swapchain_formats(context.session)
-        color_swapchain_format = context.graphics.select_color_swapchain_format(swapchain_formats) # Ignore this
+        runtime_default_format = context.graphics.select_color_swapchain_format(swapchain_formats)
+
+        if self.swapchain_color_format == "srgb8a8":
+            preferred_formats = [GL_SRGB8_ALPHA8]
+        elif self.swapchain_color_format == "rgba8":
+            preferred_formats = [GL_RGBA8]
+        else:
+            # Prefer sRGB when supported, otherwise use the runtime's preferred format.
+            preferred_formats = [GL_SRGB8_ALPHA8, runtime_default_format, GL_RGBA8]
+
+        color_swapchain_format = None
+        for fmt in preferred_formats:
+            if fmt in swapchain_formats:
+                color_swapchain_format = fmt
+                break
+        if color_swapchain_format is None:
+            color_swapchain_format = runtime_default_format
+
+        self._xr_swapchain_srgb = color_swapchain_format == GL_SRGB8_ALPHA8
         # Create a swapchain for each view.
         context.swapchains.clear()
         context.swapchain_image_buffers.clear()
@@ -140,7 +164,7 @@ class WindowVR(Window):
             # Create the swapchain.
             swapchain_create_info = xr.SwapchainCreateInfo(
                 array_size=1,
-                format=GL_SRGB8_ALPHA8, # Set to SRGB format otherwise the colors are washed out
+                format=color_swapchain_format,
                 width=vp.recommended_image_rect_width,
                 height=vp.recommended_image_rect_height,
                 mip_count=1,
@@ -185,7 +209,10 @@ class WindowVR(Window):
             config_views[0].recommended_image_rect_width * 2,
             config_views[0].recommended_image_rect_height)
 
-        glDisable(GL_FRAMEBUFFER_SRGB)
+        if self._xr_swapchain_srgb:
+            glEnable(GL_FRAMEBUFFER_SRGB)
+        else:
+            glDisable(GL_FRAMEBUFFER_SRGB)
         glEnable(GL_BLEND)
         glDepthFunc(GL_LESS)
         glEnable(GL_DEPTH_TEST)
@@ -193,8 +220,11 @@ class WindowVR(Window):
         glClearColor(*self.background)
         glClearDepth(1.0)
         glDepthMask(GL_TRUE)
-        glEnable(GL_CULL_FACE)
-        glCullFace(GL_BACK)
+        if self.vr_disable_cull_face:
+            glDisable(GL_CULL_FACE)
+        else:
+            glEnable(GL_CULL_FACE)
+            glCullFace(GL_BACK)
 
         self.renderer = self._get_renderer()
 
@@ -205,7 +235,15 @@ class WindowVR(Window):
         self.set_eye((0,0,0), (0,0))
         self.xr_frame_generator = context.frame_loop()
         self.xr_context = context
+        if self.xr_ignore_window_close:
+            context.graphics.poll_events = lambda: False
+        self._pose_mapping_mode = self._resolve_pose_mapping_mode()
+        if self._pose_mapping_mode == "native" and tuple(self.camera_offset) == (0, -130, 40):
+            self.camera_offset = (0, 0, 0)
+            print("OpenXR info: using native pose mapping; camera_offset defaulted to (0, 0, 0) for HMD-centric tracking")
         print("Initialized OpenXR window")
+        print(f"OpenXR swapchain format: {color_swapchain_format} (sRGB={self._xr_swapchain_srgb})")
+        print(f"OpenXR pose mapping mode: {self._pose_mapping_mode}")
 
     def _get_renderer(self):
         near = 1
@@ -213,40 +251,141 @@ class WindowVR(Window):
         if self.stereo_mode == 'mirror':
             glFrontFace(GL_CW);  # Switch to clockwise winding for mirrored objects
         return shadow_map.ShadowMapper(self.window_size, self.fov, near, far)
+
+    def _resolve_pose_mapping_mode(self):
+        if self.pose_mapping_mode != "auto":
+            return self.pose_mapping_mode
+        runtime_json = os.environ.get("XR_RUNTIME_JSON", "").lower()
+        if "monado" in runtime_json:
+            return "legacy"
+        return "native"
+
+    def _view_loop_retry(self, frame_state):
+        if not frame_state.should_render:
+            return
+
+        view_state, views = xr.locate_views(
+            session=self.xr_context.session,
+            view_locate_info=xr.ViewLocateInfo(
+                view_configuration_type=self.xr_context.view_configuration_type,
+                display_time=frame_state.predicted_display_time,
+                space=self.xr_context.space,
+            )
+        )
+        num_views = len(views)
+        projection_layer_views = tuple(xr.CompositionLayerProjectionView() for _ in range(num_views))
+
+        vsf = view_state.view_state_flags
+        if ((vsf & xr.VIEW_STATE_POSITION_VALID_BIT == 0)
+                or (vsf & xr.VIEW_STATE_ORIENTATION_VALID_BIT == 0)):
+            if not hasattr(self, "_warned_invalid_view_state"):
+                self._warned_invalid_view_state = False
+            if not self._warned_invalid_view_state:
+                print(f"OpenXR warning: view state flags invalid ({int(vsf)}). Rendering anyway.")
+                self._warned_invalid_view_state = True
+
+        for view_index, view in enumerate(views):
+            view_swapchain = self.xr_context.swapchains[view_index]
+            swapchain_image_index = xr.acquire_swapchain_image(
+                swapchain=view_swapchain.handle,
+                acquire_info=xr.SwapchainImageAcquireInfo(),
+            )
+            xr.wait_swapchain_image(
+                swapchain=view_swapchain.handle,
+                wait_info=xr.SwapchainImageWaitInfo(timeout=xr.INFINITE_DURATION),
+            )
+
+            layer_view = projection_layer_views[view_index]
+            layer_view.pose = view.pose
+            layer_view.fov = view.fov
+            layer_view.sub_image.swapchain = view_swapchain.handle
+            layer_view.sub_image.image_rect.offset[:] = [0, 0]
+            layer_view.sub_image.image_rect.extent[:] = [
+                view_swapchain.width, view_swapchain.height,
+            ]
+
+            swapchain_image_ptr = self.xr_context.swapchain_image_ptr_buffers[view_index][swapchain_image_index]
+            swapchain_image = cast(swapchain_image_ptr, POINTER(xr.SwapchainImageOpenGLKHR)).contents
+            color_texture = swapchain_image.image
+
+            try:
+                self.xr_context.graphics.begin_frame(layer_view, color_texture)
+            except Exception:
+                # Some runtimes can invalidate/recreate GL objects; rebuild and retry once.
+                self.xr_context.graphics.make_current()
+                self.xr_context.graphics.swapchain_framebuffer = glGenFramebuffers(1)
+                while glGetError() != GL_NO_ERROR:
+                    pass
+                self.xr_context.graphics.begin_frame(layer_view, color_texture)
+
+            yield view_index, view
+
+            self.xr_context.graphics.end_frame()
+            xr.release_swapchain_image(
+                swapchain=view_swapchain.handle,
+                release_info=xr.SwapchainImageReleaseInfo(),
+            )
+
+        layer = xr.CompositionLayerProjection(space=self.xr_context.space)
+        layer.views = projection_layer_views
+        self.xr_context.render_layers.append(byref(layer))
     
     def draw_world(self):
+        graphics = self.xr_context.graphics
+        graphics.make_current()
+        swapchain_fbo = getattr(graphics, "swapchain_framebuffer", None)
+        if not swapchain_fbo or not glIsFramebuffer(swapchain_fbo):
+            graphics.initialize_resources()
+        # Clear any stale GL errors before OpenXR's per-view begin_frame calls.
+        while glGetError() != GL_NO_ERROR:
+            pass
+
         # Get the OpenXR views
         try:
             frame_state = next(self.xr_frame_generator)
         except StopIteration:
-            self.state = None  # Exit loop if the generator is exhausted
+            return
+            return
 
-        for view_index, view in enumerate(self.xr_context.view_loop(frame_state)):
+        camera_positions = []
+        camera_rotations = []
+        for view_index, view in self._view_loop_retry(frame_state):
             projection = xr.Matrix4x4f.create_projection_fov(
                 graphics_api=xr.GraphicsAPI.OPENGL,
                 fov=view.fov,
                 near_z=0.05,
                 far_z=1024,
-            ).as_numpy().reshape(4,4).T
+            ).as_numpy().reshape(4,4)
+
+            raw_position = np.array([
+                view.pose.position[0]*100,
+                view.pose.position[1]*100,
+                view.pose.position[2]*100,
+            ], dtype=float)
+            raw_rotation = np.array([
+                view.pose.orientation.w,
+                view.pose.orientation.x,
+                view.pose.orientation.y,
+                view.pose.orientation.z,
+            ], dtype=float)
+
             if self.fixed_camera_position:
-                position = self.camera_position - np.array([1,0,0])*self.iod*(view_index-0.5)
+                position = np.array(self.camera_position, dtype=float)
             else:
-                position = -np.array([
-                    view.pose.position[0]*100 + self.camera_offset[0],
-                    view.pose.position[1]*100 + self.camera_offset[1],
-                    view.pose.position[2]*100 + self.camera_offset[2],
-                ]) # Not sure why this needs to be negated, something to do with the handedness of the coordinate system??
-                self.camera_position = tuple(position + np.array([1,0,0])*self.iod*(view_index-0.5))
+                if self._pose_mapping_mode == "legacy":
+                    position = -(raw_position + np.array(self.camera_offset, dtype=float))
+                else:
+                    position = raw_position + np.array(self.camera_offset, dtype=float)
             if self.fixed_camera_orientation:
-                rotation = self.camera_orientation
+                rotation = np.array(self.camera_orientation, dtype=float)
             else:
-                rotation = np.array([
-                    view.pose.orientation.w,
-                    -view.pose.orientation.x,
-                    -view.pose.orientation.y,
-                    -view.pose.orientation.z,
-                ]) # not sure why conj, again a handedness difference?
-                self.camera_orientation = tuple(rotation)
+                if self._pose_mapping_mode == "legacy":
+                    rotation = np.array([raw_rotation[0], -raw_rotation[1], -raw_rotation[2], -raw_rotation[3]], dtype=float)
+                else:
+                    rotation = raw_rotation
+
+            camera_positions.append(position)
+            camera_rotations.append(rotation)
             xfm = Transform(move=position, rotate=Quaternion(*rotation)) 
             self.modelview = xfm.to_mat(reverse=True)
 
@@ -268,6 +407,9 @@ class WindowVR(Window):
 
         # Save the cylopian pose data
         if hasattr(self, 'task_data'):
+            if len(camera_positions) > 0:
+                self.camera_position = tuple(np.mean(np.vstack(camera_positions), axis=0))
+                self.camera_orientation = tuple(camera_rotations[0])
             self.task_data['camera_position'] = self.camera_position
             self.task_data['camera_orientation'] = self.camera_orientation
 
