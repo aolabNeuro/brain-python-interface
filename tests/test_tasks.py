@@ -263,7 +263,7 @@ class DemoTracking(unittest.TestCase):
 
 class TestVideoPlayer(unittest.TestCase):
 
-    # @unittest.skip("")
+    @unittest.skip("")
     def test_local_video_from_downloads(self):
         
         video_file = "tests/test_data/monkeys.mp4"

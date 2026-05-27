@@ -8,6 +8,7 @@ import time
 import subprocess
 import tempfile
 from OpenGL.GL import GL_RGB, GL_RGB8, GL_UNSIGNED_BYTE
+import pygame
 
 from riglib.experiment import traits, Experiment
 from riglib.bmi.state_space_models import StateSpaceEndptVel2D
@@ -149,7 +150,7 @@ class VideoPlayer(Window, Experiment):
     '''
     Plays video files saved in the visual_stimuli system. To add files, place
     them in the directory specified by the visual_stimuli system and they will be 
-    automatically registered on startup.
+    automatically registered on startup. Requires ffmpeg and cv2.
     '''
     status = dict(wait=dict(stop=None))
     state = "wait"
@@ -160,8 +161,7 @@ class VideoPlayer(Window, Experiment):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        import cv2
-        import pygame
+        import cv2 # not a dependency for bmi3d, only needed for VideoPlayer
 
         self.event = None
         self._video_capture = None
@@ -264,8 +264,6 @@ class VideoPlayer(Window, Experiment):
         self.tex.update(frame_rgb, size=(frame_rgb.shape[1], frame_rgb.shape[0]))
 
     def _start_wait(self):
-        import cv2
-        import pygame
 
         # Start the audio playback
         if self._audio_path is not None:
@@ -282,7 +280,6 @@ class VideoPlayer(Window, Experiment):
 
     def _start_None(self):
         super()._start_None()
-        import pygame
 
         # Stop audio playback
         if pygame.mixer.get_init():
@@ -307,7 +304,6 @@ class VideoPlayer(Window, Experiment):
             self._video_capture = None
 
     def _target_frame_idx(self):
-        import pygame
 
         if self._audio_started:
             pos_ms = pygame.mixer.music.get_pos()
