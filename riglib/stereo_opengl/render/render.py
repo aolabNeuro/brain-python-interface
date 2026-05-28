@@ -3,6 +3,8 @@
 
 import os
 import operator
+import glob
+import sys
 import numpy as np
 from OpenGL.GL import *
 
@@ -10,6 +12,27 @@ from ..utils import perspective, orthographic
 from .shader import ShaderProgram
 
 cwd = os.path.join(os.path.abspath(os.path.split(__file__)[0]), "..")
+
+
+def _resolve_shader_path(filename):
+    """Resolve shader path in source and frozen (PyInstaller) execution contexts."""
+    candidates = [os.path.join(cwd, "shaders", filename)]
+
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        meipass = sys._MEIPASS
+        candidates.extend([
+            os.path.join(meipass, "riglib", "stereo_opengl", "shaders", filename),
+            os.path.join(meipass, "shaders", filename),
+        ])
+
+        # Some bundle layouts place datas in different subfolders; search as fallback.
+        candidates.extend(glob.glob(os.path.join(meipass, "**", filename), recursive=True))
+
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+
+    return candidates[0]
 
 class _textrack(object):
     pass
@@ -108,13 +131,13 @@ class Renderer(object):
 
     def add_shader(self, name, stype, filename, *includes):
         src = []
-        main_path = os.path.join(cwd, "shaders", filename)
+        main_path = _resolve_shader_path(filename)
         with open(main_path, 'r') as main:
             version = main.readline().strip()
             main_content = main.read()
         
         for inc in includes:
-            inc_path = os.path.join(cwd, "shaders", inc)
+            inc_path = _resolve_shader_path(inc)
             with open(inc_path, 'r') as incfile:
                 ver = incfile.readline().strip()
                 assert ver == version, f"Version mismatch: {ver} != {version}"
