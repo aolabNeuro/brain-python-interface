@@ -1840,8 +1840,8 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
                     else:
                         target_pos_tile = np.array(self.targ_pos_online_eye_calib)
 
-                    slopes, intercepts, _ = aopy.analysis.fit_linear_regression\
-                        (np.array(self.m_eye_pos_online_eye_calib)-np.mean(self.m_eye_pos_center_online_eye_calib, axis=0), target_pos_tile)
+                    self.eye_center = np.mean(self.m_eye_pos_center_online_eye_calib, axis=0)
+                    slopes, intercepts, _ = aopy.analysis.fit_linear_regression(np.array(self.m_eye_pos_online_eye_calib)-self.eye_center, target_pos_tile)
                     self.eye_coeff = np.vstack((slopes, intercepts)).T
                     self.eye_coeff_stack.append(self.eye_coeff)
 
