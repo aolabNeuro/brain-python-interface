@@ -11,13 +11,11 @@ try:
 except:
     import warnings
     warnings.warn('riglib/stereo_opengl_primitives.py: not importing name pygame')
-import matplotlib.tri as mtri
 
 from .models import TriMesh
 from .textures import Texture, TexModel
 from OpenGL.GL import *
 from PIL import Image, ImageDraw, ImageFont
-import matplotlib.font_manager as fm
 
 class Plane(TriMesh):
     def __init__(self, width=1, height=1, **kwargs):
@@ -451,11 +449,15 @@ class Text(TexPlane):
     @staticmethod
     def find_font_file(font_name):
         try:
-            font_prop = fm.FontProperties(fname=fm.findfont(fm.FontProperties(family=font_name)))
-            font_path = font_prop.get_file()
-            return font_path
-        except Exception as e:
+            if hasattr(pygame, 'font'):
+                if not pygame.font.get_init():
+                    pygame.font.init()
+                font_path = pygame.font.match_font(font_name)
+                if font_path:
+                    return font_path
+        except Exception:
             return None
+        return None
 
     def __init__(self, height, text, font_size=28, color=[1, 1, 1, 1], justify='left', 
                  font_name='ubuntu', texture_size=(256,256), shader='ui', **kwargs):
@@ -467,7 +469,13 @@ class Text(TexPlane):
 
         # Load a font
         font_path = Text.find_font_file(font_name)
-        font = ImageFont.truetype(font_path, font_size)
+        try:
+            if font_path is not None:
+                font = ImageFont.truetype(font_path, font_size)
+            else:
+                font = ImageFont.load_default()
+        except Exception:
+            font = ImageFont.load_default()
 
         # Draw text onto the image
         if justify == 'left':

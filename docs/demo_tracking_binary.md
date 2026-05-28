@@ -11,15 +11,15 @@ This repository now includes a small GUI launcher with three buttons for the Dem
 From the repository root:
 
 ```bash
-python -m demo_tracking.demo_tracking_gui
+python -m demo_tasks.demo_tracking_task
 ```
 
 To run one demo directly (without the launcher GUI):
 
 ```bash
-python -m demo_tracking.demo_tracking_gui --demo moon_ref
-python -m demo_tracking.demo_tracking_gui --demo moon_disturbance
-python -m demo_tracking.demo_tracking_gui --demo moon_combined
+python -m demo_tasks.demo_tracking_task --demo moon_ref
+python -m demo_tasks.demo_tracking_task --demo moon_disturbance
+python -m demo_tasks.demo_tracking_task --demo moon_combined
 ```
 
 ## Build standalone binary (PyInstaller)

@@ -1,5 +1,4 @@
 from OpenGL.GL import *
-from matplotlib import projections
 from .fbo import FBO, FBOrender
 from ..utils import look_at, orthographic, perspective
 import numpy as np

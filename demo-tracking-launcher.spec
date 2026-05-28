@@ -6,7 +6,7 @@ sys.setrecursionlimit(sys.getrecursionlimit() * 5)
 
 
 a = Analysis(
-    ['demo_tracking/demo_tracking_gui.py'],
+    ['demo_tasks/demo_tracking_task.py'],
     pathex=[],
     binaries=[],
     datas=[

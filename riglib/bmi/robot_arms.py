@@ -13,7 +13,6 @@ except ImportError as e:
     warnings.warn("The 'robot' module cannot be found! See https://github.com/sgowda/robotics_toolbox")
     print(e)
 
-import matplotlib.pyplot as plt
 import time
 
 pi = np.pi
@@ -623,6 +622,7 @@ class PlanarXZKinematicChain(KinematicChain):
 
     def plot_joint_pos(self, joint_pos, ax=None, flip=False, **kwargs):
         if ax == None:
+            import matplotlib.pyplot as plt
             plt.figure()
             ax = plt.subplot(111)
 

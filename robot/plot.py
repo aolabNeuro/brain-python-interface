@@ -125,8 +125,21 @@ from .SerialLink import *
 from .Link import * 
 from .utility import *
 from .transform import *
-import matplotlib.pyplot as plt
 import numpy as np
+
+
+class _LazyMatplotlibPyplot:
+    def __init__(self):
+        self._module = None
+
+    def __getattr__(self, name):
+        if self._module is None:
+            import matplotlib.pyplot as pyplot
+            self._module = pyplot
+        return getattr(self._module, name)
+
+
+plt = _LazyMatplotlibPyplot()
 
 
 def plot(robot, tg, **kwargs): 
