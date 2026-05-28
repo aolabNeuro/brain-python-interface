@@ -3,13 +3,14 @@ from built_in_tasks.force_task import DiskMatching
 from built_in_tasks.manualcontrolmultitasks import TrackingTask, rotations, ManualControl, ScreenTargetTracking, ReadySetGoTask
 from built_in_tasks.othertasks import Conditions, LaserConditions, SweptLaserConditions
 from built_in_tasks.target_capture_task import ScreenTargetCapture
-from built_in_tasks.passivetasks import YouTube
+from built_in_tasks.passivetasks import VideoPlayer
 from built_in_tasks.example_task import ExampleSequenceTask
 from features.generator_features import Autostart, HideLeftTrajectory, ReadysetMedley, ReadysetColorChange, HideCursorReturn
 from features.hdf_features import SaveHDF
+from features.sync_features import HDFSync, ScreenSync
 from features.touch_features import MouseEmulateTouch
 from riglib.stereo_opengl.environment import Grid
-from riglib.stereo_opengl.window import WindowDispl2D
+from riglib.stereo_opengl.window import Window2D
 from riglib import experiment
 from riglib import audio
 from features.peripheral_device_features import ForceControl, MouseControl
@@ -260,12 +261,13 @@ class DemoTracking(unittest.TestCase):
         exp.trajectory_type = '2d'
         exp.run()
 
-class TestYouTube(unittest.TestCase):
+class TestVideoPlayer(unittest.TestCase):
 
     @unittest.skip("")
-    def test_youtube_exp(self):
-
-        exp = init_exp(YouTube, [], youtube_url="https://www.youtube.com/watch?v=Qe9ansjvF7M")
+    def test_local_video_from_downloads(self):
+        
+        video_file = "tests/test_data/monkeys.mp4"
+        exp = init_exp(VideoPlayer, [Window2D, HDFSync, ScreenSync], media_file=video_file, fullscreen=False, window_size=(400,300))
         exp.run()
 
 if __name__ == '__main__':
