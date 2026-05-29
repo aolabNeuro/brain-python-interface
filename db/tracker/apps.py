@@ -1,6 +1,7 @@
 
 import os
 from django.apps import AppConfig
+from django.db import connections
 
 
 class TrackerConfig(AppConfig):
@@ -9,15 +10,16 @@ class TrackerConfig(AppConfig):
 
     def ready(self):
         """Auto-register video files from the visual_stimuli system on startup."""
-        self._register_visual_stimuli_files()
+        for dbname in connections.databases.keys():
+            self._register_visual_stimuli_files(dbname=dbname)
 
-    def _register_visual_stimuli_files(self):
+    def _register_visual_stimuli_files(self, dbname='default'):
         """Scan visual_stimuli directory and keep DataFile rows in sync."""
         try:
             from . import models
             
             # Get the visual_stimuli system
-            system = models.System.objects.get(name='visual_stimuli')
+            system = models.System.objects.using(dbname).get(name='visual_stimuli')
             
             if not os.path.isdir(system.path):
                 return
@@ -32,12 +34,12 @@ class TrackerConfig(AppConfig):
                         discovered_paths.add(os.path.realpath(filepath))
                         
                         # Check if already registered
-                        if models.DataFile.objects.filter(system=system, path=filepath).exists():
+                        if models.DataFile.objects.using(dbname).filter(system=system, path=filepath).exists():
                             continue
                         
                         # Register new video
                         try:
-                            models.DataFile.objects.create(
+                            models.DataFile.objects.using(dbname).create(
                                 system=system,
                                 path=filepath,
                                 local=True,
@@ -47,7 +49,7 @@ class TrackerConfig(AppConfig):
                             pass  # Silently skip errors during startup
 
             # Remove stale DB entries for files no longer present on disk.
-            existing_entries = models.DataFile.objects.filter(system=system)
+            existing_entries = models.DataFile.objects.using(dbname).filter(system=system)
             for datafile in existing_entries:
                 if os.path.isabs(datafile.path):
                     full_path = datafile.path
@@ -55,10 +57,13 @@ class TrackerConfig(AppConfig):
                     full_path = os.path.join(system.path, datafile.path)
 
                 full_path = os.path.realpath(os.path.abspath(full_path))
-                if full_path not in discovered_paths:
-                    try:
-                        datafile.delete()
-                    except Exception:
-                        pass
+                if full_path in discovered_paths:
+                    continue
+
+                # Remove only the DB row. QuerySet delete bypasses DataFile.delete().
+                try:
+                    models.DataFile.objects.using(dbname).filter(pk=datafile.pk).delete()
+                except Exception:
+                    pass
         except Exception:
             pass  # Silently fail if system doesn't exist yet
