@@ -152,12 +152,16 @@ class VideoPlayer(Window, Experiment):
     them in the directory specified by the visual_stimuli system and they will be 
     automatically registered on startup. Requires ffmpeg and cv2.
     '''
-    status = dict(wait=dict(stop=None))
+    status = dict(
+        wait=dict(stop=None, start_pause="pause"),
+        pause=dict(stop=None, end_pause="wait"),
+    )
     state = "wait"
 
     media_file = traits.DataFile(object, desc="Visual stimulus video file. Add files to the directory specified " \
         "by the visual_stimuli system and they will be automatically registered on startup.", bmi3d_query_kwargs=dict(system__name='visual_stimuli'))
     audio_volume = traits.Float(1.0, desc="Playback volume from 0.0 to 1.0")
+    start_time_sec = traits.Float(0.0, desc="Start playback from this time offset in seconds")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -171,6 +175,9 @@ class VideoPlayer(Window, Experiment):
         self._audio_path = None
         self._audio_started = False
         self._playback_t0 = None
+        self._pause_t0 = None
+        self._video_start_frame = 0
+        self._video_duration_sec = 0.0
 
         # Extract video metadata and prepare for playback
         # media_file can be a string (for testing/CLI) or a DataFile object
@@ -192,8 +199,16 @@ class VideoPlayer(Window, Experiment):
         if self._video_fps <= 0:
             self._video_fps = float(self.fps)
 
+        total_frames = int(self._video_capture.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+        if total_frames > 0 and self._video_fps > 0:
+            self._video_duration_sec = total_frames / self._video_fps
+        start_time_sec = max(0.0, self.start_time_sec)
+        if self._video_duration_sec > 0:
+            start_time_sec = min(start_time_sec, self._video_duration_sec)
+        self._video_start_frame = max(0, int(start_time_sec * self._video_fps))
+
         # Extract audio
-        self._audio_path = self._extract_audio_track(media_file)
+        self._audio_path = self._extract_audio_track(media_file, start_time_sec=start_time_sec)
         if not pygame.mixer.get_init():
             pygame.mixer.pre_init(44100, -16, 2, 2048)
             pygame.mixer.init()
@@ -233,13 +248,14 @@ class VideoPlayer(Window, Experiment):
         self.video_surface.rotate_x(90).translate(-plane_w/2, 0, -plane_h/2)
         self.add_model(self.video_surface)
 
-    def _extract_audio_track(self, media_file):
+    def _extract_audio_track(self, media_file, start_time_sec=0.0):
         audio_fd, audio_path = tempfile.mkstemp(prefix="bmi3d_video_audio_", suffix=".wav")
         os.close(audio_fd)
 
         command = [
             "ffmpeg",
             "-y",
+            "-ss", str(max(0.0, start_time_sec)),
             "-i", media_file,
             "-vn",
             "-acodec", "pcm_s16le",
@@ -264,6 +280,12 @@ class VideoPlayer(Window, Experiment):
         self.tex.update(frame_rgb, size=(frame_rgb.shape[1], frame_rgb.shape[0]))
 
     def _start_wait(self):
+        import cv2
+
+        # Seek video decode to the requested starting point.
+        self._video_capture.set(cv2.CAP_PROP_POS_FRAMES, self._video_start_frame)
+        self._next_frame_idx = self._video_start_frame
+        self._video_finished = False
 
         # Start the audio playback
         if self._audio_path is not None:
@@ -274,6 +296,30 @@ class VideoPlayer(Window, Experiment):
         else:
             self._audio_started = False
             self._playback_t0 = self.get_time()
+
+    def _test_start_pause(self, ts):
+        return self.pause
+
+    def _test_end_pause(self, ts):
+        return not self.pause
+
+    def _start_pause(self):
+        self._pause_t0 = self.get_time()
+        if self._audio_started:
+            try:
+                pygame.mixer.music.pause()
+            except Exception:
+                pass
+
+    def _end_pause(self):
+        if self._audio_started:
+            try:
+                pygame.mixer.music.unpause()
+            except Exception:
+                pass
+        elif self._pause_t0 is not None and self._playback_t0 is not None:
+            self._playback_t0 += self.get_time() - self._pause_t0
+        self._pause_t0 = None
 
     def _test_stop(self, ts):
         return self._video_finished or super()._test_stop(ts)
@@ -312,12 +358,12 @@ class VideoPlayer(Window, Experiment):
                     return max(0, self._next_frame_idx - 1)
                 self._video_finished = True
                 return max(0, self._next_frame_idx - 1)
-            return max(0, int((pos_ms / 1000.0) * self._video_fps))
+            return self._video_start_frame + max(0, int((pos_ms / 1000.0) * self._video_fps))
 
         if self._playback_t0 is None:
             self._playback_t0 = self.get_time()
         elapsed = self.get_time() - self._playback_t0
-        return max(0, int(elapsed * self._video_fps))
+        return self._video_start_frame + max(0, int(elapsed * self._video_fps))
 
     def _while_wait(self):
         if self._video_finished:
@@ -334,3 +380,14 @@ class VideoPlayer(Window, Experiment):
                 break
             self._set_video_frame(frame)
             self._next_frame_idx += 1
+
+    @classmethod
+    def get_desc(cls, params, report):
+        runtime_sec = 0.0
+        if isinstance(report, dict):
+            runtime_sec = float(report.get('runtime', 0.0) or 0.0)
+        elif isinstance(report, list) and len(report) > 0:
+            runtime_sec = float(report[-1][-1] - report[0][-1])
+
+        duration_min = runtime_sec / 60.0
+        return "Video playback: {:.1f} min".format(duration_min)
