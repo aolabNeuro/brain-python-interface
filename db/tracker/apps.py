@@ -29,6 +29,8 @@ class TrackerConfig(AppConfig):
             discovered_paths = set()
             for root, dirs, files in os.walk(system.path):
                 for filename in files:
+                    if filename.startswith('._'):
+                        continue
                     if filename.lower().endswith(video_extensions):
                         filepath = os.path.abspath(os.path.join(root, filename))
                         discovered_paths.add(os.path.realpath(filepath))
