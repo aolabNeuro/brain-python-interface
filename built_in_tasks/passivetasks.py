@@ -153,8 +153,9 @@ class VideoPlayer(Window, Experiment):
     automatically registered on startup. Requires ffmpeg and cv2.
     '''
     status = dict(
-        wait=dict(stop=None, start_pause="pause"),
-        pause=dict(stop=None, end_pause="wait"),
+        wait=dict(start_video="play"),
+        play=dict(stop=None, start_pause="pause"),
+        pause=dict(stop=None, end_pause="play"),
     )
     state = "wait"
 
@@ -175,7 +176,6 @@ class VideoPlayer(Window, Experiment):
         self._audio_path = None
         self._audio_started = False
         self._playback_t0 = None
-        self._pause_t0 = None
         self._video_start_frame = 0
         self._video_duration_sec = 0.0
 
@@ -269,6 +269,8 @@ class VideoPlayer(Window, Experiment):
                 os.remove(audio_path)
             except OSError:
                 pass
+            print(f"No audio found in file {media_file}")
+            print(result)
             return None
         return audio_path
 
@@ -279,7 +281,7 @@ class VideoPlayer(Window, Experiment):
         frame_rgb = np.ascontiguousarray(frame_rgb, dtype=np.uint8)
         self.tex.update(frame_rgb, size=(frame_rgb.shape[1], frame_rgb.shape[0]))
 
-    def _start_wait(self):
+    def _end_wait(self):
         import cv2
 
         # Seek video decode to the requested starting point.
@@ -297,6 +299,9 @@ class VideoPlayer(Window, Experiment):
             self._audio_started = False
             self._playback_t0 = self.get_time()
 
+    def _test_start_video(self, ts):
+        return True
+
     def _test_start_pause(self, ts):
         return self.pause
 
@@ -304,12 +309,13 @@ class VideoPlayer(Window, Experiment):
         return not self.pause
 
     def _start_pause(self):
-        self._pause_t0 = self.get_time()
         if self._audio_started:
             try:
                 pygame.mixer.music.pause()
             except Exception:
                 pass
+        self.tex.update(np.zeros((3,3,3))) # blank the screen
+        self.sync_event('PAUSE_START')
 
     def _end_pause(self):
         if self._audio_started:
@@ -317,9 +323,9 @@ class VideoPlayer(Window, Experiment):
                 pygame.mixer.music.unpause()
             except Exception:
                 pass
-        elif self._pause_t0 is not None and self._playback_t0 is not None:
-            self._playback_t0 += self.get_time() - self._pause_t0
-        self._pause_t0 = None
+        else:
+            self._playback_t0 += (self.get_time() - self.start_time) # omit the time spent in the pause state
+        self.sync_event('PAUSE_END')
 
     def _test_stop(self, ts):
         return self._video_finished or super()._test_stop(ts)
@@ -365,12 +371,13 @@ class VideoPlayer(Window, Experiment):
         elapsed = self.get_time() - self._playback_t0
         return self._video_start_frame + max(0, int(elapsed * self._video_fps))
 
-    def _while_wait(self):
+    def _while_play(self):
         if self._video_finished:
             return
 
         target_idx = self._target_frame_idx()
         self.task_data['video_frame'] = target_idx
+        self.reportstats['Video Frame'] = target_idx
 
         # Read and display video frames until we catch up to the target frame index
         while self._next_frame_idx <= target_idx and not self._video_finished:
