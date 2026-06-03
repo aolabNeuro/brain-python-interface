@@ -15,7 +15,7 @@ from .peripheral_device_features import Button, Joystick, DualJoystick, Joystick
 from .reward_features import RewardSystem, RewardSystemPulse, TTLReward, JuiceLogging, PelletReward, JackpotRewards, ProgressBar, TrackingRewards, RewardAudio, PenaltyAudio, ScoreRewards, ConsecutiveJackpot
 from .eyetracker_features import EyeCursor, EyeData, CalibratedEyeData, PupilLabStreaming, SimulatedEyeData, FixationStart, EyeConstrained, \
     AutomaticEyeCalibration, EyeCalibration, EyeStreaming
-from .touch_features import MouseEmulateTouch
+from .touch_features import MouseEmulateTouch, TabletTouch
 from .phasespace_features import MotionData, MotionSimulate, MotionAutoAlign
 from .optitrack_features import Optitrack, SpheresToCylinders
 from .plexon_features import PlexonBMI, RelayPlexon, RelayPlexByte
@@ -28,7 +28,7 @@ from .blackrock_features import RelayBlackrockByte
 from .ecube_features import EcubeFileBMI, EcubeBMI, RecordECube
 from .sync_features import ArduinoSync, CursorAnalogOut, ScreenSync, HDFSync
 from .neuropixel_features import RecordNeuropixels
-from .clda_features import CLDA_KFRML_IntendedVelocity
+from .clda_features import CLDA_Smoothbatch_IntendedVelocity, CLDA_KFRML_IntendedVelocity
 
 built_in_features = dict(
     keyboard=KeyboardControl,
@@ -96,6 +96,7 @@ built_in_features = dict(
     eye_calibration=EyeCalibration, 
     force_sensor=ForceControl,
     show_fixation_progress=Progressbar_fixation,
+    clda_smoothbatch=CLDA_Smoothbatch_IntendedVelocity,
     clda_kfrml=CLDA_KFRML_IntendedVelocity,
     hide_left_trajectory=HideLeftTrajectory,
     consecutive_jackpot=ConsecutiveJackpot,
@@ -104,6 +105,7 @@ built_in_features = dict(
     start_trial_below_speed_thr=StartTrialBelowSpeedThr,
     reward_system_pulse = RewardSystemPulse,
     readyset_colorchange = ReadysetColorChange,
+    tablet_touch = TabletTouch,
     random_delay_eye_hand_sequence = DiscreteRandomDelay_EyeHandSequence,
     hide_cursor_return = HideCursorReturn,
     auto_eye_calibration = AutomaticEyeCalibration,

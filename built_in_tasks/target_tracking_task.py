@@ -91,6 +91,7 @@ class TargetTracking(Sequence):
         # yield idx, targs, disturbance, dis_trajectory, sample_rate, ramp, ramp_down :
         self.gen_index, self.targs, self.disturbance_trial, self.disturbance_path, self.sample_rate, self.ramp_up_time, self.ramp_down_time = self.next_trial # targs and disturbance are same length
 
+
         self.targs = np.squeeze(self.targs,axis=0)
         self.disturbance_path = np.squeeze(self.disturbance_path)
 
@@ -451,9 +452,6 @@ class ScreenTargetTracking(TargetTracking, Window):
         if instantiate_targets:
             # This is the center target being followed by the user
             self.target = VirtualCircularTarget(target_radius=self.target_radius, target_color=target_colors[self.target_color])
-
-            # This is the optional progress bar (off by default)
-            self.bar = VirtualRectangularTarget(target_width=1, target_height=0, target_color=(0., 1., 0., 0.75), starting_pos=[0,-15,9])
             # print('INIT TRAJ')
 
         # Declare any plant attributes which must be saved to the HDF file at the _cycle rate
@@ -539,23 +537,15 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.frame_index += 1 # increment the frame_index for the following cycle
 
     def setup_start_wait(self):
-
         # Allow 2d movement
         if not self.always_1d:
-            self.limit1d = False
-
-        # Set up for progress bar
-        self.bar_width = 12        
-        self.tracking_frame_index = 0
+            self.limit1d = False       
         
         if self.calc_trial_num() == 0:
             # Instantiate the targets here so they don't show up in any states that might come before "wait" 
             for model in self.target.graphics_models:
                 self.add_model(model)
                 self.target.hide()
-            for model in self.bar.graphics_models:
-                self.add_model(model)
-                self.bar.hide()
 
         # Set up the next trajectory
         if hasattr(self, 'trajectory'):
@@ -596,8 +586,6 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.target.reset()
         self.trajectory.hide()
         self.trajectory.reset()
-        self.bar.hide()
-        self.bar.reset()
 
     def setup_start_tracking_in(self):
         # Revert to settable trait
@@ -807,7 +795,6 @@ class ScreenTargetTracking(TargetTracking, Window):
 
         # Cue successful trial
         self.target.cue_trial_end_success()
-        self.reward_frame_index = 0
 
         # use next generated trial using other freq set
         self.repeat_freq_set = False

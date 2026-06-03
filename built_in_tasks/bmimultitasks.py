@@ -4,6 +4,7 @@ BMI tasks in the new structure, i.e. inheriting from manualcontrolmultitasks
 import numpy as np
 import pickle
 
+from built_in_tasks.target_tracking_task import ScreenTargetTracking
 from riglib.experiment import traits
 
 from riglib.bmi import goal_calculators, ppfdecoder, feedback_controllers
@@ -394,5 +395,11 @@ class BMIControlMulti(BMIControlMultiMixin, ScreenTargetCapture):
 class BMIControlMultiDirectionConstraint(BMIControlMultiMixin, ScreenReachAngle):
     '''
     Adds an additional constraint that the direction of travel must be within a certain angle
+    '''
+    pass
+
+class BMIControlMulti_ScreenTargetTracking(BMIControlMultiMixin, ScreenTargetTracking):
+    '''
+    BMI control in the tracking task. 
     '''
     pass

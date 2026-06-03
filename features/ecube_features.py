@@ -174,7 +174,7 @@ class RecordECube(traits.HasTraits):
                 print(e)
                 traceback.print_exc()
                 log_exception(e)
-                cls.ecube_status = "Could not connect to eCube. Make sure servernode is running!\n"
+                cls.ecube_status = "Could not connect to eCube. Make sure servernode is running!\n" + str(e)
         if hasattr(super(), 'pre_init'):
             super().pre_init(saveid=saveid, **kwargs)
 

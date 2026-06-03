@@ -66,7 +66,7 @@ class Clock(object):
         import time
         time.sleep(1.0/fps)
     def get_time(self):
-        return 0
+        return time.perf_counter()
 
 class FSM(object):
     status = FSMTable(
