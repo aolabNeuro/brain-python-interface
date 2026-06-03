@@ -173,6 +173,29 @@ class RandomDelay(traits.HasTraits):
             self.delay_time = random.random()*(e-s) + s
         super()._start_wait()
 
+class DiscreteRandomDelay_EyeHandSequence(traits.HasTraits):
+    '''
+    Choose delay time from three discrete blocks (short, meidum, long delay) in eye-hand sequence task
+    '''
+    
+    rand_delay_hand_lower_bound = traits.List([0,], desc="lower bound of delay time in each block for hand go cue in sequence trials")
+    rand_delay_hand_upper_bound = traits.List([0.1,], desc="upper bound of delay time in each block for hand go cue in sequence trials")
+    rand_delay_hand_probability = traits.List([1.,], desc="probablity of each block for delay time")
+    exclude_parent_traits = ['rand_delay_hand']
+
+    def _start_wait(self):
+        super()._start_wait()
+
+        if self.tries == 0:
+            if self.trial_count_blocks - self.trials_block_simultaneous < self.trials_block_sequence: # only in sequence trials
+                
+                # Set delay time for hand go cue in sequence trials
+                delays = []
+                for lower, upper in zip(self.rand_delay_hand_lower_bound, self.rand_delay_hand_upper_bound):
+                    delays.append(random.random()*(upper-lower) + lower)
+
+                self.delay_time_hand = np.random.choice(delays, p = (self.rand_delay_hand_probability))
+
 class TransparentDelayTarget(traits.HasTraits):
     '''
     Feature to make the delay period show a semi-transparent target rather than the full target. Used 
@@ -189,10 +212,17 @@ class TransparentDelayTarget(traits.HasTraits):
         next_idx = (self.target_index + 1)
         if next_idx < self.chain_length:
             target = self.targets[next_idx % 2]
-            self._old_target_color = np.copy(target.sphere.color)
-            new_target_color = list(target.sphere.color)
-            new_target_color[3] = self.delay_target_alpha
-            target.sphere.color = tuple(new_target_color)
+
+            if hasattr(target, "sphere"):
+                self._old_target_color = np.copy(target.sphere.color)
+                new_target_color = list(target.sphere.color)
+                new_target_color[3] = self.delay_target_alpha
+                target.sphere.color = tuple(new_target_color)
+            elif hasattr(target, "cube"):
+                self._old_target_color = np.copy(target.cube.color)
+                new_target_color = list(target.cube.color)
+                new_target_color[3] = self.delay_target_alpha
+                target.cube.color = tuple(new_target_color)
 
     def _start_target(self):
         super()._start_target()
@@ -200,7 +230,42 @@ class TransparentDelayTarget(traits.HasTraits):
         # Reset the transparency of the current target
         if self.target_index > 0:
             target = self.targets[self.target_index % 2]
-            target.sphere.color = self._old_target_color
+            if hasattr(target, "sphere"):
+                target.sphere.color = self._old_target_color
+            elif hasattr(target, "cube"):
+                target.cube.color = self._old_target_color
+
+class StartTrialBelowSpeedThr(traits.HasTraits):
+    '''
+    The next trial doesn't start until the cursor speed is kept under the speed threshold for a certain duration
+    Please turn off the Autostart feature. Otherwise, it overwrites this feature and the next trial automatically starts 
+    '''
+
+    exclude_parent_traits = ['wait_time','rand_start']
+    speed_threshold = traits.Float(30, desc="Speed threshold in cm/s")
+    duration_under_speed_threshold = traits.Float(1, desc="The duration in second in which the speed must stay below the speed threshold")
+
+    def _start_wait(self):
+        
+        self.previous_cursor_pos = self.plant.get_endpoint_pos()
+        self.frames_under_speed_threshold = 0
+    
+        super()._start_wait()
+
+    def _test_start_trial(self, time_in_state):
+
+        self.current_cursor_pos = self.plant.get_endpoint_pos()
+
+        speed = np.linalg.norm(self.current_cursor_pos - self.previous_cursor_pos)*self.fps
+
+        if speed < self.speed_threshold:
+            self.frames_under_speed_threshold += 1
+        else:
+            self.frames_under_speed_threshold = 0
+
+        self.previous_cursor_pos = self.current_cursor_pos
+
+        return self.frames_under_speed_threshold/self.fps > self.duration_under_speed_threshold
 
 class PoissonWait(traits.HasTraits):
     '''
@@ -292,3 +357,111 @@ class IncrementalRotation(traits.HasTraits):
     def _start_reward(self):
         super()._start_reward()
         self.num_trials_success += 1
+
+
+class HideLeftTrajectory(traits.HasTraits):
+    '''
+    Hide the left side of the 1d target trajectory. 
+    This will make only the 'lookahead' of the trajectory visible. The 'lookbehind' will be blacked out.
+    Useful for task with bumpers.
+    '''
+
+    def setup_start_wait(self):
+        super().setup_start_wait()
+        self.trajectory.update_mask(self.lookahead, self.lookahead*2+1) # frame indices to show 
+        # a total of lookahead*2+1 frames spans the screen width: lookahead index is at center with n_lookahead frames on either side
+                                    
+    def update_frame(self):
+        self.trajectory.update_mask(self.lookahead+self.frame_index, self.lookahead*2+1+self.frame_index) # frame indices to show
+        super().update_frame() # frame_index is incremented at the end of update_frame(), so need to update trajectory mask before this
+
+class ReadysetMedley(traits.HasTraits):
+
+    '''
+    Allows for mulitple different prepbuff and delay times to be used within a single experiment.
+    Replaces the prepbuff_time and delay_time parameters with a list of possible values and corresponding probabilities.
+    '''
+
+    exclude_parent_traits = ['delay_time']
+    display_times = traits.List([0,], desc = 'Possible peripheral target display times')
+    frac_times = traits.List([0.1,], desc = 'Proportion of each type of display time. Need to be equal length to delay_times and sum to 1') #should sum to 1.0 
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        assert(len(self.display_times) == len(self.frac_times)) #can be here and task wont run if lenghts are different
+
+    def _start_wait(self):
+        '''
+        At the start of the 'wait' state, determine which prepbuff & delay_time to use
+        '''
+        self.delay_time = np.random.choice((self.display_times), p = (self.frac_times)) 
+        audio_length = 2*self.tone_space - self.early_move_time #use the same value but update to account for the different delay times
+        self.prepbuff_time = audio_length - self.delay_time #update the prepbuff time accordingly
+        super()._start_wait()
+
+class ReadysetColorChange(traits.HasTraits):
+    '''
+    Change the color to go along with the set cue
+    '''
+    def color_set_cue(self): #update function to have color change 
+        self.targets[0].cue_set_tone() #turn target orange on set tone
+
+    def color_go_cue(self): #update function to have color change
+        self.targets[0].show() #need to show as the target will be hidden by the baseline logic
+        self.targets[0].cue_fixation() #turn target blue on go tone
+                    
+    def _start_tooslow_penalty(self):
+        self.tooslow_start = self.get_time()
+        super()._start_tooslow_penalty()
+        self.targets[0].show()
+        self.targets[0].cue_trial_end_failure()
+        self.targets[1].hide()
+    
+    def _while_tooslow_penalty(self):
+        if (self.get_time() - self.tooslow_start) >= 0.5 * self.tooslow_penalty_time:
+            for targets in self.targets:
+                targets.hide()
+                targets.reset()
+
+    def _end_tooslow_penalty(self):
+        self.sync_event('TRIAL_END')
+
+class HideCursorReturn(traits.HasTraits):
+
+    '''
+    Hide the cursor during the return to center after a reward or penalty. 
+    Display again when cursor is within some user specified distance of center of the center target.
+
+    '''
+    show_cursor_return = traits.Float(3, desc = 'Distance from center at which to turn curson on')
+
+    def _start_reward(self):
+        super()._start_reward()
+        self.plant_visible = False 
+    
+    def _while_target(self):
+
+        if self.calc_trial_num() > 0: #skip logic for very first trial of block 
+            if self.target_index == 0: 
+                cursor_pos = self.plant.get_endpoint_pos()
+                dist_from_center = np.linalg.norm(cursor_pos - self.targs[self.target_index])
+                if dist_from_center < self.show_cursor_return:
+                    self.plant_visible = True
+                else:
+                    self.plant_visible = False
+    
+    def _start_hold_penalty(self):
+        super()._start_hold_penalty()
+        self.plant_visible = False
+
+    def _start_timeout_penalty(self):
+        super()._start_timeout_penalty()
+        self.plant_visible = False
+    
+    def _start_delay_penalty(self):
+        super()._start_delay_penalty()
+        self.plant_visible = False  
+
+    def _start_tooslow_penalty(self):
+        super()._start_tooslow_penalty()
+        self.plant_visible = False

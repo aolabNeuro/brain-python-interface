@@ -114,7 +114,21 @@ class OnlineAnalysis(traits.HasTraits):
         if hasattr(self, 'targs') and hasattr(self, 'gen_indices'):
             for i in range(len(self.targs)):
                 self._send_online_analysis_msg('target_location', self.gen_indices[i], self.targs[i])
+        
+        # Eye / hand sequence trial information
+        if hasattr(self, 'is_sequence'):
+            self._send_online_analysis_msg('is_sequence', self.is_sequence)
+            
+    def _parse_next_trial(self):
+        if hasattr(super(), '_parse_next_trial'):
+            super()._parse_next_trial()
 
+        # Laser conditions
+        if hasattr(self, 'trial_index') and hasattr(self, 'laser_powers'):
+            self._send_online_analysis_msg('laser_conditions', self.trial_index, self.laser_powers)
+        if hasattr(self, 'laser_power') and hasattr(self, 'laser_index'):
+            self._send_online_analysis_msg('laser_condition', self.laser_index, self.laser_power)
+        
     def _cycle(self):
         '''
         Send cursor and eye position data to the online analysis server
@@ -125,6 +139,11 @@ class OnlineAnalysis(traits.HasTraits):
             self._send_online_analysis_msg('cursor', self.plant.get_endpoint_pos())
         if hasattr(self, 'eye_pos'):
             self._send_online_analysis_msg('eye_pos', self.eye_pos)
+        if hasattr(self, 'eye_diam'):
+            self._send_online_analysis_msg('eye_diam', self.eye_diam)
+        if hasattr(self, 'calibrated_eye_pos'):
+            self._send_online_analysis_msg('calibrated_eye_pos', self.calibrated_eye_pos)
+
         if hasattr(self, 'task_data') and 'decoder_state' in self.task_data.dtype.names:
             self._send_online_analysis_msg('decoder_state', self.task_data['decoder_state'].flatten().tolist())
         if hasattr(self, 'task_data') and hasattr(self, 'extractor') and self.extractor.feature_type in self.task_data.dtype.names:

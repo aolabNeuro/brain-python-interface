@@ -1,47 +1,67 @@
 from riglib import experiment
 from built_in_tasks.manualcontrolmultitasks import ManualControl
 from built_in_tasks.othertasks import LaserConditions
-from riglib.stereo_opengl.window import WindowDispl2D
+from riglib.stereo_opengl.window import Window2D
 from features.peripheral_device_features import KeyboardControl, MouseControl
 import features.sync_features as sync_features
 from features.laser_features import CrystaLaser
 from features.video_recording_features import E3Video
+from features.touch_features import TabletTouch
 from riglib.e3vision import E3VisionInterface
 import numpy as np
 import time
 
 import unittest
-
-
-def init_exp(base_class, feats, seq=None, **kwargs):
-    blocks = 2
-    trials = 2
-    trial_length = 5
-    frequencies = np.array([.5])
-    Exp = experiment.make(base_class, feats=feats)
-    if seq is not None:
-        exp = Exp(seq, **kwargs)
-    else:
-        exp = Exp(**kwargs)
-    exp.init()
-    return exp
+from test_tasks import init_exp
 
 class TestKeyboardControl(unittest.TestCase):
 
     @unittest.skip("msg")
     def test_exp(self):
-        exp = init_exp(ManualControl, [KeyboardControl, WindowDispl2D])
+        exp = init_exp(ManualControl, [KeyboardControl, Window2D])
         exp.run()
 
 class TestMouseControl(unittest.TestCase):
 
     @unittest.skip("msg")
     def test_exp(self):
-        exp = init_exp(ManualControl, [MouseControl, WindowDispl2D])
+        exp = init_exp(ManualControl, [MouseControl, Window2D])
+        exp.run()
+
+class TestTouch(unittest.TestCase):
+
+    @unittest.skip("msg")
+    def test_touch_streaming(self):
+        from riglib.touch_data import TabletTouchData
+        touch_data = TabletTouchData()
+        touch_data.start()
+        for _ in range(3):
+            sample = touch_data.get()
+            print(sample)
+        touch_data.stop()
+
+    @unittest.skip("msg")
+    def test_touch_datasource(self):
+        from riglib.touch_data import TabletTouchData
+        from riglib.source import DataSource
+        touch_data = DataSource(TabletTouchData)
+        touch_data.start()
+        for _ in range(3):
+            samples = touch_data.get()
+            print(samples)
+            time.sleep(2)
+        touch_data.stop()
+
+    #@unittest.skip("msg")
+    def test_exp(self):
+        seq = ManualControl.centerout_2D()
+        exp = init_exp(ManualControl, [TabletTouch, Window2D], seq, fullscreen=False, window_size=(1200,800),
+            rotation='xzy')
         exp.run()
 
 class TestLaser(unittest.TestCase):
     
+    @unittest.skip("msg")
     def test_digital_wave(self):
         from riglib.gpio import TestGPIO, DigitalWave
         gpio = TestGPIO()
@@ -94,6 +114,7 @@ class TestLaser(unittest.TestCase):
         exp.init()
         exp.run()
 
+    @unittest.skip("msg")
     def test_dio_pulse_width(self):
         from riglib.gpio import ArduinoGPIO, DigitalWave
         import time
@@ -128,6 +149,7 @@ class TestLaser(unittest.TestCase):
 
 class TestSync(unittest.TestCase):
 
+    @unittest.skip("msg")
     def test_dictionary(self):
         default_dict = sync_features.rig1_sync_params['event_sync_dict']
         self.assertEqual(default_dict['TARGET_ON'] + 4, sync_features.encode_event(default_dict, 'TARGET_ON', 4))
@@ -147,6 +169,7 @@ class TestE3Video(unittest.TestCase):
     #     time.sleep(5)
     #     e3v.stop_rec()
 
+    @unittest.skip("msg")
     def test_feature(self):
         exp = init_exp(experiment.Experiment, [E3Video], saveid=0)
         exp.run()

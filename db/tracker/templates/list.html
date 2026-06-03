@@ -24,6 +24,20 @@
   var te = null;
   var feats = new Features();
   var collections = new Collections();
+
+  function updateQueryParams(params) {
+    var url = new URL(window.location.href);
+    Object.keys(params).forEach(function(key) {
+      if (params[key] === null) {
+        url.searchParams.delete(key);
+      } else {
+        url.searchParams.set(key, params[key]);
+      }
+    });
+    var query = url.searchParams.toString();
+    window.location.href = url.pathname + (query ? "?" + query : "");
+  }
+
   $(document).ready(function() {
     console.log("TEST");
     $("table#main tr").each(function() {
@@ -87,13 +101,17 @@
         if (this.checked) {
           $("#toggle_visible,#toggle_visible+span").show();
           $("#toggle_templates,#toggle_templates+span").show();
-          $("#toggle_rigs,#toggle_rigs+span").show();
+          $("#toggle_filters,#toggle_filters+span").show();
+          if ($("#toggle_filters").is(":checked")) {
+            $("#date_filter").show();
+          }
           $('#leftpane').show()
           $('#rightpane').css({'left': "640px", 'top': '0px', 'position': 'fixed'});
         } else {
           $("#toggle_visible,#toggle_visible+span").hide();
           $("#toggle_templates,#toggle_templates+span").hide();
-          $("#toggle_rigs,#toggle_rigs+span").hide();
+          $("#toggle_filters,#toggle_filters+span").hide();
+          $("#date_filter").hide();
           $('#leftpane').hide()
           $('#rightpane').css({'left': "0px", 'top': 'auto', 'position': 'relative'});
         }
@@ -103,9 +121,9 @@
     $("#toggle_visible").change(
       function() {
         if (this.checked)
-          location.href = "?show_hidden{% if show_all_rigs %}&show_all_rigs{% endif %}";
+          updateQueryParams({show_hidden: "1"});
         else
-          location.href = "?{% if show_all_rigs %}&show_all_rigs{% endif %}";
+          updateQueryParams({show_hidden: null});
       }
     );
 
@@ -118,12 +136,12 @@
       }
     );
 
-    $("#toggle_rigs").change(
+    $("#toggle_filters").change(
       function() {
         if (this.checked)
-          location.href = "?show_all_rigs{% if show_hidden %}&show_hidden{% endif %}";
+          $("#date_filter").show();
         else
-          location.href = "?{% if show_hidden %}&show_hidden{% endif %}";
+          $("#date_filter").hide();
       }
     );
 
@@ -261,8 +279,57 @@
     <input id="toggle_table" type="checkbox" checked="on" name="hist_checkbox"><span class="checkboxtext">History</span>
     <input id="toggle_visible" type="checkbox" {% if show_hidden %} checked {% endif %}><span class="checkboxtext">Hidden entries</span>
     <input id="toggle_templates" type="checkbox"><span class="checkboxtext">Templates</span>
-    <input id="toggle_rigs" type="checkbox" {% if show_all_rigs %} checked {% endif %}><span class="checkboxtext">All rigs</span>
+    <input id="toggle_filters" type="checkbox" {% if show_filters %}checked{% endif %}><span class="checkboxtext">Show filters</span>
     <button id="new_exp">Start new experiment</button><br>
+    <form id="date_filter" method="get" action="" {% if not show_filters %}style="display: none;"{% endif %}>
+      <table style="margin-left: auto;">
+        <tr>
+          <td><label for="keyword">Keyword:</label></td>
+          <td><input type="text" id="keyword" name="keyword" value="{{ keyword_filter }}" placeholder="Search across task, project, session..." style="width: 300px;"></td>
+        </tr>
+        <tr>
+          <td><label for="start_date">Date range:</label></td>
+          <td>
+            <input type="date" id="start_date" name="start_date" value="{{ start_date }}" style="width: 140px;">
+            to
+            <input type="date" id="end_date" name="end_date" value="{{ end_date }}" style="width: 140px;">
+          </td>
+        </tr>
+        <tr>
+          <td><label for="subject">Subject:</label></td>
+          <td>
+            <select id="subject" name="subject">
+              <option value="">All</option>
+              {% for subj in subjects %}
+              <option value="{{ subj.name }}" {% if subject_filter == subj.name %}selected{% endif %}>{{ subj.name }}</option>
+              {% endfor %}
+            </select>
+          </td>
+        </tr>
+        <tr>
+          <td><label for="task">Task:</label></td>
+          <td>
+            <select id="task" name="task">
+              <option value="">All</option>
+              {% for t in tasks %}
+              <option value="{{ t.name }}" {% if task_filter == t.name %}selected{% endif %}>{{ t.name }}</option>
+              {% endfor %}
+            </select>
+          </td>
+        </tr>
+        <tr>
+          <td><label for="toggle_rigs">All rigs:</label></td>
+          <td><input id="toggle_rigs" type="checkbox" name="show_all_rigs" value="1" {% if show_all_rigs %}checked{% endif %}></td>
+        </tr>
+        <tr>
+          <td colspan="2">
+            <button type="submit">Apply filters</button>
+            <a id="clear_dates" href="?{% if show_hidden %}show_hidden=1{% endif %}">Reset filters</a>
+          </td>
+        </tr>
+      </table>
+      {% if show_hidden %}<input type="hidden" name="show_hidden" value="1">{% endif %}
+    </form>
     <hr>
   </div>
   <div id="main_box">

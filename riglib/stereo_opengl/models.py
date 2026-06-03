@@ -37,6 +37,9 @@ class Model(object):
         # The orientation of the object, in the world frame
         self._xfm = self.xfm
         self.allocated = False
+
+        # Keep track of the model's size for rendering
+        self.bounding_radius = 0.0
     
     def __setattr__(self, attr, xfm):
         '''Checks if the xfm was changed, and recaches the _xfm which is sent to the shader'''
@@ -61,6 +64,21 @@ class Model(object):
         allocated = self.allocated
         self.allocated = True
         return allocated
+
+    def rotate(self, q, reset=False):
+        '''
+        Rotate the model by a quaternion q
+
+        Parameters
+        ----------
+        q: Quaternion
+            The quaternion to rotate the model by
+        reset: bool, optional, default=False
+            If true, the new rotation replaces the old one. If false, it is added on.
+        '''
+        self.xfm.rotate_q(q, reset=reset)
+        self._recache_xfm()
+        return self
 
     def rotate_x(self, deg, reset=False):
         self.xfm.rotate_x(np.radians(deg), reset=reset)
@@ -118,6 +136,33 @@ class Model(object):
         while self in self.parent.models:
             self.parent.models.remove(self)
 
+    def look_at(self, target):
+        """
+        Rotates the model so its local +z axis points toward the target coordinate.
+
+        Parameters
+        ----------
+        target : array-like
+            The (x, y, z) world coordinate to look at.
+        up : array-like
+            The up direction (default: (0, 1, 0)).
+        """
+        # Current position in world space
+        pos = np.array(self.xfm.move)
+        target = np.array(target)
+        direction = target - pos
+        if np.linalg.norm(direction) == 0:
+            return self  # No rotation needed
+
+        direction = direction / np.linalg.norm(direction)
+        # Local +z axis in model space
+        local_z = np.array([0, 0, 1])
+        # Compute quaternion to rotate +z to direction
+        q = self.xfm.rotate.rotate_vecs(local_z, direction)
+        self.xfm.rotate = q
+        self._recache_xfm()
+        return self
+
 
 class Group(Model):
     def __init__(self, models=()):
@@ -143,13 +188,18 @@ class Group(Model):
             model.init()
     
     def render_queue(self, xfm=np.eye(4), **kwargs):
-        for model in self.models:
+        def sort_key(obj):
+            pos = obj.xfm.move[1]
+            radius = obj.bounding_radius
+            dist = pos - radius
+            return -dist  # Negative for far-to-near sorting
+        sorted_models = sorted(self.models, key=sort_key)
+        for model in sorted_models:
             for out in model.render_queue(**kwargs):
                 yield out
     
     def draw(self, ctx, **kwargs):
-        sorted_models = sorted(self.models, key=lambda obj: -obj.xfm.move[1])
-        for model in sorted_models:
+        for model in self.models:
             model.draw(ctx, **kwargs)
     
     def __getitem__(self, idx):
@@ -190,6 +240,8 @@ class TriMesh(Model):
         self.polys = polys
         self.tcoords = tcoords
         self.normals = normals
+
+        self.bounding_radius = abs(np.min(self.verts[:, 1]))
     
     def init(self):
         allocated = super(TriMesh, self).init()

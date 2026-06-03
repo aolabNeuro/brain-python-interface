@@ -8,10 +8,14 @@ from features.laser_features import QwalorLaser, MultiQwalorLaser, SwitchedQwalo
 from features.quattrocento_features import QuattBMI
 from riglib.stereo_opengl.window import WindowWithExperimenterDisplay, Window2D
 from riglib.stereo_opengl.openxr import WindowVR
-from .generator_features import Autostart, AdaptiveGenerator, IgnoreCorrectness, PoissonWait, RandomDelay, Progressbar_fixation
+
+from .generator_features import Autostart, RandomDelay, AdaptiveGenerator, IgnoreCorrectness, PoissonWait, Progressbar_fixation, \
+    HideLeftTrajectory, StartTrialBelowSpeedThr, ReadysetMedley, ReadysetColorChange, DiscreteRandomDelay_EyeHandSequence, HideCursorReturn
 from .peripheral_device_features import Button, Joystick, DualJoystick, Joystick_plus_TouchSensor, KeyboardControl, MouseControl, ForceControl
-from .reward_features import RewardSystem, TTLReward, JuiceLogging, PelletReward, JackpotRewards, ProgressBar, TrackingRewards, RewardAudio, PenaltyAudio, ScoreRewards
-from .eyetracker_features import EyeData, CalibratedEyeData, PupilLabStreaming, SimulatedEyeData, FixationStart, EyeConstrained, EyeCalibration, EyeStreaming
+from .reward_features import RewardSystem, RewardSystemPulse, TTLReward, JuiceLogging, PelletReward, JackpotRewards, ProgressBar, TrackingRewards, RewardAudio, PenaltyAudio, ScoreRewards, ConsecutiveJackpot
+from .eyetracker_features import EyeCursor, EyeData, CalibratedEyeData, PupilLabStreaming, SimulatedEyeData, FixationStart, EyeConstrained, \
+    AutomaticEyeCalibration, EyeCalibration, EyeStreaming
+from .touch_features import MouseEmulateTouch, TabletTouch
 from .phasespace_features import MotionData, MotionSimulate, MotionAutoAlign
 from .optitrack_features import Optitrack, SpheresToCylinders
 from .plexon_features import PlexonBMI, RelayPlexon, RelayPlexByte
@@ -87,11 +91,23 @@ built_in_features = dict(
     neuropixel=RecordNeuropixels,
     eye_streaming=EyeStreaming,
     pupillab_streaming=PupilLabStreaming,
+    eye_cursor=EyeCursor,
     eye_constrained=EyeConstrained,
     eye_calibration=EyeCalibration, 
     force_sensor=ForceControl,
     show_fixation_progress=Progressbar_fixation,
-    clda_kfrml=CLDA_KFRML_IntendedVelocity
+    clda_kfrml=CLDA_KFRML_IntendedVelocity,
+    hide_left_trajectory=HideLeftTrajectory,
+    consecutive_jackpot=ConsecutiveJackpot,
+    mouse_emulate_touch=MouseEmulateTouch,
+    readyset_medley=ReadysetMedley,
+    start_trial_below_speed_thr=StartTrialBelowSpeedThr,
+    reward_system_pulse = RewardSystemPulse,
+    readyset_colorchange = ReadysetColorChange,
+    tablet_touch = TabletTouch,
+    random_delay_eye_hand_sequence = DiscreteRandomDelay_EyeHandSequence,
+    hide_cursor_return = HideCursorReturn,
+    auto_eye_calibration = AutomaticEyeCalibration,
 )
 
 # >>> features.built_in_features['autostart'].__module__

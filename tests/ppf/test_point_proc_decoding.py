@@ -60,8 +60,8 @@ decoding_states = ['hand_vx', 'hand_vz', 'offset']
 truedata = loadmat('/Users/sgowda/bmi/workspace/adaptive_ppf/ppf_test_case_matlab_output.mat')
 a_ppf = truedata['A'][0,0]
 w_ppf = truedata['W'][0,0]
-A = np.mat(np.diag([a_ppf, a_ppf, 1]))
-W = np.mat(np.diag([w_ppf, w_ppf, 0]))
+A = np.asmatrix(np.diag([a_ppf, a_ppf, 1]))
+W = np.asmatrix(np.diag([w_ppf, w_ppf, 0]))
 
 # Instantiate PPF
 ppf = ppfdecoder.PointProcessFilter(A, W, beta.T, T_loop)

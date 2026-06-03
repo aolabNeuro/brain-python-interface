@@ -11,8 +11,10 @@ import traceback
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.collections import PatchCollection
-from matplotlib.widgets import Button, Slider, Cursor
+from matplotlib.widgets import Button, Slider, Cursor, TextBox
 import aopy
+import traits
+from traits.trait_types import self
 from riglib.ecube import MultiSource, map_channels_for_multisource
 from riglib.source import MultiChanDataSource
 
@@ -67,7 +69,7 @@ class AnalysisWorker(mp.Process):
         Do something with incoming data. By default just keeps track of the time
         '''
         if key == 'cycle_count':
-            self.cycle_count = values[0]        
+            self.cycle_count = values[0]
 
     def draw(self):
         '''
@@ -111,7 +113,7 @@ class AnalysisWorker(mp.Process):
         plt.pause(0.1)
 
         t_update = time.perf_counter()
-        while not self._stop_event.is_set():
+        while plt.fignum_exists(self.fig.number) and (not self._stop_event.is_set()):
             if time.perf_counter() - t_update > 1./self.update_rate:
                 try:
                     self.update()
@@ -138,17 +140,16 @@ class BehaviorAnalysisWorker(AnalysisWorker):
     calibration coefficients are available. 
     '''
    
-    def __init__(self, task_params, data_queue, calibration_dir='/var/tmp', buffer_time=1, ylim=1, px_per_cm=51.67, **kwargs):
+    def __init__(self, task_params, data_queue, calibration_dir='/var/tmp', buffer_time=5, **kwargs):
         super().__init__(task_params, data_queue, **kwargs)
         self.calibration_dir = calibration_dir
         self.buffer_time = buffer_time
-        self.ylim = ylim
-        self.px_per_cm = px_per_cm
 
     def init(self):
         super().init()
         self.cursor_pos = np.zeros(2)
         self.eye_pos = np.zeros(2)
+        self.calibrated_eye_pos = np.zeros(2)
         self.target_pos = {}
         self.targets = {}
         self.calibration_data = []
@@ -156,7 +157,7 @@ class BehaviorAnalysisWorker(AnalysisWorker):
         self.eye_coeff = np.array([[1,0],[1,0]])
         self.eye_coeff_corr = 0.5 # Don't accept anything lower than 0.5 by default
         
-        self.eye_diam = np.zeros((int(self.buffer_time*self.task_params['fps']), 3))
+        self.eye_buffer = np.zeros((int(self.buffer_time*self.task_params['fps']), 3))
 
         # Load previous calibration if it exists
         subject = self.task_params.get('subject_name', 'None')
@@ -181,14 +182,15 @@ class BehaviorAnalysisWorker(AnalysisWorker):
         self.ax.add_collection(self.circles)
 
         # Set up eye diameter figure  
-        self.diam_ax = self.fig.add_axes([0.1, 0.06, 0.8, 0.11])
-        self.diam_ax.set_ylim(0, self.ylim)
+        self.eye_ax = self.fig.add_axes([0.1, 0.06, 0.8, 0.11])
+        self.eye_ax.set_xlabel('Time (s)')
+        self.eye_ax.set_ylabel('Eye Pos (cm)', color='blue')
+        self.diam_ax = self.eye_ax.twinx()
+        self.diam_ax.set_ylabel('Eye Diameter (cm)', color='green')
         self.diam_ax.set_xlim(-self.buffer_time, 0)
-        self.diam_ax.set_xlabel('Time (s)')
-        self.diam_ax.set_ylabel('Eye Diameter (cm)')
-        self.diam_plot = self.diam_ax.plot([], [], 'green')[0]
-        self.x_plot = self.diam_ax.plot([], [], 'blue')[0]
-        self.y_plot = self.diam_ax.plot([], [], 'cyan')[0]
+        self.diam_plot = self.diam_ax.plot([], [], 'green', linewidth=0.5, alpha=0.5)[0]
+        self.x_plot = self.eye_ax.plot([], [], 'blue', linewidth=0.5, alpha=0.5)[0]
+        self.y_plot = self.eye_ax.plot([], [], 'cyan', linewidth=0.5, alpha=0.5)[0]
 
 
     def update_eye_calibration(self):
@@ -231,7 +233,7 @@ class BehaviorAnalysisWorker(AnalysisWorker):
                 self.targets[event_data] = 1
             elif event_name == 'TARGET_OFF':
                 self.targets[event_data] = 0
-            elif event_name in ['PAUSE', 'TRIAL_END', 'HOLD_PENALTY', 'DELAY_PENALTY', 'TIMEOUT_PENALTY']:
+            elif event_name in ['PAUSE', 'TRIAL_END', 'HOLD_PENALTY', 'DELAY_PENALTY', 'TIMEOUT_PENALTY','FIXATION_PENALTY']:
                 # Clear targets at the end of the trial
                 self.targets = {}
             elif event_name == 'REWARD':
@@ -245,11 +247,17 @@ class BehaviorAnalysisWorker(AnalysisWorker):
             self.cursor_pos = np.array(values[0])[[0,2]]
         elif key == 'eye_pos':
             self.eye_pos = np.array(values[0])[:2]
+            self.temp = np.array(values[0])[:2]
+            self.eye_buffer[:,:2] = np.roll(self.eye_buffer[:,:2], -1, axis=0)
+            self.eye_buffer[-1,:2] = self.temp
 
-            # Update eye diameter
-            self.temp = np.array(values[0])[[0,1,4]]
-            self.eye_diam = np.roll(self.eye_diam, -1, axis=0)
-            self.eye_diam[-1] = self.temp
+        elif key == 'eye_diam':
+            self.temp = np.array(values[0])[0]
+            self.eye_buffer[:,2] = np.roll(self.eye_buffer[:,2], -1, axis=0)
+            self.eye_buffer[-1,2] = self.temp
+
+        elif key == 'calibrated_eye_pos':
+            self.calibrated_eye_pos = np.array(values[0])[:2]
 
         elif key == 'target_location':
             target_idx, target_location = values
@@ -262,27 +270,305 @@ class BehaviorAnalysisWorker(AnalysisWorker):
 
         patches = [
             plt.Circle(cursor_pos, cursor_radius), 
-            plt.Circle(eye_pos, self.eye_diam[-1, 0]/self.px_per_cm)
+            plt.Circle(eye_pos, 0.5)
         ] + [plt.Circle(pos, radius) for pos, radius, _ in targets]
         self.circles.set_paths(patches)
         colors = ['b', 'g'] + [c for _, _, c in targets]
         self.circles.set_facecolor(colors)
         self.circles.set_alpha(0.5)
 
-        # Update eye diameter plot
-        self.x_plot.set_data(np.arange(len(self.eye_diam)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
-                                self.eye_diam[:, 0])
-        self.y_plot.set_data(np.arange(len(self.eye_diam)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
-                                self.eye_diam[:, 1])
-        self.diam_plot.set_data(np.arange(len(self.eye_diam)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
-                                self.eye_diam[:, 2]/self.px_per_cm)
+        self._draw_eye()
+
+    def _draw_eye(self):
+        # Update raw eye data plot
+        self.x_plot.set_data(np.arange(len(self.eye_buffer)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
+                                self.eye_buffer[:, 0])
+        self.y_plot.set_data(np.arange(len(self.eye_buffer)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
+                                self.eye_buffer[:, 1])
+        self.eye_ax.relim()
+        self.eye_ax.autoscale_view()
+        self.diam_plot.set_data(np.arange(len(self.eye_buffer)) * 1/(int(self.task_params['fps'])) - self.buffer_time, 
+                                self.eye_buffer[:, 2])
+        self.diam_ax.relim()
+        self.diam_ax.autoscale_view()
+
 
     def cleanup(self):
 
         # Save the calibration if it was performed
-        filepath = os.path.join(self.calibration_dir, self.calibration_filename)
         if self.calibration_flag and not np.array_equal(self.eye_coeff, np.array([[1,0],[1,0]])):
             aopy.data.pkl_write(self.calibration_filename, (self.eye_coeff, self.eye_coeff_corr), self.calibration_dir)
+
+class SaccadeAnalysisWorker(BehaviorAnalysisWorker):
+    '''
+    Plots calibrated_eye, cursor, and target data from experiments that have them.
+    This is for eye-related task that requires calibrated eye position
+    '''
+ 
+    def get_current_pos(self):
+        '''
+        Get the current cursor, eye, and target positions
+
+        Returns:
+            cursor_pos ((2,) tuple): Current cursor position
+            eye_pos ((2,) tuple): Current eye position and diameters
+            targets (list): List of active targets in (position, radius, color) format
+        '''
+        try:
+            radius = self.task_params['target_radius']
+            color = 'orange'
+            targets = [(self.target_pos[k], radius, color if v == 1 else 'green') for k, v in self.targets.items() if v]
+        except:
+            targets = []
+        
+        return self.cursor_pos, self.calibrated_eye_pos, targets
+
+    def draw(self):
+        super(BehaviorAnalysisWorker, self).draw()
+        cursor_pos, calibrated_eye_pos, targets = self.get_current_pos()
+        cursor_radius = self.task_params.get('cursor_radius', 0.25)
+        if 'fixation_radius_buffer' in self.task_params:
+            buffer = self.task_params['fixation_radius_buffer']
+        elif 'fixation_dist' in self.task_params:
+            buffer = self.task_params['fixation_dist'] - self.task_params['target_radius']
+        eye_radius = 0.1
+
+        patches1 = [plt.Circle(pos, radius+buffer) for pos, radius, _ in targets]
+        patches2 = [plt.Circle(cursor_pos, cursor_radius), plt.Circle(calibrated_eye_pos, eye_radius)]
+        patches3 = [plt.Circle(pos, radius) for pos, radius, _ in targets]
+        patches = patches1 + patches2 + patches3
+        self.circles.set_paths(patches)
+        colors = [[0.8,0.8,0.8] for _, _, c in targets]  + ['darkblue', 'darkgreen']  + [c for _, _, c in targets] 
+        self.circles.set_facecolor(colors)
+        self.circles.set_alpha(0.5)
+
+        self._draw_eye()
+
+class EyeHandAnalysisWorker(BehaviorAnalysisWorker):
+    '''
+    Plots calibrated_eye, cursor, and target data from experiments that have them. 
+    This is for eye-hand task
+    '''
+
+    def init(self):
+        super().init()
+        self.calibrated_eye_pos = np.zeros(2)
+        self.hand_targets = {}
+        self.eye_targets = {}
+        self.target_pos = []
+        self.target_idx_trial = []
+
+    def handle_data(self, key, values):
+        super(BehaviorAnalysisWorker, self).handle_data(key, values)
+        if key == 'sync_event':
+            event_name, event_data = values
+            if event_name == 'TARGET_ON':
+                self.hand_targets[event_data] = 1 # event data represents target index in bmi3d
+                #self.eye_targets[self.target_idx_trial[0]] = 1 # bacause eye initial target and hand target appear at the same time
+            elif event_name == 'TARGET_OFF':
+                self.hand_targets[event_data] = 0
+            elif event_name == 'EYE_TARGET_ON':
+                self.eye_targets[event_data] = 1
+            elif event_name == 'EYE_TARGET_OFF':
+                self.eye_targets[event_data] = 0
+
+                if self.task_params['experiment_name'] == 'EyeConstrainedReachingTask':
+                    self.hand_targets[self.target_idx_trial[-1]] = 0 # In this task, the hand target also disappear
+
+            elif event_name in ['PAUSE', 'TRIAL_END', 'HOLD_PENALTY', 'DELAY_PENALTY', 'TIMEOUT_PENALTY','FIXATION_PENALTY','OTHER_PENALTY']:
+                # Clear targets at the end of the trial
+                self.hand_targets = {}
+                self.eye_targets = {}
+                self.target_pos = []
+                self.target_idx_trial = []
+
+            elif event_name == 'REWARD':
+                # Set all active targets to reward
+                for target_idx in self.hand_targets.keys():
+                    self.hand_targets[target_idx] = 2 if self.hand_targets[target_idx] else 0
+                for target_idx in self.eye_targets.keys():
+                    self.eye_targets[target_idx] = 2 if self.eye_targets[target_idx] else 0
+
+        elif key == 'cursor':
+            self.cursor_pos = np.array(values[0])[[0,2]]
+        elif key == 'calibrated_eye_pos':
+            self.calibrated_eye_pos = np.array(values[0])[:2]
+
+        elif key == 'eye_pos':
+            self.eye_pos = np.array(values[0])[:2]
+            self.temp = np.array(values[0])[:2]
+            self.eye_buffer[:,:2] = np.roll(self.eye_buffer[:,:2], -1, axis=0)
+            self.eye_buffer[-1,:2] = self.temp
+
+        elif key == 'eye_diam':
+            self.temp = np.array(values[0])[0]
+            self.eye_buffer[:,2] = np.roll(self.eye_buffer[:,2], -1, axis=0)
+            self.eye_buffer[-1,2] = self.temp
+
+        elif key == 'target_location':
+            target_idx, target_location = values
+            self.target_pos.append(np.array(target_location)[[0,2]])
+            self.target_idx_trial.append(target_idx)
+
+            
+    def get_current_pos(self):
+        '''
+        Get the current cursor, eye, and target positions
+
+        Returns:
+            cursor_pos ((2,) tuple): Current cursor position
+            eye_pos ((2,) tuple): Current eye position and diameters
+            targets (list): List of active targets in (position, radius, color) format
+        '''
+        try:
+            radius = self.task_params['target_radius']
+            eye_radius = self.task_params['fixation_radius']
+            color = 'orange'
+            eye_color = 'lightskyblue'
+            eye_targets = [(self.target_pos[0], eye_radius, eye_color if v == 1 else 'green') for k, v in self.eye_targets.items() if v and k < 3]
+            eye_targets.extend([(self.target_pos[1], eye_radius, eye_color if v == 1 else 'green') for k, v in self.eye_targets.items() if v and k >= 3])
+            hand_targets = [(self.target_pos[2], radius, color if v == 1 else 'green') for k, v in self.hand_targets.items() if v]
+        except:
+            eye_targets = []
+            hand_targets = []
+        
+        return self.cursor_pos, self.calibrated_eye_pos, eye_targets, hand_targets
+
+    def draw(self):
+        super(BehaviorAnalysisWorker, self).draw()
+        cursor_pos, calibrated_eye_pos, eye_targets, hand_targets = self.get_current_pos()
+        cursor_radius = self.task_params.get('cursor_radius', 0.25)
+        if 'fixation_radius_buffer' in self.task_params:
+            buffer = self.task_params['fixation_radius_buffer']
+        elif 'fixation_dist' in self.task_params:
+            buffer = self.task_params['fixation_dist'] - self.task_params['target_radius']
+        eye_radius = 0.2
+
+        patches1 = [plt.Circle(pos, radius+buffer) for pos, radius, _ in eye_targets]
+        patches2 = [plt.Circle(cursor_pos, cursor_radius), plt.Circle(calibrated_eye_pos, eye_radius)]
+        patches3 = [plt.Circle(pos, radius) for pos, radius, _ in eye_targets]
+        patches4 = [plt.Circle(pos, radius) for pos, radius, _ in hand_targets]
+        patches = patches1 + patches2 + patches3 + patches4
+        self.circles.set_paths(patches)
+        colors = [[0.8,0.8,0.8] for _, _, c in eye_targets]  + ['darkblue', 'darkgreen']  + [c for _, _, c in eye_targets] + [c for _, _, c in hand_targets]
+        self.circles.set_facecolor(colors)
+        self.circles.set_alpha(0.5)
+
+        self._draw_eye()
+
+class EyeHandSequenceAnalysisWorker(BehaviorAnalysisWorker):
+    '''
+    Plots calibrated_eye, cursor, and target data from experiments that have them. 
+    This is for eye-hand task
+    '''
+
+    def init(self):
+        super().init()
+        self.calibrated_eye_pos = np.zeros(2)
+        self.hand_targets = {}
+        self.eye_targets = {}
+        self.is_sequence = False
+
+    def handle_data(self, key, values):
+        super(BehaviorAnalysisWorker, self).handle_data(key, values)
+        if key == 'cycle_count':
+            self.cycle_count = values[0]       
+        elif key == 'sync_event':
+            event_name, event_data = values
+            if event_name == 'TARGET_ON':
+                self.hand_targets[event_data] = 1
+            elif event_name == 'TARGET_OFF':
+                self.hand_targets[event_data] = 0
+            elif event_name == 'EYE_TARGET_ON':
+                self.hand_targets[event_data] = 1
+                self.eye_targets[event_data] = 1
+            elif event_name == 'EYE_TARGET_OFF':
+                if not self.is_sequence:
+                    self.hand_targets[event_data] = 0
+
+                self.eye_targets[event_data] = 0
+            elif event_name in ['PAUSE', 'TRIAL_END', 'HOLD_PENALTY', 'DELAY_PENALTY', 'TIMEOUT_PENALTY','FIXATION_PENALTY', 'OTHER_PENALTY']:
+                # Clear targets at the end of the trial
+                self.hand_targets = {}
+                self.eye_targets = {}
+                self.is_sequence = False
+
+            elif event_name == 'REWARD':
+                # Set all active targets to reward
+                for target_idx in self.hand_targets.keys():
+                    self.hand_targets[target_idx] = 2 if self.hand_targets[target_idx] else 0
+                for target_idx in self.eye_targets.keys():
+                    self.eye_targets[target_idx] = 2 if self.eye_targets[target_idx] else 0
+
+        elif key == 'cursor':
+            self.cursor_pos = np.array(values[0])[[0,2]]
+        elif key == 'eye_pos':
+            self.eye_pos = np.array(values[0])[:2]
+            self.temp = np.array(values[0])[:2]
+            self.eye_buffer[:,:2] = np.roll(self.eye_buffer[:,:2], -1, axis=0)
+            self.eye_buffer[-1,:2] = self.temp
+
+        elif key == 'eye_diam':
+            self.temp = np.array(values[0])[0]
+            self.eye_buffer[:,2] = np.roll(self.eye_buffer[:,2], -1, axis=0)
+            self.eye_buffer[-1,2] = self.temp
+
+        elif key == 'calibrated_eye_pos':
+            self.calibrated_eye_pos = np.array(values[0])[:2]
+
+        elif key == 'target_location':
+            target_idx, target_location = values
+            self.target_pos[int(target_idx)] = np.array(target_location)[[0,2]]
+
+        elif key == 'is_sequence':
+            self.is_sequence = values[0]
+
+
+    def get_current_pos(self):
+        '''
+        Get the current cursor, eye, and target positions
+
+        Returns:
+            cursor_pos ((2,) tuple): Current cursor position
+            eye_pos ((2,) tuple): Current eye position and diameters
+            targets (list): List of active targets in (position, radius, color) format
+        '''
+        try:
+            radius = self.task_params['target_radius']
+            eye_radius = self.task_params['fixation_radius']
+            color = 'orange'
+            eye_color = 'darkcyan'
+            eye_targets = [(self.target_pos[k], eye_radius, eye_color if v == 1 else 'green') for k, v in self.eye_targets.items() if v]
+            hand_targets = [(self.target_pos[k], radius, color if v == 1 else 'green') for k, v in self.hand_targets.items() if v]
+        except:
+            eye_targets = []
+            hand_targets = []
+        
+        return self.cursor_pos, self.calibrated_eye_pos, eye_targets, hand_targets
+
+    def draw(self):
+        super(BehaviorAnalysisWorker, self).draw()
+        cursor_pos, calibrated_eye_pos, eye_targets, hand_targets = self.get_current_pos()
+        cursor_radius = self.task_params.get('cursor_radius', 0.25)
+        if 'fixation_radius_buffer' in self.task_params:
+            buffer = self.task_params['fixation_radius_buffer']
+        elif 'fixation_dist' in self.task_params:
+            buffer = self.task_params['fixation_dist'] - self.task_params['target_radius']
+        eye_radius = 0.2
+
+        patches1 = [plt.Circle(pos, radius+buffer) for pos, radius, _ in eye_targets]
+        patches2 = [plt.Circle(pos, radius) for pos, radius, _ in hand_targets]
+        patches3 = [plt.Circle(pos, radius) for pos, radius, _ in eye_targets]
+        patches4 = [plt.Circle(cursor_pos, cursor_radius), plt.Circle(calibrated_eye_pos, eye_radius)]
+        
+        patches = patches1 + patches2 + patches3 + patches4
+        self.circles.set_paths(patches)
+        colors = [[0.8,0.8,0.8] for _, _, c in eye_targets]  + [c for _, _, c in hand_targets] + [c for _, _, c in eye_targets] +  ['indigo', 'darkgreen']  
+        self.circles.set_facecolor(colors)
+        self.circles.set_alpha(0.7)
+
+        self._draw_eye()
+
 
 class ERPAnalysisWorker(AnalysisWorker):
     '''
@@ -291,12 +577,22 @@ class ERPAnalysisWorker(AnalysisWorker):
     '''
     bufferlen = 5 # seconds of data to keep in the buffer
 
-    def __init__(self, task_params, data_queue, update_rate=1, time_before=0.05, 
-                 time_after=0.1, figure_dir='/home/aolab/figures', **kwargs):
+    def __init__(self, task_params, data_queue, update_rate=1, time_before=0.1, 
+                 time_after=0.1, figure_dir='/home/aolab/figures',
+                 condition_idx=None, stim_sites=None, title=None, **kwargs):
         super().__init__(task_params, data_queue, update_rate=update_rate, **kwargs)
         self.time_before = time_before
         self.time_after = time_after
         self.figure_dir = figure_dir
+        self.title = title
+        try:
+            self.condition_idx = [int(condition_idx)]
+        except:
+            self.condition_idx = condition_idx
+        self.stim_sites = stim_sites
+        if self.condition_idx is not None and len(self.stim_sites) == 0:
+            raise ValueError('Condition index provided but no stim sites were present in the experiment')
+        self.current_condition_idx = 0
 
     def init(self):
         super().init()
@@ -304,6 +600,7 @@ class ERPAnalysisWorker(AnalysisWorker):
         # Initialize the data source
         self.elec_pos, self.acq_ch, _ = aopy.data.load_chmap('ECoG244')
         self.clock_dch = self.task_params.get('screen_sync_dch', 40)
+        self.headstage = self.task_params.get('headstage_connector', 7)
         self.clock_elapsed = 0
         self.clock_times = np.array([])
         self.trigger_dch = None
@@ -311,15 +608,30 @@ class ERPAnalysisWorker(AnalysisWorker):
         self.trigger_cycles = []
         self.trigger_times = []
         self.lfp_downsample = 25
+        self.erp_since_update = 0
 
+        # Determine the trigger channel and events based on the task parameters
         if 'qwalor_trigger_dch' in self.task_params:
             self.trigger_dch = self.task_params['qwalor_trigger_dch']
             channels = map_channels_for_multisource(headstage_channels=self.acq_ch, 
                                                          digital_channels=[self.clock_dch, self.trigger_dch])
+            print('Triggering on qwalor channel', self.trigger_dch)
+            print('Using clock channel', self.clock_dch)
+        elif 'qwalor_ch1_enable' in self.task_params: # TODO: support multiple lasers
+            for idx in range(1,5):
+                if self.task_params[f'qwalor_ch{idx}_enable']:
+                    self.trigger_dch = self.task_params[f'qwalor_ch{idx}_trigger_dch']
+                    break
+            channels = map_channels_for_multisource(headstage_channels=self.acq_ch,
+                                                            digital_channels=[self.clock_dch, self.trigger_dch])
+            print('Triggering on qwalor channel', self.trigger_dch)
+            print('Using clock channel', self.clock_dch)
         else:
             self.trigger_events.append('TARGET_ON') # For flash
             channels = map_channels_for_multisource(headstage_channels=self.acq_ch, digital_channels=[self.clock_dch])
-        self.ds = MultiChanDataSource(MultiSource, channels=channels, bufferlen=self.bufferlen)
+            print('Triggering on events', self.trigger_events)
+            print('Using clock channel', self.clock_dch)
+        self.ds = MultiChanDataSource(MultiSource, channels=channels, bufferlen=self.bufferlen, headstage=self.headstage)
         self.ds.start()
         print('datasource started')
 
@@ -333,6 +645,8 @@ class ERPAnalysisWorker(AnalysisWorker):
                                                  cmap='bwr', ax=self.ax)
         self.erp_im.set_clim(-100, 100)
         self.erp_text = self.ax.text(0.75, 1.05, '.', ha='center', va='center', fontsize=12, transform=self.ax.transAxes)
+        if self.title is not None:
+            self.ax.set_title(self.title)
 
         # Add a slider to control the range
         ax_slider = self.fig.add_axes([0.225, 0.075, 0.6, 0.03])
@@ -350,16 +664,37 @@ class ERPAnalysisWorker(AnalysisWorker):
         elec_pos, acq_ch, _ = aopy.data.load_chmap('ECoG244')
         stim_pos, stim_ch, _ = aopy.data.load_chmap('Opto32')
         for pos, ch in zip(elec_pos, acq_ch):
-            self.labels.append(aopy.visualization.annotate_spatial_map(pos, ch, 'c', 12, self.ax))
+            self.labels.append(aopy.visualization.annotate_spatial_map(pos, ch, 'c', fontsize=12, ax=self.ax))
         for pos, ch in zip(stim_pos, stim_ch):
-            self.labels.append(aopy.visualization.annotate_spatial_map(pos, ch, 'm', 12, self.ax))
+            self.labels.append(aopy.visualization.annotate_spatial_map(pos, ch, 'm', fontsize=12, ax=self.ax))
+        ax_toggle = self.fig.add_axes([0.1, 0.025, 0.1, 0.025])
+        self.toggle = Button(ax_toggle, 'Labels')
         def toggle_labels(event):
+            self.toggle.color = '0.85' if self.labels[0].get_visible() else '0.5'
             for label in self.labels:
                 label.set_visible(not label.get_visible())
         toggle_labels(None)
-        ax_toggle = self.fig.add_axes([0.1, 0.025, 0.1, 0.025])
-        self.toggle = Button(ax_toggle, 'Labels')
         self.toggle.on_clicked(toggle_labels)
+
+        # Add a toggle between voltage and z-score
+        self.zscore = False
+        def toggle_zscore(event):
+            self.zscore = not self.zscore
+            if self.zscore:
+                self.slider.valmax = 10
+                self.slider.set_val(5)
+                self.zscore_button.color = '0.5'
+            else:
+                self.slider.valmax = 1000
+                self.slider.set_val(100)
+                self.zscore_button.color = '0.85'
+            self.slider.ax.set_xlim(self.slider.valmin, self.slider.valmax)
+            self._update_erp_data()
+            self.draw()
+
+        self.ax_zscore = self.fig.add_axes([0.225, 0.025, 0.1, 0.025])
+        self.zscore_button = Button(self.ax_zscore, 'Z-score')
+        self.zscore_button.on_clicked(toggle_zscore)
 
     def update(self):
         super().update()
@@ -378,27 +713,36 @@ class ERPAnalysisWorker(AnalysisWorker):
             timestamps, edges = aopy.utils.detect_edges(trigger_data, self.ds.source.update_freq, rising=True, falling=False)   
             self.trigger_times = np.concatenate((self.trigger_times, timestamps + clock_elapsed_prev)).tolist()
 
+        # Only count triggers that occur during the specified condition if a condition index was provided
+        in_condition = True
+        if self.condition_idx is not None:
+            in_condition = self.current_condition_idx in self.condition_idx
+
         # Append new ERPs from trigger events
         fs = self.ds.source.update_freq / self.lfp_downsample
         nt = 2./self.update_rate # seconds
         npts = int(nt * self.ds.source.update_freq)
         lfp = self.ds.get(npts, map_channels_for_multisource(headstage_channels=self.acq_ch))
         lfp = np.array(lfp)[:,::self.lfp_downsample].T # reshape and downsample (nt, nch)
+        erp_count = 0
         ignored_trigger_cycles = []
         while len(self.trigger_cycles) > 0:
             cycle = self.trigger_cycles.pop()
             if cycle >= len(self.clock_times):
-                ignored_trigger_cycles.append(cycle)
+                ignored_trigger_cycles.append(cycle) # future cycle we haven't seen yet, check back on the next update
                 continue
             time = self.clock_times[cycle]
             if time + self.time_after > clock_elapsed_new:
-                ignored_trigger_cycles.append(cycle)
+                ignored_trigger_cycles.append(cycle) # future trigger we haven't seen yet, check back on the next update
                 continue
             elif time - self.time_before < clock_elapsed_new - nt:
-                print('missed cycle', cycle, 'at time', time)
+                print('missed cycle', cycle, 'at time', time) # missed trigger we don't have any data for, just skip it
                 continue
+            if not in_condition:
+                continue # trigger occurred outside of the specified condition, ignore it
             erp = aopy.analysis.calc_erp(lfp, [time - clock_elapsed_new + nt], self.time_before, self.time_after, fs)
             self.erp = np.concatenate((self.erp, erp), axis=2)
+            erp_count += 1
         self.trigger_cycles = ignored_trigger_cycles
 
         # Check for new digital triggers
@@ -406,22 +750,46 @@ class ERPAnalysisWorker(AnalysisWorker):
         while len(self.trigger_times) > 0:
             time = self.trigger_times.pop()
             if time + self.time_after > clock_elapsed_new:
-                ignored_trigger_times.append(time)
+                ignored_trigger_times.append(time) # future trigger we haven't seen yet, check back on the next update
                 continue
             elif time - self.time_before < clock_elapsed_new - nt:
-                print('missed trigger', time)
+                print('missed trigger', time) # missed trigger we don't have any data for, just skip it
                 continue
+            if not in_condition:
+                continue # trigger occurred outside of the specified condition, ignore it
             erp = aopy.analysis.calc_erp(lfp, [time - clock_elapsed_new + nt], self.time_before, self.time_after, fs)
             self.erp = np.concatenate((self.erp, erp), axis=2)
+            erp_count += 1
         self.trigger_times = ignored_trigger_times
 
         # Update the total elapsed time
         self.clock_elapsed = clock_elapsed_new
 
         # Update the ERP
+        self.erp_since_update += erp_count
+        self._update_erp_data()
+
+    def _update_erp_data(self):
+        if self.erp_since_update == 0:
+            return
+        if (self.erp.shape[2] > 50) and (self.erp_since_update < 10):
+            return  # only update the plot every 10 new ERPs to save on computation
+        self.erp_since_update = 0
+        
         fs = self.ds.source.update_freq / self.lfp_downsample
-        max_erp = aopy.analysis.get_max_erp(self.erp, self.time_before, self.time_after, fs, trial_average=True)
-        self.data_map = aopy.visualization.get_data_map(max_erp*1.907348633e-7*1e6, self.elec_pos[:,0], self.elec_pos[:,1])
+        if self.zscore:
+            altcond_window = (0, self.time_after)
+            nullcond_window = (-self.time_before, 0)
+            altcond, nullcond = aopy.analysis.latency.prepare_erp(self.erp, self.erp, fs, 
+                                                                self.time_before, self.time_after, 
+                                                                nullcond_window, altcond_window)[:2]
+            z_erp = np.std(nullcond, axis=0)
+            sd_erp = (altcond - np.mean(nullcond, axis=0)) / z_erp
+            max_erp = aopy.analysis.get_max_erp(sd_erp, 0, self.time_after, fs, trial_average=True)
+        else:
+            max_erp = aopy.analysis.get_max_erp(self.erp, self.time_before, self.time_after, fs, trial_average=True)
+            max_erp *= 1.907348633e-7*1e6 # convert to microvolts
+        self.data_map = aopy.visualization.get_data_map(max_erp, self.elec_pos[:,0], self.elec_pos[:,1])
 
     def handle_data(self, key, values):
         super().handle_data(key, values)
@@ -429,6 +797,10 @@ class ERPAnalysisWorker(AnalysisWorker):
             event_name, event_data = values
             if event_name in self.trigger_events:
                 self.trigger_cycles.append(self.cycle_count)
+        elif key == 'laser_conditions': # multiple lasers on each trial
+            self.current_condition_idx = values[0][0] # pick first one for now, TODO: support multiple conditions at once
+        elif key == 'laser_condition': # single laser on each trial
+            self.current_condition_idx = values[0]
 
     def draw(self):
         super().draw()
@@ -440,15 +812,104 @@ class ERPAnalysisWorker(AnalysisWorker):
         Cleanup tasks after the experiment ends, e.g. saving the figure.
         '''
         self.ds.stop()      
-        # TO-DO: implenent saving figures
         subject = self.task_params.get('subject_name', 'None')
         te_id = self.task_params.get('te_id', 'None')
         if te_id == 'None':
             return
         date = datetime.date.today()
-        filename = f'online_erp_{subject}_{te_id}_{date}.png'
+        if self.title is not None:
+            filename = f'online_erp_{self.title.replace(" ", "_")}_{subject}_{te_id}_{date}.png'
+        else:
+            filename = f'online_erp_{subject}_{te_id}_{date}.png'
         plt.figure(self.fig)
         aopy.visualization.savefig(self.figure_dir, filename, transparent=False)
+
+class SLICAnalysisWorker(ERPAnalysisWorker):
+    '''
+    Plots SLIC connectivity from experiments with an ECoG244 array recordings.
+    '''
+    def init(self):
+        super().init()
+        self.erp_im.set_clim(-0.1, 0.1)
+        stim_site = self.stim_sites[self.condition_idx[0]]
+        ch_near_stim = aopy.analysis.connectivity.get_acq_ch_near_stimulation_site(stim_site)
+        _, acq_ch, _ = aopy.data.load_chmap('ECoG244')
+        self.stim_ch = np.where(np.isin(acq_ch, ch_near_stim))[0]
+        self.taper_len = 0.06
+        self.angle_map = self.data_map.copy()
+        self.slic_map = self.data_map.copy()
+
+        # Add a toggle between coherence and phase
+        del self.zscore_button # hide the z-score button
+        self.show_angle = False
+        self.slider.valmin = 0
+        self.slider.valmax = 1
+        self.slider.set_val(0.1)
+        self.slider.ax.set_xlim(self.slider.valmin, self.slider.valmax)
+        def toggle_angle(event):
+            self.show_angle = not self.show_angle
+            if self.show_angle:
+                self.erp_im.set_cmap('YlGnBu')
+                self.erp_im.set_clim=(0, 2*np.pi),
+                self.slider.drag_active = False # disable the slider for phase
+            else:
+                self.erp_im.set_cmap('bwr')
+                self.erp_im.set_clim=(-self.slider.val, self.slider.val), 
+                self.erp_im.set_data(self.data_map)
+                self.slider.drag_active = True
+            self.draw()
+
+        self.ax_angle = self.fig.add_axes([0.225, 0.025, 0.1, 0.025])
+        self.angle_button = Button(self.ax_angle, 'Phase')
+        self.angle_button.on_clicked(toggle_angle)
+
+        # Add text boxes to enter the frequency band of interest
+        self.band = [80, 150]
+        def on_lf_text_submit(text):
+            try:
+                lf = float(text)
+                self.band[0] = lf
+            except:
+                pass
+        def on_hf_text_submit(text):
+            try:
+                hf = float(text)
+                self.band[1] = hf
+            except:
+                pass
+        axlf = self.fig.add_axes([0.525, 0.025, 0.05, 0.025])
+        self.lf_text = TextBox(axlf, 'Min freq (Hz)', initial='80')
+        self.lf_text.on_submit(on_lf_text_submit)
+        axhf = self.fig.add_axes([0.725, 0.025, 0.05, 0.025])
+        self.hf_text = TextBox(axhf, 'Max freq (Hz)', initial='150')
+        self.hf_text.on_submit(on_hf_text_submit)
+        print('finished init')
+
+    def _update_erp_data(self):
+        if self.erp_since_update == 0:
+            return
+        if (self.erp_since_update < 10):
+            return  # only update the plot every 10 new ERPs to save on computation
+        self.erp_since_update = 0
+
+        fs = self.ds.source.update_freq / self.lfp_downsample
+        freqs, time, coh_all, angle_all = aopy.analysis.connectivity.calc_connectivity_map_coh(
+            self.erp, fs, self.time_before, self.time_after, self.stim_ch, 
+            window=(-self.taper_len,self.taper_len), n=self.taper_len, step=self.taper_len, 
+            parallel=False, verbose=False
+        )
+        angle = aopy.analysis.calc_tfr_mean(freqs, time[1:], angle_all[:,[1],:], self.band)
+        self.angle_map = aopy.visualization.get_data_map(angle, self.elec_pos[:,0], self.elec_pos[:,1])
+        slic = aopy.analysis.calc_tfr_mean(freqs, time[1:], coh_all[:,[1],:]-coh_all[:,[0],:], self.band)
+        self.slic_map = aopy.visualization.get_data_map(slic, self.elec_pos[:,0], self.elec_pos[:,1])
+
+    def draw(self):
+        if self.show_angle:
+            self.data_map = self.angle_map
+        else:
+            self.data_map = self.slic_map
+        super().draw()
+
 
 class BMIAnalysisWorker(AnalysisWorker):
     '''
@@ -529,7 +990,8 @@ class OnlineDataServer(threading.Thread):
             MultiSource.pre_init()
             print('eCube streaming initialized')
         except:
-            pass
+            print('Error initializing eCube streaming')
+            traceback.print_exc()
 
         # Initialize the server
         self._stop_event = threading.Event()
@@ -566,15 +1028,53 @@ class OnlineDataServer(threading.Thread):
         Once the experiment is initialized but before it starts, we spin up the analysis processes
         based on what kind of experiment is running.
         '''
-        # Always start with the behavior analysis worker
+        # Open the behavior analysis worker
         print('init in state', self.state)
         data_queue = mp.Queue()
-        self.analysis_workers.append((BehaviorAnalysisWorker(self.task_params, data_queue), data_queue))
+        if self.task_params['experiment_name'] == 'ManualControl':
+            self.analysis_workers.append((BehaviorAnalysisWorker(self.task_params, data_queue), data_queue))
+
+        elif self.task_params['experiment_name'] == 'EyeConstrainedManualControl':
+            self.analysis_workers.append((SaccadeAnalysisWorker(self.task_params, data_queue), data_queue))
+
+        elif self.task_params['experiment_name'] == 'SaccadeTask':
+            self.analysis_workers.append((SaccadeAnalysisWorker(self.task_params, data_queue), data_queue))
+
+        elif self.task_params['experiment_name'] == 'HandConstrainedSaccadeTask':
+            self.analysis_workers.append((EyeHandAnalysisWorker(self.task_params, data_queue), data_queue))
+
+        elif self.task_params['experiment_name'] == 'EyeConstrainedReachingTask':
+            self.analysis_workers.append((EyeHandAnalysisWorker(self.task_params, data_queue), data_queue))        
+
+        elif self.task_params['experiment_name'] == 'EyeHandConstrainedReachingTask':
+            self.analysis_workers.append((EyeHandAnalysisWorker(self.task_params, data_queue), data_queue))  
+
+        elif self.task_params['experiment_name'] == 'EyeHandConstrainedSequentialReachingTask':
+            self.analysis_workers.append((EyeHandAnalysisWorker(self.task_params, data_queue), data_queue))   
+
+        elif self.task_params['experiment_name'] == 'EyeHandSequenceTask':
+            self.analysis_workers.append((EyeHandSequenceAnalysisWorker(self.task_params, data_queue), data_queue))     
 
         # Is there ecube neural data?
         if 'record_headstage' in self.task_params and self.task_params['record_headstage']:
-            data_queue = mp.Queue()
-            self.analysis_workers.append((ERPAnalysisWorker(self.task_params, data_queue), data_queue))
+            stim_site = self.task_params.get('stimulation_site', 0)
+            try:
+                stim_sites = [int(stim_site)]
+            except:
+                stim_sites = [int(s) for s in stim_site]
+            for idx, site in enumerate(stim_sites):
+                if site == -1:
+                    continue
+                title = f"Stim site {site}"
+                data_queue = mp.Queue()
+                self.analysis_workers.append((ERPAnalysisWorker(
+                    self.task_params, data_queue, condition_idx=idx, stim_sites=stim_sites, 
+                    title=title), data_queue))
+                title = f"SLIC Stim site {site}"
+                data_queue = mp.Queue()
+                self.analysis_workers.append((SLICAnalysisWorker(
+                    self.task_params, data_queue, condition_idx=idx, stim_sites=stim_sites, 
+                    title=title), data_queue))
 
         # Is this a BMI task?
         if 'decoder' in self.task_params:
@@ -603,6 +1103,10 @@ class OnlineDataServer(threading.Thread):
                 self.is_completed = True
             for _, data_queue in self.analysis_workers:
                 data_queue.put((key, values))
+        elif key == 'init' and self.is_running:
+            print('Experiment died in error, restarting')
+            self.reset()
+            self.init()
         elif key == 'init' and values[0]:
             self.is_running = True
             self.init()
@@ -644,7 +1148,7 @@ if __name__ == '__main__':
         hostname = 'localhost'
     
     if len(sys.argv) >= 3:
-        port = sys.argv[2]
+        port = int(sys.argv[2])
     else:
         port = 5000
 
@@ -653,7 +1157,7 @@ if __name__ == '__main__':
     else:
         display = ':0'
 
-    # Spin up servernode
+    # # Spin up servernode
     # if hostname == '0.0.0.0':
     #     import subprocess
     #     subprocess.Popen('/home/aolab/code/bmi3d/riglib/ecube/servernode-control')

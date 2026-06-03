@@ -51,7 +51,7 @@ class SuperSimpleEndPtAssister(object):
 
         assist_cursor_vel = (assist_cursor_pos-cursor_pos)/decoder_binlen
         x_assist = np.hstack([assist_cursor_pos, assist_cursor_vel, 1])
-        x_assist = np.mat(x_assist.reshape(-1,1))
+        x_assist = np.asmatrix(x_assist.reshape(-1,1))
         return x_assist
 
 #SimCosineTunedEnc
@@ -64,15 +64,15 @@ class SimVFB(Autostart, SimTime, FakeWindow, SimKFDecoderSup, SimFAEnc, BMIContr
         #OFC FB CTRL   from BMIControlMulti
         # F = np.eye(7)
         # decoding_rate = 10.
-        # B = np.mat(np.vstack([np.zeros([3,3]), np.eye(3)*1000*1./decoding_rate, np.zeros(3)]))
+        # B = np.asmatrix(np.vstack([np.zeros([3,3]), np.eye(3)*1000*1./decoding_rate, np.zeros(3)]))
         # B = np.hstack((np.zeros((7, 3)), B, np.zeros((7, 1)) ))
         # self.fb_ctrl = feedback_controllers.LinearFeedbackController(A=B, B=B, F=F)
         self.fb_ctrl = SuperSimpleEndPtAssister()
         self.sim_C = np.zeros((self.n_neurons, ssm.n_states))
 
         # self.A, self.B, _ = ssm.get_ssm_matrices()
-        # self.Q = np.mat(np.diag([1., 1., 1., 5, 5, 5, 0]))
-        # self.R = 1e6 * np.mat(np.diag([1., 1., 1.]))
+        # self.Q = np.asmatrix(np.diag([1., 1., 1., 5, 5, 5, 0]))
+        # self.R = 1e6 * np.asmatrix(np.diag([1., 1., 1.]))
         # self.fb_ctrl = LQRController(self.A, self.B, self.Q, self.R)
 
         self.plant = plantlist.plantlist[self.plant_type]

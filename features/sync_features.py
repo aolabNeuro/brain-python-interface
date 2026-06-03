@@ -122,6 +122,7 @@ class HDFSync(traits.HasTraits):
             h5file = tables.open_file(self.h5file.name, mode='a')
             for param in self.sync_params.keys():
                 h5file.root.sync_events.attrs[param] = self.sync_params[param]
+                h5file.root.sync_events.attrs['t0'] = self.t0
             h5file.close()
 
 class NIDAQSync(HDFSync):
@@ -249,7 +250,7 @@ class ScreenSync(traits.HasTraits):
         self.fps = self._tmp_fps
         # if hasattr(self, 'decoder'):
         #     self.decoder.set_call_rate(1./self.fps)
-        #     print("restore update rate")
+        print("restore update rate")
 
     def _test_start_experiment(self, ts):
         return ts > self.sync_state_duration

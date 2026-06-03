@@ -26,13 +26,16 @@ class Texture(object):
 
         if isinstance(tex, np.ndarray):
             if tex.max() <= 1:
-                tex *= 255
-            if len(tex.shape) < 3:
-                tex = np.tile(tex, [3, 1, 1]).T
-            if tex.shape[-1] == 3:
-                tex = np.dstack([tex, np.ones(tex.shape[:-1])])
-            size = tex.shape[:2]
-            tex = tex.astype(np.uint8).tobytes()
+                tex = (tex * 255).astype(np.uint8)
+            else:
+                tex = tex.astype(np.uint8)
+            if tex.ndim == 2:
+                tex = np.stack([tex]*3, axis=-1)  # grayscale → RGB
+            elif tex.shape[-1] == 1:
+                tex = np.repeat(tex, 3, axis=-1)
+            if size is None:
+                size = (tex.shape[1], tex.shape[0])
+            tex = np.ascontiguousarray(tex.astype(np.uint8)).tobytes()
         elif isinstance(tex, str):
             im = pygame.image.load(tex)
             size = im.get_size()
@@ -41,6 +44,68 @@ class Texture(object):
         self.texstr = tex
         self.size = size
         self.tex = None
+
+    def update(self, tex, size=None):
+        if not isinstance(tex, np.ndarray):
+            raise TypeError("Texture.update expects a numpy ndarray")
+
+        if tex.max() <= 1:
+            tex = (tex * 255).astype(np.uint8)
+        else:
+            tex = tex.astype(np.uint8)
+
+        if tex.ndim == 2:
+            tex = np.stack([tex] * 3, axis=-1)
+        elif tex.shape[-1] == 1:
+            tex = np.repeat(tex, 3, axis=-1)
+
+        if size is None:
+            size = (tex.shape[1], tex.shape[0])
+
+        tex = np.ascontiguousarray(tex.astype(np.uint8))
+        tex_bytes = tex.tobytes()
+
+        if self.tex is None:
+            self.size = size
+            self.texstr = tex_bytes
+            self.init()
+            return
+
+        width, height = int(size[0]), int(size[1])
+        needs_realloc = tuple(size) != tuple(self.size)
+
+        glBindTexture(GL_TEXTURE_2D, self.tex)
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
+        if needs_realloc:
+            glTexImage2D(
+                GL_TEXTURE_2D,
+                0,
+                self.opts['iformat'],
+                width,
+                height,
+                0,
+                self.opts['exformat'],
+                self.opts['dtype'],
+                tex_bytes,
+            )
+            self.size = size
+        else:
+            glTexSubImage2D(
+                GL_TEXTURE_2D,
+                0,
+                0,
+                0,
+                width,
+                height,
+                self.opts['exformat'],
+                self.opts['dtype'],
+                tex_bytes,
+            )
+
+        if self.opts['mipmap']:
+            glGenerateMipmap(GL_TEXTURE_2D)
+
+        self.texstr = tex_bytes
 
     def init(self):
         if self.tex is not None:
@@ -70,6 +135,9 @@ class Texture(object):
 
         # Ensure width and height are integers
         width, height = int(self.size[0]), int(self.size[1])
+
+        # Avoid row-stride artifacts for RGB textures whose row width is not 4-byte aligned.
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
         
         # Create and fill texture
         glTexImage2D(
@@ -87,8 +155,6 @@ class Texture(object):
         error = glGetError()
         if error != GL_NO_ERROR:
             print(f"OpenGL error after texture creation: {error}")
-        else:
-            print(f"Texture initialized successfully: {gltex}")
         
         self.tex = gltex
     
@@ -141,3 +207,11 @@ class TexModel(Model):
             yield shader, self.draw, self.tex
         else:
             yield self.shader, self.draw, self.tex
+
+    def release(self):
+        self.tex.delete()
+
+    def replace_texture(self, new_tex):
+        self.tex.delete()
+        self.tex = new_tex
+        self.tex.init()

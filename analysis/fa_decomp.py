@@ -135,7 +135,7 @@ def learning_curve_metrics(hdf_list, epoch_size=56, n_factors=5):
         #SOT Variance Ratio by target
         #Priv var / mean
         Cov_Priv = np.sum(FA.noise_variance_)
-        U = np.mat(FA.components_).T
+        U = np.asmatrix(FA.components_).T
         Cov_Shar = np.trace(U*U.T)
 
         ratio.append(Cov_Shar/(Cov_Shar+Cov_Priv))
@@ -470,7 +470,7 @@ def shared_vs_total_var(spk, targ_ix, reach_time, factors=5):
         FA.fit(zscore_X)
 
         Cov_Priv = np.sum(FA.noise_variance_)
-        U = np.mat(FA.components_).T
+        U = np.asmatrix(FA.components_).T
         Cov_Shar = np.trace(U*U.T)
 
         ratio[it] = Cov_Shar/(Cov_Shar+Cov_Priv)
@@ -517,7 +517,7 @@ def fast_vs_slow_trials(spk, targ_ix, reach_time, factors=5,plot=True, all_trial
             FA.fit(zscore_X)
 
             Cov_Priv = np.sum(FA.noise_variance_)
-            U = np.mat(FA.components_).T
+            U = np.asmatrix(FA.components_).T
             Cov_Shar = np.trace(U*U.T)
             return Cov_Shar/(Cov_Shar+Cov_Priv)
         
@@ -549,8 +549,8 @@ def fast_vs_slow_trials(spk, targ_ix, reach_time, factors=5,plot=True, all_trial
     return fast_ratio, slow_ratio, beh_fast, beh_slow
 
 def FA_subspace_align(FA1, FA2):
-    U_A = np.mat(FA1.components_.T)
-    U_B = np.mat(FA2.components_).T
+    U_A = np.asmatrix(FA1.components_.T)
+    U_B = np.asmatrix(FA2.components_).T
     v, s, vt = np.linalg.svd(U_B*U_B.T)
     P_B = v*vt
     S_A_shared = U_A*U_A.T

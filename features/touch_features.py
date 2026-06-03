@@ -4,10 +4,132 @@ Features for a touch sensor on the neurosync arduino
 '''
 from riglib.experiment import traits
 from riglib import touch_data
+import numpy as np
+import pygame
+from riglib.experiment import traits
+from riglib.touch_data import TabletTouchData
+import subprocess
 
 ########################################################################################################
 # Touch sensor datasources
 ########################################################################################################
+
+class TabletTouch(traits.HasTraits):
+
+    host_ip = traits.String("192.168.0.150", desc="The ip address of the bmi host machine.")
+    port_value = traits.Int(8000, desc='The port value to identify which tablet is running.')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Create a source to buffer the touch data
+        from riglib import source
+        TabletTouchData.udp_port = self.port_value + 5
+        self.touch_data = source.DataSource(TabletTouchData)
+
+        if self.port_value == 8000:
+            self.tablet_ip = "192.168.0.100"
+            self.tablet_username = "AOLabs"
+        elif self.port_value == 9000:
+            self.tablet_ip = "192.168.0.200"
+            self.tablet_username = "aolab"
+        elif self.port_value== 7000:
+            self.tablet_ip = "192.168.0.170" # 300
+        elif self.port_value == 8500:
+            self.tablet_ip = "192.168.0.201"
+            self.tablet_username = "AOLabs"
+        else:
+            print('uh oh')
+            self.tablet_ip = "192.168.0.150"
+
+        # Save to the sink
+        from riglib import sink
+        sink_manager = sink.SinkManager.get_instance()
+        sink_manager.register(self.touch_data)
+
+    def run(self):
+        '''
+        Code to execute immediately prior to the beginning of the task FSM executing, or after the FSM has finished running. 
+        See riglib.experiment.Experiment.run(). This 'run' method starts the motiondata source and stops it after the FSM has finished running
+        '''
+        self.touch_data.start()
+        try:
+            print("Starting touch app")
+            ssh_cmd = ["ssh", f"{self.tablet_username}@{self.tablet_ip}", rf"C:\Users\tablet_touch\start_touch.bat", rf"{self.host_ip}", rf"{self.port_value + 5}"]
+            subprocess.Popen(ssh_cmd)
+            super().run()
+        finally:
+            print("Stopping touch streaming")
+            self.touch_data.stop()
+            print("Stopping touch app")
+            ssh_cmd = ["ssh", f"{self.tablet_username}@{self.tablet_ip}", rf"C:\Users\tablet_touch\exit_touch.bat"]
+            subprocess.Popen(ssh_cmd)
+
+    def _get_manual_position(self):
+        ''' Overridden method to get input coordinates based on touch data'''
+
+        # Get data from optitrack datasource
+        data = self.touch_data.get(all=True) # List of (list of features)
+
+        # Hide cursor until first touch event (by making manual input NaN)
+        if len(data) == 0:
+            return np.ones((3,))*np.nan
+        
+        # Keep cursor at most recent valid position (by making manual input None)
+        if data[-1][0] == -1:
+            return
+
+        # Otherwise get the most recent touch position
+        pos = np.array(data[-1])[1:].astype(float) # get the most recent event
+        pos[0] = (pos[0] / self.window_size[0] - 0.5) * self.screen_cm[0]
+        pos[1] = -(pos[1] / self.window_size[1] - 0.5) * self.screen_cm[1] # pygame counts (0,0) as the top left
+
+        return [pos[0], pos[1], 0]
+
+class MouseEmulateTouch(traits.HasTraits):
+    '''
+    Emulate a touch screen by detecting when mouse position doesn't update
+    '''
+
+    mouse_repeat_delay = traits.Float(1., desc="Time in seconds before the same mouse position causes the cursor to disappear")
+
+    def init(self, *args, **kwargs):
+        super().init(*args, **kwargs)
+        n_repeat_delay = int(self.mouse_repeat_delay * self.fps)
+        self.joystick = MouseHistory(self.window_size, self.screen_cm, 
+                                     np.array(self.starting_pos[::2]), n_repeat_delay=n_repeat_delay)
+
+class MouseHistory():
+    '''
+    Pretend to be a data source
+    '''
+
+    def __init__(self, window_size, screen_cm, start_pos, n_repeat_delay=3, init_frames=3):
+        self.window_size = window_size
+        self.screen_cm = screen_cm
+        self.history = np.zeros((n_repeat_delay, 2))
+        self.pos = [0., 0.]
+        self.pos[0] = start_pos[0]
+        self.pos[1] = start_pos[1]
+        self.init_frames = init_frames
+
+    def get(self):
+        pos = pygame.mouse.get_pos()
+        self.pos[0] = (pos[0] / self.window_size[0] - 0.5) * self.screen_cm[0]
+        self.pos[1] = -(pos[1] / self.window_size[1] - 0.5) * self.screen_cm[1] # pygame counts (0,0) as the top left
+        
+        # Have to ignore the first few positions because they can change when the screen is initializing
+        if self.init_frames > 0:
+            self.history[:] = self.pos
+            self.init_frames -= 1
+
+        # Save a buffer of previous positions and if they are all the same, then set pos to NaN
+        self.history[:-1, :] = self.history[1:, :]
+        self.history[-1, :] = self.pos
+        if np.all(np.diff(self.history, axis=0) == 0):
+            self.pos[0] = np.nan
+            self.pos[1] = np.nan
+        return [self.pos]
 
 class TouchDataFeature(traits.HasTraits):
     '''

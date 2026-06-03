@@ -71,8 +71,8 @@ class LinearFeedbackController(FeedbackController):
         np.matrix
         '''
         # explicitly cast current_state and target_state to column vectors
-        current_state = np.mat(current_state).reshape(-1,1)
-        target_state = np.mat(target_state).reshape(-1,1)
+        current_state = np.asmatrix(current_state).reshape(-1,1)
+        target_state = np.asmatrix(target_state).reshape(-1,1)
         ns = self.A * current_state + self.B * self.F * (target_state - current_state)
 
         return ns
@@ -92,8 +92,8 @@ class LinearFeedbackController(FeedbackController):
         '''
         
         
-        current_state = np.mat(current_state).reshape(-1,1)
-        target_state = np.mat(target_state).reshape(-1,1)
+        current_state = np.asmatrix(current_state).reshape(-1,1)
+        target_state = np.asmatrix(target_state).reshape(-1,1)
         Bu = self.B * self.F * (target_state - current_state)
         return Bu
 
@@ -125,10 +125,10 @@ class LQRController(LinearFeedbackController):
         -------
         LQRController instance
         '''
-        self.A = np.mat(A)
-        self.B = np.mat(B)
-        self.Q = np.mat(Q)
-        self.R = np.mat(R)
+        self.A = np.asmatrix(A)
+        self.B = np.asmatrix(B)
+        self.Q = np.asmatrix(Q)
+        self.R = np.asmatrix(R)
         F = self.dlqr(A, B, Q, R, **kwargs)
         super(LQRController, self).__init__(A, B, F, **kwargs)
 
