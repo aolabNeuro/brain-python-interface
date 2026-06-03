@@ -321,6 +321,7 @@ class ScreenTargetCapture(TargetCapture, Window):
     cursor_bounds = traits.Tuple((-10., 10., -10., 10., -10., 10.), desc='(x min, x max, y min, y max, z min, z max)')
     starting_pos = traits.Tuple((5., 0., 5.), desc='Where to initialize the cursor') 
     cursor_lag = traits.Float(0, desc='Number of seconds to lag the cursor position')
+    cursor_fb_rate = traits.Float(60, desc='Rate at which to update the cursor position on screen (Hz)')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

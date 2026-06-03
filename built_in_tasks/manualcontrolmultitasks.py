@@ -167,11 +167,16 @@ class ManualControlMixin(traits.HasTraits):
             else:
                 self.current_pt = self.last_pt
 
-        self.plant.set_endpoint_pos(self.current_pt)
-        self.last_pt = self.plant.get_endpoint_pos()
+        # only update the cursor position on screen at the specified feedback rate
+        if self.cycle_count % int(self.fps / self.cursor_fb_rate) == 0:
+
+            self.plant.set_endpoint_pos(self.current_pt)
+            self.last_pt = self.plant.get_endpoint_pos()
 
         self._pos_buffer.append(self.last_pt.copy())
         self.plant.cursor.translate(*self._pos_buffer[0], reset=True)
+
+
 
     def update_report_stats(self):
         super().update_report_stats()

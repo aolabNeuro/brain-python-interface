@@ -397,7 +397,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         'tracking_target_chain', 'tracking_target_debug', 'tracking_target_training', 'single_sine_chain', 'circle_chain', 'figure8_chain'
     ]
 
-    hidden_traits = ['cursor_color', 'trajectory_color', 'cursor_bounds', 'cursor_radius', 'plant_hide_rate', 'starting_pos', 'cursor_lag']
+    hidden_traits = ['cursor_color', 'trajectory_color', 'cursor_bounds', 'cursor_radius', 'plant_hide_rate', 'starting_pos', 'cursor_lag', 'cursor_fb_rate'] # traits that are not shown in the GUI because they are more for debugging or specific use cases
     targets = []
 
     is_bmi_seed = True
@@ -417,6 +417,7 @@ class ScreenTargetTracking(TargetTracking, Window):
     cursor_bounds = traits.Tuple((-10., 10., 0., 0., -10., 10.), desc='(x min, x max, z min, z max, y min, y max)')
     starting_pos = traits.Tuple((5., 0., 5.), desc='Where to initialize the cursor')
     cursor_lag = traits.Float(0, desc='Number of seconds to lag the cursor position')
+    cursor_fb_rate = traits.Float(60, desc='Rate at which to update the cursor position on screen (Hz)')
     fps = traits.Float(60, desc="Rate at which the FSM is called in Hz") # originally set by class Experiment
     trajectory_amplitude = traits.Float(1, desc='Scale factor applied to the trajectory')
     disturbance_amplitude = traits.Float(1, desc='Scale factors applied to the disturbance')
