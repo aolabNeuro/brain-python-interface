@@ -23,6 +23,7 @@ class Renderer(object):
         self.projection = perspective(fov, w / h, near, far)
         self.light_direction = light_direction or (-1., -2., -2., 0.)
         self.modelview = np.eye(4) if modelview is None else modelview
+        self._maxtex_units = 16
 
         #Add the default shaders
         if shaders is None:
@@ -46,7 +47,13 @@ class Renderer(object):
         for name, shaders in list(programs.items()):
             self.add_program(name, shaders)
         
-        #Set up the texture units
+        # Cache max texture unit count while a valid GL context is current.
+        try:
+            self._maxtex_units = int(glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS))
+        except Exception:
+            self._maxtex_units = 16
+
+        # Set up the texture units
         self.reset_texunits()
 
         #Generate the default fullscreen quad
@@ -100,10 +107,14 @@ class Renderer(object):
         return self.texunits[tex]
     
     def reset_texunits(self):
-        maxtex = glGetIntegerv(GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS)
-        # print(f"Max texture units: {maxtex}")
-        # glActiveTexture(GL_TEXTURE0)  # Reset to default texture unit
-        self.texavail = set((i, globals()['GL_TEXTURE%d'%i]) for i in range(1, maxtex))
+        maxtex = max(2, int(getattr(self, "_maxtex_units", 16)))
+        texavail = set()
+        for i in range(1, maxtex):
+            name = 'GL_TEXTURE%d' % i
+            if name not in globals():
+                break
+            texavail.add((i, globals()[name]))
+        self.texavail = texavail
         self.texunits = dict() 
 
     def add_shader(self, name, stype, filename, *includes):

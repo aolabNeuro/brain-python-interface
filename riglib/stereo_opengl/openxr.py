@@ -47,9 +47,8 @@ class WindowVR(Window):
     fixed_camera_orientation = traits.Bool(False, desc="Fixed orientation of the camera")
     xr_runtime_json = traits.String("", desc="Optional path to OpenXR runtime JSON. If empty, uses XR_RUNTIME_JSON from the environment")
     swapchain_color_format = traits.OptionsList("auto", "srgb8a8", "rgba8", desc="Preferred OpenXR swapchain color format")
-    vr_disable_cull_face = traits.Bool(True, desc="Disable face culling in VR to avoid black output if winding/handedness differs by runtime")
-    pose_mapping_mode = traits.OptionsList("auto", "native", "legacy", desc="How OpenXR pose is mapped into bmi3d coordinates")
     xr_ignore_window_close = traits.Bool(True, desc="Ignore hidden OpenXR helper-window close signal to keep frame loop running")
+    setup_steamvr_env = traits.Bool(True, desc="Set SteamVR helper environment paths for stable runtime startup")
 
     hidden_traits = ['fps', 'window_size', 'screen_dist']
 
@@ -64,6 +63,8 @@ class WindowVR(Window):
     def screen_init(self):
         from ctypes import byref, c_int32, c_void_p, cast, POINTER, pointer, Structure
 
+        if self.setup_steamvr_env:
+            self._setup_steamvr_env()
         if self.xr_runtime_json:
             os.environ['XR_RUNTIME_JSON'] = self.xr_runtime_json
         pygame.init()
@@ -209,10 +210,7 @@ class WindowVR(Window):
             config_views[0].recommended_image_rect_width * 2,
             config_views[0].recommended_image_rect_height)
 
-        if self._xr_swapchain_srgb:
-            glEnable(GL_FRAMEBUFFER_SRGB)
-        else:
-            glDisable(GL_FRAMEBUFFER_SRGB)
+        glDisable(GL_FRAMEBUFFER_SRGB)
         glEnable(GL_BLEND)
         glDepthFunc(GL_LESS)
         glEnable(GL_DEPTH_TEST)
@@ -220,11 +218,8 @@ class WindowVR(Window):
         glClearColor(*self.background)
         glClearDepth(1.0)
         glDepthMask(GL_TRUE)
-        if self.vr_disable_cull_face:
-            glDisable(GL_CULL_FACE)
-        else:
-            glEnable(GL_CULL_FACE)
-            glCullFace(GL_BACK)
+        glEnable(GL_CULL_FACE)
+        glCullFace(GL_BACK)
 
         self.renderer = self._get_renderer()
 
@@ -237,13 +232,8 @@ class WindowVR(Window):
         self.xr_context = context
         if self.xr_ignore_window_close:
             context.graphics.poll_events = lambda: False
-        self._pose_mapping_mode = self._resolve_pose_mapping_mode()
-        if self._pose_mapping_mode == "native" and tuple(self.camera_offset) == (0, -130, 40):
-            self.camera_offset = (0, 0, 0)
-            print("OpenXR info: using native pose mapping; camera_offset defaulted to (0, 0, 0) for HMD-centric tracking")
         print("Initialized OpenXR window")
         print(f"OpenXR swapchain format: {color_swapchain_format} (sRGB={self._xr_swapchain_srgb})")
-        print(f"OpenXR pose mapping mode: {self._pose_mapping_mode}")
 
     def _get_renderer(self):
         near = 1
@@ -252,13 +242,38 @@ class WindowVR(Window):
             glFrontFace(GL_CW);  # Switch to clockwise winding for mirrored objects
         return shadow_map.ShadowMapper(self.window_size, self.fov, near, far)
 
-    def _resolve_pose_mapping_mode(self):
-        if self.pose_mapping_mode != "auto":
-            return self.pose_mapping_mode
-        runtime_json = os.environ.get("XR_RUNTIME_JSON", "").lower()
-        if "monado" in runtime_json:
-            return "legacy"
-        return "native"
+    def _setup_steamvr_env(self):
+        steamvr_root = os.path.expanduser('~/.local/share/Steam/steamapps/common/SteamVR')
+        vrenv = os.path.join(steamvr_root, 'bin', 'vrenv.sh')
+        if os.path.exists(vrenv):
+            os.environ.setdefault('STEAMVR_VRENV', vrenv)
+
+        # Reduce hard process termination when auxiliary SteamVR helpers fail.
+        os.environ.setdefault('STEAMVR_DISABLE_THREAD_WATCHDOGS', '1')
+        os.environ.setdefault('STEAMVR_DISABLE_ASSERT_MINIDUMP', '1')
+        os.environ.setdefault('STEAMVR_DISABLE_CRASH_REPORTING', '1')
+
+        candidates = [
+            os.path.join(steamvr_root, 'bin', 'linux64'),
+            os.path.join(steamvr_root, 'bin', 'linux64', 'qt', 'lib'),
+            os.path.join(steamvr_root, 'bin', 'vrwebhelper', 'linux64'),
+            os.path.join(steamvr_root, 'tools', 'lighthouse', 'bin', 'linux64'),
+        ]
+        existing = [p for p in os.environ.get('LD_LIBRARY_PATH', '').split(':') if p]
+
+        # Prevent conda/OpenCV libs from shadowing SteamVR's bundled runtime libs.
+        filtered = []
+        for p in existing:
+            pl = p.lower()
+            if 'miniconda' in pl or 'anaconda' in pl or 'site-packages/cv2' in pl:
+                continue
+            filtered.append(p)
+
+        for p in reversed(candidates):
+            if os.path.isdir(p) and p not in filtered:
+                filtered.insert(0, p)
+
+        os.environ['LD_LIBRARY_PATH'] = ':'.join(filtered)
 
     def _view_loop_retry(self, frame_state):
         if not frame_state.should_render:
@@ -345,47 +360,34 @@ class WindowVR(Window):
             frame_state = next(self.xr_frame_generator)
         except StopIteration:
             return
-            return
 
-        camera_positions = []
-        camera_rotations = []
         for view_index, view in self._view_loop_retry(frame_state):
             projection = xr.Matrix4x4f.create_projection_fov(
                 graphics_api=xr.GraphicsAPI.OPENGL,
                 fov=view.fov,
                 near_z=0.05,
                 far_z=1024,
-            ).as_numpy().reshape(4,4)
-
-            raw_position = np.array([
-                view.pose.position[0]*100,
-                view.pose.position[1]*100,
-                view.pose.position[2]*100,
-            ], dtype=float)
-            raw_rotation = np.array([
-                view.pose.orientation.w,
-                view.pose.orientation.x,
-                view.pose.orientation.y,
-                view.pose.orientation.z,
-            ], dtype=float)
+            ).as_numpy().reshape(4,4).T
 
             if self.fixed_camera_position:
-                position = np.array(self.camera_position, dtype=float)
+                position = np.array(self.camera_position, dtype=float) - np.array([1,0,0])*self.iod*(view_index-0.5)
             else:
-                if self._pose_mapping_mode == "legacy":
-                    position = -(raw_position + np.array(self.camera_offset, dtype=float))
-                else:
-                    position = raw_position + np.array(self.camera_offset, dtype=float)
+                position = -np.array([
+                    view.pose.position[0]*100 + self.camera_offset[0],
+                    view.pose.position[1]*100 + self.camera_offset[1],
+                    view.pose.position[2]*100 + self.camera_offset[2],
+                ])
+                self.camera_position = tuple(position + np.array([1,0,0])*self.iod*(view_index-0.5))
             if self.fixed_camera_orientation:
-                rotation = np.array(self.camera_orientation, dtype=float)
+                rotation = self.camera_orientation
             else:
-                if self._pose_mapping_mode == "legacy":
-                    rotation = np.array([raw_rotation[0], -raw_rotation[1], -raw_rotation[2], -raw_rotation[3]], dtype=float)
-                else:
-                    rotation = raw_rotation
-
-            camera_positions.append(position)
-            camera_rotations.append(rotation)
+                rotation = np.array([
+                    view.pose.orientation.w,
+                    -view.pose.orientation.x,
+                    -view.pose.orientation.y,
+                    -view.pose.orientation.z,
+                ])
+                self.camera_orientation = tuple(rotation)
             xfm = Transform(move=position, rotate=Quaternion(*rotation)) 
             self.modelview = xfm.to_mat(reverse=True)
 
@@ -403,13 +405,18 @@ class WindowVR(Window):
                 self.task_data['view_pose_rotation'][:,view_index,:] = rotation
                 self.task_data['modelview'][:,view_index] = self.modelview
 
-        self.renderer.draw_done()
+        try:
+            graphics.make_current()
+            self.renderer.draw_done()
+        except Exception as exc:
+            if not hasattr(self, '_warned_draw_done_error'):
+                self._warned_draw_done_error = False
+            if not self._warned_draw_done_error:
+                print(f"OpenXR warning: draw_done failed ({exc}). Continuing.")
+                self._warned_draw_done_error = True
 
         # Save the cylopian pose data
         if hasattr(self, 'task_data'):
-            if len(camera_positions) > 0:
-                self.camera_position = tuple(np.mean(np.vstack(camera_positions), axis=0))
-                self.camera_orientation = tuple(camera_rotations[0])
             self.task_data['camera_position'] = self.camera_position
             self.task_data['camera_orientation'] = self.camera_orientation
 
