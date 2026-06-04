@@ -96,15 +96,18 @@ class Renderer(object):
         '''Input a Texture object, output a tuple (index, TexUnit)'''
         if tex not in self.texunits:
             unit = self.texavail.pop()
-            glActiveTexture(unit[1])
-            if tex == "None":
-                glBindTexture(GL_TEXTURE_2D, 0)
-            else:
-                glBindTexture(GL_TEXTURE_2D, tex.tex)
             #print "Binding %r to %d"%(tex, unit[0])
             self.texunits[tex] = unit[0]
+
+        unit_idx = self.texunits[tex]
+        unit_name = globals().get('GL_TEXTURE%d' % unit_idx, GL_TEXTURE0 + unit_idx)
+        glActiveTexture(unit_name)
+        if tex == "None":
+            glBindTexture(GL_TEXTURE_2D, 0)
+        else:
+            glBindTexture(GL_TEXTURE_2D, tex.tex)
         
-        return self.texunits[tex]
+        return unit_idx
     
     def reset_texunits(self):
         maxtex = max(2, int(getattr(self, "_maxtex_units", 16)))
