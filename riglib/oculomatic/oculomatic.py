@@ -1,5 +1,5 @@
 '''
-Base code for 'optitrack' feature, compatible with Optitrack motiontracker
+Base code for 'oculomatic' streaming
 '''
 import threading
 import time
@@ -13,10 +13,11 @@ UDP_PORT = 11999
 
 class System(DataSourceSystem):
     '''
-    Optitrack DataSourceSystem collects motion tracking data via UDP packets using natnet depacketizer
+    Oculomatic DataSourceSystem collects eye tracking data via UDP packets
     '''
     update_freq = 240 # This may not always be the case, but lower frequencies will still work, just waste space in the circular buffer
-    dtype = np.dtype(('float', (6,)))
+    dtype = np.dtype(('float', (7,)))
+    local_clock = time.perf_counter
 
     def start(self):
         '''
@@ -33,7 +34,7 @@ class System(DataSourceSystem):
     
     def get(self):
         '''
-        Main logic -- parse the motion tracking data into a defined datatype
+        Parse eye tracking data into a defined datatype. Receive rate is exactly the send rate.
         '''      
         data, addr = self.sock.recvfrom(1024) # buffer size is 1024 bytes
         items = data.decode('utf-8').split('&')
@@ -60,8 +61,8 @@ class System(DataSourceSystem):
         le_diam = float(items[3])
         re_diam = float(items[6])
 
-        # Pack into (1,6) array
-        coords = np.array([le_x, le_y, re_x, re_y, le_diam, re_diam])
+        # Pack into (1,7) array
+        coords = np.array([le_x, le_y, re_x, re_y, le_diam, re_diam, self.local_clock()])
         coords = np.expand_dims(coords, axis=0)
         return coords
 

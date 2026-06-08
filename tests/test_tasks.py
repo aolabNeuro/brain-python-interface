@@ -3,17 +3,18 @@ from built_in_tasks.force_task import DiskMatching
 from built_in_tasks.manualcontrolmultitasks import TrackingTask, rotations, ManualControl, ScreenTargetTracking, ReadySetGoTask
 from built_in_tasks.othertasks import Conditions, LaserConditions, SweptLaserConditions
 from built_in_tasks.target_capture_task import ScreenTargetCapture
-from built_in_tasks.passivetasks import YouTube
+from built_in_tasks.passivetasks import VideoPlayer
 from built_in_tasks.example_task import ExampleSequenceTask
 from features.generator_features import Autostart, HideLeftTrajectory, ReadysetMedley, ReadysetColorChange, HideCursorReturn
 from features.hdf_features import SaveHDF
+from features.sync_features import HDFSync, ScreenSync
 from features.touch_features import MouseEmulateTouch
 from riglib.stereo_opengl.environment import Grid
-from riglib.stereo_opengl.window import WindowDispl2D
+from riglib.stereo_opengl.window import Window2D
 from riglib import experiment
 from riglib import audio
 from features.peripheral_device_features import ForceControl, MouseControl
-from features.optitrack_features import OptitrackSimulate, Optitrack, SpheresToCylinders
+from features.optitrack_features import OptitrackSimulate, Optitrack, SpheresToCylinders, SpheresToImages
 from features.reward_features import ProgressBar, ScoreRewards, PenaltyAudioMulti
 import cProfile
 import pstats
@@ -84,7 +85,7 @@ class TestManualControlTasks(unittest.TestCase):
         exp = init_exp(TrackingTask, [HideLeftTrajectory, MouseControl, Window2D], seq, window_size=(1000,800), fullscreen=False,
                        lookahead_time=1, screen_half_height=10)
         exp.rotation = 'xzy'
-        # exp.trajectory_type = 'space'
+        exp.trajectory_type = '1d'
         exp.trajectory_amplitude = 5
         exp.trajectory_radius = 0.2
         exp.run()
@@ -99,7 +100,7 @@ class TestManualControlTasks(unittest.TestCase):
                        limit1d=False, trajectory_amplitude=5, lookahead_time=1)
         exp.stereo_mode = 'projection'
         exp.rotation = 'xzy'
-        exp.trajectory_type = 'space'
+        exp.trajectory_type = '2d'
         exp.run()
 
     @unittest.skip("")
@@ -213,12 +214,60 @@ class TestSeqGenerators(unittest.TestCase):
         plt.tight_layout()
         plt.show()
 
-class TestYouTube(unittest.TestCase):
+class DemoTracking(unittest.TestCase):
 
     @unittest.skip("")
-    def test_youtube_exp(self):
+    def test_tracking_moon_ref(self):
+        print("Running tracking task test")
+        seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=9, ramp=1, ramp_down=0, 
+                                                 num_primes=10, seed=42, sample_rate=60, dimensions=2, 
+                                                 disturbance=True, boundaries=(-10,10,-10,10), decay_rate = None)
+        exp = init_exp(TrackingTask, [Window2D, MouseControl, SpheresToImages, ProgressBar, ScoreRewards], seq, window_size=(1280,720), fullscreen=True, 
+                       limit1d=False, trajectory_amplitude=6, disturbance_amplitude = 0, lookahead_time=1, reward_time = 4, 
+                       score_display_location = (-200,0,7), score_multiplier = 10000, cursor_radius = 1, tracking_out_time = 8, 
+                       cursor_color='black', target_color='black')
+        exp.stereo_mode = 'projection'
+        exp.rotation = 'xzy'
+        exp.trajectory_type = '2d'
+        exp.run()
+    
+    @unittest.skip("")
+    def test_tracking_moon_disturbance(self):
+        
+        seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=9, ramp=1, ramp_down=0,
+                                                 num_primes=10, seed=42, sample_rate=60, dimensions=2,
+                                                 disturbance=True, boundaries=(-10,10,-10,10), decay_rate = None)
+        exp = init_exp(TrackingTask, [Window2D, MouseControl, SpheresToImages, ProgressBar, ScoreRewards], seq, window_size=(1280,720), fullscreen=True,
+                       limit1d=False, trajectory_amplitude=0, disturbance_amplitude = 2, lookahead_time=1, reward_time = 4, 
+                       score_display_location = (-200,0,7), score_multiplier = 10000, cursor_radius = 1, tracking_out_time = 8, 
+                       cursor_color='black', target_color='black')
+        exp.stereo_mode = 'projection'
+        exp.rotation = 'xzy'
+        exp.trajectory_type = '2d'
+        exp.run()
 
-        exp = init_exp(YouTube, [], youtube_url="https://www.youtube.com/watch?v=Qe9ansjvF7M")
+    @unittest.skip("")
+    def test_tracking_moon(self):
+
+        seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=9, ramp=1, ramp_down=0,
+                                                 num_primes=10, seed=42, sample_rate=60, dimensions=2,
+                                                 disturbance=True, boundaries=(-10,10,-10,10), decay_rate = None)
+        exp = init_exp(TrackingTask, [Window2D, MouseControl, SpheresToImages, ProgressBar, ScoreRewards], seq, window_size=(1280,720), fullscreen=True,
+                       limit1d=False, trajectory_amplitude=6, disturbance_amplitude = 2, lookahead_time=1, reward_time = 4, 
+                       score_display_location = (-2,0,7), score_multiplier = 10000, cursor_radius = 1, tracking_out_time = 8, 
+                       cursor_color='black', target_color='black')
+        exp.stereo_mode = 'projection'
+        exp.rotation = 'xzy'
+        exp.trajectory_type = '2d'
+        exp.run()
+
+class TestVideoPlayer(unittest.TestCase):
+
+    #@unittest.skip("")
+    def test_local_video_from_downloads(self):
+        
+        video_file = "tests/test_data/monkeys.mp4"
+        exp = init_exp(VideoPlayer, [Window2D, HDFSync, ScreenSync], media_file=video_file, fullscreen=False, window_size=(400,300), start_time_sec=30)
         exp.run()
 
 if __name__ == '__main__':
