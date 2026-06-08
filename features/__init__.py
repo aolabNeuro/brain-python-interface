@@ -19,6 +19,7 @@ from .touch_features import MouseEmulateTouch, TabletTouch
 from .phasespace_features import MotionData, MotionSimulate, MotionAutoAlign
 from .optitrack_features import Optitrack, SpheresToCylinders
 from .plexon_features import PlexonBMI, RelayPlexon, RelayPlexByte
+from .spikerbox_features import SpikerBoxBMI
 from .hdf_features import SaveHDF
 from .video_recording_features import SingleChannelVideo, E3Video
 from .bmi_task_features import NormFiringRates
@@ -29,7 +30,6 @@ from .ecube_features import EcubeFileBMI, EcubeBMI, RecordECube
 from .sync_features import ArduinoSync, CursorAnalogOut, ScreenSync, HDFSync
 from .neuropixel_features import RecordNeuropixels
 from .clda_features import CLDA_KFRML_IntendedVelocity
-from .neural_sys_features import SpikerBoxBMI
 
 built_in_features = dict(
     keyboard=KeyboardControl,

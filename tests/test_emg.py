@@ -12,13 +12,13 @@ import unittest
 from riglib import source
 import hid
 from riglib.spikerbox.usb_comms import SpikerBox
-from riglib.spikerbox import LFP
+from riglib.spikerbox import EMG
 
 class EMGTests(unittest.TestCase):
 
     #@unittest.skip("")
     def test_connect(self):
-        b = SpikerBox(strict_init=True)
+        b = SpikerBox()
 
         print("Manufacturer: %s" % b.manufacturer)
         print("Product: %s" % b.product)
@@ -59,7 +59,7 @@ class EMGTests(unittest.TestCase):
     #@unittest.skip("")
     def test_datasource(self):
         channels = [1, 2]
-        ds = source.MultiChanDataSource(LFP, channels=channels)
+        ds = source.MultiChanDataSource(EMG, channels=channels)
         ds.start()
         time.sleep(4)
         if ds.status.value <= 0:

@@ -85,7 +85,7 @@ class OnlineAnalysis(traits.HasTraits):
                 if key in self.object_trait_names:
                     self._send_online_analysis_msg('param', key, None) # Skip objects
                     if key == 'decoder':
-                        self._send_online_analysis_msg('param', 'decoder_channels', value.channels.flatten().tolist())
+                        self._send_online_analysis_msg('param', 'decoder_channels', np.array(value.channels).flatten().tolist())
                         self._send_online_analysis_msg('param', 'decoder_states', value.states)
                         self._send_online_analysis_msg('param', 'decoder_bands', [(0,0)]) # TODO: How to get this?
                 else:

@@ -4,7 +4,7 @@ import time
 from ..source import DataSourceSystem
 from .usb_comms import SpikerBox
 
-class LFP(DataSourceSystem):
+class EMG(DataSourceSystem):
     '''
     SpikerBox DataSourceSystem collects EMG data from USB packets. Compatible with riglib.source.MultiChanDataSource
     '''

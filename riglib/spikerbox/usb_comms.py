@@ -9,7 +9,7 @@ _SPIKERBOX_PRODUCT_ID = 0x0001
 
 class SpikerBox:
 
-    def __init__(self, timeout=0.02, strict_init=False):
+    def __init__(self, timeout=0.02):
 
         self.timeout = int(timeout*1000) # convert s to ms
         self.h = hid.Device(_SPIKERBOX_VENDOR_ID, _SPIKERBOX_PRODUCT_ID)  # Muscle SpikerBox Pro VendorID/ProductID
@@ -18,20 +18,13 @@ class SpikerBox:
         self.serial = self.h.serial
 
         # Ensure device starts from a known non-streaming state
-        self.send_cmd("h:;")
-        time.sleep(0.005)
-        self._drain_input()
+        self._ensure_idle()
 
-        # Quick metadata query (best effort). strict_init=True enables
-        # slower but more persistent retries.
-        if strict_init:
-            info_tries, info_timeout = 5, 0.20
-            rate_tries, rate_timeout = 5, 0.20
-            retry_delay = 0.02
-        else:
-            info_tries, info_timeout = 1, 0.05
-            rate_tries, rate_timeout = 2, 0.08
-            retry_delay = 0.005
+        # Single reliable retry profile tuned to read device metadata quickly
+        # without falling back to the weaker one-shot query path.
+        info_tries, info_timeout = 5, 0.30
+        rate_tries, rate_timeout = 5, 0.30
+        retry_delay = 0.05
 
         # write version query data to the device
         self.fw_ver, self.hw_type, self.hw_ver = self._query_with_retry(
@@ -64,20 +57,38 @@ class SpikerBox:
         self.pending_samples = []
 
     def _query_with_retry(self, cmd, *keys, n_tries=5, retry_delay=0.02, response_timeout=0.1):
-        resp = tuple(None for _ in keys)
+        values = {key: None for key in keys}
         for _ in range(n_tries):
-            self._drain_input()
+            if all(values[key] is not None for key in keys):
+                break
+            self._ensure_idle(max_wait=0.15)
             self.send_cmd(cmd)
             resp = self.parse_response(*keys, response_timeout=response_timeout)
-            if all(v is not None for v in resp):
-                return resp
+            for key, value in zip(keys, resp):
+                if value is not None:
+                    values[key] = value
             time.sleep(retry_delay)
-        return resp
+        return tuple(values[key] for key in keys)
+
+    def _ensure_idle(self, max_wait=0.30, read_timeout_ms=5, quiet_reads=3):
+        # Metadata replies are unreliable if query commands race with stale
+        # stream packets, so force the device into a quiet non-streaming state
+        # before issuing each query.
+        self.send_cmd("h:;")
+        deadline = time.time() + max_wait
+        quiet_count = 0
+        while time.time() < deadline and quiet_count < quiet_reads:
+            d = self.h.read(64, read_timeout_ms)
+            if d is None or len(d) == 0:
+                quiet_count += 1
+            else:
+                quiet_count = 0
+        self._drain_input()
 
     def _drain_input(self):
         # Remove stale packets before sending a command so parse_response
         # reads the corresponding reply.
-        for _ in range(4):
+        for _ in range(16):
             d = self.h.read(64, 1)
             if d is None or len(d) == 0:
                 break
@@ -109,6 +120,7 @@ class SpikerBox:
         '''
         response = {key: None for key in keys}
         deadline = time.time() + response_timeout
+        msg_buffer = ""
 
         while time.time() < deadline:
             d = self.h.read(64, self.timeout)
@@ -116,15 +128,18 @@ class SpikerBox:
                 continue
 
             length = d[1] if len(d) > 1 else len(d)
-            data = bytes(d[2:length]) if length > 2 else bytes(d[2:])
+            data = bytes(d[2:2 + length]) if length > 0 else bytes(d[2:])
 
             payload_match = re.search(b'\xff\xff\x01\x01\x80\xff(.*?)\xff\xff\x01\x01\x81\xff', data)
             payload = payload_match.group(1) if payload_match is not None else data
             msg = payload.decode('utf-8', errors='ignore')
+            msg_buffer += msg
+            if len(msg_buffer) > 512:
+                msg_buffer = msg_buffer[-512:]
 
             for key in keys:
                 if response[key] is None:
-                    key_match = re.search(rf'{re.escape(key)}:(.*?);', msg)
+                    key_match = re.search(rf'{re.escape(key)}:(.*?);', msg_buffer)
                     if key_match is not None:
                         response[key] = key_match.group(1)
 
