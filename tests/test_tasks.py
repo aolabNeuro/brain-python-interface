@@ -263,11 +263,11 @@ class DemoTracking(unittest.TestCase):
 
 class TestVideoPlayer(unittest.TestCase):
 
-    @unittest.skip("")
+    #@unittest.skip("")
     def test_local_video_from_downloads(self):
         
         video_file = "tests/test_data/monkeys.mp4"
-        exp = init_exp(VideoPlayer, [Window2D, HDFSync, ScreenSync], media_file=video_file, fullscreen=False, window_size=(400,300))
+        exp = init_exp(VideoPlayer, [Window2D, HDFSync, ScreenSync], media_file=video_file, fullscreen=False, window_size=(400,300), start_time_sec=30)
         exp.run()
 
 if __name__ == '__main__':
