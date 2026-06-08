@@ -3,13 +3,19 @@ import hid
 import re
 import time
 
+
+_SPIKERBOX_VENDOR_ID = 0x2e73
+_SPIKERBOX_PRODUCT_ID = 0x0001
+
 class SpikerBox:
 
     def __init__(self, timeout=0.02, strict_init=False):
 
         self.timeout = int(timeout*1000) # convert s to ms
-        self.h = hid.device()
-        self.h.open(0x2e73, 0x0001)  # Muscle SpikerBox Pro VendorID/ProductID
+        self.h = hid.Device(_SPIKERBOX_VENDOR_ID, _SPIKERBOX_PRODUCT_ID)  # Muscle SpikerBox Pro VendorID/ProductID
+        self.manufacturer = self.h.manufacturer
+        self.product = self.h.product
+        self.serial = self.h.serial
 
         # Ensure device starts from a known non-streaming state
         self.send_cmd("h:;")
@@ -92,7 +98,7 @@ class SpikerBox:
         Command packet is always 64 bytes long; starts with 0x3f and 0x3e, then command null padded
         '''
         data = [0x3f, 0x3e] + list(bytearray(cmd.ljust(62, "\0").encode("utf-8")))
-        self.h.write(data)
+        self.h.write(bytes(data))
 
     def parse_response(self, *keys, response_timeout=0.1):
         '''

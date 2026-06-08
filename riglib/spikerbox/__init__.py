@@ -13,7 +13,8 @@ class LFP(DataSourceSystem):
 
     def __init__(self, channels=[1,2]):
         self.b = SpikerBox()
-        self.channels = channels
+        # Remove any channels that aren't 1 or 2, since those are the only ones that exist on the SpikerBox
+        self.channels = [ch for ch in channels if ch in [1,2]]
 
     def start(self):
         self.b.start()
