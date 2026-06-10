@@ -308,9 +308,12 @@ class EyeStreaming(traits.HasTraits):
             self.eye_data = Eye([0,0])
             self.eye_pos = np.zeros((2,))*np.nan
             self.eye_diam = np.zeros((2,))*np.nan
+            self.blink_monitor = 0
         else:
             from riglib import source
             from riglib.oculomatic import System
+            
+            self.blink_monitor = 0
             self.eye_data = source.DataSource(System)
             from riglib import sink
             sink_manager = sink.SinkManager.get_instance()
@@ -355,6 +358,19 @@ class EyeStreaming(traits.HasTraits):
             eye_pos = self.eye_data.get() # A list of lists of of x,y keyboard pos
             eye_pos = eye_pos[0]
             eye_diam = 0
+
+
+        print(eye_pos.shape)
+
+        """if eye_diam==0:
+            self.blink_monitor = self.blink_monitor + 1
+        else:
+            self.blink_monitor = 0 
+
+        if self.blink_monitor>250:
+            eye_pos[0] = float('nan')
+            eye_pos[1] = float('nan')"""
+
         self.eye_pos = eye_pos
         self.eye_diam = eye_diam
         self.task_data['eye'] = eye_pos
@@ -516,7 +532,6 @@ class PupilLabStreaming(EyeStreaming):
         self.eye_diam = np.zeros((2,))*np.nan
         self.add_dtype('eye', 'f8', (len(eye_idx),))
         self.add_dtype('eye_diam', 'f8', (2,))
-        self.blink_monitor = 0
         super(EyeStreaming, self).init()
 
     def _update_eye_pos(self):
@@ -540,16 +555,6 @@ class PupilLabStreaming(EyeStreaming):
         # Find the last non-nan value of eye position
         eye_pos = _latest_value(eye_pos[eye_pos_confidence > self.pupillabs_confidence_threshold]) # only consider positions with high confidence
         eye_diam = _latest_value(eye_diam[eye_diam_confidence > self.pupillabs_confidence_threshold]) / self.eye_pixels_per_cm
-
-        print(eye_pos.shape)
-
-        """if eye_diam==0:
-            self.blink_monitor = self.blink_monitor + 1
-        else:
-            self.blink_monitor = 0 
-
-        if self.blink_monitor>250:
-            eye_pos = np.nan(np.shape(eye_pos))"""
 
 
 
