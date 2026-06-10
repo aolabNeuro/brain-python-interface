@@ -18,6 +18,8 @@ from .target_capture_task_xt import ScreenReachAngle
 from features.bmi_task_features import LinearlyDecreasingAssist
 from .target_graphics import target_colors
 
+from .target_capture_task_eye import EyeConstrainedTargetCapture
+
 np.set_printoptions(suppress=False)
 
 ###################
@@ -38,7 +40,7 @@ class OFCEndpointAssister(FeedbackControllerAssist):
 
         Returns
         -------
-        OFCEndpointAssister instance
+        OFCEndpointAssister instanBMIControlMultiMixince
         '''
         F_dict = pickle.load(open('/storage/assist_params/assist_20levels_ppf.pkl'))
         B = np.asmatrix(np.vstack([np.zeros([3,3]), np.eye(3)*1000*1./decoding_rate, np.zeros(3)]))
@@ -386,6 +388,12 @@ class BMIControlMulti2DWindow(BMIControlMultiMixin, WindowDispl2D, ScreenTargetC
         return ts > self.wait_time and not self.pause
 
 class BMIControlMulti(BMIControlMultiMixin, ScreenTargetCapture):
+    '''
+    Slightly refactored original bmi control task
+    '''
+    pass
+
+class BMIControlMultiEyeConstrained(BMIControlMultiMixin, EyeConstrainedTargetCapture):
     '''
     Slightly refactored original bmi control task
     '''
