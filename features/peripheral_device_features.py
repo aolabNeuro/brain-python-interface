@@ -256,6 +256,9 @@ class Eye(object):
                     self.pos[1] += self.move_step
                 if event.key == pygame.K_DOWN:
                     self.pos[1] -= self.move_step
+                if event.key == pygame.K_b:
+                    self.pos[0] = 1
+                    self.pos[1] = 1
 
         calibrated_pos = self.calibration*self.pos
         return [calibrated_pos]

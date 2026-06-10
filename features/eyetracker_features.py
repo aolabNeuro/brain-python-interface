@@ -516,6 +516,7 @@ class PupilLabStreaming(EyeStreaming):
         self.eye_diam = np.zeros((2,))*np.nan
         self.add_dtype('eye', 'f8', (len(eye_idx),))
         self.add_dtype('eye_diam', 'f8', (2,))
+        self.blink_monitor = 0
         super(EyeStreaming, self).init()
 
     def _update_eye_pos(self):
@@ -540,6 +541,18 @@ class PupilLabStreaming(EyeStreaming):
         eye_pos = _latest_value(eye_pos[eye_pos_confidence > self.pupillabs_confidence_threshold]) # only consider positions with high confidence
         eye_diam = _latest_value(eye_diam[eye_diam_confidence > self.pupillabs_confidence_threshold]) / self.eye_pixels_per_cm
 
+        print(eye_pos.shape)
+
+        """if eye_diam==0:
+            self.blink_monitor = self.blink_monitor + 1
+        else:
+            self.blink_monitor = 0 
+
+        if self.blink_monitor>250:
+            eye_pos = np.nan(np.shape(eye_pos))"""
+
+
+
         # Prepare the gaze position depending on its source
         if self.pupillabs_gaze == 'gaze3d':
             eye_pos = self.convert_gaze3d_to_screen(eye_pos)[:2]
@@ -548,6 +561,9 @@ class PupilLabStreaming(EyeStreaming):
 
         self.eye_pos = eye_pos
         self.eye_diam = eye_diam
+
+        print(eye_pos.shape)
+
         self.task_data['eye'] = eye_pos
         self.task_data['eye_diam'] = eye_diam
 
@@ -634,6 +650,7 @@ class EyeCursor(traits.HasTraits):
         self.eye_plant.set_endpoint_pos(np.array(self.starting_pos))
         for model in self.eye_plant.graphics_models:
             self.add_model(model)
+            eye_pos = np.nan(np.shape(eye_pos))
 
     def _cycle(self):
         super()._cycle()
