@@ -257,8 +257,12 @@ class Eye(object):
                 if event.key == pygame.K_DOWN:
                     self.pos[1] -= self.move_step
                 if event.key == pygame.K_b:
-                    self.pos[0] = float('nan')
-                    self.pos[1] = float('nan')
+                    if self.pos[0] == 1000:
+                        self.pos[0] = 0
+                        self.pos[1] = 0
+                    else:
+                        self.pos[0] = 1000#float('nan')
+                        self.pos[1] = 1000#float('nan')
 
         calibrated_pos = self.calibration*self.pos
         return [calibrated_pos]

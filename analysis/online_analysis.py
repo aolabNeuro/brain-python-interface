@@ -253,7 +253,7 @@ class BehaviorAnalysisWorker(AnalysisWorker):
 
         elif key == 'eye_diam':
             self.temp = np.array(values[0])
-            if np.size(self.temp) == 0:
+            if (np.size(self.temp) == 0) or (self.task_params.get('keyboard_control', False)):
                 return
             self.eye_buffer[:,2] = np.roll(self.eye_buffer[:,2], -1, axis=0)
             self.eye_buffer[-1,2] = self.temp[0]
@@ -923,7 +923,7 @@ class BMIAnalysisWorker(AnalysisWorker):
     def __init__(self, task_params, data_queue, buffer_time=10, **kwargs):
         super().__init__(task_params, data_queue, **kwargs)
         self.buffer_time = buffer_time
-
+        
     def init(self):
         super().init()
         self.channels = self.task_params['decoder_channels']
