@@ -252,7 +252,9 @@ class BehaviorAnalysisWorker(AnalysisWorker):
             self.eye_buffer[-1,:2] = self.temp
 
         elif key == 'eye_diam':
-            self.temp = np.array(values[0])[0]
+            self.temp = np.array(values[0])
+            if np.size(self.temp) == 0:
+                return
             self.eye_buffer[:,2] = np.roll(self.eye_buffer[:,2], -1, axis=0)
             self.eye_buffer[-1,2] = self.temp
 
