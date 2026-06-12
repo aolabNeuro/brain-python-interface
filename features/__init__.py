@@ -19,6 +19,7 @@ from .touch_features import MouseEmulateTouch, TabletTouch
 from .phasespace_features import MotionData, MotionSimulate, MotionAutoAlign
 from .optitrack_features import Optitrack, SpheresToCylinders
 from .plexon_features import PlexonBMI, RelayPlexon, RelayPlexByte
+from .spikerbox_features import SpikerBoxBMI
 from .hdf_features import SaveHDF
 from .video_recording_features import SingleChannelVideo, E3Video
 from .bmi_task_features import NormFiringRates
@@ -67,6 +68,7 @@ built_in_features = dict(
     single_video=SingleChannelVideo,
     exp_display=WindowWithExperimenterDisplay,
     relay_arduino=PlexonSerialDIORowByte,
+    spikerbox_bmi=SpikerBoxBMI,
     plexonbmi=PlexonBMI,
     relay_plexon=RelayPlexon,
     relay_plexbyte=RelayPlexByte,

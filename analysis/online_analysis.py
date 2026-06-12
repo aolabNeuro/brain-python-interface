@@ -954,15 +954,28 @@ class BMIAnalysisWorker(AnalysisWorker):
             self.neural_feats = np.roll(self.neural_feats, -1, axis=0)
             self.neural_feats[-1] = np.array(values[0])
 
+    def _set_axis_limits(self, axis, data):
+        if data.size == 0:
+            axis.set_ylim(-1, 1)
+            return
+
+        data_min = np.min(data)
+        data_max = np.max(data)
+        if data_min == data_max:
+            pad = 1 if data_min == 0 else abs(data_min) * 0.1
+            axis.set_ylim(data_min - pad, data_max + pad)
+        else:
+            axis.set_ylim(data_min, data_max)
+
     def draw(self):
         super().draw()
         time = np.arange(len(self.neural_feats)) * 1/(int(self.task_params['fps'])) - self.buffer_time
         for i, plot in enumerate(self.feat_plots):
             plot.set_data(time, self.neural_feats[:,i])
-        self.feat_ax.set_ylim(np.min(self.neural_feats), np.max(self.neural_feats))
+        self._set_axis_limits(self.feat_ax, self.neural_feats)
         for i, plot in enumerate(self.state_plots):
             plot.set_data(time, self.decoder_states[:,i])
-        self.state_ax.set_ylim(np.min(self.decoder_states), np.max(self.decoder_states))
+        self._set_axis_limits(self.state_ax, self.decoder_states)
 
 class OnlineDataServer(threading.Thread):
     '''
