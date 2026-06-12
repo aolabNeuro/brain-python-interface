@@ -301,8 +301,13 @@ class EyeStreaming(traits.HasTraits):
     eye_pixels_per_cm = traits.Float(51.67, desc="Conversion from eye diameter to cm")
 
     def __init__(self, *args, **kwargs):
+
         super().__init__(*args, **kwargs)
 
+        print('******************************')
+        print(f'keyboard control value is {self.keyboard_control}')
+        print('******************************')
+        
         # Visualize eye positions
         if self.keyboard_control:
             self.eye_data = Eye([0,0])
@@ -318,6 +323,7 @@ class EyeStreaming(traits.HasTraits):
             from riglib import sink
             sink_manager = sink.SinkManager.get_instance()
             sink_manager.register(self.eye_data) # register to the sink so it can save data
+            print('Did we run the registration command?')
             self.eye_pos = np.zeros((4,))*np.nan if self.binocular else np.zeros((2,))*np.nan
             self.eye_diam = np.zeros((2,))*np.nan
 
@@ -358,10 +364,6 @@ class EyeStreaming(traits.HasTraits):
             eye_pos = self.eye_data.get() # A list of lists of of x,y keyboard pos
             eye_pos = eye_pos[0]
             eye_diam = 0
-
-
-        print(eye_pos.shape)
-
         """if eye_diam==0:
             self.blink_monitor = self.blink_monitor + 1
         else:
@@ -375,6 +377,8 @@ class EyeStreaming(traits.HasTraits):
         self.eye_diam = eye_diam
         self.task_data['eye'] = eye_pos
         self.task_data['eye_diam'] = eye_diam
+
+
 
     def _cycle(self):
         if not hasattr(self, 'calibrated_eye_pos'):
@@ -567,8 +571,6 @@ class PupilLabStreaming(EyeStreaming):
         self.eye_pos = eye_pos
         self.eye_diam = eye_diam
 
-        print(eye_pos.shape)
-
         self.task_data['eye'] = eye_pos
         self.task_data['eye_diam'] = eye_diam
 
@@ -661,6 +663,7 @@ class EyeCursor(traits.HasTraits):
         super()._cycle()
 
         if hasattr(self, 'calibrated_eye_pos') and not np.any(np.isnan(self.calibrated_eye_pos)):
+            print('Has Calibrated eye movement')
             eye = self.calibrated_eye_pos
         elif hasattr(self, 'eye_pos') and not np.any(np.isnan(self.eye_pos)):
             eye = self.eye_pos

@@ -256,7 +256,7 @@ class BehaviorAnalysisWorker(AnalysisWorker):
             if np.size(self.temp) == 0:
                 return
             self.eye_buffer[:,2] = np.roll(self.eye_buffer[:,2], -1, axis=0)
-            self.eye_buffer[-1,2] = self.temp
+            self.eye_buffer[-1,2] = self.temp[0]
 
         elif key == 'calibrated_eye_pos':
             self.calibrated_eye_pos = np.array(values[0])[:2]
