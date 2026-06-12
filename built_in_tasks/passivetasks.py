@@ -24,12 +24,16 @@ from built_in_tasks.bmimultitasks import BMIControlMulti
 
 from .target_graphics import *
 
+from .bmimultitasks import BMIControlMultiEyeConstrained
+
 bmi_ssm_options = ['Endpt2D', 'Tentacle', 'Joint2L']
 
 class EndPostureFeedbackController(BMILoop, traits.HasTraits):
     ssm_type_options = bmi_ssm_options
     ssm_type = traits.OptionsList(*bmi_ssm_options, bmi3d_input_options=bmi_ssm_options)
     decoder_update_rate = traits.Float(60, desc="Assist feedback rate (Hz)")
+
+    static_states = ['wait', 'reward', 'fixation_penalty'] # states in which the decoder is not run
 
     def load_decoder(self):
         self.ssm = StateSpaceEndptVel2D()
@@ -50,6 +54,90 @@ class TargetCaptureVisualFeedback(EndPostureFeedbackController, BMIControlMulti)
 
     def move_effector(self):
         pass
+
+class TargetCaptureVisualFeedbackEyeConstrained(EndPostureFeedbackController, BMIControlMultiEyeConstrained):
+    assist_level = (1, 1)
+    is_bmi_seed = True
+
+    status = dict(
+        wait = dict(start_trial="target", start_pause="pause"),
+        target = dict(timeout="timeout_penalty", enter_target="hold", start_pause="pause", fixation_break="fixation_penalty"),
+        hold = dict(leave_target="hold_penalty", hold_complete="delay", fixation_break="fixation_penalty", start_pause="pause"),
+        delay = dict(leave_target="delay_penalty", delay_complete="targ_transition", fixation_break="fixation_penalty", start_pause="pause"),
+        targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target", start_pause="pause"),
+        timeout_penalty = dict(timeout_penalty_end="wait", start_pause="pause", end_state=True),
+        hold_penalty = dict(hold_penalty_end="wait", start_pause="pause", end_state=True),
+        delay_penalty = dict(delay_penalty_end="wait", start_pause="pause", end_state=True),
+        fixation_penalty = dict(fixation_penalty_end="wait", start_pause="pause", end_state=True),
+        reward = dict(reward_end="wait", start_pause="pause", stoppable=False, end_state=True),
+        pause = dict(end_pause="wait", end_state=True),
+    )
+    def move_effector(self):
+        pass
+
+    def _start_target(self):
+        self.plant.set_visibility(True)
+        #target capture 
+        self.target_index += 1
+
+        #screen target capture: Modified
+        # Show target if it is hidden (this is the first target, or previous state was a penalty)
+        target = self.targets[self.target_index % 2]
+        if self.target_index == 0:
+            #target.move_to_position(self.targs[self.target_index])
+            #target.show()
+            self.sync_event('TARGET_ON', self.gen_indices[self.target_index])
+        self.target_location = self.targs[self.target_index] # save for BMILoop
+
+
+        #if self.target_index == 0:
+        #    self.targets_eye[0].move_to_position(self.targs[self.target_index] - self.offset_cube)
+        #    self.targets_eye[0].show()
+
+    def _start_fixation_penalty(self):
+        self.plant.set_visibility(False)
+        super()._start_fixation_penalty()
+        self.decoder.filt.state.mean = self.init_decoder_mean.copy()
+        
+    def _start_wait(self):
+        super()._start_wait()
+        #self.plant_visible = False
+        self.plant.set_visibility(False)
+
+    def _end_targ_transition(self):
+        self.plant.set_visibility(False)
+        super()._end_targ_transition()
+
+
+        
+
+    def _test_fixation_break(self,time_in_state):
+        '''
+        Triggers the fixation_penalty state when eye positions are outside fixation distance
+        Only apply this to the first hold and delay period
+        '''  
+        #eye_d = np.linalg.norm(self.calibrated_eye_pos)
+
+        if (self.target_index==0) & (time_in_state<0.5):
+            return False
+        
+        eye_pos = self.calibrated_eye_pos
+        eye_d = np.linalg.norm(eye_pos - self.targs[self.target_index,[0,2]])
+        
+        return (eye_d > self.target_radius + self.fixation_radius_buffer)
+    
+
+    #def _end_targ_transition(self):
+    #    super()._end_targ_transition()
+    #    if self.reset == 1:# and ((self.target_index == self.chain_length - 1) or (self.target_index == -1)):
+
+    #            # Reset on any target transition away from the last target
+    #            self.decoder.filt.state.mean = self.init_decoder_mean.copy()
+    #            self.hdf.sendMsg("reset")
+
+
+
+
 
 class TargetCaptureVFB2DWindow(TargetCaptureVisualFeedback, WindowDispl2D):
     fps = 20.

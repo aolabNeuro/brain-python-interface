@@ -117,7 +117,7 @@ See install.sh for the detailed commands to install each of these packages
 
 udev and groups
 ---------------
-udev rules are necessary for any user to interact with the Phidgets board (optional) and the NIDAQ card. In addition, to allow the BMI3D software to be run as a regular user but still interact with various hardware devices/serial ports, it is necessary to add the experimenter user ('lab', in our case) to the 'dialout' group ()for serial port access) and the 'iocard' group (NIDAQ board access). 
+udev rules are necessary for any user to interact with the Phidgets board (optional), the SpikerBox HID device, and the NIDAQ card. In addition, to allow the BMI3D software to be run as a regular user but still interact with various hardware devices/serial ports, it is necessary to add the experimenter user ('lab', in our case) to the 'dialout' group ()for serial port access) and the 'iocard' group (NIDAQ board access). The SpikerBox rule is installed from ``install/udev/99-spikerbox.rules`` and grants access to ``hidraw`` for the device VID ``2e73`` and PID ``0001``. 
 
 Path configuration
 ------------------

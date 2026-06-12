@@ -60,7 +60,7 @@ class TargetCapture(Sequence):
     num_targets_per_attempt = traits.Int(2, desc="Minimum number of target acquisitions to be counted as an attempt")
 
     def init(self):
-        self.trial_dtype = np.dtype([('trial', 'u4'), ('index', 'u4'), ('target', 'f8', (3,))])
+        self.trial_dtype = np.dtype([('trial', 'u4'), ('index', 'u4'), ('target', 'f8', (3,)), ('delay_period', 'f8', (1,))])
         super().init()
         self.penalty_index = 0
         self.pause_index = 0
@@ -87,6 +87,8 @@ class TargetCapture(Sequence):
         # Set index to 0 because the state may come from the penalty or pause state,
         self.penalty_index = 0
         self.pause_index = 0
+
+        self.trial_record['delay_period'] = self.delay_time
 
     def _parse_next_trial(self):
         '''Check that the generator has the required data'''
@@ -235,7 +237,7 @@ class TargetCapture(Sequence):
             - Target held for the minimum requred time (implemented here)
             - Sensorized object moved by a certain amount
             - Sensorized object moved to the required location
-            - Manually triggered by experimenter
+            - Manually triggered by experimenterplant
         '''
         return time_in_state > self.hold_time
 
@@ -425,7 +427,6 @@ class ScreenTargetCapture(TargetCapture, Window):
     #### STATE FUNCTIONS ####
     def _start_wait(self):
         super()._start_wait()
-
         if self.calc_trial_num() == 0:
 
             # Instantiate the targets here so they don't show up in any states that might come before "wait"
