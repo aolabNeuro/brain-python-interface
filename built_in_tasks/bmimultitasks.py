@@ -215,6 +215,9 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
+    def move_effector(self, *args, **kwargs):
+        pass
+    
     def create_assister(self):
         # Create the appropriate type of assister object
         start_level, end_level = self.assist_level

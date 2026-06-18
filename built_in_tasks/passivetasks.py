@@ -43,7 +43,7 @@ class TargetCaptureVisualFeedback(EndPostureFeedbackController, BMIControlMulti)
     assist_level = (1, 1)
     is_bmi_seed = True
 
-    def move_effector(self):
+    def move_effector(self, *args, **kwargs):
         pass
 
 class TargetCaptureVFB2DWindow(TargetCaptureVisualFeedback, WindowDispl2D):
@@ -133,7 +133,7 @@ class TargetCaptureReplay(ScreenTargetCapture):
         t1 = time.perf_counter() - self.t0
         self.cycle_count = int(t1*self.fps)
 
-    def move_effector(self):
+    def move_effector(self, *args, **kwargs):
         current_pt = self.replay_task['cursor'][self.cycle_count]
         self.plant.set_endpoint_pos(current_pt)
 

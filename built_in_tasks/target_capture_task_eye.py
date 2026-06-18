@@ -797,7 +797,7 @@ class EyeHandCaptureBlock(Sequence, Window):
 
         super()._cycle()
 
-    def move_effector(self):
+    def move_effector(self, *args, **kwargs):
         '''Move the end effector, if a robot or similar is being controlled'''
         pass
 
