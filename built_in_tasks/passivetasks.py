@@ -102,14 +102,12 @@ class TargetCaptureVisualFeedbackEyeConstrained(EndPostureFeedbackController, BM
     def _start_wait(self):
         super()._start_wait()
         #self.plant_visible = False
-        self.plant.set_visibility(False)
+        self.plant.set_visibility(True)
 
     def _end_targ_transition(self):
         self.plant.set_visibility(False)
         super()._end_targ_transition()
 
-
-        
 
     def _test_fixation_break(self,time_in_state):
         '''
@@ -118,14 +116,23 @@ class TargetCaptureVisualFeedbackEyeConstrained(EndPostureFeedbackController, BM
         '''  
         #eye_d = np.linalg.norm(self.calibrated_eye_pos)
 
-        if (self.target_index==0) & (time_in_state<0.5):
-            return False
-        
+        #if (self.target_index==0):# & (time_in_state<0.5):
+        #    return False
         eye_pos = self.calibrated_eye_pos
         eye_d = np.linalg.norm(eye_pos - self.targs[self.target_index,[0,2]])
         
         return (eye_d > self.target_radius + self.fixation_radius_buffer)
     
+    def _test_start_trial(self, time_in_state):
+        #Check that the eye position is on the center target
+        print('testing_start trial')
+        #return True #super()._test_start_trial
+        eye_pos = self.calibrated_eye_pos
+        eye_d = np.linalg.norm(eye_pos - self.targs[0,[0,2]]) #target index is zero, this is only applyied during the wait period before the center target comes on
+        
+        value = (eye_d < self.target_radius + self.fixation_radius_buffer)
+        print (value)
+        return value#(eye_d > self.target_radius + self.fixation_radius_buffer)
 
     #def _end_targ_transition(self):
     #    super()._end_targ_transition()
@@ -196,7 +203,7 @@ class TargetCaptureReplay(ScreenTargetCapture):
         self.replay_trial = trial
         for k, v in self.task_meta.items():
             if k in self.exclude_parent_traits:
-                print("setting {} to {}".format(k, v))
+                print("setting {} to {}".forstart_trialmat(k, v))
                 setattr(self, k, v)
 
         # Have to additionally reset the targets since they are created in super().__init__()
@@ -206,6 +213,7 @@ class TargetCaptureReplay(ScreenTargetCapture):
 
     def _test_start_trial(self, time_in_state):
         '''Wait for the state change in the HDF file in case there is autostart enabled'''
+        print('testing_start_trial')
         trials = self.replay_state[self.replay_state['msg'] == b'target']
         upcoming_trials = [t['time']-1 for t in trials if self.replay_task[t['time']]['trial'] >= self.calc_trial_num()]
         return (np.array(upcoming_trials) <= self.cycle_count).any()
