@@ -301,16 +301,24 @@ class EyeStreaming(traits.HasTraits):
     eye_pixels_per_cm = traits.Float(51.67, desc="Conversion from eye diameter to cm")
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)   
 
         # Visualize eye positions
         if self.keyboard_control:
+
+            print('******************************')
+            print(f'keyboard control value is {self.keyboard_control}')
+            print('******************************')
+
             self.eye_data = Eye([0,0])
             self.eye_pos = np.zeros((2,))*np.nan
             self.eye_diam = np.zeros((2,))*np.nan
+            self.blink_monitor = 0
         else:
             from riglib import source
             from riglib.oculomatic import System
+            
+            self.blink_monitor = 0
             self.eye_data = source.DataSource(System)
             from riglib import sink
             sink_manager = sink.SinkManager.get_instance()
@@ -355,6 +363,15 @@ class EyeStreaming(traits.HasTraits):
             eye_pos = self.eye_data.get() # A list of lists of of x,y keyboard pos
             eye_pos = eye_pos[0]
             eye_diam = 0
+        """if eye_diam==0:
+            self.blink_monitor = self.blink_monitor + 1
+        else:
+            self.blink_monitor = 0 
+
+        if self.blink_monitor>250:
+            eye_pos[0] = float('nan')
+            eye_pos[1] = float('nan')"""
+
         self.eye_pos = eye_pos
         self.eye_diam = eye_diam
         self.task_data['eye'] = eye_pos
@@ -540,6 +557,8 @@ class PupilLabStreaming(EyeStreaming):
         eye_pos = _latest_value(eye_pos[eye_pos_confidence > self.pupillabs_confidence_threshold]) # only consider positions with high confidence
         eye_diam = _latest_value(eye_diam[eye_diam_confidence > self.pupillabs_confidence_threshold]) / self.eye_pixels_per_cm
 
+
+
         # Prepare the gaze position depending on its source
         if self.pupillabs_gaze == 'gaze3d':
             eye_pos = self.convert_gaze3d_to_screen(eye_pos)[:2]
@@ -548,6 +567,7 @@ class PupilLabStreaming(EyeStreaming):
 
         self.eye_pos = eye_pos
         self.eye_diam = eye_diam
+
         self.task_data['eye'] = eye_pos
         self.task_data['eye_diam'] = eye_diam
 
@@ -634,6 +654,7 @@ class EyeCursor(traits.HasTraits):
         self.eye_plant.set_endpoint_pos(np.array(self.starting_pos))
         for model in self.eye_plant.graphics_models:
             self.add_model(model)
+            eye_pos = np.nan(np.shape(eye_pos))
 
     def _cycle(self):
         super()._cycle()
