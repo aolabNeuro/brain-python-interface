@@ -646,6 +646,11 @@ class ERPAnalysisWorker(AnalysisWorker):
         self.erp_im = aopy.visualization.plot_spatial_map(self.data_map, self.elec_pos[:,0], self.elec_pos[:,1], 
                                                  cmap='bwr', ax=self.ax)
         self.erp_im.set_clim(-100, 100)
+        
+        # Add colorbar axis
+        self.cbar_ax = self.fig.add_axes([0.875, 0.2, 0.015, 0.7])
+        self.colorbar = self.fig.colorbar(self.erp_im, cax=self.cbar_ax)
+        self.colorbar.set_label('Amplitude (uV)')
         self.erp_text = self.ax.text(0.75, 1.05, '.', ha='center', va='center', fontsize=12, transform=self.ax.transAxes)
         if self.title is not None:
             self.ax.set_title(self.title)
@@ -659,7 +664,10 @@ class ERPAnalysisWorker(AnalysisWorker):
             valmax=1000,
             valinit=100
         )
-        self.slider.on_changed(lambda val: self.erp_im.set_clim(-val, val))
+        def on_slider_change(val):
+            self.erp_im.set_clim(-val, val)
+            self.colorbar.update_normal(self.erp_im)
+        self.slider.on_changed(on_slider_change)
 
         # And a button to show/hide channel numbers
         self.labels = []
@@ -669,7 +677,7 @@ class ERPAnalysisWorker(AnalysisWorker):
             self.labels.append(aopy.visualization.annotate_spatial_map(pos, ch, 'c', fontsize=12, ax=self.ax))
         for pos, ch in zip(stim_pos, stim_ch):
             self.labels.append(aopy.visualization.annotate_spatial_map(pos, ch, 'm', fontsize=12, ax=self.ax))
-        ax_toggle = self.fig.add_axes([0.1, 0.025, 0.1, 0.025])
+        ax_toggle = self.fig.add_axes([0.1, 0.025, 0.08, 0.02])
         self.toggle = Button(ax_toggle, 'Labels')
         def toggle_labels(event):
             self.toggle.color = '0.85' if self.labels[0].get_visible() else '0.5'
@@ -686,17 +694,28 @@ class ERPAnalysisWorker(AnalysisWorker):
                 self.slider.valmax = 10
                 self.slider.set_val(5)
                 self.zscore_button.color = '0.5'
+                self.colorbar.set_label('Z-score')
             else:
                 self.slider.valmax = 1000
                 self.slider.set_val(100)
                 self.zscore_button.color = '0.85'
+                self.colorbar.set_label('Amplitude (uV)')
             self.slider.ax.set_xlim(self.slider.valmin, self.slider.valmax)
             self._update_erp_data()
             self.draw()
 
-        self.ax_zscore = self.fig.add_axes([0.225, 0.025, 0.1, 0.025])
+        self.ax_zscore = self.fig.add_axes([0.2, 0.025, 0.08, 0.02])
         self.zscore_button = Button(self.ax_zscore, 'Z-score')
         self.zscore_button.on_clicked(toggle_zscore)
+
+        # Add a button to force recalculation of the spatial map from current ERP data.
+        ax_recalculate = self.fig.add_axes([0.295, 0.025, 0.1, 0.02])
+        self.recalculate_button = Button(ax_recalculate, 'Recalculate')
+        def recalculate_map(event):
+            self._update_erp_data(force=True)
+            self.draw()
+            self.fig.canvas.draw_idle()
+        self.recalculate_button.on_clicked(recalculate_map)
 
     def update(self):
         super().update()
@@ -771,11 +790,13 @@ class ERPAnalysisWorker(AnalysisWorker):
         self.erp_since_update += erp_count
         self._update_erp_data()
 
-    def _update_erp_data(self):
-        if self.erp_since_update == 0:
+    def _update_erp_data(self, force=False):
+        if (not force) and (self.erp_since_update == 0):
             return
-        if (self.erp.shape[2] > 50) and (self.erp_since_update < 10):
+        if (not force) and (self.erp.shape[2] > 50) and (self.erp_since_update < 10):
             return  # only update the plot every 10 new ERPs to save on computation
+        if self.erp.shape[2] == 0:
+            return
         self.erp_since_update = 0
         
         fs = self.ds.source.update_freq / self.lfp_downsample
@@ -800,7 +821,7 @@ class ERPAnalysisWorker(AnalysisWorker):
             if event_name in self.trigger_events:
                 self.trigger_cycles.append(self.cycle_count)
         elif key == 'laser_conditions': # multiple lasers on each trial
-            self.current_condition_idx = values[0][0] # pick first one for now, TODO: support multiple conditions at once
+            self.current_condition_idx = values[0] # pick first one for now, TODO: support multiple conditions at once
         elif key == 'laser_condition': # single laser on each trial
             self.current_condition_idx = values[0]
 
@@ -820,7 +841,7 @@ class ERPAnalysisWorker(AnalysisWorker):
             return
         date = datetime.date.today()
         if self.title is not None:
-            filename = f'online_erp_{self.title.replace(" ", "_")}_{subject}_{te_id}_{date}.png'
+            filename = f'online_erp_{subject}_{te_id}_{self.title.replace(" ", "_")}_{date}.png'
         else:
             filename = f'online_erp_{subject}_{te_id}_{date}.png'
         plt.figure(self.fig)
@@ -852,16 +873,19 @@ class SLICAnalysisWorker(ERPAnalysisWorker):
             self.show_angle = not self.show_angle
             if self.show_angle:
                 self.erp_im.set_cmap('YlGnBu')
-                self.erp_im.set_clim=(0, 2*np.pi),
+                self.erp_im.set_clim(0, 2*np.pi)
+                self.colorbar.set_label('Phase (rad)')
                 self.slider.drag_active = False # disable the slider for phase
             else:
                 self.erp_im.set_cmap('bwr')
-                self.erp_im.set_clim=(-self.slider.val, self.slider.val), 
+                self.erp_im.set_clim(-self.slider.val, self.slider.val)
+                self.colorbar.set_label('Delta coherence')
                 self.erp_im.set_data(self.data_map)
                 self.slider.drag_active = True
+            self.colorbar.update_normal(self.erp_im)
             self.draw()
 
-        self.ax_angle = self.fig.add_axes([0.225, 0.025, 0.1, 0.025])
+        self.ax_angle = self.fig.add_axes([0.2, 0.025, 0.08, 0.02])
         self.angle_button = Button(self.ax_angle, 'Phase')
         self.angle_button.on_clicked(toggle_angle)
 
@@ -887,11 +911,13 @@ class SLICAnalysisWorker(ERPAnalysisWorker):
         self.hf_text.on_submit(on_hf_text_submit)
         print('finished init')
 
-    def _update_erp_data(self):
-        if self.erp_since_update == 0:
+    def _update_erp_data(self, force=False):
+        if (not force) and (self.erp_since_update == 0):
             return
-        if (self.erp_since_update < 10):
+        if (not force) and (self.erp_since_update < 10):
             return  # only update the plot every 10 new ERPs to save on computation
+        if self.erp.shape[2] == 0:
+            return
         self.erp_since_update = 0
 
         fs = self.ds.source.update_freq / self.lfp_downsample
@@ -1046,34 +1072,35 @@ class OnlineDataServer(threading.Thread):
         # Open the behavior analysis worker
         print('init in state', self.state)
         data_queue = mp.Queue()
-        if self.task_params['experiment_name'] == 'ManualControl':
+        experiment_name = self.task_params.get('experiment_name', 'None')
+        if experiment_name == 'ManualControl':
             self.analysis_workers.append((BehaviorAnalysisWorker(self.task_params, data_queue), data_queue))
 
-        elif self.task_params['experiment_name'] == 'EyeConstrainedManualControl':
+        elif experiment_name == 'EyeConstrainedManualControl':
             self.analysis_workers.append((SaccadeAnalysisWorker(self.task_params, data_queue), data_queue))
 
-        elif self.task_params['experiment_name'] == 'SaccadeTask':
+        elif experiment_name == 'SaccadeTask':
             self.analysis_workers.append((SaccadeAnalysisWorker(self.task_params, data_queue), data_queue))
 
-        elif self.task_params['experiment_name'] == 'HandConstrainedSaccadeTask':
+        elif experiment_name == 'HandConstrainedSaccadeTask':
             self.analysis_workers.append((EyeHandAnalysisWorker(self.task_params, data_queue), data_queue))
 
-        elif self.task_params['experiment_name'] == 'EyeConstrainedReachingTask':
+        elif experiment_name == 'EyeConstrainedReachingTask':
             self.analysis_workers.append((EyeHandAnalysisWorker(self.task_params, data_queue), data_queue))        
 
-        elif self.task_params['experiment_name'] == 'EyeHandConstrainedReachingTask':
+        elif experiment_name == 'EyeHandConstrainedReachingTask':
             self.analysis_workers.append((EyeHandAnalysisWorker(self.task_params, data_queue), data_queue))  
 
-        elif self.task_params['experiment_name'] == 'EyeHandConstrainedSequentialReachingTask':
+        elif experiment_name == 'EyeHandConstrainedSequentialReachingTask':
             self.analysis_workers.append((EyeHandAnalysisWorker(self.task_params, data_queue), data_queue))   
 
-        elif self.task_params['experiment_name'] == 'EyeHandSequenceTask':
+        elif experiment_name == 'EyeHandSequenceTask':
             self.analysis_workers.append((EyeHandSequenceAnalysisWorker(self.task_params, data_queue), data_queue))  
 
-        elif self.task_params['experiment_name'] == 'TargetCaptureVisualFeedback':
+        elif experiment_name == 'TargetCaptureVisualFeedback':
             self.analysis_workers.append((SaccadeAnalysisWorker(self.task_params, data_queue), data_queue))
 
-        elif self.task_params['experiment_name'] == 'TargetCaptureVisualFeedbackEyeConstrained':
+        elif experiment_name == 'TargetCaptureVisualFeedbackEyeConstrained':
             self.analysis_workers.append((SaccadeAnalysisWorker(self.task_params, data_queue), data_queue))   
 
         # Is there ecube neural data?
