@@ -78,15 +78,24 @@ class EyeCalibration(traits.HasTraits):
                 # load raw eye data
                 # raw_eye_data, raw_eye_metadata = aopy.preproc.parse_oculomatic(hdf_dir, files, debug=False)
                 samplerate = 1000
-                eye_interp = aopy.data.get_interp_kinematics(bmi3d_data, bmi3d_metadata, datatype='eye',
+                try:
+                    eye_interp = aopy.data.get_interp_kinematics(bmi3d_data, bmi3d_metadata, datatype='eye',
+                                                            samplerate=samplerate)[:,:4]
+                except:
+                    eye_interp = aopy.data.bmi3d.get_interp_task_data(bmi3d_data, bmi3d_metadata, datatype='eye',
                                                             samplerate=samplerate)[:,:4]
 
                 # calculate coefficients to calibrate eye data
                 events = bmi3d_data['events']
 
                 if not self.eye_target_calibration:
-                    cursor_interp = aopy.data.get_interp_kinematics(bmi3d_data, bmi3d_metadata, datatype='cursor',
-                                                            samplerate=samplerate)
+                    try:
+                        cursor_interp = aopy.data.get_interp_kinematics(bmi3d_data, bmi3d_metadata, datatype='cursor',
+                                                                samplerate=samplerate)
+                    except:
+                        cursor_interp = aopy.data.bmi3d.get_interp_task_data(bmi3d_data, bmi3d_metadata, datatype='cursor',
+                                                                samplerate=samplerate)
+                                            
                     self.eye_coeff,_,_,_ = aopy.preproc.calc_eye_calibration(
                         cursor_interp, samplerate, eye_interp, samplerate, 
                         events['timestamp'], events['code'], return_datapoints=True
