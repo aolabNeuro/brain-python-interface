@@ -61,6 +61,7 @@ class EyeCalibration(traits.HasTraits):
             raise ValueError(f"Taskid {taskid} not found in database")
         files = entry.get_data_files_dict_absolute()
         print(files)
+        files.pop('ecube') # ignore neural data
         
         self.eye_center = np.zeros((4,))
         _, metadata_hdf = aopy.data.load_bmi3d_hdf_table('', files['hdf'], 'task')
