@@ -795,7 +795,7 @@ class EyeHandCaptureBlock(Sequence, Window):
         self.penalty_index = 0
         self.pause_index = 0
         self.total_pause_time = 0
-        self.current_pause_time = time_in_state
+        self.current_pause_time = 0
         super().init()
         self.plant.set_endpoint_pos(np.array(self.starting_pos))
 
@@ -1118,7 +1118,7 @@ class EyeHandCaptureBlock(Sequence, Window):
 
         self.targets_hand[0].cue_trial_end_failure()
         self.targets_hand[0].show()
-        time_in_state
+
         if self.is_eye_hand_trials:
             self.targets_hand[1].cue_trial_end_failure()
             self.targets_hand[1].show()            
