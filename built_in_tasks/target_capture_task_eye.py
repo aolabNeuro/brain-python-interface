@@ -1924,7 +1924,7 @@ class ScreenTargetCapture_Saccade(ScreenTargetCapture):
         super()._start_wait()
         # Make cursor invisible
         self.plant.cursor.detach()
-        self.chain_length = 2
+        self.chain_length = len(self.targs)
         
     def _test_enter_target(self, ts):
         '''
