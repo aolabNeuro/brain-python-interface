@@ -268,8 +268,6 @@ class HandConstrainedEyeCapture(ScreenTargetCapture):
         Triggers the fixation_penalty state when eye positions are outside fixation distance
         '''
         # Distance of an eye position from a target position
-        if np.isnan(eye_pos).any():
-            return True
         
         eye_pos = self.calibrated_eye_pos
         d_eye = np.linalg.norm(eye_pos - self.targs[self.target_index,[0,2]])
