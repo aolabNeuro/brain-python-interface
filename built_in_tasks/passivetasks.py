@@ -56,13 +56,15 @@ class TargetCaptureVisualFeedback(EndPostureFeedbackController, BMIControlMulti)
         pass
 
 class TargetCaptureVisualFeedbackEyeConstrained(EndPostureFeedbackController, BMIControlMultiEyeConstrained):
+    blink_time_threshold = traits.Float(0.1, desc="The amount of time in seconds that the eyes can be closed before triggering a fixation break, measured by eye_diam=0")
+    assist_level = (1, 1)
+    is_bmi_seed = True
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.most_recent_open_eye = 0
     
-    assist_level = (1, 1)
-    is_bmi_seed = True
+    
 
     status = dict(
         wait = dict(start_trial="target", start_pause="pause"),
@@ -119,26 +121,21 @@ class TargetCaptureVisualFeedbackEyeConstrained(EndPostureFeedbackController, BM
         Triggers the fixation_penalty state when eye positions are outside fixation distance
         Only apply this to the first hold and delay period
         '''  
-        
-        
-        #eye_d = np.linalg.norm(self.calibrated_eye_pos)
 
-        #if (self.target_index==0):# & (time_in_state<0.5):
-        #    return False
         eye_pos = self.calibrated_eye_pos
         eye_d = np.linalg.norm(eye_pos - self.targs[self.target_index,[0,2]])
 
         #Make flag that tracks the last non-zero eye diameter and check that it has occured in the last 100ms
-        
         #First logic check: Check to see if the eye is open. If open, reset flag to 0   
-        if (self.eye_diam != 0):
+        if np.any(self.eye_diam != 0):
             self.most_recent_open_eye = 0
-        elif self.most_recent_open_eye != 0: #Additionally check if this if the first cycle of 'eyes closed'. If not the first cycle, check how long since the flag was set and trigger a fixatio nfailure if longer than 100ms.
-            return (self.get_time-self.most_recent_open_eye) > 0.1
-        else: #Finally, if the eyes are closed but its the first cycle set the flag here        
-            self.most_recent_open_eye=self.get_time
+        elif self.most_recent_open_eye == 0: #Additionally check if this if the first cycle of 'eyes closed'. If not the first cycle, check how long since the flag was set and trigger a fixatio nfailure if longer than 100ms.
+            self.most_recent_open_eye=self.get_time()
+        elif (self.get_time-self.most_recent_open_eye) > self.blink_time_threshold:
+            self.most_recent_open_eye = 0
+            return True            
     
-
+        #Finally check if the eye location is within the target + buffer
         return (eye_d > self.target_radius + self.fixation_radius_buffer)
     
     def _test_start_trial(self, time_in_state):
