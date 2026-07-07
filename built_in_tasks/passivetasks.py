@@ -32,7 +32,7 @@ class EndPostureFeedbackController(BMILoop, traits.HasTraits):
     ssm_type_options = bmi_ssm_options
     ssm_type = traits.OptionsList(*bmi_ssm_options, bmi3d_input_options=bmi_ssm_options)
     decoder_update_rate = traits.Float(60, desc="Assist feedback rate (Hz)")
-
+    
     static_states = ['wait', 'reward', 'fixation_penalty'] # states in which the decoder is not run
 
     def load_decoder(self):
@@ -42,6 +42,8 @@ class EndPostureFeedbackController(BMILoop, traits.HasTraits):
         units = []
         self.decoder = Decoder(filt, units, self.ssm, binlen=1./self.decoder_update_rate)
         self.decoder.n_features = 1
+        self.decoder.mFR = 0
+        self.decoder.sdFR = 1  #This should prevent an error from triggering when the decoder is saved
 
     def create_feature_extractor(self):
         self.extractor = DummyExtractor()
