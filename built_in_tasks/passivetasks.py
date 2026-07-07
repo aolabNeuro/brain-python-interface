@@ -129,7 +129,10 @@ class TargetCaptureVisualFeedbackEyeConstrained(EndPostureFeedbackController, BM
 
         #Make flag that tracks the last non-zero eye diameter and check that it has occured in the last 100ms
         #First logic check: Check to see if the eye is open. If open, reset flag to 0   
-        if np.any(self.eye_diam != 0):
+        eye_within_fixation_buffer = (eye_d > self.target_radius + self.fixation_radius_buffer)
+        if self.keyboard_control:
+            return eye_within_fixation_buffer
+        elif np.any(self.eye_diam != 0):
             self.most_recent_open_eye = 0
         elif self.most_recent_open_eye == 0: #Additionally check if this if the first cycle of 'eyes closed'. If not the first cycle, check how long since the flag was set and trigger a fixatio nfailure if longer than 100ms.
             self.most_recent_open_eye=self.get_time()
@@ -138,7 +141,7 @@ class TargetCaptureVisualFeedbackEyeConstrained(EndPostureFeedbackController, BM
             return True            
     
         #Finally check if the eye location is within the target + buffer
-        return (eye_d > self.target_radius + self.fixation_radius_buffer)
+        return eye_within_fixation_buffer
     
     def _test_start_trial(self, time_in_state):
         #Check that the eye position is on the center target
@@ -146,7 +149,9 @@ class TargetCaptureVisualFeedbackEyeConstrained(EndPostureFeedbackController, BM
         eye_pos = self.calibrated_eye_pos
         eye_d = np.linalg.norm(eye_pos - self.targs[0,[0,2]]) #target index is zero, this is only applyied during the wait period before the center target comes on
         
-        value = (eye_d < self.target_radius + self.fixation_radius_buffer) & np.any(self.eye_diam!=0)
+        blink = self.keyboard_control | np.any(self.eye_diam!=0)
+
+        value = (eye_d < self.target_radius + self.fixation_radius_buffer) & blink
         return value#(eye_d > self.target_radius + self.fixation_radius_buffer)
 
     #def _end_targ_transition(self):
