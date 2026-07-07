@@ -131,7 +131,7 @@ class TargetCaptureVisualFeedbackEyeConstrained(EndPostureFeedbackController, BM
             self.most_recent_open_eye = 0
         elif self.most_recent_open_eye == 0: #Additionally check if this if the first cycle of 'eyes closed'. If not the first cycle, check how long since the flag was set and trigger a fixatio nfailure if longer than 100ms.
             self.most_recent_open_eye=self.get_time()
-        elif (self.get_time-self.most_recent_open_eye) > self.blink_time_threshold:
+        elif (self.get_time()-self.most_recent_open_eye) > self.blink_time_threshold:
             self.most_recent_open_eye = 0
             return True            
     
@@ -140,13 +140,11 @@ class TargetCaptureVisualFeedbackEyeConstrained(EndPostureFeedbackController, BM
     
     def _test_start_trial(self, time_in_state):
         #Check that the eye position is on the center target
-        print('testing_start trial')
         #return True #super()._test_start_trial
         eye_pos = self.calibrated_eye_pos
         eye_d = np.linalg.norm(eye_pos - self.targs[0,[0,2]]) #target index is zero, this is only applyied during the wait period before the center target comes on
         
-        value = (eye_d < self.target_radius + self.fixation_radius_buffer)
-        print (value)
+        value = (eye_d < self.target_radius + self.fixation_radius_buffer) & np.any(self.eye_diam!=0)
         return value#(eye_d > self.target_radius + self.fixation_radius_buffer)
 
     #def _end_targ_transition(self):
