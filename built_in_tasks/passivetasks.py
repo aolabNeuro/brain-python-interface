@@ -32,7 +32,7 @@ class EndPostureFeedbackController(BMILoop, traits.HasTraits):
     ssm_type_options = bmi_ssm_options
     ssm_type = traits.OptionsList(*bmi_ssm_options, bmi3d_input_options=bmi_ssm_options)
     decoder_update_rate = traits.Float(60, desc="Assist feedback rate (Hz)")
-
+    
     static_states = ['wait', 'reward', 'fixation_penalty'] # states in which the decoder is not run
 
     def load_decoder(self):
@@ -42,6 +42,8 @@ class EndPostureFeedbackController(BMILoop, traits.HasTraits):
         units = []
         self.decoder = Decoder(filt, units, self.ssm, binlen=1./self.decoder_update_rate)
         self.decoder.n_features = 1
+        self.decoder.mFR = 0
+        self.decoder.sdFR = 1  #This should prevent an error from triggering when the decoder is saved
 
     def create_feature_extractor(self):
         self.extractor = DummyExtractor()
@@ -56,8 +58,15 @@ class TargetCaptureVisualFeedback(EndPostureFeedbackController, BMIControlMulti)
         pass
 
 class TargetCaptureVisualFeedbackEyeConstrained(EndPostureFeedbackController, BMIControlMultiEyeConstrained):
+    blink_time_threshold = traits.Float(0.1, desc="The amount of time in seconds that the eyes can be closed before triggering a fixation break, measured by eye_diam=0")
     assist_level = (1, 1)
     is_bmi_seed = True
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.most_recent_open_eye = 0
+    
+    
 
     status = dict(
         wait = dict(start_trial="target", start_pause="pause"),
@@ -102,30 +111,48 @@ class TargetCaptureVisualFeedbackEyeConstrained(EndPostureFeedbackController, BM
     def _start_wait(self):
         super()._start_wait()
         #self.plant_visible = False
-        self.plant.set_visibility(False)
+        self.plant.set_visibility(True)
 
     def _end_targ_transition(self):
         self.plant.set_visibility(False)
         super()._end_targ_transition()
 
 
-        
-
     def _test_fixation_break(self,time_in_state):
         '''
         Triggers the fixation_penalty state when eye positions are outside fixation distance
         Only apply this to the first hold and delay period
         '''  
-        #eye_d = np.linalg.norm(self.calibrated_eye_pos)
 
-        if (self.target_index==0) & (time_in_state<0.5):
-            return False
-        
         eye_pos = self.calibrated_eye_pos
         eye_d = np.linalg.norm(eye_pos - self.targs[self.target_index,[0,2]])
-        
-        return (eye_d > self.target_radius + self.fixation_radius_buffer)
+
+        #Make flag that tracks the last non-zero eye diameter and check that it has occured in the last 100ms
+        #First logic check: Check to see if the eye is open. If open, reset flag to 0   
+        eye_within_fixation_buffer = (eye_d > self.target_radius + self.fixation_radius_buffer)
+        if self.keyboard_control:
+            return eye_within_fixation_buffer
+        elif np.any(self.eye_diam != 0):
+            self.most_recent_open_eye = 0
+        elif self.most_recent_open_eye == 0: #Additionally check if this if the first cycle of 'eyes closed'. If not the first cycle, check how long since the flag was set and trigger a fixatio nfailure if longer than 100ms.
+            self.most_recent_open_eye=self.get_time()
+        elif (self.get_time()-self.most_recent_open_eye) > self.blink_time_threshold:
+            self.most_recent_open_eye = 0
+            return True            
     
+        #Finally check if the eye location is within the target + buffer
+        return eye_within_fixation_buffer
+    
+    def _test_start_trial(self, time_in_state):
+        #Check that the eye position is on the center target
+        #return True #super()._test_start_trial
+        eye_pos = self.calibrated_eye_pos
+        eye_d = np.linalg.norm(eye_pos - self.targs[0,[0,2]]) #target index is zero, this is only applyied during the wait period before the center target comes on
+        
+        blink = self.keyboard_control | np.any(self.eye_diam!=0)
+
+        value = (eye_d < self.target_radius + self.fixation_radius_buffer) & blink
+        return value#(eye_d > self.target_radius + self.fixation_radius_buffer)
 
     #def _end_targ_transition(self):
     #    super()._end_targ_transition()
@@ -196,7 +223,7 @@ class TargetCaptureReplay(ScreenTargetCapture):
         self.replay_trial = trial
         for k, v in self.task_meta.items():
             if k in self.exclude_parent_traits:
-                print("setting {} to {}".format(k, v))
+                print("setting {} to {}".forstart_trialmat(k, v))
                 setattr(self, k, v)
 
         # Have to additionally reset the targets since they are created in super().__init__()
@@ -206,6 +233,7 @@ class TargetCaptureReplay(ScreenTargetCapture):
 
     def _test_start_trial(self, time_in_state):
         '''Wait for the state change in the HDF file in case there is autostart enabled'''
+        print('testing_start_trial')
         trials = self.replay_state[self.replay_state['msg'] == b'target']
         upcoming_trials = [t['time']-1 for t in trials if self.replay_task[t['time']]['trial'] >= self.calc_trial_num()]
         return (np.array(upcoming_trials) <= self.cycle_count).any()
