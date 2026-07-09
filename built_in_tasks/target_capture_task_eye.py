@@ -10,6 +10,11 @@ from riglib.stereo_opengl.window import Window
 from .target_capture_task import ScreenTargetCapture
 from riglib.experiment import traits, Sequence
 from riglib import plants
+from collections import deque
+import aopy
+import tables
+import collections
+import re
 
 ## Plants
 # List of possible "plants" that a subject could control either during manual or brain control
@@ -650,24 +655,30 @@ class EyeHandCaptureBlock(Sequence, Window):
     In simultaneous trials, they need to simultaneously move eye and hand to the target, responding a single go cue.
     '''
 
-    trials_block_eye = traits.Int(100, desc='Trial numbers of the block in sequence trials')
-    trials_block_eye_hand = traits.Int(100, desc='Trial numbers of the block in simultaneous trials')
-    reward_time_eye = traits.Float(.7, desc="Reward time in sequence trials")
-    reward_time_eye_hand = traits.Float(.5, desc="Reward time in simultaneous trials")
+    eye_first = traits.Bool(True, desc="If True, eye_trials come first. If False, eye_hand_trials come first")
+    trials_block_eye = traits.Int(108, desc="Trial numbers of the block in eye trials")
+    trials_block_eye_hand = traits.Int(216, desc="Trial numbers of the block in eye-hand trials")
+    reward_time_eye = traits.Float(.5, desc="Reward time in eye trials")
+    reward_time_eye_hand = traits.Float(.5, desc="Reward time in eye-hand trials")
+    trials_jackpot_eye = traits.Int(0, desc="Trial numbers to get jackpot in eye trials. If 0, no jackpot reward")
+    trials_jackpot_eye_hand = traits.Int(27, desc="Trial numbers to get jackpot in eye-hand trials. If 0, no jackpot reward")
+    reward_time_jackpot_eye = traits.Float(1.0, desc="Reward time for jackpot trials in eye trials")
+    reward_time_jackpot_eye_hand = traits.Float(1.0, desc="Reward time for jackpot trials in eye-hand trials")
+
     fixation_time = traits.Float(.3, desc="fixation duration during which subjects have to keep fixating the first eye target")
     fixation_radius = traits.Float(2.5, desc="Width of the square eye target")
     fixation_radius_buffer = traits.Float(.5, desc="additional radius for eye target. fixation_radius (width) + buffer determines the break of fixation")
     fixation_penalty_time = traits.Float(1, desc="Length of penalty time for fixation break")
     hold_time = traits.Float(.2, desc="Length of hold required at targets before next target appears")
     hold_penalty_time = traits.Float(1, desc="Length of penalty time for target hold error")
-    rand_delay_eye = traits.Tuple((0.4, 0.7), desc="Delay interval for eye in sequence trials")
-    rand_delay_eye_hand = traits.Tuple((0.4, 0.7), desc="Delay interval for eye and hand in simultaneous trials")
+    rand_delay_eye = traits.Tuple((0.4, 0.7), desc="Delay interval in eye trials")
+    rand_delay_eye_hand = traits.Tuple((0.4, 0.7), desc="Delay interval in eye-hand trials")
     delay_penalty_time = traits.Float(1, desc="Length of penalty time for delay error")
     timeout_time = traits.Float(10, desc="Time allowed to go between targets")
     timeout_penalty_time = traits.Float(1, desc="Length of penalty time for timeout error")
     incorrect_target_radius_buffer = traits.Float(.5, desc="target radius + buffer radius determines if subjects look at the incorrect target")
     incorrect_target_penalty_time = traits.Float(1, desc="Length of penalty time for acquiring an incorrect target")
-    max_attempts = traits.Int(10, desc='The number of attempts of a target chain before skipping to the next one')
+    max_attempts = traits.Int(10, desc="The number of attempts of a target chain before skipping to the next one")
     num_targets_per_attempt = traits.Int(2, desc="Minimum number of target acquisitions to be counted as an attempt")
 
     target_radius = traits.Float(2, desc="Radius of targets in cm")
@@ -765,7 +776,16 @@ class EyeHandCaptureBlock(Sequence, Window):
         # Initialize these values for report_stats
         self.trials_all_blocks = self.trials_block_eye + self.trials_block_eye_hand
         self.trial_count_blocks = self.reward_count % self.trials_all_blocks
-        self.is_eye_trials = True
+
+        self.reward_count_eye = 0
+        self.reward_count_eye_hand = 0
+
+        if self.eye_first:
+            self.is_eye_trials = True
+            self.is_eye_hand_trials = False
+        else:
+            self.is_eye_trials = False
+            self.is_eye_hand_trials = True           
 
     def init(self):
         self.trial_dtype = np.dtype([('trial', 'u4'), ('index', 'u4'), ('target', 'f8', (3,))])
@@ -775,7 +795,7 @@ class EyeHandCaptureBlock(Sequence, Window):
         self.penalty_index = 0
         self.pause_index = 0
         self.total_pause_time = 0
-        self.current_pause_time = time_in_state
+        self.current_pause_time = 0
         super().init()
         self.plant.set_endpoint_pos(np.array(self.starting_pos))
 
@@ -853,13 +873,18 @@ class EyeHandCaptureBlock(Sequence, Window):
         self.reportstats['Total pause time'] = self._time_to_string(self.total_pause_time)
         self.reportstats['Current pause time'] = self._time_to_string(self.current_pause_time)
 
-        self.trial_count_blocks = self.calc_state_occurrences('reward') % self.trials_all_blocks
+        self.trial_count_blocks = self._fast_state_counts['reward'] % self.trials_all_blocks
         if self.is_eye_trials:
-            self.reportstats['Task of this block'] = 'Saccade'
-            self.reportstats['Success trial # / Block'] = f'{self.trial_count_blocks} / {self.trials_block_eye}'
+            self.reportstats['Task of this block'] = 'Eye'
+            current_count = self.trial_count_blocks if self.eye_first else self.trial_count_blocks - self.trials_block_eye_hand
+            self.reportstats['Success trial # / Block'] = f'{current_count} / {self.trials_block_eye}'
         else:
-            self.reportstats['Task of this block'] = 'Saccade reaching'
-            self.reportstats['Success trial # / Block'] = f'{self.trial_count_blocks - self.trials_block_eye} / {self.trials_block_eye_hand}'
+            self.reportstats['Task of this block'] = 'Eye-Hand'
+            current_count = self.trial_count_blocks - self.trials_block_eye if self.eye_first else self.trial_count_blocks
+            self.reportstats['Success trial # / Block'] = f'{current_count} / {self.trials_block_eye_hand}'
+
+        self.reportstats['Success trial # (eye trials)'] = self.reward_count_eye
+        self.reportstats['Success trial # (eye-hand trials)'] = self.reward_count_eye_hand
 
     def _start_wait(self):
         self.fixation_passed = False
@@ -890,24 +915,21 @@ class EyeHandCaptureBlock(Sequence, Window):
 
         if self.tries == 0: # Update delay_time only in the first attempt
             
-            # Set delay time
-            s, e = self.rand_delay_eye
-            self.delay_time_eye = random.random()*(e-s) + s
-            s, e = self.rand_delay_eye_hand
-            self.delay_time_eye_hand = random.random()*(e-s) + s
-
             # Decide eye or eye-hand trials  
-            self.trial_count_blocks = self.calc_state_occurrences('reward') % self.trials_all_blocks
+            self.trial_count_blocks = self._fast_state_counts['reward'] % self.trials_all_blocks
 
-            if self.trial_count_blocks < self.trials_block_eye:
-                self.is_eye_trials = True
-                self.is_eye_hand_trials = False
-                self.reward_time = self.reward_time_eye
-
-            elif self.trial_count_blocks - self.trials_block_eye < self.trials_block_eye_hand:
-                self.is_eye_trials = False
-                self.is_eye_hand_trials = True
-                self.reward_time = self.reward_time_eye_hand
+            if self.eye_first:
+                # Trial blocks changes from eye to eye-hand
+                if self.trial_count_blocks < self.trials_block_eye:
+                    self._set_trial_type(is_eye=True)
+                else:
+                    self._set_trial_type(is_eye=False)
+            else:
+                # Trial blocks changes from eye-hand to eye
+                if self.trial_count_blocks < self.trials_block_eye_hand:
+                    self._set_trial_type(is_eye=False)
+                else:
+                    self._set_trial_type(is_eye=True)
 
             self.task_data['is_eye_trials'] = self.is_eye_trials
 
@@ -917,6 +939,29 @@ class EyeHandCaptureBlock(Sequence, Window):
         # Set index to 0 because the state may come from the penalty or pause state,
         self.penalty_index = 0
         self.pause_index = 0
+
+    def _set_trial_type(self, is_eye):
+        if is_eye:
+            self.is_eye_trials = True
+            self.is_eye_hand_trials = False
+
+            s, e = self.rand_delay_eye
+            self.delay_time_eye = random.random()*(e-s) + s
+
+            self.reward_time = self.reward_time_eye
+            if self.reward_count_eye % self.trials_jackpot_eye == self.trials_jackpot_eye-1:
+                self.reward_time = self.reward_time_jackpot_eye
+
+        else:
+            self.is_eye_trials = False
+            self.is_eye_hand_trials = True
+            
+            s, e = self.rand_delay_eye_hand
+            self.delay_time_eye_hand = random.random()*(e-s) + s
+
+            self.reward_time = self.reward_time_eye_hand
+            if self.reward_count_eye_hand % self.trials_jackpot_eye_hand == self.trials_jackpot_eye_hand-1:
+                self.reward_time = self.reward_time_jackpot_eye_hand
 
     def _start_target(self):
         # Only show the hand target
@@ -1073,7 +1118,7 @@ class EyeHandCaptureBlock(Sequence, Window):
 
         self.targets_hand[0].cue_trial_end_failure()
         self.targets_hand[0].show()
-        time_in_state
+
         if self.is_eye_hand_trials:
             self.targets_hand[1].cue_trial_end_failure()
             self.targets_hand[1].show()            
@@ -1095,6 +1140,11 @@ class EyeHandCaptureBlock(Sequence, Window):
         self.targets_hand[0].hide()
         self.plant.cursor.detach()
         self.sync_event('REWARD')
+
+        if self.is_eye_trials:
+            self.reward_count_eye += 1
+        else:
+            self.reward_count_eye_hand += 1
 
     def _end_reward(self):
         self.sync_event('TRIAL_END')
@@ -1343,6 +1393,9 @@ class EyeHandCaptureBlock_sequence(EyeHandCaptureBlock):
     For eye-hand trials, subjects need to move their eyes first, then move their arm while keeping their fixation on the eye target.
     '''
 
+    trials_online_eye_calib = traits.Int(0, desc='Trial numbers used for online eye calibration. If 0, no online calibration is performed')
+    offset_time_online_eye_calib = traits.Float(0.1, desc="Data after this offset_time is only used for eye calibration in the fixation state")
+    duration_online_eye_calib = traits.Float(0.1, desc="Data within this duration after offset_time in the fixation state is only used for eye calibration")
     fixation_time1 = traits.Float(.2, desc="First fixation duration. This is both for eye_trials nad eye_hand_trials")
     fixation_time2 = traits.Float(.2, desc="Second fixation duration. This is only for eye_hand_trials")
     exclude_parent_traits = ['fixation_time']
@@ -1367,9 +1420,62 @@ class EyeHandCaptureBlock_sequence(EyeHandCaptureBlock):
         pause = dict(end_pause="wait", end_state=True),
     )
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if self.trials_online_eye_calib:
+            self.eye_coeff_stack = []
+            self.m_eye_pos_online_eye_calib = deque(maxlen = self.trials_online_eye_calib*2) # bacause there are 2 eye pos within a single trial
+            self.targ_pos_online_eye_calib = deque(maxlen = self.trials_online_eye_calib*2)
+
     def _start_wait(self):
         super()._start_wait()
         self.hand_target_index = -1
+
+        if self.trials_online_eye_calib:
+            self.eye_pos_tmp0 = []
+            self.eye_pos_tmp1 = []
+
+            if self.tries == 0:
+                if self.calc_state_occurrences('reward') > self.trials_online_eye_calib:
+                    if len(self.eye_pos) == 4:
+                        target_pos_tile = np.tile(np.array(self.targ_pos_online_eye_calib), (1,2))
+                    else:
+                        target_pos_tile = np.array(self.targ_pos_online_eye_calib)
+
+                    slopes, intercepts, _ = aopy.analysis.fit_linear_regression(np.array(self.m_eye_pos_online_eye_calib), target_pos_tile)
+                    self.eye_coeff = np.vstack((slopes, intercepts)).T
+                    self.eye_center = np.zeros((4,))
+
+                    self.eye_coeff_stack.append(self.eye_coeff)
+
+    def _start_fixation(self):
+        super()._start_fixation()
+        if self.trials_online_eye_calib:
+            self.start_fixation_time = self.get_time()
+
+    def _while_fixation(self):
+        # Only store eye pos between offset ~ offset + duration in the fixation state of eye trials
+        if self.trials_online_eye_calib:
+            elapsed_time = self.get_time() - self.start_fixation_time
+            if elapsed_time > self.offset_time_online_eye_calib and elapsed_time < self.offset_time_online_eye_calib + self.duration_online_eye_calib:
+                if self.target_index == 0:
+                    self.eye_pos_tmp0.append(self.eye_pos[:4]) # store data regardless of whther it is eye trials or eye-hand trials
+                elif self.target_index == 1 and self.is_eye_trials:
+                    self.eye_pos_tmp1.append(self.eye_pos[:4]) # store data only from eye trials
+
+    def _start_hold(self):
+        super()._start_hold()
+        if self.trials_online_eye_calib:
+            self.start_hold_time = self.get_time()
+
+    def _while_hold(self):
+        # Only store eye pos between offset ~ offset + duration in the hold state of eye-hand trials
+        if self.trials_online_eye_calib:
+            elapsed_time = self.get_time() - self.start_hold_time
+            if elapsed_time > self.offset_time_online_eye_calib and elapsed_time < self.offset_time_online_eye_calib + self.duration_online_eye_calib:
+                if self.hand_target_index == 1 and self.is_eye_hand_trials:
+                    self.eye_pos_tmp1.append(self.eye_pos[:4]) # store data only from eye-hand trials
 
     def _start_target_hand(self):
         # Hide hand target to show the go cue for hand movement
@@ -1377,6 +1483,14 @@ class EyeHandCaptureBlock_sequence(EyeHandCaptureBlock):
             self.hand_target_index = 1
             self.targets_hand[self.hand_target_index-1].hide()
             self.sync_event('TARGET_OFF', self.gen_indices[self.hand_target_index-1])
+
+    def _end_reward(self):
+        super()._end_reward()
+        if self.trials_online_eye_calib:
+            self.m_eye_pos_online_eye_calib.append(np.nanmean(self.eye_pos_tmp0, axis=0))
+            self.m_eye_pos_online_eye_calib.append(np.nanmean(self.eye_pos_tmp1, axis=0))
+            self.targ_pos_online_eye_calib.append(np.array(self.targs)[0,[0,2]])
+            self.targ_pos_online_eye_calib.append(np.array(self.targs)[1,[0,2]])
 
     def _start_targ_transition(self):
         if self.target_index + 1 < self.chain_length:
@@ -1423,6 +1537,14 @@ class EyeHandCaptureBlock_sequence(EyeHandCaptureBlock):
     def _test_targ_eye(self,ts):
         return self.target_index < self.chain_length - 1
 
+    def cleanup_hdf(self):
+        super().cleanup_hdf()
+        if self.trials_online_eye_calib:
+            if hasattr(self, "h5file"):
+                h5file = tables.open_file(self.h5file.name, mode='a')
+                h5file.root.task.attrs['eye_coeff_stack'] = np.array(self.eye_coeff_stack)
+                h5file.close()
+
 class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
     '''
     Subjects have to gaze at and reach to a target, responding to the eye or hand go cue indivisually in sequence trials.
@@ -1431,14 +1553,26 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
     '''
 
     exclude_parent_traits = ['delay_time', 'rand_delay','prob_catch_trials','short_delay_catch_trials','reward_time']
+
+    trials_online_eye_calib = traits.Int(0, desc='Trial numbers used for online eye calibration. If 0, no online calibration is performed')
+    offset_time_online_eye_calib = traits.Float(0.1, desc="Data after this offset_time is only used for eye calibration in the fixation state")
+    duration_online_eye_calib = traits.Float(0.1, desc="Data within this duration after offset_time in the fixation state is only used for eye calibration")
+
     rand_delay_eye_hand = traits.Tuple((0.4, 0.7), desc="Delay interval for eye and hand in simultaneous trials")
     rand_delay_eye = traits.Tuple((0.4, 0.7), desc="Delay interval for eye in sequence trials")
     rand_delay_hand = traits.Tuple((0., 0.5), desc="Delay interval for hand in sequence trials")
-    fixation_time = traits.Float(.3, desc="fixation duration during which subjects have to keep fixating the first eye target")
-    trials_block_sequence = traits.Int(100, desc='Trial numbers of the block in sequence trials')
+    fixation_time = traits.Float(.3, desc="fixation duration during which subjects have to keep fixating the target")
+    hold_time = traits.Float(.3, desc="hold duration during which subjects have to hold the second target in sequence trials")
     trials_block_simultaneous = traits.Int(100, desc='Trial numbers of the block in simultaneous trials')
-    reward_time_sequence = traits.Float(.7, desc="Reward time in sequence trials")
+    trials_block_sequence = traits.Int(100, desc='Trial numbers of the block in sequence trials')
+    
     reward_time_simultaneous = traits.Float(.5, desc="Reward time in simultaneous trials")
+    reward_time_sequence = traits.Float(.7, desc="Reward time in sequence trials")
+    trials_jackpot_simultaneous = traits.Int(0, desc="Trial numbers to get jackpot in simultaneous trials. If 0, no jackpot reward")
+    trials_jackpot_sequence = traits.Int(27, desc="Trial numbers to get jackpot in sequence trials. If 0, no jackpot reward")
+    reward_time_jackpot_simultaneous = traits.Float(1.0, desc="Reward time for jackpot trials in simultaneous trials")
+    reward_time_jackpot_sequence = traits.Float(1.0, desc="Reward time for jackpot trials in sequence trials")    
+
     diff_eye_hand_RTs_thr = traits.Float(0.5, desc="Accepted difference between eye and hand RTs in simultaneous trials")
     coordination_penalty_time = traits.Float(0.5, desc="Length of penalty time for less coordinated eye and hand movement in simultaneous trials")
     hand_RTs_thr_simul = traits.Float(0.55, desc="Accepted reach RTs in simultaneous trials")
@@ -1493,6 +1627,16 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
         self.is_sequence = False
         self.is_simultaneous = True
 
+        self.reward_count_simultaneous = 0
+        self.reward_count_sequence = 0
+
+        # For eye calibration during the task
+        if self.trials_online_eye_calib:
+            self.eye_coeff_stack = []
+            self.m_eye_pos_online_eye_calib = deque(maxlen = self.trials_online_eye_calib)
+            self.m_eye_pos_center_online_eye_calib = deque(maxlen = self.trials_online_eye_calib)
+            self.targ_pos_online_eye_calib = deque(maxlen = self.trials_online_eye_calib)
+
     def init(self):
         self.add_dtype('is_sequence', bool, (1,))
         super().init()
@@ -1504,11 +1648,14 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
         super().update_report_stats()
         self.trial_count_blocks = self.calc_state_occurrences('reward') % self.trials_all_blocks
         if self.is_simultaneous:
-            self.reportstats['Task of this block'] = 'Simultaneous'
+            self.reportstats['Task of this block'] = 'Joint'
             self.reportstats['Success trial # / Block'] = f'{self.trial_count_blocks} / {self.trials_block_simultaneous}'
         else:
             self.reportstats['Task of this block'] = 'Sequence'
             self.reportstats['Success trial # / Block'] = f'{self.trial_count_blocks - self.trials_block_simultaneous} / {self.trials_block_sequence}'
+
+        self.reportstats['Success trial # (joint trials)'] = self.reward_count_simultaneous
+        self.reportstats['Success trial # (sequence trials)'] = self.reward_count_sequence
 
     def _test_gaze_enter_target(self,ts):
         '''
@@ -1665,36 +1812,68 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
 
         if self.tries == 0: # Update delay_time only in the first attempt
 
-            # Set delay time
-            s, e = self.rand_delay_eye
-            self.delay_time_eye = random.random()*(e-s) + s
-            s, e = self.rand_delay_hand
-            self.delay_time_hand = random.random()*(e-s) + s
-            s, e = self.rand_delay_eye_hand
-            self.delay_time_eye_hand = random.random()*(e-s) + s
-
             # Decide sequence or simultaneous trials  
             self.trial_count_blocks = self.calc_state_occurrences('reward') % self.trials_all_blocks
 
             if self.trial_count_blocks < self.trials_block_simultaneous:
-                self.is_simultaneous = True
-                self.is_sequence = False
-                self.chain_length = 2
-                self.reaction_time_thr = self.hand_RTs_thr_simul
-                self.reward_time = self.reward_time_simultaneous
+                self._set_trial_type(is_simultaneous=True)
 
             elif self.trial_count_blocks - self.trials_block_simultaneous < self.trials_block_sequence:
-                self.is_simultaneous = False
-                self.is_sequence = True
-                self.chain_length = 3
-                self.reaction_time_thr = self.hand_RTs_thr_seq
-                self.reward_time = self.reward_time_sequence
+                self._set_trial_type(is_simultaneous=False)
 
             self.task_data['is_sequence'] = self.is_sequence
 
         if self.is_sequence:
             for target in self.targets_hand:
                 target.sphere.color = target_colors[self.sequence_target_color]
+
+        # For eye calibration during the task
+        if self.trials_online_eye_calib:
+            self.eye_pos_tmp0 = []
+            self.eye_pos_tmp1 = []
+
+            if self.tries == 0:
+                if self.calc_state_occurrences('reward') > self.trials_online_eye_calib:
+                    if len(self.eye_pos) == 4:
+                        target_pos_tile = np.tile(np.array(self.targ_pos_online_eye_calib), (1,2))
+                    else:
+                        target_pos_tile = np.array(self.targ_pos_online_eye_calib)
+
+                    self.eye_center = np.mean(self.m_eye_pos_center_online_eye_calib, axis=0)
+                    slopes, intercepts, _ = aopy.analysis.fit_linear_regression(np.array(self.m_eye_pos_online_eye_calib)-self.eye_center, target_pos_tile)
+                    self.eye_coeff = np.vstack((slopes, intercepts)).T
+                    self.eye_coeff_stack.append(self.eye_coeff)
+
+    def _set_trial_type(self, is_simultaneous):
+        if is_simultaneous:
+            self.is_simultaneous = True
+            self.is_sequence = False
+
+            s, e = self.rand_delay_eye_hand
+            self.delay_time_eye_hand = random.random()*(e-s) + s
+
+            self.chain_length = 2
+            self.reaction_time_thr = self.hand_RTs_thr_simul
+
+            self.reward_time = self.reward_time_simultaneous
+            if self.reward_count_simultaneous % self.trials_jackpot_simultaneous == self.trials_jackpot_simultaneous-1:
+                self.reward_time = self.reward_time_jackpot_simultaneous
+
+        else:
+            self.is_simultaneous = False
+            self.is_sequence = True
+            
+            s, e = self.rand_delay_eye
+            self.delay_time_eye = random.random()*(e-s) + s
+            s, e = self.rand_delay_hand
+            self.delay_time_hand = random.random()*(e-s) + s
+
+            self.chain_length = 3
+            self.reaction_time_thr = self.hand_RTs_thr_seq
+
+            self.reward_time = self.reward_time_sequence
+            if self.reward_count_sequence % self.trials_jackpot_sequence == self.trials_jackpot_sequence-1:
+                self.reward_time = self.reward_time_jackpot_sequence
 
     def _start_target(self):
         
@@ -1759,9 +1938,33 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
         self.sync_event('FIXATION', self.eye_gen_indices[self.eye_target_index])
         self.targets_eye[self.eye_target_index].cube.color = target_colors[self.fixation_target_color]
 
+        if self.trials_online_eye_calib:
+            self.start_fixation_time = self.get_time()
+
+    def _while_fixation(self):
+        # Only store eye pos between offset ~ offset + duration in the fixation state
+        if self.trials_online_eye_calib:
+            elapsed_time = self.get_time() - self.start_fixation_time
+            if elapsed_time > self.offset_time_online_eye_calib and elapsed_time < self.offset_time_online_eye_calib + self.duration_online_eye_calib:
+                if self.eye_target_index == 0:
+                    self.eye_pos_tmp0.append(self.eye_pos[:4]) # store eye data for the center target
+                elif self.eye_target_index == 1 and self.is_simultaneous:
+                    self.eye_pos_tmp1.append(self.eye_pos[:4]) # store eye data for the peripheral target from eye trials
+
     def _start_hold(self):
         if self.target_index != 1: # when the state comes from target_eye, skip start_hold
             self.sync_event('CURSOR_ENTER_TARGET', self.hand_gen_indices[self.hand_target_index])
+
+        if self.trials_online_eye_calib:
+            self.start_hold_time = self.get_time()
+
+    def _while_hold(self):
+        # Only store eye pos between offset ~ offset + duration in the hold state of eye-hand trials
+        if self.trials_online_eye_calib:
+            elapsed_time = self.get_time() - self.start_hold_time
+            if elapsed_time > self.offset_time_online_eye_calib and elapsed_time < self.offset_time_online_eye_calib + self.duration_online_eye_calib:
+                if self.hand_target_index == 1 and self.is_sequence:
+                    self.eye_pos_tmp1.append(self.eye_pos[:4]) # store eye data for the peripheral target from sequential trials
 
     def _start_delay(self):
         if self.target_index == 0 and self.is_simultaneous: # This is for both eye and hand targets
@@ -1864,6 +2067,11 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
             target_eye.cue_trial_end_success()
             target_hand.cue_trial_end_success()
 
+        if self.is_sequence:
+            self.reward_count_sequence += 1
+        else:
+            self.reward_count_simultaneous += 1
+
     def _end_reward(self):
         super()._end_reward()
         for target_eye, target_hand in zip(self.targets_eye,self.targets_hand):
@@ -1872,6 +2080,11 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
             target_hand.hide()
             target_hand.reset()     
 
+        if self.trials_online_eye_calib:
+            self.m_eye_pos_center_online_eye_calib.append(np.nanmean(self.eye_pos_tmp0, axis=0)) # eye data for the center target
+            self.m_eye_pos_online_eye_calib.append(np.nanmean(self.eye_pos_tmp1, axis=0)) # eye data for the peripheral target
+            self.targ_pos_online_eye_calib.append(np.array(self.targs)[1,[0,2]]) # periphetal target position
+
     def _start_pause(self):
         super()._start_pause()
         for target_eye, target_hand in zip(self.targets_eye,self.targets_hand):
@@ -1879,6 +2092,14 @@ class EyeHandSequenceCapture(EyeConstrainedTargetCapture):
             target_eye.reset()
             target_hand.hide()
             target_hand.reset()
+
+    def cleanup_hdf(self):
+        super().cleanup_hdf()
+        if self.trials_online_eye_calib:
+            if hasattr(self, "h5file"):
+                h5file = tables.open_file(self.h5file.name, mode='a')
+                h5file.root.task.attrs['eye_coeff_stack'] = np.array(self.eye_coeff_stack)
+                h5file.close()
 
 class ScreenTargetCapture_Saccade(ScreenTargetCapture):
     '''
