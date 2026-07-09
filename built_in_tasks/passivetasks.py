@@ -42,8 +42,8 @@ class EndPostureFeedbackController(BMILoop, traits.HasTraits):
         units = []
         self.decoder = Decoder(filt, units, self.ssm, binlen=1./self.decoder_update_rate)
         self.decoder.n_features = 1
-        self.decoder.mFR = 0
-        self.decoder.sdFR = 1  #This should prevent an error from triggering when the decoder is saved
+        #self.decoder.mFR = 0
+        #self.decoder.sdFR = 1  #This should prevent an error from triggering when the decoder is saved
 
     def create_feature_extractor(self):
         self.extractor = DummyExtractor()
