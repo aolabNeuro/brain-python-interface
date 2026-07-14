@@ -307,27 +307,27 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
         if (not self.save_zscore) or (self.saveid is None):
             return
         #Check if null decoder here
-        if hasattr(self.decoder, 'is_null_decoder'):
-            return self.decoder.is_null_decoder
+        if not (hasattr(self.decoder, 'is_null_decoder') and self.decoder.is_null_decoder):
         
-        if not (np.all(self.decoder.mFR == 0) and np.all(self.decoder.sdFR) == 1):
-            filename = self.decoder.save()
+            if not (np.all(self.decoder.mFR == 0) and np.all(self.decoder.sdFR) == 1):
+                filename = self.decoder.save()
 
-            from db.tracker import dbq
-            suffix = f"saved_from_{self.saveid}"
-            dbq.save_bmi(suffix, self.saveid, filename)
-            return
+                from db.tracker import dbq
+                suffix = f"saved_from_{self.saveid}"
+                dbq.save_bmi(suffix, self.saveid, filename)
+                return
 
-        # This is linear mapping specific - needs updating
-        self.decoder.filt.fix_norm_attr()
-        self.decoder.filt._update_scale_attr()
-        mFR = self.decoder.filt.attr['offset'].copy()
-        sdFR = self.decoder.filt.attr['scale'].copy()
-        n_units = self.decoder.filt.n_units
-        self.decoder.filt.update_norm_attr(offset=np.zeros(n_units), scale=np.ones(n_units))
+            # This is linear mapping specific - needs updating
+            self.decoder.filt.fix_norm_attr()
+            self.decoder.filt._update_scale_attr()
+            mFR = self.decoder.filt.attr['offset'].copy()
+            sdFR = self.decoder.filt.attr['scale'].copy()
+            n_units = self.decoder.filt.n_units
+            self.decoder.filt.update_norm_attr(offset=np.zeros(n_units), scale=np.ones(n_units))
 
-        # The rest should work with any decoder
-        self.decoder.init_zscore(mFR, sdFR)
+            # The rest should work with any decoder
+            self.decoder.init_zscore(mFR, sdFR)
+            
         filename = self.decoder.save()
 
         from db.tracker import dbq
