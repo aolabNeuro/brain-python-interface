@@ -42,9 +42,7 @@ class EndPostureFeedbackController(BMILoop, traits.HasTraits):
         units = []
         self.decoder = Decoder(filt, units, self.ssm, binlen=1./self.decoder_update_rate)
         self.decoder.n_features = 1
-        print(self.decoder.filt)
-        #This flag is to indicate that it was an assist an not necessary to be saved.
-        self.decoder.is_null_decoder = True
+        
 
     def create_feature_extractor(self):
         self.extractor = DummyExtractor()
@@ -66,6 +64,16 @@ class TargetCaptureVisualFeedbackEyeConstrained(EndPostureFeedbackController, BM
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.most_recent_open_eye = 0
+
+    def load_decoder(self):
+        self.ssm = StateSpaceEndptVel2D()
+        A, B, W = self.ssm.get_ssm_matrices()
+        filt = MachineOnlyFilter(A, W)
+        units = []
+        self.decoder = Decoder(filt, units, self.ssm, binlen=1./self.decoder_update_rate)
+        self.decoder.n_features = 1
+        #This flag is to indicate that it was an assist an not necessary to be saved.
+        self.decoder.is_null_decoder = True
 
     status = dict(
         wait = dict(start_trial="target", start_pause="pause"),
