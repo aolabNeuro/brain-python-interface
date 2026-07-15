@@ -84,6 +84,7 @@ class FlashTargets(ScreenTargetCapture_Saccade):
         #self.target_index += 1 #I'm not sure if this makes sense to increment here; may
 
         # Show target if it is hidden (this is the first target, or previous state was a penalty)
+        #UPdate!
         target = self.targets[self.center_target_index]
         #if self.target_index == 0:
         target.move_to_position(self.center_target_position) #Check the formating on these indicies; self.targs[self.target_index] - self.offset_cube)
