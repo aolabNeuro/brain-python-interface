@@ -66,7 +66,7 @@ class FlashTargets(ScreenTargetCapture_Saccade):
 
             self.offset_cube = np.array([0,0,self.target_radius/2]) # To center the cube target
             self.center_target_index = 0
-            self.center_target_position = [0,0,0] - self.offset_cube
+            self.center_target_position = [0,0,0] 
 
     
     
@@ -87,7 +87,15 @@ class FlashTargets(ScreenTargetCapture_Saccade):
         #UPdate!
         target = self.targets[self.center_target_index]
         #if self.target_index == 0:
-        target.move_to_position(self.center_target_position) #Check the formating on these indicies; self.targs[self.target_index] - self.offset_cube)
+        target.move_to_position(self.center_target_position - self.offset_cube) #Check the formating on these indicies; self.targs[self.target_index] - self.offset_cube)
         target.show()
         self.sync_event('TARGET_ON', self.center_target_index) #Double check that 0 corresponds correctly to the center target
         self.target_location = self.center_target_position # save for BMILoop
+
+    def _test_enter_target(self, ts):
+        '''
+        return true if the distance between center of cursor and target is smaller than the cursor radius
+        '''
+        cursor_pos = self.plant.get_endpoint_pos()
+        d = np.linalg.norm(cursor_pos - self.targs[self.center_target_index])
+        return d <= (self.target_radius - self.cursor_radius) or super()._test_enter_target(ts)
