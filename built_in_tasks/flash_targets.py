@@ -66,7 +66,7 @@ class FlashTargets(ScreenTargetCapture_Saccade):
 
             self.offset_cube = np.array([0,0,self.target_radius/2]) # To center the cube target
             self.center_target_index = 0
-            self.center_target_position = [0,0,0] 
+            self.center_target_position = np.array([0,0,0] )
 
     
     
@@ -96,6 +96,13 @@ class FlashTargets(ScreenTargetCapture_Saccade):
         '''
         return true if the distance between center of cursor and target is smaller than the cursor radius
         '''
-        cursor_pos = self.plant.get_endpoint_pos()
-        d = np.linalg.norm(cursor_pos - self.targs[self.center_target_index])
-        return d <= (self.target_radius - self.cursor_radius) or super()._test_enter_target(ts)
+        eye_pos = self.calibrated_eye_pos
+        target_pos = self.center_target_position[0:2] #Only grab two values from the target position to match the shape of the eye position
+        d_eye = np.linalg.norm(eye_pos - target_pos)
+        return (d_eye <= self.target_radius + self.fixation_radius_buffer)
+
+    #def _test_leave_target(self):
+    #    eye_pos = self.calibrated_eye_pos
+    #    target_pos = self.center_target_position[0:2] #Only grab two values from the target position to match the shape of the eye position
+    #    d_eye = np.linalg.norm(eye_pos - target_pos)
+    #    return not (d_eye <= self.target_radius + self.fixation_radius_buffer)
