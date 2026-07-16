@@ -512,7 +512,7 @@ class ScreenTargetCapture(TargetCapture, Window):
         super()._end_timeout_penalty()
         self.sync_event('TRIAL_END')
 
-    def _start_reward(self):
+    def _start_reward(sself.targs[self.target_index]elf):
         self.targets[self.target_index % 2].cue_trial_end_success()
         self.sync_event('REWARD')
         

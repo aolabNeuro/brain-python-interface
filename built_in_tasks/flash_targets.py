@@ -79,14 +79,66 @@ class FlashTargets(ScreenTargetCapture_Saccade):
 
     status = dict(
         wait = dict(start_trial="target", start_pause="pause"),
-        target = dict(enter_target="hold", start_pause="pause"),
-        hold_buffer = dict(leave_target="hold_penalty", start_flash_cycle='hold_flash_on', hold_complete="reward", start_pause="pause"),
-        hold_flash_on = dict(leave_target="hold_penalty", flash_complete="hold_flash_off", flash_cycle_complete='hold_buffer', start_pause="pause")
-        hold_flash_off = dict(leave_target="hold_penalty", flash_interval_complete = "flash_complete", flash_cycle_complete='hold_buffer', start_pause="pause")
+        target = dict(enter_target="hold_start_buffer", start_pause="pause"),
+        hold_start_buffer = dict(leave_target="hold_penalty", start_flash_cycle='hold_flash_on', start_pause="pause"),
+        hold_flash_on = dict(leave_target="hold_penalty", flash_complete="hold_flash_off", flash_cycle_complete='hold_end_buffer', start_pause="pause"),
+        hold_flash_off = dict(leave_target="hold_penalty", flash_interval_complete = "hold_flash_on", flash_cycle_complete='hold_end_buffer', start_pause="pause"),
+        hold_end_buffer = dict(leave_target="hold_penalty", hold_complete='reward', start_pause="pause"),
         hold_penalty = dict(hold_penalty_end="wait", start_pause="pause", end_state=True),
         reward = dict(reward_end="wait", start_pause="pause", stoppable=False, end_state=True),
         pause = dict(end_pause="wait", end_state=True),
     )
+
+    def _test_hold_complete(self, time_in_state):
+        time_since_hold_start = self.get_time() - self.most_recent_hold_start_time
+        return self.hold_time<=(time_since_hold_start)
+    
+    def _start_hold_flash_off(self):
+        #Turn off the target
+        #Which actual animatino blob do I hide?
+        target = self.targets[1]
+        #Show the target
+        target.hide()
+
+    def _test_flash_interval_complete(self, time_in_state):
+        #wait until the inter flash interval has completed before turning the flash back on
+        return time_in_state>=self.target_flash_time_s
+
+    def _test_flash_cycle_complete(self, time_in_state):
+        #make sure we have not encroached on the end hold buffer time
+        time_since_hold_start = self.get_time() - self.most_recent_hold_start_time
+        return self.hold_time<=(time_since_hold_start + self.flash_buffer_time_s)
+
+    def _test_start_flash_cycle(self, time_in_state):
+        #Test to see if the buffer period at the beginningof the hold has been completed so that we can start showing peripheral targets
+        return time_in_state > self.flash_buffer_time_s
+    
+    def _test_flash_complete(self, time_in_state):
+        return time_in_state>self.target_flash_time_s
+
+    def _start_hold_start_buffer(self):
+        #Save the start time of the hold for future reference and checking
+        self.most_recent_hold_start_time = self.get_time()
+
+    def _start_hold_flash_on(self):
+        #We want to grab the first peripheral target and turn it on
+        #Which actual animatino blob do I move? The second one
+        target = self.targets[1]
+
+        #Incrementing to the next target in the generator
+        self.target_index += 1
+        #move the animation object to the correct location
+        print(f'The peripheral target object is {target}')
+        target_position = self.targs[self.target_index] - self.offset_cube
+        print(f'The peripheral target position {target_position}')
+        target.move_to_position(target_position)
+
+        #Show the target
+        target.show()
+        #Sync to ecube
+        self.sync_event('TARGET_ON', self.gen_indices[self.target_index])
+        #Save the target location
+        self.target_location = self.targs[self.target_index]
 
     def _start_target(self):
         #self.target_index += 1 #I'm not sure if this makes sense to increment here; may
@@ -114,32 +166,3 @@ class FlashTargets(ScreenTargetCapture_Saccade):
         target_pos = self.center_target_position[0:2] #Only grab two values from the target position to match the shape of the eye position
         d_eye = np.linalg.norm(eye_pos - target_pos)
         return not (d_eye <= self.target_radius + self.fixation_radius_buffer)
-
-
-    def _start_hold(self):
-        self.flash_target_index = 0
-        
-    def _while_hold(self, time_in_state):
-        '''What do I want to do durinng the hold periods? I want to intermittently show the peripheral targets'''
-        #Which actual animatino blob do I move? The second one
-        target = self.targets[1]
-        
-        if (time_in_state<self.flash_buffer_time_s) or  (time_in_state>(self.hold_time-self.flash_buffer_time_s)):
-            target.hide()
-            return
-        else:
-            flash_cycle_time = time_in_state - self.flash_buffer_time_s - self.flash_target_index * 2 * self.target_flash_time_s
-            if flash_cycle_time < self.target_flash_time_s:
-                self.target_index += 1
-                target.move_to_position(self.targs[self.target_index] - self.offset_cube)
-                target
-
-        #Is it time to turn on a flash?
-        
-        #Is it timeto turn off a flash
-        #Increment the target index
-        self.target_index += 1
-        target.move_to_position(self.targs[self.target_index] - self.offset_cube)
-        target.show()
-        self.sync_event('TARGET_ON', self.gen_indices[self.target_index])
-        self.target_location = self.targs[self.target_index]
