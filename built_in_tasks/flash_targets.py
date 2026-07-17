@@ -28,23 +28,40 @@ from .target_graphics import *
 from .bmimultitasks import BMIControlMultiEyeConstrained
 
 class FlashTargets(ScreenTargetCapture_Saccade):
-    "This task recquires a central fixation and then shows different peripheral targets. "
     '''
-    Key Features:
+    # Flash Targets
+    This task comprises of a white rectangle to fixate on to intialize the trial. 
+    Then a series of circular peripheral targets are flashed while recquiring the animal to maintain the central fixation.
 
-    Key Parameters:
-    hold time: 
-    flash target:
+    ## Key Features:
+    - arduino_sync
+    - autostart
+    - ecube_start
+    - eye_calibration
+    - eye_streaming
+    - online_analysis
+    - optitrack
+    - reward_system
+    - rig1_sync
+    - saveHDF
+    - test_2D
+
+    ## Key Parameters:
+    - hold time: determines fixation time and total trial time
+    - target_flash_time_s: Tuple, The amount of time in seconds that the peripheral targets are flashed on (target_flash_time_s[0] and off (target_flash_time_s[1])
+    - flash_buffer_time_s: Float, The amount of time after the fixation starts and before the fixation ends where no peripheral targets will be shown
+    - task_id_for_eye_calibration: Set to the correct ID of the eye calibration or manual control task
+
+    ## Parameters to watch:
+    - keyboard_control
+    - show_eye_pos
+    - session_length
+
     
+    ## Todo
+    1. blink_time_threshold: implement logic into a feature so taht we can use it for multiple tasks
+    2. Reorganize the functions to improve readibility
     '''
-    #Step 1: Make the center eye target come on, hold, reward
-        #Don't use a generator to make the center target, it's always at the center!
-    #Step 2: Add peripheral target flashes
-        #Use the out_2d generator to make targets
-    #Step 3: Make blink_time_threshold logic into a feature so taht we can use it for multiple tasks
-
-    #Recquired Features
-        #Autostart selected 
 
     sequence_generators = [
         'centerout_2D_chain', 'out_2D', 'out_2D_select', 'centerout_2D', 'centeroutback_2D', 'centerout_2D_select', 'rand_target_chain_2D', 'rand_same_target_chain_2D', 
