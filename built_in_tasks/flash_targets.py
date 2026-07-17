@@ -45,17 +45,22 @@ class FlashTargets(ScreenTargetCapture_Saccade):
     peripheral_target_radius = traits.Float(2, desc="Radius of targets in cm")
     peripheral_target_color = traits.OptionsList("yellow", *target_colors, desc="Color of the target", bmi3d_input_options=list(target_colors.keys()))
 
+    #This is the variable that sets the total flash on and flash off time
+    target_flash_time_s = traits.Tuple((0.2, 0.2), desc="The amount of time in seconds that " \
+    "the peripheral targets are flashed on (target_flash_time_s[0] and off (target_flash_time_s[1])")
+
+    #this is the variable that sets the buffer windown at the beginning and end of the hold period where no peripheral target will be shown
+    flash_buffer_time_s = traits.Float(0.2, 'The amount of time after the fixation starts and before the fixation ends where no ' \
+    'peripheral targets will be shown')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.most_recent_open_eye = 0
-        #This is the variable that sets the total flash on and flash off time
-        self.target_flash_time_s = 0.2
-        #this is the variable that sets the buffer windown at the beginning and end of the hold period where no peripheral target will be shown
-        self.flash_buffer_time_s = self.target_flash_time_s
         #Here we calculate the total number of flash targets that can be shown in a single trial
-        self.total_flashes = np.floor((self.hold_time - 2*(self.flash_buffer_time_s))/(2*self.target_flash_time_s))
-        
+        self.total_flashes = np.floor((self.hold_time - 2*(self.flash_buffer_time_s))/(self.target_flash_time_s[0] + self.target_flash_time_s[1]))
+
+        assert self.total_flashes>0, f"Hold time {self.hold_time} is too short to show any peripheral targets with the current flash buffer time {self.flash_buffer_time_s} and flash on/off times {self.target_flash_time_s}"
+
         # Instantiate the targets
         instantiate_targets = kwargs.pop('instantiate_targets', True)
 
@@ -64,7 +69,6 @@ class FlashTargets(ScreenTargetCapture_Saccade):
             # Control transparency of targets
             new_color1 = list(target_colors[self.target_color])
             new_color1[3] = self.init_eye_target_alpha
-
             new_color2 = list(target_colors[self.peripheral_target_color])
 
             # 2 targets for delay
@@ -107,7 +111,7 @@ class FlashTargets(ScreenTargetCapture_Saccade):
 
     def _test_flash_interval_complete(self, time_in_state):
         #wait until the inter flash interval has completed before turning the flash back on
-        return time_in_state>=self.target_flash_time_s
+        return time_in_state>=self.target_flash_time_s[1]
 
     def _test_flash_cycle_complete(self, time_in_state):
         #make sure we have not encroached on the end hold buffer time
@@ -119,7 +123,7 @@ class FlashTargets(ScreenTargetCapture_Saccade):
         return time_in_state > self.flash_buffer_time_s
     
     def _test_flash_complete(self, time_in_state):
-        return time_in_state>self.target_flash_time_s
+        return time_in_state>self.target_flash_time_s[0]
 
     def _start_hold_start_buffer(self):
         #Save the start time of the hold for future reference and checking
@@ -180,11 +184,12 @@ class FlashTargets(ScreenTargetCapture_Saccade):
      @staticmethod  
     def centerout_2D_chain(nblocks=100, ntargets=8, chain_length=5, distance=10, origin=(0,0,0)):
         '''
-        Pairs of central targets at the origin and peripheral targets centered around the origin
+        Chains of targets, starting at the center and then random 
+         peripheral targets radially arranged around the center.
 
         Returns
         -------
-        [nblocks*ntargets x 1] array of tuples containing trial indices and [2 x 3] target coordinates
+        [nblocks*ntargets x 1] array of tuples containing trial indices and [1+chain_length x 3] target coordinates
         '''
         gen = ScreenTargetCapture.out_2D(nblocks*chain_length, ntargets, distance, origin)
         for _ in range(nblocks*ntargets):
