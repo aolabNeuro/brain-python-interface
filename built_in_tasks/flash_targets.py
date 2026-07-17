@@ -181,7 +181,7 @@ class FlashTargets(ScreenTargetCapture_Saccade):
 
 
 
-     @staticmethod  
+    @staticmethod  
     def centerout_2D_chain(nblocks=100, ntargets=8, chain_length=5, distance=10, origin=(0,0,0)):
         '''
         Chains of targets, starting at the center and then random 
@@ -191,6 +191,7 @@ class FlashTargets(ScreenTargetCapture_Saccade):
         -------
         [nblocks*ntargets x 1] array of tuples containing trial indices and [1+chain_length x 3] target coordinates
         '''
+        #Could I add a check here that looks at the total number of flashes and updates the generator here?
         gen = ScreenTargetCapture.out_2D(nblocks*chain_length, ntargets, distance, origin)
         for _ in range(nblocks*ntargets):
             targs = np.zeros([1+chain_length, 3]) + origin
