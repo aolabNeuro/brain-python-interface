@@ -309,7 +309,7 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
         #Check if null decoder here
         if not (hasattr(self.decoder, 'is_null_decoder') and self.decoder.is_null_decoder):
         
-            if not (np.all(self.decoder.mFR == 0) and np.all(self.decoder.sdFR) == 1):
+            if not (np.all(self.decoder.mFR == 0) and np.all(self.decoder.sdFR == 1)):
                 filename = self.decoder.save()
 
                 from db.tracker import dbq
