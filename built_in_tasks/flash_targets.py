@@ -112,6 +112,7 @@ class FlashTargets(ScreenTargetCapture_Saccade):
         target = self.targets[1]
         #Show the target
         target.hide()
+        self.sync_event('TARGET_OFF', self.gen_indices[self.target_index])
 
     def _test_flash_interval_complete(self, time_in_state):
         #wait until the inter flash interval has completed before turning the flash back on
