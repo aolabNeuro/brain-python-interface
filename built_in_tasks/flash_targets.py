@@ -42,6 +42,10 @@ class FlashTargets(ScreenTargetCapture_Saccade):
     blink_time_threshold = traits.Float(0.1, desc="The amount of time in seconds that " \
     "the eyes can be closed before triggering a fixation break, measured by eye_diam=0")
     
+    peripheral_target_radius = traits.Float(2, desc="Radius of targets in cm")
+    peripheral_target_color = traits.OptionsList("yellow", *target_colors, desc="Color of the target", bmi3d_input_options=list(target_colors.keys()))
+
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.most_recent_open_eye = 0
@@ -55,22 +59,19 @@ class FlashTargets(ScreenTargetCapture_Saccade):
         # Instantiate the targets
         instantiate_targets = kwargs.pop('instantiate_targets', True)
 
-        self.peripheral_target_radius = traits.Float(2, desc="Radius of targets in cm")
-        self.peripheral_target_color = traits.OptionsList("yellow", *target_colors, desc="Color of the target", bmi3d_input_options=list(target_colors.keys()))
-
         if instantiate_targets:
 
             # Control transparency of targets
             new_color1 = list(target_colors[self.target_color])
             new_color1[3] = self.init_eye_target_alpha
-            new_color2 = list(target_colors[self.target_color])
-            new_color2[3] = self.goal_eye_target_alpha
+
+            new_color2 = list(target_colors[self.peripheral_target_color])
 
             # 2 targets for delay
             #Target 1 is the central fixation target we are using as the eye target
             target1 = VirtualRectangularTarget(target_width=self.target_radius, target_height=self.target_radius/2, target_color=new_color1)
             #Target 2 will be the peripheral 'flash' target; needs to be modified to regular center out target
-            target2 = VirtualCircularTarget(target_radius=self.peripheral_target_radius, target_color=target_colors[self.peripheral_target_color])
+            target2 = VirtualCircularTarget(target_radius=self.peripheral_target_radius, target_color=new_color2)
 
             self.targets = [target1, target2]
 
