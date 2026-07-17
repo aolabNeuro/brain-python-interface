@@ -306,8 +306,11 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
         # Optionally save a new decoder zscored from this task
         if (not self.save_zscore) or (self.saveid is None):
             return
-
-        if not (np.all(self.decoder.mFR == 0) and np.all(self.decoder.sdFR) == 1):
+        #Check if null decoder here
+        if hasattr(self.decoder, 'is_null_decoder') and self.decoder.is_null_decoder:
+            return
+        
+        if not (np.all(self.decoder.mFR == 0) and np.all(self.decoder.sdFR == 1)):
             filename = self.decoder.save()
 
             from db.tracker import dbq
@@ -325,6 +328,7 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
 
         # The rest should work with any decoder
         self.decoder.init_zscore(mFR, sdFR)
+        
         filename = self.decoder.save()
 
         from db.tracker import dbq

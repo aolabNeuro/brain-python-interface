@@ -42,8 +42,8 @@ class EndPostureFeedbackController(BMILoop, traits.HasTraits):
         units = []
         self.decoder = Decoder(filt, units, self.ssm, binlen=1./self.decoder_update_rate)
         self.decoder.n_features = 1
-        self.decoder.mFR = 0
-        self.decoder.sdFR = 1  #This should prevent an error from triggering when the decoder is saved
+        self.decoder.is_null_decoder = True
+        
 
     def create_feature_extractor(self):
         self.extractor = DummyExtractor()
@@ -65,8 +65,6 @@ class TargetCaptureVisualFeedbackEyeConstrained(EndPostureFeedbackController, BM
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.most_recent_open_eye = 0
-    
-    
 
     status = dict(
         wait = dict(start_trial="target", start_pause="pause"),
