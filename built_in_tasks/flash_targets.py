@@ -178,7 +178,11 @@ class FlashTargets(ScreenTargetCapture_Saccade):
         d_eye = np.linalg.norm(eye_pos - target_pos)
         return not (d_eye <= self.target_radius + self.fixation_radius_buffer)
     
-
+    def _parse_next_trial(self):
+        '''Check that the generator has the required data'''
+        
+        super()._parse_next_trial()
+        assert self.gen_indices.shape[0]>=np.floor(self.total_flashes), f'The specified generator chain_length is shorter than the total number of flashes needed per trial. Please increase chain length to {np.floor(self.total_flashes)} or greater'
 
 
     @staticmethod  
