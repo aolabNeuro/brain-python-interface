@@ -54,6 +54,10 @@ class FlashTargets(ScreenTargetCapture_Saccade):
         
         # Instantiate the targets
         instantiate_targets = kwargs.pop('instantiate_targets', True)
+
+        self.peripheral_target_radius = traits.Float(2, desc="Radius of targets in cm")
+        self.peripheral_target_color = traits.OptionsList("yellow", *target_colors, desc="Color of the target", bmi3d_input_options=list(target_colors.keys()))
+
         if instantiate_targets:
 
             # Control transparency of targets
@@ -66,7 +70,7 @@ class FlashTargets(ScreenTargetCapture_Saccade):
             #Target 1 is the central fixation target we are using as the eye target
             target1 = VirtualRectangularTarget(target_width=self.target_radius, target_height=self.target_radius/2, target_color=new_color1)
             #Target 2 will be the peripheral 'flash' target; needs to be modified to regular center out target
-            target2 = VirtualRectangularTarget(target_width=self.target_radius, target_height=self.target_radius/2, target_color=new_color2)
+            target2 = VirtualCircularTarget(target_radius=self.peripheral_target_radius, target_color=target_colors[self.peripheral_target_color])
 
             self.targets = [target1, target2]
 
@@ -129,6 +133,8 @@ class FlashTargets(ScreenTargetCapture_Saccade):
         self.target_index += 1
         #move the animation object to the correct location
         print(f'The peripheral target object is {target}')
+        print(f'The target index is {self.target_index}')
+        print(f'The shape of targs is {self.targs}')
         target_position = self.targs[self.target_index] - self.offset_cube
         print(f'The peripheral target position {target_position}')
         target.move_to_position(target_position)
@@ -136,7 +142,7 @@ class FlashTargets(ScreenTargetCapture_Saccade):
         #Show the target
         target.show()
         #Sync to ecube
-        self.sync_event('TARGET_ON', self.gen_indices[self.target_index])
+        self.sync_event('TARGET_ON', self.gen_indices[1])
         #Save the target location
         self.target_location = self.targs[self.target_index]
 
