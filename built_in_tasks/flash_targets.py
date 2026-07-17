@@ -173,3 +173,27 @@ class FlashTargets(ScreenTargetCapture_Saccade):
         target_pos = self.center_target_position[0:2] #Only grab two values from the target position to match the shape of the eye position
         d_eye = np.linalg.norm(eye_pos - target_pos)
         return not (d_eye <= self.target_radius + self.fixation_radius_buffer)
+    
+
+
+
+     @staticmethod  
+    def centerout_2D_chain(nblocks=100, ntargets=8, chain_length=5, distance=10, origin=(0,0,0)):
+        '''
+        Pairs of central targets at the origin and peripheral targets centered around the origin
+
+        Returns
+        -------
+        [nblocks*ntargets x 1] array of tuples containing trial indices and [2 x 3] target coordinates
+        '''
+        gen = ScreenTargetCapture.out_2D(nblocks*chain_length, ntargets, distance, origin)
+        for _ in range(nblocks*ntargets):
+            targs = np.zeros([1+chain_length, 3]) + origin
+            indices = np.zeros([1+chain_length,1])
+
+            for chain_idx in range(chain_length):
+                idx, pos = next(gen)
+                targs[1+chain_idx,:] = pos[0]
+                indices[1+chain_idx] = idx
+
+            yield indices, targs
