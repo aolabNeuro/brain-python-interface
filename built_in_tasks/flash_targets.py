@@ -29,7 +29,14 @@ from .bmimultitasks import BMIControlMultiEyeConstrained
 
 class FlashTargets(ScreenTargetCapture_Saccade):
     "This task recquires a central fixation and then shows different peripheral targets. "
+    '''
+    Key Features:
 
+    Key Parameters:
+    hold time: 
+    flash target:
+    
+    '''
     #Step 1: Make the center eye target come on, hold, reward
         #Don't use a generator to make the center target, it's always at the center!
     #Step 2: Add peripheral target flashes
@@ -57,6 +64,8 @@ class FlashTargets(ScreenTargetCapture_Saccade):
     flash_buffer_time_s = traits.Float(0.2, desc='The amount of time after the fixation starts and before the fixation ends where no ' \
     'peripheral targets will be shown')
     
+    hold_time = traits.Float(0.8, desc="Length of central hold, ie the central fixation during the entire task. It must include the beginning and end buffer and a integer number of flash on/off cycles. Given default buffer and flash times, valid hold times are 0.8 (1 flash), 1.2 (2 flashes), 1.6 etc...")
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.most_recent_open_eye = 0
@@ -185,7 +194,11 @@ class FlashTargets(ScreenTargetCapture_Saccade):
         super()._parse_next_trial()
         assert self.gen_indices.shape[0]>=np.floor(self.total_flashes), f'The specified generator chain_length is shorter than the total number of flashes needed per trial. Please increase chain length to {np.floor(self.total_flashes)} or greater'
 
-
+    def _end_hold_end_buffer(self):
+        target = self.targets[self.center_target_index]
+        target.hide()
+        #self.sync_event('TARGET_OFF', self.center_target_index)
+        
     @staticmethod  
     def centerout_2D_chain(nblocks=100, ntargets=8, chain_length=5, distance=10, origin=(0,0,0)):
         '''
