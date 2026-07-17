@@ -56,13 +56,13 @@ class FlashTargets(ScreenTargetCapture_Saccade):
     #this is the variable that sets the buffer windown at the beginning and end of the hold period where no peripheral target will be shown
     flash_buffer_time_s = traits.Float(0.2, desc='The amount of time after the fixation starts and before the fixation ends where no ' \
     'peripheral targets will be shown')
-
+    
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.most_recent_open_eye = 0
         #Here we calculate the total number of flash targets that can be shown in a single trial
-        self.total_flashes = np.floor((self.hold_time - 2*(self.flash_buffer_time_s))/(self.target_flash_time_s[0] + self.target_flash_time_s[1]))
-
+        self.total_flashes = (self.hold_time - 2*(self.flash_buffer_time_s))/(self.target_flash_time_s[0] + self.target_flash_time_s[1])
+        assert self.total_flashes==np.floor(self.total_flashes), f"The hold time needs to be appropriately set to allow for the start/end buffer and a integer number of flashes. Current hold time should be modified to {np.floor(self.total_flashes)*(self.target_flash_time_s[0] + self.target_flash_time_s[1]) + 2*(self.flash_buffer_time_s)}"
         assert self.total_flashes>0, f"Hold time {self.hold_time} is too short to show any peripheral targets with the current flash buffer time {self.flash_buffer_time_s} and flash on/off times {self.target_flash_time_s}"
 
         # Instantiate the targets
