@@ -141,17 +141,13 @@ class FlashTargets(ScreenTargetCapture_Saccade):
         #Incrementing to the next target in the generator
         self.target_index += 1
         #move the animation object to the correct location
-        print(f'The peripheral target object is {target}')
-        print(f'The target index is {self.target_index}')
-        print(f'The shape of targs is {self.targs}')
         target_position = self.targs[self.target_index] - self.offset_cube
-        print(f'The peripheral target position {target_position}')
         target.move_to_position(target_position)
 
         #Show the target
         target.show()
         #Sync to ecube
-        self.sync_event('TARGET_ON', self.gen_indices[1])
+        self.sync_event('TARGET_ON', self.gen_indices[self.target_index])
         #Save the target location
         self.target_location = self.targs[self.target_index]
 
@@ -193,17 +189,17 @@ class FlashTargets(ScreenTargetCapture_Saccade):
 
         Returns
         -------
-        [nblocks*ntargets x 1] array of tuples containing trial indices and [1+chain_length x 3] target coordinates
+        [nblocks*ntargets x 1] array of tuples containing trial indices and [chain_length x 3] target coordinates
         '''
         #Could I add a check here that looks at the total number of flashes and updates the generator here?
         gen = ScreenTargetCapture.out_2D(nblocks*chain_length, ntargets, distance, origin)
         for _ in range(nblocks*ntargets):
-            targs = np.zeros([1+chain_length, 3]) + origin
-            indices = np.zeros([1+chain_length,1])
+            targs = np.zeros([chain_length, 3]) + origin
+            indices = np.zeros([chain_length,1])
 
             for chain_idx in range(chain_length):
                 idx, pos = next(gen)
-                targs[1+chain_idx,:] = pos[0]
-                indices[1+chain_idx] = idx
+                targs[chain_idx,:] = pos[0]
+                indices[chain_idx] = idx
 
             yield indices, targs
