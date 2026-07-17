@@ -310,8 +310,8 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
         if hasattr(self.decoder, 'is_null_decoder') and self.decoder.is_null_decoder:
             return
         
-            if not (np.all(self.decoder.mFR == 0) and np.all(self.decoder.sdFR == 1)):
-                filename = self.decoder.save()
+        if not (np.all(self.decoder.mFR == 0) and np.all(self.decoder.sdFR == 1)):
+            filename = self.decoder.save()
 
             from db.tracker import dbq
             suffix = f"saved_from_{self.saveid}"
