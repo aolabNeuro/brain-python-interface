@@ -39,6 +39,10 @@ class FlashTargets(ScreenTargetCapture_Saccade):
     #Recquired Features
         #Autostart selected 
 
+    sequence_generators = [
+        'centerout_2D_chain', 'out_2D', 'out_2D_select', 'centerout_2D', 'centeroutback_2D', 'centerout_2D_select', 'rand_target_chain_2D', 'rand_same_target_chain_2D', 
+        'rand_target_chain_3D', 'corners_2D', 'centerout_tabletop', 'out_2D_square', 'centerout_2D_square'
+    ]
     blink_time_threshold = traits.Float(0.1, desc="The amount of time in seconds that " \
     "the eyes can be closed before triggering a fixation break, measured by eye_diam=0")
     
@@ -50,7 +54,7 @@ class FlashTargets(ScreenTargetCapture_Saccade):
     "the peripheral targets are flashed on (target_flash_time_s[0] and off (target_flash_time_s[1])")
 
     #this is the variable that sets the buffer windown at the beginning and end of the hold period where no peripheral target will be shown
-    flash_buffer_time_s = traits.Float(0.2, 'The amount of time after the fixation starts and before the fixation ends where no ' \
+    flash_buffer_time_s = traits.Float(0.2, desc='The amount of time after the fixation starts and before the fixation ends where no ' \
     'peripheral targets will be shown')
 
     def __init__(self, *args, **kwargs):
