@@ -1057,6 +1057,9 @@ class OnlineDataServer(threading.Thread):
         elif self.task_params['experiment_name'] == 'SaccadeTask':
             self.analysis_workers.append((SaccadeAnalysisWorker(self.task_params, data_queue), data_queue))
 
+        elif self.task_params['experiment_name'] == 'FlashTargets':
+            self.analysis_workers.append((SaccadeAnalysisWorker(self.task_params, data_queue), data_queue))
+
         elif self.task_params['experiment_name'] == 'HandConstrainedSaccadeTask':
             self.analysis_workers.append((EyeHandAnalysisWorker(self.task_params, data_queue), data_queue))
 
