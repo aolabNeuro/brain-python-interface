@@ -74,7 +74,7 @@ class TargetCapture(Sequence):
             super()._start_wait()
             self.tries = 0 # number of times this sequence of targets has been attempted
 
-        if self.tries==self.max_attempts: # The task goes to the next target after the number of reattempting is max attempts 
+        if self.tries==self.max_attempts and self.pause_index == 0: # The task goes to the next target after the number of reattempting is max attempts 
             super()._start_wait()
             self.tries = 0 # number of times this sequence of targets has been attempted
 
@@ -88,8 +88,6 @@ class TargetCapture(Sequence):
         self.penalty_index = 0
         self.pause_index = 0
 
-        self.trial_record['delay_period'] = self.delay_time
-
     def _parse_next_trial(self):
         '''Check that the generator has the required data'''
         self.gen_indices, self.targs = self.next_trial
@@ -100,6 +98,7 @@ class TargetCapture(Sequence):
         for i in range(len(self.gen_indices)):
             self.trial_record['index'] = self.gen_indices[i]
             self.trial_record['target'] = self.targs[i]
+            self.trial_record['delay_period'] = self.delay_time
             self.sinks.send("trials", self.trial_record)
 
     def _start_target(self):
