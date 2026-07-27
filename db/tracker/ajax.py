@@ -572,15 +572,22 @@ def toggle_features(request):
     from . import models
 
     name = request.POST.get('name')
-    
+
     # check if the feature is already installed
-    existing_features = Feature.objects.filter(name=name)
+    existing_features = Feature.objects.filter(name=name).order_by('id')
 
     if len(existing_features) > 0:
-        # disable the feature
-        Feature.objects.filter(name=name).delete()
-        msg = "Disabled feature: %s" % str(name)
-        return _respond(dict(msg=msg, status="success"))
+        if existing_features.filter(visible=True).exists():
+            # Soft-disable the feature so historical task links remain intact.
+            existing_features.filter(visible=True).update(visible=False)
+            msg = "Disabled feature: %s" % str(name)
+            return _respond(dict(msg=msg, status="success"))
+
+        # Re-enable an existing hidden feature instead of creating a new row.
+        existing_features.update(visible=True)
+        feat = existing_features[0]
+        msg = "Enabled feature: %s" % str(feat.name)
+        return _respond(dict(msg=msg, status="success", id=feat.id))
     elif name in built_in_features:
         import_path = built_in_features[name].__module__ + '.' + built_in_features[name].__qualname__
         feat = Feature(name=name, import_path=import_path)
@@ -604,11 +611,21 @@ def add_new_feature(request):
         traceback.print_exc()
         return _respond(dict(msg="import path invalid!", status="error"))
 
-    feat = Feature(name=name, import_path=import_path)
-    feat.save()
+    existing_feature = Feature.objects.filter(name=name).order_by('id').first()
+    if existing_feature is not None:
+        # Re-use an existing row to avoid duplicate feature names.
+        existing_feature.import_path = import_path
+        existing_feature.visible = True
+        existing_feature.save()
+        feat = existing_feature
+        msg = "Updated existing feature: %s" % feat.name
+    else:
+        feat = Feature(name=name, import_path=import_path)
+        feat.save()
+        msg = "Added new feature: %s" % feat.name
     
     feature_data = dict(id=feat.id, name=feat.name, import_path=feat.import_path)
-    return _respond(dict(msg="Added new feature: %s" % feat.name, status="success", data=feature_data))
+    return _respond(dict(msg=msg, status="success", data=feature_data))
 
 @csrf_exempt
 def setup_run_upkeep(request):
