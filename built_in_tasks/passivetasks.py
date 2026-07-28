@@ -33,7 +33,7 @@ class EndPostureFeedbackController(BMILoop, traits.HasTraits):
     ssm_type = traits.OptionsList(*bmi_ssm_options, bmi3d_input_options=bmi_ssm_options)
     decoder_update_rate = traits.Float(60, desc="Assist feedback rate (Hz)")
     
-    static_states = ['wait', 'reward', 'fixation_penalty'] # states in which the decoder is not run
+    static_states = ['wait', 'reward', 'fixation_penalty', 'pause'] # states in which the decoder is not run
 
     def load_decoder(self):
         self.ssm = StateSpaceEndptVel2D()
@@ -115,6 +115,17 @@ class TargetCaptureVisualFeedbackEyeConstrained(EndPostureFeedbackController, BM
         self.plant.set_visibility(False)
         super()._end_targ_transition()
 
+    def _start_pause(self):
+        super()._start_pause()
+        self.plant.set_visibility(False)
+    
+    def _end_pause(self):
+        super()._end_pause()
+        # Reset on any target transition away from the last target
+        self.decoder.filt.state.mean = self.init_decoder_mean.copy()
+        self.hdf.sendMsg("reset")
+        
+        self.plant.set_visibility(True)
 
     def _test_fixation_break(self,time_in_state):
         '''
