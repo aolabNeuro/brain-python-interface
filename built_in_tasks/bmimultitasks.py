@@ -414,7 +414,7 @@ class FixationBMIControlMulti(BMIControlMultiEyeConstrained):
     assist_level = (1, 1)
     is_bmi_seed = True
     
-    static_states = ['wait', 'reward', 'fixation_penalty', 'delay_penalty', 'hold_penalty', 'timeout_penalty']
+    static_states = ['wait', 'reward', 'fixation_penalty', 'pause', 'delay_penalty','timeout_penalty']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -445,8 +445,15 @@ class FixationBMIControlMulti(BMIControlMultiEyeConstrained):
         # Show target if it is hidden (this is the first target, or previous state was a penalty)
         target = self.targets[self.target_index % 2]
         if self.target_index == 0:
+            #target.move_to_position(self.targs[self.target_index])
+            #target.show()
             self.sync_event('TARGET_ON', self.gen_indices[self.target_index])
         self.target_location = self.targs[self.target_index] # save for BMILoop
+
+
+        #if self.target_index == 0:
+        #    self.targets_eye[0].move_to_position(self.targs[self.target_index] - self.offset_cube)
+        #    self.targets_eye[0].show()
 
     def _start_fixation_penalty(self):
         self.plant.set_visibility(False)
@@ -462,6 +469,17 @@ class FixationBMIControlMulti(BMIControlMultiEyeConstrained):
         self.plant.set_visibility(False)
         super()._end_targ_transition()
 
+    def _start_pause(self):
+        super()._start_pause()
+        self.plant.set_visibility(False)
+    
+    def _end_pause(self):
+        super()._end_pause()
+        # Reset on any target transition away from the last target
+        self.decoder.filt.state.mean = self.init_decoder_mean.copy()
+        self.hdf.sendMsg("reset")
+        
+        self.plant.set_visibility(True)
 
     def _test_fixation_break(self,time_in_state):
         '''
@@ -487,3 +505,14 @@ class FixationBMIControlMulti(BMIControlMultiEyeConstrained):
     
         #Finally check if the eye location is within the target + buffer
         return eye_within_fixation_buffer
+    
+    def _test_start_trial(self, time_in_state):
+        #Check that the eye position is on the center target
+        #return True #super()._test_start_trial
+        eye_pos = self.calibrated_eye_pos
+        eye_d = np.linalg.norm(eye_pos - self.targs[0,[0,2]]) #target index is zero, this is only applyied during the wait period before the center target comes on
+        
+        blink = self.keyboard_control | np.any(self.eye_diam!=0)
+
+        value = (eye_d < self.target_radius + self.fixation_radius_buffer) & blink
+        return value#(eye_d > self.target_radius + self.fixation_radius_buffer)
