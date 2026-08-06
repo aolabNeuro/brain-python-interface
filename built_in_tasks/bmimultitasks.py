@@ -414,7 +414,7 @@ class FixationBMIControlMulti(BMIControlMultiEyeConstrained):
     assist_level = (1, 1)
     is_bmi_seed = True
     
-    static_states = ['wait', 'reward', 'fixation_penalty', 'pause', 'delay_penalty','timeout_penalty']
+    static_states = ['wait', 'reward', 'fixation_penalty', 'pause', 'delay_penalty','timeout_penalty', 'sync']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -493,6 +493,7 @@ class FixationBMIControlMulti(BMIControlMultiEyeConstrained):
         #Make flag that tracks the last non-zero eye diameter and check that it has occured in the last 100ms
         #First logic check: Check to see if the eye is open. If open, reset flag to 0   
         eye_within_fixation_buffer = (eye_d > self.target_radius + self.fixation_radius_buffer)
+        #eye_within_fixation_buffer_cursor = 
         if self.keyboard_control:
             return eye_within_fixation_buffer
         elif np.any(self.eye_diam != 0):
