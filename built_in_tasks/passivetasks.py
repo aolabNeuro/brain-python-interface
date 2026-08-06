@@ -25,6 +25,7 @@ from built_in_tasks.bmimultitasks import BMIControlMulti
 from .target_graphics import *
 
 from .bmimultitasks import FixationBMIControlMulti
+from .bmimultitasks import FixationBMIControlMulti
 
 bmi_ssm_options = ['Endpt2D', 'Tentacle', 'Joint2L']
 
