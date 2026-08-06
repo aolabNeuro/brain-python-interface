@@ -279,7 +279,7 @@ class EcubeFileBMI(EcubeFileData, CorticalBMI):
     '''
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
+        
         self.cortical_channels = [int(ch) for ch in self.decoder.units[:,0]]
 
         # These get read by CorticalData when initializing the extractor
