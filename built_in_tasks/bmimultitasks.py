@@ -522,6 +522,7 @@ class FixationBMIControlMulti(BMIControlMultiEyeConstrained):
         #First logic check: Check to see if the eye is open. If open, reset flag to 0   
         eye_within_fixation_buffer = (eye_d > self.target_radius + self.fixation_radius_buffer)
         #eye_within_fixation_buffer_cursor = 
+        #eye_within_fixation_buffer_cursor = 
         if self.keyboard_control:
             return eye_within_fixation_buffer
         elif np.any(self.eye_diam != 0):
