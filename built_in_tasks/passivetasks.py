@@ -24,7 +24,7 @@ from built_in_tasks.bmimultitasks import BMIControlMulti
 
 from .target_graphics import *
 
-from .bmimultitasks import BMIControlMultiEyeConstrained
+from .bmimultitasks import FixationBMIControlMulti
 
 bmi_ssm_options = ['Endpt2D', 'Tentacle', 'Joint2L']
 
@@ -57,30 +57,6 @@ class TargetCaptureVisualFeedback(EndPostureFeedbackController, BMIControlMulti)
     def move_effector(self):
         pass
 
-class TargetCaptureVisualFeedbackEyeConstrained(EndPostureFeedbackController, BMIControlMultiEyeConstrained):
-    blink_time_threshold = traits.Float(0.1, desc="The amount of time in seconds that the eyes can be closed before triggering a fixation break, measured by eye_diam=0")
-    assist_level = (1, 1)
-    is_bmi_seed = True
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.most_recent_open_eye = 0
-
-    status = dict(
-        wait = dict(start_trial="target", start_pause="pause"),
-        target = dict(timeout="timeout_penalty", enter_target="hold", start_pause="pause", fixation_break="fixation_penalty"),
-        hold = dict(leave_target="hold_penalty", hold_complete="delay", fixation_break="fixation_penalty", start_pause="pause"),
-        delay = dict(leave_target="delay_penalty", delay_complete="targ_transition", fixation_break="fixation_penalty", start_pause="pause"),
-        targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target", start_pause="pause"),
-        timeout_penalty = dict(timeout_penalty_end="wait", start_pause="pause", end_state=True),
-        hold_penalty = dict(hold_penalty_end="wait", start_pause="pause", end_state=True),
-        delay_penalty = dict(delay_penalty_end="wait", start_pause="pause", end_state=True),
-        fixation_penalty = dict(fixation_penalty_end="wait", start_pause="pause", end_state=True),
-        reward = dict(reward_end="wait", start_pause="pause", stoppable=False, end_state=True),
-        pause = dict(end_pause="wait", end_state=True),
-    )
-    def move_effector(self):
-        pass
 
     def _start_target(self):
         self.plant.set_visibility(True)
@@ -161,18 +137,13 @@ class TargetCaptureVisualFeedbackEyeConstrained(EndPostureFeedbackController, BM
         blink = self.keyboard_control | np.any(self.eye_diam!=0)
 
         value = (eye_d < self.target_radius + self.fixation_radius_buffer) & blink
-        return value#(eye_d > self.target_radius + self.fixation_radius_buffer)
-
-    #def _end_targ_transition(self):
-    #    super()._end_targ_transition()
-    #    if self.reset == 1:# and ((self.target_index == self.chain_length - 1) or (self.target_index == -1)):
-
-    #            # Reset on any target transition away from the last target
-    #            self.decoder.filt.state.mean = self.init_decoder_mean.copy()
-    #            self.hdf.sendMsg("reset")
+        return value
 
 
 
+class TargetCaptureVisualFeedbackEyeConstrained(EndPostureFeedbackController, FixationBMIControlMulti):
+    """Passive viewing version of the fixation BMI task"""
+    pass
 
 
 class TargetCaptureVFB2DWindow(TargetCaptureVisualFeedback, WindowDispl2D):
