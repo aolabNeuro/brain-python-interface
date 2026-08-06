@@ -408,3 +408,82 @@ class BMIControlMultiDirectionConstraint(BMIControlMultiMixin, ScreenReachAngle)
     Adds an additional constraint that the direction of travel must be within a certain angle
     '''
     pass
+
+class FixationBMIControlMulti(BMIControlMultiEyeConstrained):
+    blink_time_threshold = traits.Float(0.1, desc="The amount of time in seconds that the eyes can be closed before triggering a fixation break, measured by eye_diam=0")
+    assist_level = (1, 1)
+    is_bmi_seed = True
+    
+    static_states = ['wait', 'reward', 'fixation_penalty', 'delay_penalty', 'hold_penalty', 'timeout_penalty']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.most_recent_open_eye = 0
+
+    status = dict(
+        wait = dict(start_trial="target", start_pause="pause"),
+        target = dict(timeout="timeout_penalty", enter_target="hold", start_pause="pause", fixation_break="fixation_penalty"),
+        hold = dict(leave_target="hold_penalty", hold_complete="delay", fixation_break="fixation_penalty", start_pause="pause"),
+        delay = dict(leave_target="delay_penalty", delay_complete="targ_transition", fixation_break="fixation_penalty", start_pause="pause"),
+        targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target", start_pause="pause"),
+        timeout_penalty = dict(timeout_penalty_end="wait", start_pause="pause", end_state=True),
+        hold_penalty = dict(hold_penalty_end="wait", start_pause="pause", end_state=True),
+        delay_penalty = dict(delay_penalty_end="wait", start_pause="pause", end_state=True),
+        fixation_penalty = dict(fixation_penalty_end="wait", start_pause="pause", end_state=True),
+        reward = dict(reward_end="wait", start_pause="pause", stoppable=False, end_state=True),
+        pause = dict(end_pause="wait", end_state=True),
+    )
+    def move_effector(self):
+        pass
+
+    def _start_target(self):
+        self.plant.set_visibility(True)
+        #target capture 
+        self.target_index += 1
+
+        #screen target capture: Modified
+        # Show target if it is hidden (this is the first target, or previous state was a penalty)
+        target = self.targets[self.target_index % 2]
+        if self.target_index == 0:
+            self.sync_event('TARGET_ON', self.gen_indices[self.target_index])
+        self.target_location = self.targs[self.target_index] # save for BMILoop
+
+    def _start_fixation_penalty(self):
+        self.plant.set_visibility(False)
+        super()._start_fixation_penalty()
+        self.decoder.filt.state.mean = self.init_decoder_mean.copy()
+        
+    def _start_wait(self):
+        super()._start_wait()
+        #self.plant_visible = False
+        self.plant.set_visibility(True)
+
+    def _end_targ_transition(self):
+        self.plant.set_visibility(False)
+        super()._end_targ_transition()
+
+
+    def _test_fixation_break(self,time_in_state):
+        '''
+        Triggers the fixation_penalty state when eye positions are outside fixation distance
+        Only apply this to the first hold and delay period
+        '''  
+
+        eye_pos = self.calibrated_eye_pos
+        eye_d = np.linalg.norm(eye_pos - self.targs[self.target_index,[0,2]])
+
+        #Make flag that tracks the last non-zero eye diameter and check that it has occured in the last 100ms
+        #First logic check: Check to see if the eye is open. If open, reset flag to 0   
+        eye_within_fixation_buffer = (eye_d > self.target_radius + self.fixation_radius_buffer)
+        if self.keyboard_control:
+            return eye_within_fixation_buffer
+        elif np.any(self.eye_diam != 0):
+            self.most_recent_open_eye = 0
+        elif self.most_recent_open_eye == 0: #Additionally check if this if the first cycle of 'eyes closed'. If not the first cycle, check how long since the flag was set and trigger a fixatio nfailure if longer than 100ms.
+            self.most_recent_open_eye=self.get_time()
+        elif (self.get_time()-self.most_recent_open_eye) > self.blink_time_threshold:
+            self.most_recent_open_eye = 0
+            return True            
+    
+        #Finally check if the eye location is within the target + buffer
+        return eye_within_fixation_buffer

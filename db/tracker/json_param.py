@@ -82,6 +82,8 @@ def norm_trait(trait, value):
             Model = getattr(models, mdl_name)
             record = Model.objects.get(pk=value)
             value = record.get()
+            if value is None:
+                raise ValueError("Instance not loaded properly, likely a Decoder not found or not properly loaded. Check that /storage/bmi is properly mounted and that the specified decoder is there")
         # Otherwise, let's hope it's already an instance
     elif ttype == 'DataFile':
         # Similar to Instance traits, except we always know to use models.DataFile as the database table to look up the primary key
