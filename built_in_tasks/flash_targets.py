@@ -122,7 +122,7 @@ class FlashTargets(ScreenTargetCapture_Saccade):
         wait = dict(start_trial="target", start_pause="pause"),
         target = dict(enter_target="hold_start_buffer", start_pause="pause"),
         hold_start_buffer = dict(leave_target="hold_penalty", start_flash_cycle='hold_flash_on', start_pause="pause"),
-        hold_flash_on = dict(leave_target="hold_penalty", flash_complete="hold_flash_off", flash_cycle_complete='hold_end_buffer', start_pause="pause"),
+        hold_flash_on = dict(leave_target="hold_penalty", flash_complete="hold_flash_off", start_pause="pause"),
         hold_flash_off = dict(leave_target="hold_penalty", flash_interval_complete = "hold_flash_on", flash_cycle_complete='hold_end_buffer', start_pause="pause"),
         hold_end_buffer = dict(leave_target="hold_penalty", hold_complete='reward', start_pause="pause"),
         hold_penalty = dict(hold_penalty_end="wait", start_pause="pause", end_state=True),
@@ -133,7 +133,7 @@ class FlashTargets(ScreenTargetCapture_Saccade):
     def _test_hold_complete(self, time_in_state):
         time_since_hold_start = self.get_time() - self.most_recent_hold_start_time
         return self.hold_time<=(time_since_hold_start)
-    
+
     def _start_hold_flash_off(self):
         #Turn off the target
         #Which actual animatino blob do I hide?
@@ -144,13 +144,15 @@ class FlashTargets(ScreenTargetCapture_Saccade):
 
     def _test_flash_interval_complete(self, time_in_state):
         #wait until the inter flash interval has completed before turning the flash back on
-        return time_in_state>=self.target_flash_time_s[1]
+        interval_complete = time_in_state>=self.target_flash_time_s[1]
+        max_flashes_reached = self.flash_tracker >= self.total_flashes
+        return interval_complete and ~max_flashes_reached
 
     def _test_flash_cycle_complete(self, time_in_state):
         #make sure we have not encroached on the end hold buffer time
         time_since_hold_start = self.get_time() - self.most_recent_hold_start_time
         time_elapsed_check = self.hold_time<=(time_since_hold_start + self.flash_buffer_time_s)
-        flash_elapsed_check = self.flash_tracker>=self.total_flashes
+        flash_elapsed_check = self.flash_tracker>self.total_flashes
 
         return time_elapsed_check or flash_elapsed_check
 
@@ -169,9 +171,10 @@ class FlashTargets(ScreenTargetCapture_Saccade):
     def _start_hold_flash_on(self):
         #We want to grab the first peripheral target and turn it on
         #Which actual animatino blob do I move? The second one
-        target = self.targets[1]
-        #Increment flash tracker
-        self.flash_tracker += 1 
+        target = self.targets[1] 
+
+        #Increment the flash tracker
+        self.flash_tracker += 1
 
         #Incrementing to the next target in the generator
         self.target_index += 1
