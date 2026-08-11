@@ -53,7 +53,7 @@ class Window(LogExperiment):
 
     show_environment = traits.Bool(False, desc="Show wireframe box around environment")
     show_environment_plane = traits.Bool(False, desc="Show a 2D plane in environment")
-    environment_plane_size = traits.Tuple((20, 20), desc="Size in cm of the environment plane")
+    environment_plane_size = traits.Tuple((20, 20, -20), desc="(Width, Height, Z position): Size in cm of the environment plane and Z position to set behind targets to ensure visibility, ensure the z is negative")
     environment_plane_color = traits.Tuple((1, 1, 1, 0.25), desc="Color (rgba) of the environment plane")
     environment_plane_rotation = traits.Tuple((0, 0, 0), desc="Rotation of environment plane about (x, y, z) axes in degrees")
     show_grid = traits.Bool(False, desc="Show a textured grid on the floor")
@@ -137,9 +137,9 @@ class Window(LogExperiment):
         if self.show_environment:
             self.add_model(Box())
         if self.show_environment_plane:
-            width, height = self.environment_plane_size
+            width, height, z_pos = self.environment_plane_size
             plane = Plane(width, height, color=self.environment_plane_color, specular_color=(0, 0, 0, 0))
-            plane_pos = -np.array([width/2, 0, height/2])  # adjust position so that plane is centered on specified pos
+            plane_pos = -np.array([width/2, z_pos, height/2])  # adjust position so that plane is centered on specified pos
             plane.rotate_x(90+self.environment_plane_rotation[0]).rotate_y(self.environment_plane_rotation[1]).rotate_z(self.environment_plane_rotation[2])
             plane.translate(*plane_pos)
             self.add_model(plane)
