@@ -414,7 +414,7 @@ class FixationBMIControlMulti(BMIControlMultiEyeConstrained):
     assist_level = (1, 1)
     is_bmi_seed = True
     
-    static_states = ['wait', 'reward', 'fixation_penalty', 'pause', 'delay_penalty','timeout_penalty', 'sync']
+    static_states = ['wait', 'delay', 'reward', 'cursor_out_of_bounds_penalty', 'fixation_penalty', 'pause', 'delay_penalty','timeout_penalty', 'sync']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -422,10 +422,13 @@ class FixationBMIControlMulti(BMIControlMultiEyeConstrained):
 
     status = dict(
         wait = dict(start_trial="target", start_pause="pause"),
-        target = dict(timeout="timeout_penalty", enter_target="hold", start_pause="pause", fixation_break="fixation_penalty"),
+        target = dict(timeout="timeout_penalty", enter_target="hold", start_pause="pause", fixation_break="fixation_penalty", 
+                      cursor_out_of_bounds='cursor_out_of_bounds_penalty'),
         hold = dict(leave_target="hold_penalty", hold_complete="delay", fixation_break="fixation_penalty", start_pause="pause"),
         delay = dict(leave_target="delay_penalty", delay_complete="targ_transition", fixation_break="fixation_penalty", start_pause="pause"),
-        targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target", start_pause="pause"),
+        targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target", 
+                               cursor_out_of_bounds='cursor_out_of_bounds_penalty', start_pause="pause"),
+        cursor_out_of_bounds_penalty = dict(cursor_out_of_bounds_end="wait", start_pause="pause", end_state=True),
         timeout_penalty = dict(timeout_penalty_end="wait", start_pause="pause", end_state=True),
         hold_penalty = dict(hold_penalty_end="wait", start_pause="pause", end_state=True),
         delay_penalty = dict(delay_penalty_end="wait", start_pause="pause", end_state=True),
@@ -433,6 +436,31 @@ class FixationBMIControlMulti(BMIControlMultiEyeConstrained):
         reward = dict(reward_end="wait", start_pause="pause", stoppable=False, end_state=True),
         pause = dict(end_pause="wait", end_state=True),
     )
+
+
+    def _start_cursor_out_of_bounds_penalty(self):
+        self.sync_event('TIMEOUT_PENALTY')
+        super()._start_timeout_penalty()
+        # Hide targets
+        for target in self.targets:
+            target.hide()
+            target.reset()
+
+    def _end_cursor_out_of_bounds_penalty(self):
+        super()._end_timeout_penalty()
+        self.sync_event('TRIAL_END')
+
+
+    def _test_cursor_out_of_bounds(self):
+        cursor_bounds = self.cursor_bounds
+        #traits.Tuple((-10., 10., -10., 10., -10., 10.), desc='(x min, x max, y min, y max, z min, z max)')
+        cur_pos = self.plant.get_endpoint_pos()
+        check_x = (cur_pos[0] => cursor_bounds[0]) | (cur_pos[0] <= cursor_bounds[1])
+        check_y = (cur_pos[1] => cursor_bounds[0]) | (cur_pos[1] <= cursor_bounds[1])
+        check_z = (cur_pos[2] => cursor_bounds[0]) | (cur_pos[2] <= cursor_bounds[1])
+
+        return check_x | check_y | check_z
+
     def move_effector(self):
         pass
 
