@@ -54,6 +54,7 @@ class Window(LogExperiment):
     show_environment = traits.Bool(False, desc="Show wireframe box around environment")
     show_environment_plane = traits.Bool(False, desc="Show a 2D plane in environment")
     environment_plane_size = traits.Tuple((20, 20), desc="Size in cm of the environment plane")
+    environment_plane_origin = traits.Tuple((0, 0, -1), desc="(x,y,z): Set the origin of the plane. Ensure that the z is negative so that it appears behidn all targets")
     environment_plane_color = traits.Tuple((1, 1, 1, 0.25), desc="Color (rgba) of the environment plane")
     environment_plane_rotation = traits.Tuple((0, 0, 0), desc="Rotation of environment plane about (x, y, z) axes in degrees")
     show_grid = traits.Bool(False, desc="Show a textured grid on the floor")
@@ -61,7 +62,7 @@ class Window(LogExperiment):
     grid_position = traits.Tuple((0, 0, 0), desc="Position of the grid in cm. If you want the floor of the grid to be on the floor of the world, set the z component to (grid_size - camera_offset[2])")
 
     hidden_traits = ['stereo_mode', 'screen_dist', 'screen_half_height', 'iod', 'show_environment', 
-                     'show_environment_plane', 'environment_plane_size', 'environment_plane_color', 
+                     'show_environment_plane', 'environment_plane_size', 'environment_plane_origin', 'environment_plane_color', 
                      'environment_plane_rotation', 'show_grid', 'grid_size', 'grid_position', 'background']
 
     def __init__(self, *args, **kwargs):
@@ -138,8 +139,9 @@ class Window(LogExperiment):
             self.add_model(Box())
         if self.show_environment_plane:
             width, height = self.environment_plane_size
+            x_pos, y_pos, z_pos = self.environment_plane_origin
             plane = Plane(width, height, color=self.environment_plane_color, specular_color=(0, 0, 0, 0))
-            plane_pos = -np.array([width/2, 0, height/2])  # adjust position so that plane is centered on specified pos
+            plane_pos = -np.array([width/2+x_pos, z_pos, height/2+y_pos])  # adjust position so that plane is centered on specified pos
             plane.rotate_x(90+self.environment_plane_rotation[0]).rotate_y(self.environment_plane_rotation[1]).rotate_z(self.environment_plane_rotation[2])
             plane.translate(*plane_pos)
             self.add_model(plane)
