@@ -451,15 +451,18 @@ class FixationBMIControlMulti(BMIControlMultiEyeConstrained):
         self.sync_event('TRIAL_END')
 
 
-    def _test_cursor_out_of_bounds(self):
-        cursor_bounds = self.cursor_bounds
+    def _test_cursor_out_of_bounds(self, time_in_state):
+        cursor_bounds = np.array(self.cursor_bounds)
         #traits.Tuple((-10., 10., -10., 10., -10., 10.), desc='(x min, x max, y min, y max, z min, z max)')
         cur_pos = self.plant.get_endpoint_pos()
-        check_x = (cur_pos[0] => cursor_bounds[0]) | (cur_pos[0] <= cursor_bounds[1])
-        check_y = (cur_pos[1] => cursor_bounds[0]) | (cur_pos[1] <= cursor_bounds[1])
-        check_z = (cur_pos[2] => cursor_bounds[0]) | (cur_pos[2] <= cursor_bounds[1])
+        check_x = (cur_pos[0] >= cursor_bounds[0]) or (cur_pos[0] <= cursor_bounds[1])
+        check_y = (cur_pos[1] >= cursor_bounds[2]) or (cur_pos[1] <= cursor_bounds[3])
+        check_z = (cur_pos[2] >= cursor_bounds[4]) or (cur_pos[2] <= cursor_bounds[5])
 
-        return check_x | check_y | check_z
+        cursor_out_of_bounds = ~check_x or ~check_y or ~check_z
+        print(f'Cursor out of bounds: {cursor_out_of_bounds}, pos: {cur_pos}, bounds: {cursor_bounds}')
+        return cursor_out_of_bounds
+    
 
     def move_effector(self):
         pass
