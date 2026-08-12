@@ -452,18 +452,24 @@ class FixationBMIControlMulti(BMIControlMultiEyeConstrained):
 
 
     def _test_cursor_out_of_bounds(self, time_in_state):
-        cursor_bounds = np.array(self.cursor_bounds)
+        width, height = self.environment_plane_size
+        x_pos, y_pos, z_pos = self.environment_plane_origin
+        x_bound = np.array([width/2, -width/2])+x_pos
+        print(f'The x_bounds are {x_bound}')
+        y_bound = np.array([height/2, -height/2])+y_pos
+        print(f'The y_bounds are {y_bound}')
+
+
         #traits.Tuple((-10., 10., -10., 10., -10., 10.), desc='(x min, x max, y min, y max, z min, z max)')
         cur_pos = self.plant.get_endpoint_pos()
-        check_x = (cur_pos[0] >= cursor_bounds[0]) or (cur_pos[0] <= cursor_bounds[1])
-        check_y = (cur_pos[1] >= cursor_bounds[2]) or (cur_pos[1] <= cursor_bounds[3])
-        check_z = (cur_pos[2] >= cursor_bounds[4]) or (cur_pos[2] <= cursor_bounds[5])
+        check_x = (cur_pos[0] >= x_bound[0]) or (cur_pos[0] <= x_bound[1])
+        check_y = (cur_pos[1] >= y_bound[0]) or (cur_pos[1] <= y_bound[1])
+        #check_z = (cur_pos[2] >= cursor_bounds[4]) or (cur_pos[2] <= cursor_bounds[5])
 
-        cursor_out_of_bounds = ~check_x or ~check_y or ~check_z
-        print(f'Cursor out of bounds: {cursor_out_of_bounds}, pos: {cur_pos}, bounds: {cursor_bounds}')
+        cursor_out_of_bounds = ~check_x or ~check_y# or ~check_z
         return cursor_out_of_bounds
     
-
+/home/pagaiisland/code/bmi3d/built_in_tasks/bmimultitasks.py
     def move_effector(self):
         pass
 
