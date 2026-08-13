@@ -411,14 +411,19 @@ class BMIControlMultiDirectionConstraint(BMIControlMultiMixin, ScreenReachAngle)
 
 class FixationBMIControlMulti(BMIControlMultiEyeConstrained):
     blink_time_threshold = traits.Float(0.1, desc="The amount of time in seconds that the eyes can be closed before triggering a fixation break, measured by eye_diam=0")
+    cursor_out_of_bounds_penalty_time = traits.Float(0.5, desc="The length of the penalty for moving the cursor out of bounds, in seconds")
     assist_level = (1, 1)
     is_bmi_seed = True
-    
+
+    exclude_parent_traits = ['cursor_bounds','show_environment_plane', 'show_environment']
     static_states = ['wait', 'delay', 'reward', 'cursor_out_of_bounds_penalty', 'fixation_penalty', 'pause', 'delay_penalty','timeout_penalty', 'sync']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.most_recent_open_eye = 0
+        self.cursor_bounds = (-100., 100., -100., 100., -100., 100.)
+        self.show_environment_plane = True
+        self.show_environment = False
 
     status = dict(
         wait = dict(start_trial="target", start_pause="pause"),
@@ -437,28 +442,35 @@ class FixationBMIControlMulti(BMIControlMultiEyeConstrained):
         pause = dict(end_pause="wait", end_state=True),
     )
 
+    def _reset_cursor(self):
+        self.decoder.filt.state.mean = self.init_decoder_mean.copy()
+        self.plant.set_visibility(False)
+        
+
+    def _test_cursor_out_of_bounds_end(self, time_in_state):
+        return time_in_state > self.cursor_out_of_bounds_penalty_time
 
     def _start_cursor_out_of_bounds_penalty(self):
-        self.sync_event('TIMEOUT_PENALTY')
-        super()._start_timeout_penalty()
+        self.sync_event('OUT_OF_BOUNDS_PENALTY')
+        self._reset_cursor()
         # Hide targets
         for target in self.targets:
             target.hide()
             target.reset()
 
+        self._increment_tries()
+        self.penalty_index = 1
+
     def _end_cursor_out_of_bounds_penalty(self):
-        super()._end_timeout_penalty()
         self.sync_event('TRIAL_END')
+        #self.sync_event('TRIAL_END')
 
 
     def _test_cursor_out_of_bounds(self, time_in_state):
         width, height = self.environment_plane_size
         x_pos, y_pos, z_pos = self.environment_plane_origin
         x_bound = np.array([width/2, -width/2])+x_pos
-        print(f'The x_bounds are {x_bound}')
         y_bound = np.array([height/2, -height/2])+y_pos
-        print(f'The y_bounds are {y_bound}')
-
 
         #traits.Tuple((-10., 10., -10., 10., -10., 10.), desc='(x min, x max, y min, y max, z min, z max)')
         cur_pos = self.plant.get_endpoint_pos()
@@ -466,10 +478,9 @@ class FixationBMIControlMulti(BMIControlMultiEyeConstrained):
         check_y = (cur_pos[1] >= y_bound[0]) or (cur_pos[1] <= y_bound[1])
         #check_z = (cur_pos[2] >= cursor_bounds[4]) or (cur_pos[2] <= cursor_bounds[5])
 
-        cursor_out_of_bounds = ~check_x or ~check_y# or ~check_z
+        cursor_out_of_bounds = check_x or check_y# or ~check_z
         return cursor_out_of_bounds
     
-/home/pagaiisland/code/bmi3d/built_in_tasks/bmimultitasks.py
     def move_effector(self):
         pass
 
@@ -492,10 +503,10 @@ class FixationBMIControlMulti(BMIControlMultiEyeConstrained):
         #    self.targets_eye[0].move_to_position(self.targs[self.target_index] - self.offset_cube)
         #    self.targets_eye[0].show()
 
+    
     def _start_fixation_penalty(self):
-        self.plant.set_visibility(False)
+        self._reset_cursor()
         super()._start_fixation_penalty()
-        self.decoder.filt.state.mean = self.init_decoder_mean.copy()
         
     def _start_wait(self):
         super()._start_wait()
