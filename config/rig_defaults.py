@@ -26,6 +26,7 @@ sync_events = dict(
     TIMEOUT_PENALTY         = 0x41,
     DELAY_PENALTY           = 0x42,
     FIXATION_PENALTY        = 0x43,
+    OUT_OF_BOUNDS_PENALTY   = 0x44,
     OTHER_PENALTY           = 0x4f,
     CURSOR_ENTER_TARGET     = 0x50,
     CURSOR_LEAVE_TARGET     = 0x60,

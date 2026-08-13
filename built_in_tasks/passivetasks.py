@@ -61,7 +61,7 @@ class TargetCaptureVisualFeedback(EndPostureFeedbackController, BMIControlMulti)
 
 class TargetCaptureVisualFeedbackEyeConstrained(EndPostureFeedbackController, FixationBMIControlMulti):
     """Passive viewing version of the fixation BMI task"""
-    pass
+    static_states = ['wait', 'delay', 'reward', 'cursor_out_of_bounds_penalty', 'fixation_penalty', 'pause', 'delay_penalty','timeout_penalty', 'sync']
 
 
 class TargetCaptureVFB2DWindow(TargetCaptureVisualFeedback, WindowDispl2D):
