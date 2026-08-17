@@ -292,7 +292,7 @@ class EcubeFileBMI(EcubeFileData, CorticalBMI):
 
 class EcubeBMI(CorticalBMI):
     '''
-    BMI using ecube as the datasource.
+    BMI using ecube as the datasource (Incoming Ecube data is decimated by 25, down to a samplerate of 1000 Hz)
     '''
 
     bmi_ecube_headstage = traits.Int(7, desc="Which headstage to use for BMI data")
