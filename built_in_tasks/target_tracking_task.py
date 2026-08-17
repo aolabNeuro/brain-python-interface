@@ -518,6 +518,7 @@ class ScreenTargetTracking(TargetTracking, Window):
             self.plant.set_visibility(self.plant_visible)
 
     def update_frame(self):
+        # print(self.frame_index)
         if self.trial_timed_out:
             use_frame_index = self.trajectory_length - 1
         else:

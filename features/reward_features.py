@@ -461,6 +461,116 @@ class TrackingRewards(traits.HasTraits):
             super()._start_tracking_out_ramp()
             self.reward.off()
 
+class TrackingRewardsSwitch(traits.HasTraits):
+        '''
+        Switches off intermittent rewards for the rest of the trial if the tracking out time is exceeded (instead of going to tracking out penalty).
+        
+        TODO:   turn off the "end of trial" reward
+                add task data field to denote when tracking out time is exceeded & rewards are turned off
+        '''
+        exclude_parent_traits = ['tracking_out_penalty_time']
+
+        status = dict(
+            wait = dict(start_trial="trajectory", start_pause="pause"),
+            wait_retry = dict(start_trial="trajectory", start_pause="pause"),
+            trajectory = dict(enter_target="hold", timeout="timeout_penalty", start_pause="pause"),
+            hold = dict(hold_complete_go_ramp="tracking_in_ramp", hold_complete_no_ramp="tracking_in", leave_target="hold_penalty", start_pause="pause"),
+
+            tracking_in_ramp = dict(ramp_complete="tracking_in", ramp_and_trial_complete="reward", leave_target="tracking_out_ramp", start_pause="pause"),
+            tracking_out_ramp = dict(ramp_complete="tracking_out", ramp_and_trial_complete="reward", enter_target="tracking_in_ramp", start_pause="pause"),
+            
+            tracking_in = dict(traj_complete="tracking_in_ramp", trial_complete="reward", leave_target="tracking_out", start_pause="pause"),
+            tracking_out = dict(traj_complete="tracking_out_ramp", trial_complete="reward", enter_target="tracking_in", start_pause="pause"),
+            
+            timeout_penalty = dict(timeout_penalty_end="wait", timeout_penalty_end_retry = "wait_retry", start_pause="pause", end_state=True),
+            hold_penalty = dict(hold_penalty_end="wait", hold_penalty_end_retry="wait_retry", start_pause="pause", end_state=True),
+            
+            reward = dict(reward_end="wait", start_pause="pause", stoppable=False, end_state=True),
+            pause = dict(end_pause="wait", end_state=True)
+            # all end_states will result in trial counter +1, so if you start pause during a penalty state, 
+            # the next trial after unpausing will be current trial +2
+
+        )
+
+        def init(self):    
+            super().init()
+            self.turnoff_rewards = False
+            self.tracking_out_frame = None
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+
+        def cleanup(self, database, saveid, **kwargs):
+            self.reward.off()
+            super().cleanup(database, saveid, **kwargs)
+
+        def _start_trajectory(self):
+            super()._start_trajectory()
+            self.turnoff_rewards = False # reset at the beginning of each trial
+
+        def general_start_tracking_in(self):
+            self.trigger_reward = False
+            self.reward.off()
+            self.reward_start_frame = self.frame_index + self.tracking_reward_interval*self.fps # frame to start first reward
+            self.reward_stop_frame = self.reward_start_frame + self.tracking_reward_time*self.fps # frame to stop first reward
+            # print('START TRACKING', self.reward_start_frame, self.reward_stop_frame)
+
+        def general_while_tracking_in(self):
+            if not self.turnoff_rewards:
+            # Give reward for tracking in
+                if self.frame_index >= self.reward_start_frame and self.trigger_reward==False:
+                    self.trigger_reward = True
+                    self.reward_stop_frame = self.frame_index + self.tracking_reward_time*self.fps # frame to stop current reward
+                    self.reward_start_frame = self.frame_index + self.tracking_reward_interval*self.fps # frame to start next reward
+                    self.reward.on()
+                    print('REWARD ON', self.frame_index/self.fps)
+                if self.frame_index >= self.reward_stop_frame and self.trigger_reward==True:        
+                    self.trigger_reward = False
+                    self.reward.off()
+                    print('REWARD OFF', self.frame_index/self.fps)
+
+        def _start_tracking_in(self):
+            super()._start_tracking_in()
+            self.general_start_tracking_in()
+
+        def _start_tracking_in_ramp(self):
+            super()._start_tracking_in_ramp()
+            self.general_start_tracking_in()
+
+        def _while_tracking_in(self):
+            super()._while_tracking_in()
+            self.general_while_tracking_in()
+
+        def _while_tracking_in_ramp(self):
+            super()._while_tracking_in_ramp()
+            self.general_while_tracking_in()
+
+        def _start_tracking_out(self):
+            super()._start_tracking_out()
+            self.reward.off()
+            if self.tracking_out_frame is None:
+                self.tracking_out_frame = self.frame_index + self.tracking_out_time*self.fps # frame to start turning off all future rewards
+                print('turn off on frame', self.tracking_out_frame)
+        
+        def _start_tracking_out_ramp(self):
+            super()._start_tracking_out_ramp()
+            self.reward.off()
+            if self.tracking_out_frame is None:
+                self.tracking_out_frame = self.frame_index + self.tracking_out_time*self.fps # frame to start turning off all future rewards
+                print('turn off on frame', self.tracking_out_frame)
+
+        def _while_tracking_out(self):
+            super()._while_tracking_out()
+            if self.frame_index >= self.tracking_out_frame and self.turnoff_rewards==False:
+                self.turnoff_rewards = True
+                print('Rewards off?', self.turnoff_rewards)
+
+        def _while_tracking_out_ramp(self):
+            super()._while_tracking_out_ramp()
+            if self.frame_index >= self.tracking_out_frame and self.turnoff_rewards==False:
+                self.turnoff_rewards = True
+                print('Rewards off?', self.turnoff_rewards)
+
 
 class ScoreRewards(traits.HasTraits):
     '''
