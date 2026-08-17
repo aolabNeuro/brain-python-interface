@@ -17,6 +17,7 @@ from .target_capture_task import ScreenTargetCapture
 from .target_capture_task_xt import ScreenReachAngle
 from features.bmi_task_features import LinearlyDecreasingAssist
 from .target_graphics import target_colors
+from .target_tracking_task import ScreenTargetTracking
 
 from .target_capture_task_eye import EyeConstrainedTargetCapture
 
@@ -267,6 +268,10 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
         else:
             raise ValueError("Unrecognized decoder state space!")
 
+    
+    def move_effector(self, pos_offset=[0,0,0], vel_offset=[0,0,0]):
+        pass
+    
     def get_target_BMI_state(self, *args):
         '''
         Run the goal calculator to determine the target state of the task
@@ -370,6 +375,8 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
         self.hdf.sendMsg(f"clda = {self.learn_flag}")
         print(f"clda = {self.learn_flag}")
 
+    
+
 class BMIControlMulti2DWindow(BMIControlMultiMixin, WindowDispl2D, ScreenTargetCapture):
     fps = 20.
     def __init__(self,*args, **kwargs):
@@ -406,5 +413,12 @@ class BMIControlMultiEyeConstrained(BMIControlMultiMixin, EyeConstrainedTargetCa
 class BMIControlMultiDirectionConstraint(BMIControlMultiMixin, ScreenReachAngle):
     '''
     Adds an additional constraint that the direction of travel must be within a certain angle
+    '''
+    pass
+
+
+class BMIControlMulti_ScreenTargetTracking(BMIControlMultiMixin, ScreenTargetTracking):
+    '''
+    BMI control for target tracking task
     '''
     pass
