@@ -464,6 +464,7 @@ class TrackingRewards(traits.HasTraits):
 class TrackingRewardsSwitch(traits.HasTraits):
         '''
         Switches off intermittent rewards for the rest of the trial if the tracking out time is exceeded (instead of going to tracking out penalty).
+        Replaces the TrackingRewards feature, so cannot have both features turned on!
         
         TODO:   turn off the "end of trial" reward
                 add task data field to denote when tracking out time is exceeded & rewards are turned off
