@@ -475,7 +475,7 @@ class HilbertPowerExtractor(object):
 
     feature_type = 'lfp_power'
 
-    def __init__(self, source, channels=[], bands=default_bands, win_len=0.2, NW=3, fs=1000, **kwargs):
+    def __init__(self, source, channels=[], high_gamma_band=(80, 150), win_len=0.2, fs=1000, **kwargs):
         '''
         Constructor for HilbertPowerExtractor, which extracts LFP power using the Hilbert transform.
 
@@ -502,9 +502,8 @@ class HilbertPowerExtractor(object):
         '''
         self.source = source
         self.channels = channels
-        self.bands = bands
+        self.high_gamma_band = high_gamma_band
         self.win_len = win_len
-        self.NW = NW
         if source is not None:
             self.fs = source.source.update_freq
         else:
@@ -512,22 +511,15 @@ class HilbertPowerExtractor(object):
 
         extractor_kwargs = dict()
         extractor_kwargs['channels'] = self.channels
-        extractor_kwargs['bands']    = self.bands
+        extractor_kwargs['high_gamma_band']    = self.high_gamma_band
         extractor_kwargs['win_len']  = self.win_len
-        extractor_kwargs['NW']       = self.NW
         extractor_kwargs['fs']       = self.fs
         extractor_kwargs['ref']      = kwargs.get('ref', True)
-
-        #Set High Gamma Band
-        if 'high_gamma_band' not in kwargs:
-            extractor_kwargs['high_gamma_band'] = (80, 150)
-        else:
-            extractor_kwargs['high_gamma_band'] = kwargs.get('high_gamma_band')
 
         #Set default bandpass filter for all incoming LFP signals
         if 'default_band_pass_filter' not in kwargs:
             #This will be an initial bandpass applied to all incoming lfp xignals
-            extractor_kwargs['default_band_pass_filter'] = (np.min(0.1), np.max(200))
+            extractor_kwargs['default_band_pass_filter'] = [(0.1, 200)]
         else:
             extractor_kwargs['default_band_pass_filter'] = kwargs.get('default_band_pass_filter')
 
@@ -536,8 +528,6 @@ class HilbertPowerExtractor(object):
             extractor_kwargs['default_band_pass_filter_order'] = 4
         else:
             extractor_kwargs['default_band_pass_filter_order'] = kwargs.get('default_band_pass_filter_order')
-
-        self.npk = aopy.precondition.convert_taper_parameters(win_len, NW/win_len)
 
    
         #extractor_kwargs['no_log']  = 'no_log' in kwargs and kwargs['no_log']==True #remove log calculation
@@ -590,7 +580,7 @@ class HilbertPowerExtractor(object):
         lfp_power : np.ndarray of shape (n_channels * n_features, 1)
             Multi-band power estimates for each channel, for each band specified when the feature extractor was instantiated.
         '''
-        assert int(self.win_len * self.fs) == cont_samples.shape[1]
+        assert int(self.win_len * self.fs) == cont_samples.shape[0]
         
 
         #Filter signal with the overarchign bandpass filter
@@ -604,7 +594,7 @@ class HilbertPowerExtractor(object):
         lfp_filter = lfp_filter[0]
 
         #Reref signal
-        lfp_reref = lfp_filter - np.mean(lfp_filter, axis=1, keepdims=True)
+        lfp_reref = lfp_filter - np.mean(lfp_filter, axis=0, keepdims=True)
 
         sos = butter(self.extractor_kwargs['default_band_pass_filter_order'], self.extractor_kwargs['high_gamma_band'], btype='bandpass', fs=self.fs, output='sos')
         filtered_lfp_reref = sosfilt(sos, lfp_reref, axis=0)
@@ -612,7 +602,7 @@ class HilbertPowerExtractor(object):
         envelope = np.abs(analytic_signal)
         log_bnd = np.log(envelope + 1e-8)
         #Is this what I really want here? Need to check with Sofie
-        final_output_signal = np.mean(log_bnd, axis=1)
+        final_output_signal = np.mean(log_bnd, axis=0)
         
         return final_output_signal
                 
