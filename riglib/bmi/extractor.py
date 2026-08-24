@@ -479,6 +479,14 @@ class HilbertPowerExtractor(object):
         '''
         Constructor for HilbertPowerExtractor, which extracts LFP power using the Hilbert transform.
 
+        Signal processing pipeline:
+        1. Bandpass filter the signal to remove DC and high frequency noise
+        2. Rereference LFP signal to remove shared noise across channels
+        3. Bandpass High Gamma 
+        4. Compute the analytic signal using the Hilbert transform
+        5. Compute the envelope of the analytic signal
+        6. Compute the log of the envelope to get the log power of the signal
+        7. Take the average of the log power across time to get a single value for each channel and frequency band
         Parameters
         ----------
         source : riglib.source.Source object
@@ -510,12 +518,20 @@ class HilbertPowerExtractor(object):
         extractor_kwargs['fs']       = self.fs
         extractor_kwargs['ref']      = kwargs.get('ref', True)
 
+        #Set High Gamma Band
+        if 'high_gamma_band' not in kwargs:
+            extractor_kwargs['high_gamma_band'] = (80, 150)
+        else:
+            extractor_kwargs['high_gamma_band'] = kwargs.get('high_gamma_band')
+
+        #Set default bandpass filter for all incoming LFP signals
         if 'default_band_pass_filter' not in kwargs:
             #This will be an initial bandpass applied to all incoming lfp xignals
-            extractor_kwargs['default_band_pass_filter'] = (np.min(self.bands), np.max(self.bands))
+            extractor_kwargs['default_band_pass_filter'] = (np.min(0.1), np.max(200))
         else:
             extractor_kwargs['default_band_pass_filter'] = kwargs.get('default_band_pass_filter')
 
+        #Set default bandpass filter order for all incoming LFP signals
         if 'default_band_pass_filter_order' not in kwargs:
             extractor_kwargs['default_band_pass_filter_order'] = 4
         else:
@@ -590,17 +606,15 @@ class HilbertPowerExtractor(object):
         #Reref signal
         lfp_reref = lfp_filter - np.mean(lfp_filter, axis=1, keepdims=True)
 
-        aggregated_hilbert_power = np.zeros((len(self.bands), self.channels.shape[0]))
-
-        for bnd in self.bands:
-            sos = butter(4, bnd, btype='bandpass', fs=self.fs, output='sos')
-            filtered_lfp_reref = sosfilt(sos, lfp_reref, axis=0)
-            analytic_signal = hilbert(filtered_lfp_reref, axis=0)
-            envelope = np.abs(analytic_signal)
-            log_bnd = np.log(envelope + 1e-8)
-            #Is this what I really want here? Need to check with Sofie
-            aggregated_hilbert_power[self.bands.index(bnd)] = np.mean(log_bnd, axis=1)
-        return aggregated_hilbert_power
+        sos = butter(self.extractor_kwargs['default_band_pass_filter_order'], self.extractor_kwargs['high_gamma_band'], btype='bandpass', fs=self.fs, output='sos')
+        filtered_lfp_reref = sosfilt(sos, lfp_reref, axis=0)
+        analytic_signal = hilbert(filtered_lfp_reref, axis=0)
+        envelope = np.abs(analytic_signal)
+        log_bnd = np.log(envelope + 1e-8)
+        #Is this what I really want here? Need to check with Sofie
+        final_output_signal = np.mean(log_bnd, axis=1)
+        
+        return final_output_signal
                 
     def __call__(self, start_time, *args, **kwargs):
         '''
