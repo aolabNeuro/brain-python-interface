@@ -7,6 +7,7 @@ from scipy.signal import butter, lfilter
 import os
 import nitime.algorithms as tsa
 import aopy
+from scipy.signal import butter, sosfilt, hilbert
 
 class FeatureExtractor(object):
     '''
@@ -466,6 +467,257 @@ class rms_emg(object):
         return dict(emg_amplitude=emg_amplitude)
 
 
+class HilbertPowerExtractor(object):
+    '''
+    Computes log power of the LFP in different frequency bands (for each 
+    channel) in freq-domain using the Hilbert transform.
+    '''
+
+    feature_type = 'lfp_power'
+
+    def __init__(self, source, channels=[], bands=default_bands, win_len=0.2, NW=3, fs=1000, **kwargs):
+        '''
+        Constructor for HilbertPowerExtractor, which extracts LFP power using the Hilbert transform.
+
+        Parameters
+        ----------
+        source : riglib.source.Source object
+            Object which yields new data when its 'get' method is called
+        channels : list 
+            LFP electrode indices to use for feature extraction
+        bands : list of tuples
+            Each tuple defines a frequency band of interest as (start frequency, end frequency) 
+
+        Returns
+        -------
+        HilbertPowerExtractor instance
+        '''
+        self.source = source
+        self.channels = channels
+        self.bands = bands
+        self.win_len = win_len
+        self.NW = NW
+        if source is not None:
+            self.fs = source.source.update_freq
+        else:
+            self.fs = fs
+
+        extractor_kwargs = dict()
+        extractor_kwargs['channels'] = self.channels
+        extractor_kwargs['bands']    = self.bands
+        extractor_kwargs['win_len']  = self.win_len
+        extractor_kwargs['NW']       = self.NW
+        extractor_kwargs['fs']       = self.fs
+        extractor_kwargs['ref']      = kwargs.get('ref', True)
+
+        if 'default_band_pass_filter' not in kwargs:
+            #This will be an initial bandpass applied to all incoming lfp xignals
+            extractor_kwargs['default_band_pass_filter'] = (np.min(self.bands), np.max(self.bands))
+        else:
+            extractor_kwargs['default_band_pass_filter'] = kwargs.get('default_band_pass_filter')
+
+        if 'default_band_pass_filter_order' not in kwargs:
+            extractor_kwargs['default_band_pass_filter_order'] = 4
+        else:
+            extractor_kwargs['default_band_pass_filter_order'] = kwargs.get('default_band_pass_filter_order')
+
+        self.npk = aopy.precondition.convert_taper_parameters(win_len, NW/win_len)
+
+   
+        #extractor_kwargs['no_log']  = 'no_log' in kwargs and kwargs['no_log']==True #remove log calculation
+        #extractor_kwargs['no_mean'] = 'no_mean' in kwargs and kwargs['no_mean']==True #r
+        self.extractor_kwargs = extractor_kwargs
+
+        self.n_pts = int(self.win_len * self.fs)
+        '''self.nfft = 2**int(np.ceil(np.log2(self.n_pts)))  # nextpow2(self.n_pts)
+        fft_freqs = np.arange(0., fs, float(fs)/self.nfft)[:int(self.nfft/2) + 1]
+        self.fft_inds = dict()
+        for band_idx, band in enumerate(bands):
+            self.fft_inds[band_idx] = [freq_idx for freq_idx, freq in enumerate(fft_freqs) if band[0] <= freq < band[1]]
+
+        extractor_kwargs['fft_inds']       = self.fft_inds
+        extractor_kwargs['fft_freqs']      = fft_freqs
+        
+        self.epsilon = 1e-9
+        if extractor_kwargs['no_mean']: #Used in lfp 1D control task
+            self.feature_dtype = ('lfp_power', 'f8', (len(channels)*len(fft_freqs), 1))
+        else:
+            self.feature_dtype = ('lfp_power', 'f8', (len(channels)*len(bands), 1))'''
+
+    def get_cont_samples(self, *args, **kwargs):
+        '''
+        Retreives the last n_pts number of samples for each LPF channel from the neural data 'source'
+
+        Parameters
+        ----------
+        *args, **kwargs : optional arguments
+            Ignored for this extractor (not necessary)
+
+        Returns
+        -------
+        np.ndarray of shape ???
+        '''
+        
+        return self.source.get(self.n_pts, self.channels)
+        
+    def extract_features(self, cont_samples):
+        '''
+        Extract spectral features from a block of time series samples
+
+        Parameters
+        ----------
+        cont_samples : np.ndarray of shape (n_channels, n_samples)
+            Raw voltage time series (one per channel) from which to extract spectral features 
+
+        Returns
+        -------
+        lfp_power : np.ndarray of shape (n_channels * n_features, 1)
+            Multi-band power estimates for each channel, for each band specified when the feature extractor was instantiated.
+        '''
+        assert int(self.win_len * self.fs) == cont_samples.shape[1]
+        
+
+        #Filter signal with the overarchign bandpass filter
+        lfp_filter, Wn = aopy.precondition.base.butterworth_filter_data(
+            cont_samples, 
+            self.fs,
+            bands=self.extractor_kwargs['default_band_pass_filter'], 
+            order=self.extractor_kwargs['default_band_pass_filter_order'],
+            filter_type='bandpass')
+
+        lfp_filter = lfp_filter[0]
+
+        #Reref signal
+        lfp_reref = lfp_filter - np.mean(lfp_filter, axis=1, keepdims=True)
+
+        aggregated_hilbert_power = np.zeros((len(self.bands), self.channels.shape[0]))
+
+        for bnd in self.bands:
+            sos = butter(4, bnd, btype='bandpass', fs=self.fs, output='sos')
+            filtered_lfp_reref = sosfilt(sos, lfp_reref, axis=0)
+            analytic_signal = hilbert(filtered_lfp_reref, axis=0)
+            envelope = np.abs(analytic_signal)
+            log_bnd = np.log(envelope + 1e-8)
+            #Is this what I really want here? Need to check with Sofie
+            aggregated_hilbert_power[self.bands.index(bnd)] = np.mean(log_bnd, axis=1)
+        return aggregated_hilbert_power
+                
+    def __call__(self, start_time, *args, **kwargs):
+        '''
+        Parameters
+        ----------
+        start_time : float 
+            Absolute time from the task event loop. This is unused by LFP extractors in their current implementation
+            and only passed in to ensure that function signatures are the same across extractors.
+        *args, **kwargs : optional positional/keyword arguments
+            These are passed to the source, or ignored (not needed for this extractor).
+
+        Returns
+        -------
+        dict
+            Extracted features to be saved in the task.         
+        '''
+        cont_samples = self.get_cont_samples(*args, **kwargs)  # dims of channels x time
+        lfp_power = self.extract_features(cont_samples)
+
+        return dict(lfp_power=lfp_power)
+
+    @classmethod
+    def extract_from_file(cls, files, neurows, binlen, units, extractor_kwargs, strobe_rate=60.0):
+        '''
+        Compute binned spike count features
+
+        Parameters
+        ----------
+        files : dict
+            Data files used to train the decoder. Should contain exactly one type of neural data file (e.g., Plexon, Blackrock, TDT)
+        neurows: np.ndarray of shape (T,)
+            Timestamps in the plexon time reference corresponding to bin boundaries
+        binlen: float
+            Length of time over which to sum spikes from the specified cells
+        units: np.ndarray of shape (N, 2)
+            List of units that the decoder will be trained on. The first column specifies the electrode number and the second specifies the unit on the electrode
+        extractor_kwargs: dict 
+            Any additional parameters to be passed to the feature extractor. This function is agnostic to the actual extractor utilized
+        strobe_rate: 60.0
+            The rate at which the task sends the sync pulse to the plx file
+
+        Returns
+        -------
+        spike_counts : np.ndarray of shape (N, T)
+            Spike counts binned over the length of the datafile.
+        units : 
+            Not used by this type of extractor, just passed back from the input argument to make the outputs consistent with spike count extractors
+        extractor_kwargs : dict
+            Parameters used to instantiate the feature extractor, to be stored 
+            along with the trained decoder so that the exact same feature extractor can be re-created at runtime.
+        '''
+    
+        # interpolate between the rows to 180 Hz
+        if binlen < 1./strobe_rate:
+            interp_rows = []
+            neurows = np.hstack([neurows[0] - 1./strobe_rate, neurows])
+            for r1, r2 in zip(neurows[:-1], neurows[1:]):
+                interp_rows += list(np.linspace(r1, r2, 4)[1:])
+            interp_rows = np.array(interp_rows)
+        else:
+            step = int(binlen/(1./strobe_rate)) # Downsample kinematic data according to decoder bin length (assumes non-overlapping bins)
+            interp_rows = neurows[::step]
+        
+        # create extractor object
+        f_extractor = LFPMTMPowerExtractor(None, **extractor_kwargs)
+        extractor_kwargs = f_extractor.extractor_kwargs
+
+        win_len  = f_extractor.win_len
+        bands    = f_extractor.bands
+        channels = f_extractor.channels
+        fs       = f_extractor.fs
+        print(('bands:', bands))
+        print(('win_len:', win_len))
+
+        n_itrs = len(interp_rows)
+        n_chan = len(channels)
+        lfp_power = np.zeros((n_itrs, n_chan * len(bands)))
+
+        # get the samples
+        if 'plexon' in files:
+            from plexon import plexfile
+            plx = plexfile.openFile(files['plexon'].encode('utf-8'))
+            lfp = plx.lfp[:].data[:, channels-1]
+
+        elif 'blackrock' in files:
+            raise NotImplementedError
+
+        elif 'ecube' in files:
+            from riglib.ecube.file import load_lfp
+            data = load_lfp(str(files['ecube']))
+            lfp = data[:, [c-1 for c in channels]]
+        
+        # for i, t in enumerate(interp_rows):
+        #     cont_samples = plx.lfp[t-win_len:t].data[:, channels-1]
+        #     lfp_power[i, :] = f_extractor.extract_features(cont_samples.T).T
+        n_pts = int(win_len * fs)
+        for i, t in enumerate(interp_rows):
+            # try:
+            sample_num = int(t * fs)
+            cont_samples = lfp[max(0,sample_num-n_pts):min(lfp.shape[0], sample_num), :]
+            if cont_samples.shape[0] < n_pts:
+                # maybe don't count these ones?
+                continue
+            lfp_power[i, :] = f_extractor.extract_features(cont_samples.T).T
+            # except:
+            #     print("Error with LFP decoder training")
+            #     print((i, t))
+
+
+        # TODO -- discard any channel(s) for which the log power in any frequency 
+        #   bands was ever equal to -inf (i.e., power was equal to 0)
+        # or, perhaps just add a small epsilon inside the log to avoid this
+        # then, remember to do this:  extractor_kwargs['channels'] = channels
+        #   and reset the units variable
+
+        return lfp_power, units, extractor_kwargs
+    
 class LFPMTMPowerExtractor(object):
     '''
     Computes log power of the LFP in different frequency bands (for each 
