@@ -191,7 +191,7 @@
           // add new row to table
           tr = $(document.createElement("tr"));
           tr.html("<td>" + resp["data"].id + "</td>" + "<td>" + resp["data"].name + "</td>" + "<td>" + 
-            "<input type=\"submit\" value=\"Remove\" onclick=\"toggle_feature(\'" + resp["data"].name + "\')\">" + "</td>");
+            "<input type=\"submit\" id=\"feature_" + resp["data"].name + "\" value=\"Disable\" onclick=\"toggle_feature(\'" + resp["data"].name + "\')\">" + "</td>");
           $('#new-feature-row').after(tr);
         }
       })
