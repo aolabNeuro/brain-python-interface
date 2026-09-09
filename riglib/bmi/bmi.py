@@ -798,6 +798,7 @@ class Decoder(object):
         x = self.filt.state.mean
 
         # Run the filter
+        print(f'The size of the neural observation is {neural_obs.shape}')
         self.filt(neural_obs, **kwargs)
 
         if np.any(assist_level) > 0:
@@ -1338,7 +1339,7 @@ class BMILoop(object):
         raise NotImplementedError
 
     def _cycle(self):
-        self.move_plant()
+        self.()
         # print(self.decoder.filt.C)
         # save loop time to HDF file
         self.task_data['loop_time'] = self.iter_time()
