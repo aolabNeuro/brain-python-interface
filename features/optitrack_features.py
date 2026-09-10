@@ -203,21 +203,31 @@ class HidePlantOnPause():
         self.plant_visible = not self.pause
         super()._cycle()
 
-class SpheresToCylinders():
+class SpheresToCylinders(traits.HasTraits):
     '''
-    Convert spheres to cylinders pointing in and out of the screen up to the bounds.
+    Convert spheres to cylinders and use 2d logic to test target entry.
     '''
+
+    cylinder_radius_thresh = traits.Float(0.5, desc="Minimum radius to convert to cylinders")
+    cylinder_rotation = traits.Tuple((0, 0, 0), desc="Rotation of the cylinder in degrees (x, y, z)")
+    cylinder_height = traits.Float(0.0, desc="Height of the cylinder. If 0, the cylinder will extend to the bounds of the cursor.")
     
     def add_model(self, model):
         '''
         Hijack spheres and switch them for cylinders along the y-axis
         '''
-        if isinstance(model, Sphere) and model.radius > 0.5:
-            height = self.cursor_bounds[3] - self.cursor_bounds[2]
+        if isinstance(model, Sphere) and model.radius > self.cylinder_radius_thresh:
+            if self.cylinder_height > 0:
+                height = self.cylinder_height
+            else:
+                height = self.cursor_bounds[3] - self.cursor_bounds[2]
             tmp_model = Cylinder(height, model.radius, color=model.color)
             print('Switched sphere for cylinder')
             model.verts, model.polys, model.tcoords, model.normals = tmp_model.verts, tmp_model.polys, tmp_model.tcoords, tmp_model.normals
             model.rotate_x(90)
+            model.rotate_x(self.cylinder_rotation[0])
+            model.rotate_y(self.cylinder_rotation[1])
+            model.rotate_z(self.cylinder_rotation[2])
         super().add_model(model)
 
     def _test_enter_target(self, ts):
