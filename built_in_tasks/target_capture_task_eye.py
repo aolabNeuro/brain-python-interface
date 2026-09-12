@@ -2276,3 +2276,36 @@ class ScreenTargetCapture_Saccade(ScreenTargetCapture):
             #indices[2] = idx3[0]
 
             yield indices, targs
+
+class ScreenTargetCapture_Saccade_withBackgroundTargets(ScreenTargetCapture_Saccade):
+    background_target_radius = traits.Float(2, desc="Radius of targets in cm")
+    background_target_color = traits.OptionsList("yellow", *target_colors, desc="Color of the target", bmi3d_input_options=list(target_colors.keys()))
+
+    def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+
+            instantiate_targets = kwargs.pop('instantiate_targets', True)
+            if instantiate_targets:
+                print("Instantiating background targets")
+                background_target = VirtualCircularTarget(target_radius=self.background_target_radius, target_color=target_colors[self.background_target_color])
+                self.targets.append(background_target)
+
+    def _start_delay(self):
+            # Make next target visible unless this is the final target in the trial
+            next_idx = (self.target_index + 1)
+            if next_idx < self.chain_length:
+                target = self.targets[next_idx % 2]
+                bck_target = self.targets[-1]
+                sphere_position = self.targs[next_idx] - [0 ,-10,0]
+                cube_position = self.targs[next_idx] - self.offset_cube
+                print(f'Showing cube at {cube_position} and sphere at {sphere_position}')
+                target.move_to_position(cube_position)
+                bck_target.move_to_position(sphere_position)
+
+                target.show()
+                bck_target.show()
+
+                self.sync_event('TARGET_ON', self.gen_indices[next_idx])
+            else:
+                # This delay state should only last 1 cycle, don't sync anything
+                pass
