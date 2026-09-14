@@ -256,7 +256,7 @@ class File(DataSourceSystem):
             try:
                 data_block = next(self.file)
             except StopIteration:
-                data_block = np.zeros((int(728/25),1))
+                data_block = np.zeros((int(728/25), len(self.channels)))
             self.gen = multi_chan_generator(data_block, self.channels, downsample=25)
             return next(self.gen)
 

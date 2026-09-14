@@ -162,7 +162,7 @@ class Task(models.Model):
 
                 # look up database records which match the model type & filter parameters
                 insts = Model.objects.filter(**filter_kwargs).order_by("-date")
-                params[trait_name]['options'] = [(i.pk, i.path) for i in insts]
+                params[trait_name]['options'] = [(i.pk, os.path.basename(i.path)) for i in insts]
 
             if trait_name in values:
                 params[trait_name]['value'] = values[trait_name]

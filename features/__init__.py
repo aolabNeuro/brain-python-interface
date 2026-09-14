@@ -6,7 +6,7 @@ task/experiment by multiple inheritance.
 from features.debug_features import Profiler, OnlineAnalysis
 from features.laser_features import QwalorLaser, MultiQwalorLaser, SwitchedQwalorLaser, LaserState
 from features.quattrocento_features import QuattBMI
-from riglib.stereo_opengl.window import WindowWithExperimenterDisplay, Window2D
+from riglib.stereo_opengl.window import WindowWithExperimenterDisplay, Window2D, Window2DIn3D
 from riglib.stereo_opengl.openxr import WindowVR
 
 from .generator_features import Autostart, RandomDelay, AdaptiveGenerator, IgnoreCorrectness, PoissonWait, Progressbar_fixation, \
@@ -19,6 +19,7 @@ from .touch_features import MouseEmulateTouch, TabletTouch
 from .phasespace_features import MotionData, MotionSimulate, MotionAutoAlign
 from .optitrack_features import Optitrack, SpheresToCylinders
 from .plexon_features import PlexonBMI, RelayPlexon, RelayPlexByte
+from .spikerbox_features import SpikerBoxBMI
 from .hdf_features import SaveHDF
 from .video_recording_features import SingleChannelVideo, E3Video
 from .bmi_task_features import NormFiringRates
@@ -45,6 +46,7 @@ built_in_features = dict(
     rand_delay=RandomDelay,
     poisson_wait=PoissonWait,
     window2D=Window2D,
+    window2Din3D=Window2DIn3D,
     windowVR=WindowVR,
     cylinder_center_out=SpheresToCylinders,
     adaptive_generator=AdaptiveGenerator,
@@ -67,6 +69,7 @@ built_in_features = dict(
     single_video=SingleChannelVideo,
     exp_display=WindowWithExperimenterDisplay,
     relay_arduino=PlexonSerialDIORowByte,
+    spikerbox_bmi=SpikerBoxBMI,
     plexonbmi=PlexonBMI,
     relay_plexon=RelayPlexon,
     relay_plexbyte=RelayPlexByte,

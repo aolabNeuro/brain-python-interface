@@ -136,6 +136,9 @@ sudo python setup.py install
 # Phidgets
 sudo cp udev/99-phidgets.rules /etc/udev/rules.d
 sudo chmod a+r /etc/udev/rules.d/99-phidgets.rules
+# SpikerBox
+sudo cp udev/99-spikerbox.rules /etc/udev/rules.d/
+sudo chmod a+r /etc/udev/rules.d/99-spikerbox.rules
 # NIDAQ
 sudo cp $HOME/code/bmi3d/install/udev/comedi.rules /etc/udev/rules.d/
 sudo chmod a+r /etc/udev/rules.d/comedi.rules 

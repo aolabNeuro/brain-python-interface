@@ -252,9 +252,11 @@ class BehaviorAnalysisWorker(AnalysisWorker):
             self.eye_buffer[-1,:2] = self.temp
 
         elif key == 'eye_diam':
-            self.temp = np.array(values[0])[0]
+            self.temp = np.array(values[0])
+            if (np.size(self.temp) == 0) or (self.task_params.get('keyboard_control', False)):
+                return
             self.eye_buffer[:,2] = np.roll(self.eye_buffer[:,2], -1, axis=0)
-            self.eye_buffer[-1,2] = self.temp
+            self.eye_buffer[-1,2] = self.temp[0]
 
         elif key == 'calibrated_eye_pos':
             self.calibrated_eye_pos = np.array(values[0])[:2]
@@ -331,6 +333,8 @@ class SaccadeAnalysisWorker(BehaviorAnalysisWorker):
             buffer = self.task_params['fixation_radius_buffer']
         elif 'fixation_dist' in self.task_params:
             buffer = self.task_params['fixation_dist'] - self.task_params['target_radius']
+        else:
+            buffer=0
         eye_radius = 0.1
 
         patches1 = [plt.Circle(pos, radius+buffer) for pos, radius, _ in targets]
@@ -919,7 +923,7 @@ class BMIAnalysisWorker(AnalysisWorker):
     def __init__(self, task_params, data_queue, buffer_time=10, **kwargs):
         super().__init__(task_params, data_queue, **kwargs)
         self.buffer_time = buffer_time
-
+        
     def init(self):
         super().init()
         self.channels = self.task_params['decoder_channels']
@@ -952,15 +956,28 @@ class BMIAnalysisWorker(AnalysisWorker):
             self.neural_feats = np.roll(self.neural_feats, -1, axis=0)
             self.neural_feats[-1] = np.array(values[0])
 
+    def _set_axis_limits(self, axis, data):
+        if data.size == 0:
+            axis.set_ylim(-1, 1)
+            return
+
+        data_min = np.min(data)
+        data_max = np.max(data)
+        if data_min == data_max:
+            pad = 1 if data_min == 0 else abs(data_min) * 0.1
+            axis.set_ylim(data_min - pad, data_max + pad)
+        else:
+            axis.set_ylim(data_min, data_max)
+
     def draw(self):
         super().draw()
         time = np.arange(len(self.neural_feats)) * 1/(int(self.task_params['fps'])) - self.buffer_time
         for i, plot in enumerate(self.feat_plots):
             plot.set_data(time, self.neural_feats[:,i])
-        self.feat_ax.set_ylim(np.min(self.neural_feats), np.max(self.neural_feats))
+        self._set_axis_limits(self.feat_ax, self.neural_feats)
         for i, plot in enumerate(self.state_plots):
             plot.set_data(time, self.decoder_states[:,i])
-        self.state_ax.set_ylim(np.min(self.decoder_states), np.max(self.decoder_states))
+        self._set_axis_limits(self.state_ax, self.decoder_states)
 
 class OnlineDataServer(threading.Thread):
     '''
@@ -1040,6 +1057,9 @@ class OnlineDataServer(threading.Thread):
         elif self.task_params['experiment_name'] == 'SaccadeTask':
             self.analysis_workers.append((SaccadeAnalysisWorker(self.task_params, data_queue), data_queue))
 
+        elif self.task_params['experiment_name'] == 'FlashTargets':
+            self.analysis_workers.append((SaccadeAnalysisWorker(self.task_params, data_queue), data_queue))
+
         elif self.task_params['experiment_name'] == 'HandConstrainedSaccadeTask':
             self.analysis_workers.append((EyeHandAnalysisWorker(self.task_params, data_queue), data_queue))
 
@@ -1053,7 +1073,13 @@ class OnlineDataServer(threading.Thread):
             self.analysis_workers.append((EyeHandAnalysisWorker(self.task_params, data_queue), data_queue))   
 
         elif self.task_params['experiment_name'] == 'EyeHandSequenceTask':
-            self.analysis_workers.append((EyeHandSequenceAnalysisWorker(self.task_params, data_queue), data_queue))     
+            self.analysis_workers.append((EyeHandSequenceAnalysisWorker(self.task_params, data_queue), data_queue))  
+
+        elif self.task_params['experiment_name'] == 'TargetCaptureVisualFeedback':
+            self.analysis_workers.append((SaccadeAnalysisWorker(self.task_params, data_queue), data_queue))
+
+        elif self.task_params['experiment_name'] == 'TargetCaptureVisualFeedbackEyeConstrained':
+            self.analysis_workers.append((SaccadeAnalysisWorker(self.task_params, data_queue), data_queue))   
 
         # Is there ecube neural data?
         if 'record_headstage' in self.task_params and self.task_params['record_headstage']:

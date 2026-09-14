@@ -507,6 +507,7 @@ class LFPMTMPowerExtractor(object):
         extractor_kwargs['win_len']  = self.win_len
         extractor_kwargs['NW']       = self.NW
         extractor_kwargs['fs']       = self.fs
+        extractor_kwargs['ref']      = kwargs.get('ref', True)
         self.npk = aopy.precondition.convert_taper_parameters(win_len, NW/win_len)
    
         extractor_kwargs['no_log']  = 'no_log' in kwargs and kwargs['no_log']==True #remove log calculation
@@ -591,7 +592,13 @@ class LFPMTMPowerExtractor(object):
         '''
         assert int(self.win_len * self.fs) == cont_samples.shape[1]
         
-        freqs, time, psd_est = aopy.analysis.calc_mt_tfr(cont_samples.T, *self.npk, self.fs, 1)
+        freqs, time, psd_est = aopy.analysis.calc_mt_tfr(
+            cont_samples.T,
+            *self.npk,
+            self.fs,
+            1,
+            ref=self.extractor_kwargs['ref'],
+        )
         if ('no_mean' in self.extractor_kwargs) and (self.extractor_kwargs['no_mean'] is True):
             return psd_est.reshape(psd_est.shape[0]*psd_est.shape[1], 1)
         else:

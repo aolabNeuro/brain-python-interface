@@ -250,7 +250,7 @@ class ScreenSync(traits.HasTraits):
         self.fps = self._tmp_fps
         # if hasattr(self, 'decoder'):
         #     self.decoder.set_call_rate(1./self.fps)
-        print("restore update rate")
+        # print("restore update rate")
 
     def _test_start_experiment(self, ts):
         return ts > self.sync_state_duration

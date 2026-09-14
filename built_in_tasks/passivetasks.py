@@ -24,12 +24,16 @@ from built_in_tasks.bmimultitasks import BMIControlMulti
 
 from .target_graphics import *
 
+from .bmimultitasks import BMIControlMultiEyeConstrained
+
 bmi_ssm_options = ['Endpt2D', 'Tentacle', 'Joint2L']
 
 class EndPostureFeedbackController(BMILoop, traits.HasTraits):
     ssm_type_options = bmi_ssm_options
     ssm_type = traits.OptionsList(*bmi_ssm_options, bmi3d_input_options=bmi_ssm_options)
     decoder_update_rate = traits.Float(60, desc="Assist feedback rate (Hz)")
+    
+    static_states = ['wait', 'reward', 'fixation_penalty', 'pause'] # states in which the decoder is not run
 
     def load_decoder(self):
         self.ssm = StateSpaceEndptVel2D()
@@ -38,6 +42,8 @@ class EndPostureFeedbackController(BMILoop, traits.HasTraits):
         units = []
         self.decoder = Decoder(filt, units, self.ssm, binlen=1./self.decoder_update_rate)
         self.decoder.n_features = 1
+        self.decoder.is_null_decoder = True
+        
 
     def create_feature_extractor(self):
         self.extractor = DummyExtractor()
@@ -50,6 +56,124 @@ class TargetCaptureVisualFeedback(EndPostureFeedbackController, BMIControlMulti)
 
     def move_effector(self):
         pass
+
+class TargetCaptureVisualFeedbackEyeConstrained(EndPostureFeedbackController, BMIControlMultiEyeConstrained):
+    blink_time_threshold = traits.Float(0.1, desc="The amount of time in seconds that the eyes can be closed before triggering a fixation break, measured by eye_diam=0")
+    assist_level = (1, 1)
+    is_bmi_seed = True
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.most_recent_open_eye = 0
+
+    status = dict(
+        wait = dict(start_trial="target", start_pause="pause"),
+        target = dict(timeout="timeout_penalty", enter_target="hold", start_pause="pause", fixation_break="fixation_penalty"),
+        hold = dict(leave_target="hold_penalty", hold_complete="delay", fixation_break="fixation_penalty", start_pause="pause"),
+        delay = dict(leave_target="delay_penalty", delay_complete="targ_transition", fixation_break="fixation_penalty", start_pause="pause"),
+        targ_transition = dict(trial_complete="reward", trial_abort="wait", trial_incomplete="target", start_pause="pause"),
+        timeout_penalty = dict(timeout_penalty_end="wait", start_pause="pause", end_state=True),
+        hold_penalty = dict(hold_penalty_end="wait", start_pause="pause", end_state=True),
+        delay_penalty = dict(delay_penalty_end="wait", start_pause="pause", end_state=True),
+        fixation_penalty = dict(fixation_penalty_end="wait", start_pause="pause", end_state=True),
+        reward = dict(reward_end="wait", start_pause="pause", stoppable=False, end_state=True),
+        pause = dict(end_pause="wait", end_state=True),
+    )
+    def move_effector(self):
+        pass
+
+    def _start_target(self):
+        self.plant.set_visibility(True)
+        #target capture 
+        self.target_index += 1
+
+        #screen target capture: Modified
+        # Show target if it is hidden (this is the first target, or previous state was a penalty)
+        target = self.targets[self.target_index % 2]
+        if self.target_index == 0:
+            #target.move_to_position(self.targs[self.target_index])
+            #target.show()
+            self.sync_event('TARGET_ON', self.gen_indices[self.target_index])
+        self.target_location = self.targs[self.target_index] # save for BMILoop
+
+
+        #if self.target_index == 0:
+        #    self.targets_eye[0].move_to_position(self.targs[self.target_index] - self.offset_cube)
+        #    self.targets_eye[0].show()
+
+    def _start_fixation_penalty(self):
+        self.plant.set_visibility(False)
+        super()._start_fixation_penalty()
+        self.decoder.filt.state.mean = self.init_decoder_mean.copy()
+        
+    def _start_wait(self):
+        super()._start_wait()
+        #self.plant_visible = False
+        self.plant.set_visibility(True)
+
+    def _end_targ_transition(self):
+        self.plant.set_visibility(False)
+        super()._end_targ_transition()
+
+    def _start_pause(self):
+        super()._start_pause()
+        self.plant.set_visibility(False)
+    
+    def _end_pause(self):
+        super()._end_pause()
+        # Reset on any target transition away from the last target
+        self.decoder.filt.state.mean = self.init_decoder_mean.copy()
+        self.hdf.sendMsg("reset")
+        
+        self.plant.set_visibility(True)
+
+    def _test_fixation_break(self,time_in_state):
+        '''
+        Triggers the fixation_penalty state when eye positions are outside fixation distance
+        Only apply this to the first hold and delay period
+        '''  
+
+        eye_pos = self.calibrated_eye_pos
+        eye_d = np.linalg.norm(eye_pos - self.targs[self.target_index,[0,2]])
+
+        #Make flag that tracks the last non-zero eye diameter and check that it has occured in the last 100ms
+        #First logic check: Check to see if the eye is open. If open, reset flag to 0   
+        eye_within_fixation_buffer = (eye_d > self.target_radius + self.fixation_radius_buffer)
+        if self.keyboard_control:
+            return eye_within_fixation_buffer
+        elif np.any(self.eye_diam != 0):
+            self.most_recent_open_eye = 0
+        elif self.most_recent_open_eye == 0: #Additionally check if this if the first cycle of 'eyes closed'. If not the first cycle, check how long since the flag was set and trigger a fixatio nfailure if longer than 100ms.
+            self.most_recent_open_eye=self.get_time()
+        elif (self.get_time()-self.most_recent_open_eye) > self.blink_time_threshold:
+            self.most_recent_open_eye = 0
+            return True            
+    
+        #Finally check if the eye location is within the target + buffer
+        return eye_within_fixation_buffer
+    
+    def _test_start_trial(self, time_in_state):
+        #Check that the eye position is on the center target
+        #return True #super()._test_start_trial
+        eye_pos = self.calibrated_eye_pos
+        eye_d = np.linalg.norm(eye_pos - self.targs[0,[0,2]]) #target index is zero, this is only applyied during the wait period before the center target comes on
+        
+        blink = self.keyboard_control | np.any(self.eye_diam!=0)
+
+        value = (eye_d < self.target_radius + self.fixation_radius_buffer) & blink
+        return value#(eye_d > self.target_radius + self.fixation_radius_buffer)
+
+    #def _end_targ_transition(self):
+    #    super()._end_targ_transition()
+    #    if self.reset == 1:# and ((self.target_index == self.chain_length - 1) or (self.target_index == -1)):
+
+    #            # Reset on any target transition away from the last target
+    #            self.decoder.filt.state.mean = self.init_decoder_mean.copy()
+    #            self.hdf.sendMsg("reset")
+
+
+
+
 
 class TargetCaptureVFB2DWindow(TargetCaptureVisualFeedback, WindowDispl2D):
     fps = 20.
@@ -108,7 +232,7 @@ class TargetCaptureReplay(ScreenTargetCapture):
         self.replay_trial = trial
         for k, v in self.task_meta.items():
             if k in self.exclude_parent_traits:
-                print("setting {} to {}".format(k, v))
+                print("setting {} to {}".forstart_trialmat(k, v))
                 setattr(self, k, v)
 
         # Have to additionally reset the targets since they are created in super().__init__()
@@ -118,6 +242,7 @@ class TargetCaptureReplay(ScreenTargetCapture):
 
     def _test_start_trial(self, time_in_state):
         '''Wait for the state change in the HDF file in case there is autostart enabled'''
+        print('testing_start_trial')
         trials = self.replay_state[self.replay_state['msg'] == b'target']
         upcoming_trials = [t['time']-1 for t in trials if self.replay_task[t['time']]['trial'] >= self.calc_trial_num()]
         return (np.array(upcoming_trials) <= self.cycle_count).any()
@@ -152,12 +277,17 @@ class VideoPlayer(Window, Experiment):
     them in the directory specified by the visual_stimuli system and they will be 
     automatically registered on startup. Requires ffmpeg and cv2.
     '''
-    status = dict(wait=dict(stop=None))
+    status = dict(
+        wait=dict(start_video="play"),
+        play=dict(stop=None, start_pause="pause"),
+        pause=dict(stop=None, end_pause="play"),
+    )
     state = "wait"
 
     media_file = traits.DataFile(object, desc="Visual stimulus video file. Add files to the directory specified " \
         "by the visual_stimuli system and they will be automatically registered on startup.", bmi3d_query_kwargs=dict(system__name='visual_stimuli'))
     audio_volume = traits.Float(1.0, desc="Playback volume from 0.0 to 1.0")
+    start_time_sec = traits.Float(0.0, desc="Start playback from this time offset in seconds")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -171,6 +301,8 @@ class VideoPlayer(Window, Experiment):
         self._audio_path = None
         self._audio_started = False
         self._playback_t0 = None
+        self._video_start_frame = 0
+        self._video_duration_sec = 0.0
 
         # Extract video metadata and prepare for playback
         # media_file can be a string (for testing/CLI) or a DataFile object
@@ -192,8 +324,16 @@ class VideoPlayer(Window, Experiment):
         if self._video_fps <= 0:
             self._video_fps = float(self.fps)
 
+        total_frames = int(self._video_capture.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+        if total_frames > 0 and self._video_fps > 0:
+            self._video_duration_sec = total_frames / self._video_fps
+        start_time_sec = max(0.0, self.start_time_sec)
+        if self._video_duration_sec > 0:
+            start_time_sec = min(start_time_sec, self._video_duration_sec)
+        self._video_start_frame = max(0, int(start_time_sec * self._video_fps))
+
         # Extract audio
-        self._audio_path = self._extract_audio_track(media_file)
+        self._audio_path = self._extract_audio_track(media_file, start_time_sec=start_time_sec)
         if not pygame.mixer.get_init():
             pygame.mixer.pre_init(44100, -16, 2, 2048)
             pygame.mixer.init()
@@ -233,13 +373,14 @@ class VideoPlayer(Window, Experiment):
         self.video_surface.rotate_x(90).translate(-plane_w/2, 0, -plane_h/2)
         self.add_model(self.video_surface)
 
-    def _extract_audio_track(self, media_file):
+    def _extract_audio_track(self, media_file, start_time_sec=0.0):
         audio_fd, audio_path = tempfile.mkstemp(prefix="bmi3d_video_audio_", suffix=".wav")
         os.close(audio_fd)
 
         command = [
             "ffmpeg",
             "-y",
+            "-ss", str(max(0.0, start_time_sec)),
             "-i", media_file,
             "-vn",
             "-acodec", "pcm_s16le",
@@ -253,6 +394,8 @@ class VideoPlayer(Window, Experiment):
                 os.remove(audio_path)
             except OSError:
                 pass
+            print(f"No audio found in file {media_file}")
+            print(result)
             return None
         return audio_path
 
@@ -263,7 +406,13 @@ class VideoPlayer(Window, Experiment):
         frame_rgb = np.ascontiguousarray(frame_rgb, dtype=np.uint8)
         self.tex.update(frame_rgb, size=(frame_rgb.shape[1], frame_rgb.shape[0]))
 
-    def _start_wait(self):
+    def _end_wait(self):
+        import cv2
+
+        # Seek video decode to the requested starting point.
+        self._video_capture.set(cv2.CAP_PROP_POS_FRAMES, self._video_start_frame)
+        self._next_frame_idx = self._video_start_frame
+        self._video_finished = False
 
         # Start the audio playback
         if self._audio_path is not None:
@@ -274,6 +423,34 @@ class VideoPlayer(Window, Experiment):
         else:
             self._audio_started = False
             self._playback_t0 = self.get_time()
+
+    def _test_start_video(self, ts):
+        return True
+
+    def _test_start_pause(self, ts):
+        return self.pause
+
+    def _test_end_pause(self, ts):
+        return not self.pause
+
+    def _start_pause(self):
+        if self._audio_started:
+            try:
+                pygame.mixer.music.pause()
+            except Exception:
+                pass
+        self.tex.update(np.zeros((3,3,3))) # blank the screen
+        self.sync_event('PAUSE_START')
+
+    def _end_pause(self):
+        if self._audio_started:
+            try:
+                pygame.mixer.music.unpause()
+            except Exception:
+                pass
+        else:
+            self._playback_t0 += (self.get_time() - self.start_time) # omit the time spent in the pause state
+        self.sync_event('PAUSE_END')
 
     def _test_stop(self, ts):
         return self._video_finished or super()._test_stop(ts)
@@ -312,19 +489,20 @@ class VideoPlayer(Window, Experiment):
                     return max(0, self._next_frame_idx - 1)
                 self._video_finished = True
                 return max(0, self._next_frame_idx - 1)
-            return max(0, int((pos_ms / 1000.0) * self._video_fps))
+            return self._video_start_frame + max(0, int((pos_ms / 1000.0) * self._video_fps))
 
         if self._playback_t0 is None:
             self._playback_t0 = self.get_time()
         elapsed = self.get_time() - self._playback_t0
-        return max(0, int(elapsed * self._video_fps))
+        return self._video_start_frame + max(0, int(elapsed * self._video_fps))
 
-    def _while_wait(self):
+    def _while_play(self):
         if self._video_finished:
             return
 
         target_idx = self._target_frame_idx()
         self.task_data['video_frame'] = target_idx
+        self.reportstats['Video Frame'] = target_idx
 
         # Read and display video frames until we catch up to the target frame index
         while self._next_frame_idx <= target_idx and not self._video_finished:
@@ -334,3 +512,14 @@ class VideoPlayer(Window, Experiment):
                 break
             self._set_video_frame(frame)
             self._next_frame_idx += 1
+
+    @classmethod
+    def get_desc(cls, params, report):
+        runtime_sec = 0.0
+        if isinstance(report, dict):
+            runtime_sec = float(report.get('runtime', 0.0) or 0.0)
+        elif isinstance(report, list) and len(report) > 0:
+            runtime_sec = float(report[-1][-1] - report[0][-1])
+
+        duration_min = runtime_sec / 60.0
+        return "Video playback: {:.1f} min".format(duration_min)

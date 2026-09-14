@@ -19,6 +19,8 @@ from features.bmi_task_features import LinearlyDecreasingAssist
 from .target_graphics import target_colors
 from .target_tracking_task import ScreenTargetTracking
 
+from .target_capture_task_eye import EyeConstrainedTargetCapture
+
 np.set_printoptions(suppress=False)
 
 ###################
@@ -39,7 +41,7 @@ class OFCEndpointAssister(FeedbackControllerAssist):
 
         Returns
         -------
-        OFCEndpointAssister instance
+        OFCEndpointAssister instanBMIControlMultiMixince
         '''
         F_dict = pickle.load(open('/storage/assist_params/assist_20levels_ppf.pkl'))
         B = np.asmatrix(np.vstack([np.zeros([3,3]), np.eye(3)*1000*1./decoding_rate, np.zeros(3)]))
@@ -309,8 +311,11 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
         # Optionally save a new decoder zscored from this task
         if (not self.save_zscore) or (self.saveid is None):
             return
-
-        if not (np.all(self.decoder.mFR == 0) and np.all(self.decoder.sdFR) == 1):
+        #Check if null decoder here
+        if hasattr(self.decoder, 'is_null_decoder') and self.decoder.is_null_decoder:
+            return
+        
+        if not (np.all(self.decoder.mFR == 0) and np.all(self.decoder.sdFR == 1)):
             filename = self.decoder.save()
 
             from db.tracker import dbq
@@ -328,6 +333,7 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
 
         # The rest should work with any decoder
         self.decoder.init_zscore(mFR, sdFR)
+        
         filename = self.decoder.save()
 
         from db.tracker import dbq
@@ -393,6 +399,12 @@ class BMIControlMulti2DWindow(BMIControlMultiMixin, WindowDispl2D, ScreenTargetC
         return ts > self.wait_time and not self.pause
 
 class BMIControlMulti(BMIControlMultiMixin, ScreenTargetCapture):
+    '''
+    Slightly refactored original bmi control task
+    '''
+    pass
+
+class BMIControlMultiEyeConstrained(BMIControlMultiMixin, EyeConstrainedTargetCapture):
     '''
     Slightly refactored original bmi control task
     '''

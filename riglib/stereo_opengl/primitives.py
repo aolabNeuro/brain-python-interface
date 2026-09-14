@@ -531,7 +531,8 @@ class Snake(Cable, TexModel):
             mask = 1 - mask
         mask = np.tile(mask, (4, 1)).T  # Repeat for RGBA
         mask = self.color * mask  # Apply color
-        tex = Texture(mask.reshape((1, len(mask), 4))) # Reshape to (1, n_colors, 4)
+        # Keep the varying dimension on texture-v (height) so the gradient runs along cable length.
+        tex = Texture(mask.reshape((len(mask), 1, 4)))
         return tex
         
     def update_texture(self, start_frame, end_frame, inverse=False):
