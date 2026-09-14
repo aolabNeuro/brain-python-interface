@@ -434,6 +434,8 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.lookahead = int(self.fps * self.lookahead_time) # convert to frames
         self.lookahead_scale = (0.5 * self.screen_cm[0]) / (self.lookahead) # cm per frame
         self.original_limit1d = self.limit1d # keep track of original settable trait
+        if not hasattr(self, "velocity_control"):
+            self.velocity_control = False
         
         if not self.always_1d:
             self.limit1d = False # allow 2d movement before center-hold initiation
