@@ -742,17 +742,17 @@ class PassThroughExtractor(HilbertPowerExtractor):
         
 
         #Filter signal with the overarchign bandpass filter
-        lfp_filter, Wn = aopy.precondition.base.butterworth_filter_data(
-            cont_samples, 
-            self.fs,
-            bands=self.extractor_kwargs['default_band_pass_filter'], 
-            order=self.extractor_kwargs['default_band_pass_filter_order'],
-            filter_type='bandpass')
+        #lfp_filter, Wn = aopy.precondition.base.butterworth_filter_data(
+        #    cont_samples, 
+        #    self.fs,
+        #    bands=self.extractor_kwargs['default_band_pass_filter'], 
+        #    order=self.extractor_kwargs['default_band_pass_filter_order'],
+        #    filter_type='bandpass')
 
-        lfp_filter = lfp_filter[0]
+        #lfp_filter = lfp_filter[0]
 
         #Reref signal
-        lfp_reref = lfp_filter - np.mean(lfp_filter, axis=0, keepdims=True)
+        #lfp_reref = lfp_filter - np.mean(lfp_filter, axis=0, keepdims=True)
 
         #sos = butter(self.extractor_kwargs['default_band_pass_filter_order'], self.extractor_kwargs['high_gamma_band'], btype='bandpass', fs=self.fs, output='sos')
         #filtered_lfp_reref = sosfilt(sos, lfp_reref, axis=0)
@@ -760,9 +760,9 @@ class PassThroughExtractor(HilbertPowerExtractor):
         #envelope = np.abs(analytic_signal)
         #log_bnd = np.log(envelope + 1e-8)
         #Is this what I really want here? Need to check with Sofie
-        final_output_signal = np.mean(lfp_reref, axis=0)
+        final_output_signal = cont_samples[0,:]#np.mean(lfp_reref, axis=0)
         
-        return lfp_reref
+        return final_output_signal
 
 class LFPMTMPowerExtractor(object):
     '''
