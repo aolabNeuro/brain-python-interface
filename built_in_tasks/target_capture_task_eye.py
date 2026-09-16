@@ -2309,3 +2309,9 @@ class ScreenTargetCapture_Saccade_withBackgroundTargets(ScreenTargetCapture_Sacc
             else:
                 # This delay state should only last 1 cycle, don't sync anything
                 pass
+
+
+    
+    def _start_reward(self):
+        #self.targets[self.target_index % 2].cue_trial_end_success()
+        self.sync_event('REWARD')
