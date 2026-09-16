@@ -2298,7 +2298,6 @@ class ScreenTargetCapture_Saccade_withBackgroundTargets(ScreenTargetCapture_Sacc
                 bck_target = self.targets[-1]
                 sphere_position = self.targs[next_idx] - [0 ,-10,0]
                 cube_position = self.targs[next_idx] - self.offset_cube
-                print(f'Showing cube at {cube_position} and sphere at {sphere_position}')
                 target.move_to_position(cube_position)
                 bck_target.move_to_position(sphere_position)
 
