@@ -65,6 +65,10 @@ class Model(object):
         self.allocated = True
         return allocated
 
+    def delete(self):
+        '''Free any GPU resources allocated by init(). Must be called from the drawing thread.'''
+        self.allocated = False
+
     def rotate(self, q, reset=False):
         '''
         Rotate the model by a quaternion q
@@ -268,6 +272,17 @@ class TriMesh(Model):
                 glBufferData(GL_ARRAY_BUFFER,
                     self.normals.astype(np.float32).ravel(), GL_STATIC_DRAW)
         return allocated
+
+    def delete(self):
+        if self.allocated:
+            buffers = [self.vbuf, self.ebuf]
+            if self.tcoords is not None:
+                buffers.append(self.tbuf)
+            if self.normals is not None:
+                buffers.append(self.nbuf)
+            glDeleteBuffers(len(buffers), buffers)
+            glDeleteVertexArrays(1, [self.vao])
+        super().delete()
     
     def draw(self, ctx):
         super(TriMesh, self).draw(ctx)
