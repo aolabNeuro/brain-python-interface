@@ -33,7 +33,7 @@ class EndPostureFeedbackController(BMILoop, traits.HasTraits):
     ssm_type = traits.OptionsList(*bmi_ssm_options, bmi3d_input_options=bmi_ssm_options)
     decoder_update_rate = traits.Float(60, desc="Assist feedback rate (Hz)")
     
-    static_states = ['wait', 'reward', 'fixation_penalty', 'pause'] # states in which the decoder is not run
+    static_states = ['wait', 'reward', 'hold','delay','fixation_penalty', 'pause'] # states in which the decoder is not run
 
     def load_decoder(self):
         self.ssm = StateSpaceEndptVel2D()
