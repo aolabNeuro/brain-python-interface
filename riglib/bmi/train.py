@@ -1214,6 +1214,79 @@ def train_WFDecoder_abstract(ssm, kin, neural_features, units, update_rate, tsli
 
     return decoder
 
+def make_fixed_wf_decoder(units, ssm, H, dt=0.1, n_taps=1):
+    '''
+    Make a WFDecoder with the given filter weights, e.g., to hand-design a decoder or to seed CLDA
+
+    Parameters
+    ----------
+    units : np.array of shape (N, 2)
+        Unit labels of each of the N neural features
+    ssm : state_space_models.StateSpace instance
+        State-space model for the WFDecoder. Should specify the A and W matrices
+    H : np.ndarray
+        Filter weights. Either the full matrix of shape (n_states, N*n_taps + 1), or only the
+        rows of the states estimated from the observations (ssm.train_inds), of shape
+        (len(train_inds), N*n_taps + 1). In either case, the offset column may be omitted, i.e.,
+        a second dimension of N*n_taps is padded with a zero offset. Column k*N + j is the weight
+        of feature j at lag k
+    dt : float, optional, default=0.1
+        Time between decoder updates [s]
+    n_taps : int, optional, default=1
+        Number of bins of neural history the filter acts on, including the current one
+
+    Returns
+    -------
+    WFDecoder instance
+    '''
+    units = np.asarray(units)
+    n_features = units.shape[0]
+    H = np.array(H, dtype=np.float64)
+    train_inds = np.array(ssm.train_inds)
+
+    if H.shape[1] == n_features*n_taps:
+        H = np.hstack([H, np.zeros((H.shape[0], 1))])
+    assert H.shape[1] == n_features*n_taps + 1, "H must have %d*%d (+1 for the offset) columns, not %d" % (n_features, n_taps, H.shape[1])
+
+    if H.shape[0] == len(train_inds) and H.shape[0] != ssm.n_states:
+        H_full = np.zeros((ssm.n_states, H.shape[1]))
+        H_full[train_inds, :] = H
+        H = H_full
+    assert H.shape[0] == ssm.n_states, "H must have either %d (all states) or %d (trained states) rows, not %d" % (ssm.n_states, len(train_inds), H.shape[0])
+
+    A, B, W = ssm.get_ssm_matrices(update_rate=dt)
+    wf = wfdecoder.WienerFilter(A, W, H, n_taps=n_taps, is_stochastic=ssm.is_stochastic)
+    decoder = wfdecoder.WFDecoder(wf, units, ssm, binlen=dt)
+    decoder.n_features = n_features
+    return decoder
+
+def rand_WFDecoder(ssm, units, dt=0.1, n_taps=1, scale=1.):
+    '''
+    Make a WFDecoder with the filter weights initialized randomly (zero-mean Gaussian),
+    e.g., as a naive starting point for CLDA
+
+    Parameters
+    ----------
+    ssm : state_space_models.StateSpace instance
+        State-space model for the WFDecoder. Should specify the A and W matrices
+    units : np.array of shape (N, 2)
+        Unit labels of each of the N neural features
+    dt : float, optional, default=0.1
+        Time between decoder updates [s]
+    n_taps : int, optional, default=1
+        Number of bins of neural history the filter acts on, including the current one
+    scale : float, optional, default=1
+        Standard deviation of the random weights. The offset weights are zero
+
+    Returns
+    -------
+    WFDecoder instance
+    '''
+    units = np.asarray(units)
+    n_features = units.shape[0]
+    H = scale * np.random.standard_normal([len(ssm.train_inds), n_features*n_taps])
+    return make_fixed_wf_decoder(units, ssm, H, dt=dt, n_taps=n_taps)
+
 def train_PPFDecoder(files, extractor_cls, extractor_kwargs, kin_extractor, ssm, units, update_rate=0.1, tslice=None, kin_source='task',
     pos_key='cursor', vel_key=None, zscore=False):
     '''

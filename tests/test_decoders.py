@@ -425,6 +425,48 @@ class TestWFDecoder(unittest.TestCase):
         out = decoder.decode(self.neural_features)
         self.assertTrue(np.corrcoef(out[4:, 3], self.kin[3, 4:])[0, 1] > 0.99)
 
+    def test_fixed_decoder(self):
+        n_taps = 2
+        # only the rows of the trained states, without the offset column
+        H = np.random.randn(2, self.n_units*n_taps)
+        decoder = train.make_fixed_wf_decoder(self.units, self.ssm, H, dt=0.1, n_taps=n_taps)
+        self.assertEqual(decoder.filt.H.shape, (self.ssm.n_states, self.n_units*n_taps + 1))
+        self.assertEqual(decoder.filt.n_taps, n_taps)
+        self.assertEqual(decoder.n_features, self.n_units)
+        np.testing.assert_array_equal(np.asarray(decoder.filt.H)[[3, 5], :-1], H)
+        self.assertTrue(np.all(np.asarray(decoder.filt.H)[[0, 1, 2, 4, 6], :] == 0))
+        self.assertTrue(np.all(np.asarray(decoder.filt.H)[:, -1] == 0))
+
+        # the full matrix is accepted as is
+        decoder_full = train.make_fixed_wf_decoder(self.units, self.ssm, decoder.filt.H, dt=0.1, n_taps=n_taps)
+        np.testing.assert_array_equal(decoder_full.filt.H, decoder.filt.H)
+
+        with self.assertRaises(AssertionError):
+            train.make_fixed_wf_decoder(self.units, self.ssm, H, dt=0.1, n_taps=3)
+
+        # the decoder runs and behaves as a trained one
+        decoder.filt._init_state()
+        out = decoder.decode(self.neural_features[:, :20])
+        self.assertEqual(out.shape, (20, self.ssm.n_states))
+        np.testing.assert_allclose(out[1:, 0], np.cumsum(out[:-1, 3])*decoder.binlen)
+
+        import pickle
+        decoder_copy = pickle.loads(pickle.dumps(decoder, 2))
+        np.testing.assert_array_equal(decoder_copy.filt.H, decoder.filt.H)
+
+    def test_random_decoder(self):
+        np.random.seed(1)
+        decoder = train.rand_WFDecoder(self.ssm, self.units, dt=0.1, n_taps=3, scale=0.5)
+        H = np.asarray(decoder.filt.H)
+        self.assertEqual(H.shape, (self.ssm.n_states, self.n_units*3 + 1))
+        self.assertTrue(np.all(H[[0, 1, 2, 4, 6], :] == 0))
+        self.assertTrue(np.all(H[:, -1] == 0))
+        self.assertAlmostEqual(np.std(H[[3, 5], :-1]), 0.5, delta=0.1)
+
+        decoder.filt._init_state()
+        out = decoder.decode(self.neural_features[:, :10])
+        self.assertEqual(out.shape, (10, self.ssm.n_states))
+
 
 def calculate_rewards(exp):
     rewards = 0
