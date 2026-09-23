@@ -451,6 +451,8 @@ class ScreenTargetTracking(TargetTracking, Window):
             # This is the center target being followed by the user
             self.target = VirtualCircularTarget(target_radius=self.target_radius, target_color=target_colors[self.target_color])
             # print('INIT TRAJ')
+            # Keep a task-level copy of the target location for BMI goal calculations
+            self.target_location = np.array(self.starting_pos).copy()
 
         # Declare any plant attributes which must be saved to the HDF file at the _cycle rate
         for attr in self.plant.hdf_attrs:
@@ -525,6 +527,8 @@ class ScreenTargetTracking(TargetTracking, Window):
             use_frame_index = self.frame_index
 
         self.target.move_to_position(self.targs[use_frame_index])
+        # keep `target_location` in sync for BMIControlMultiMixin.get_target_BMI_state
+        self.target_location = self.target.get_position()
         if self.trajectory_type == '1d':
             self.trajectory.move_to_position(np.array([-use_frame_index*self.lookahead_scale - self.lookahead*self.lookahead_scale,0,0]))
             # print(self.frame_index, use_frame_index, self.trajectory.get_position())
