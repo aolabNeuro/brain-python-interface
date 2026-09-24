@@ -418,7 +418,16 @@ class BMIControlMultiDirectionConstraint(BMIControlMultiMixin, ScreenReachAngle)
 
 
 class BMIControlMulti_ScreenTargetTracking(BMIControlMultiMixin, ScreenTargetTracking):
-    '''
-    BMI control for target tracking task
-    '''
+
+    def move_effector(self, pos_offset=[0,0,0], vel_offset=[0,0,0]):
+        '''Runs after BMILoop.move_plant() has set the cursor to the decoded position.'''
+        pos_offset = np.asarray(pos_offset, dtype=float)
+        if not np.any(pos_offset):
+            return
+        decoded_pos = np.asarray(self.plant.get_endpoint_pos()).ravel()
+        new_pos = decoded_pos + pos_offset
+
+        bounds = np.asarray(self.cursor_bounds)       # (min0, max0, min1, max1, min2, max2)
+        new_pos = np.clip(new_pos, bounds[0::2], bounds[1::2])
+        self.plant.set_endpoint_pos(new_pos)
     pass
