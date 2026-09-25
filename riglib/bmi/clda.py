@@ -1312,9 +1312,11 @@ class WFSmoothbatch(Updater):
         cost_args = (X, Y, lambda_E, lambda_D, mask)
 
         if solver == 'exact':
-            # ridge regression solution, (Y*Y^T + lambda_D/lambda_E * M) * H^T = Y * X^T
+            # ridge regression solution, (Y*Y^T + lambda_D/lambda_E * M) * H^T = Y * X^T. lstsq
+            # returns the minimum-norm minimizer if the system is singular, e.g., for lambda_D=0
+            # with rank-deficient or short batches
             YtY_lamb = Y.dot(Y.T) + (lambda_D/lambda_E) * np.diag(mask[0, :])
-            H_hat = np.linalg.solve(YtY_lamb, Y.dot(X.T)).T
+            H_hat = np.linalg.lstsq(YtY_lamb, Y.dot(X.T), rcond=None)[0].T
             info = dict(cost=cls.cost_l2(H_hat, *cost_args))
         elif solver == 'bfgs':
             from scipy.optimize import minimize

@@ -116,6 +116,43 @@ class TestWFSmoothbatch(unittest.TestCase):
         H_ridge, _ = clda.WFSmoothbatch.estimate_filter(self.X[:, self.n_taps-1:], self.Y[:, self.n_taps-1:], lambda_E=1., lambda_D=0.5, solver='exact')
         np.testing.assert_allclose(H_ridge, np.asarray(H_mle), atol=1e-8)
 
+    def test_exact_rank_deficient(self):
+        # a silent unit makes Y*Y^T singular without regularization
+        Y = np.vstack([self.Y[:-1], np.zeros((1, self.T)), self.Y[-1:]])
+        H_hat, info = clda.WFSmoothbatch.estimate_filter(self.X, Y, lambda_E=1., lambda_D=0., solver='exact')
+        H_lstsq = np.linalg.lstsq(Y.T, self.X.T, rcond=None)[0].T
+        np.testing.assert_allclose(H_hat, H_lstsq, atol=1e-8)
+
+    def test_train_single_feature(self):
+        kin = np.zeros((7, self.T))
+        kin[[3, 5], :] = self.vel
+        decoder = train.train_WFDecoder_abstract(self.ssm, kin, self.obs[:1], self.units[:1], 0.1, n_taps=self.n_taps)
+        self.assertEqual(decoder.filt.n_features, 1)
+
+    def test_mle_filter_no_offset(self):
+        H = wfdecoder.WienerFilter.MLE_filter(self.X, self.obs, n_taps=self.n_taps, include_offset=False)
+        self.assertEqual(H.shape, (2, self.n_units*self.n_taps + 1))
+        np.testing.assert_array_equal(H[:, -1], 0)
+        decoder = train.make_fixed_wf_decoder(self.units, self.ssm, H, n_taps=self.n_taps)
+        decoder.filt._init_state()
+        decoder.filt(self.obs[:, 0])
+
+    def test_control_inputs(self):
+        decoder = self._make_decoder()
+        B = decoder.filt.B
+        decoder.filt(self.obs[:, 0], u=np.zeros((B.shape[1], 1)))
+        # without feedback gains x_target cannot be used
+        x_target = np.zeros((self.ssm.n_states, 1))
+        with self.assertRaises(ValueError):
+            decoder.filt(self.obs[:, 0], x_target=x_target)
+        decoder.filt(self.obs[:, 0], x_target=x_target, F=np.zeros((B.shape[1], self.ssm.n_states)))
+
+        # a filter constructed without B rejects the control inputs explicitly
+        filt = wfdecoder.WienerFilter(decoder.filt.A, decoder.filt.W, decoder.filt.H, n_taps=self.n_taps)
+        filt._init_state()
+        with self.assertRaises(ValueError):
+            filt(self.obs[:, 0], u=np.zeros((B.shape[1], 1)))
+
     def test_regularization_shrinks_weights(self):
         H_ridge, _ = clda.WFSmoothbatch.estimate_filter(self.X, self.Y, lambda_E=1., lambda_D=100., solver='bfgs')
         H_lstsq, _ = clda.WFSmoothbatch.estimate_filter(self.X, self.Y, lambda_E=1., lambda_D=0., solver='exact')

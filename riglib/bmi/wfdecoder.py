@@ -20,9 +20,9 @@ class WienerFilter(bmi.GaussianStateHMM):
     model only, e.g., position states are updated by integrating the decoded velocity. 
     """
     model_attrs = ['A', 'W', 'H']
-    attrs_to_pickle = ['A', 'W', 'H', 'n_taps', 'is_stochastic']
+    attrs_to_pickle = ['A', 'W', 'H', 'n_taps', 'is_stochastic', 'B', 'F']
 
-    def __init__(self, A=None, W=None, H=None, n_taps=1, is_stochastic=None):
+    def __init__(self, A=None, W=None, H=None, n_taps=1, is_stochastic=None, B=None, F=None):
         '''
         Constructor for WienerFilter
 
@@ -42,6 +42,10 @@ class WienerFilter(bmi.GaussianStateHMM):
         is_stochastic : np.array, optional
             Array of booleans specifying for each state whether it is estimated from the 
             observations. If 'None' specified, all states are assumed to be stochastic
+        B : np.mat, optional
+            Control input matrix, required for the 'u' and 'x_target' control inputs
+        F : np.mat, optional
+            Default feedback controller gains, used with 'x_target' if no gains are given
 
         Returns
         -------
@@ -55,6 +59,8 @@ class WienerFilter(bmi.GaussianStateHMM):
             self.W = np.asmatrix(W)
             self.H = np.asmatrix(H)
             self.n_taps = int(n_taps)
+            self.B = None if B is None else np.asmatrix(B)
+            self.F = None if F is None else np.asmatrix(F)
 
             if is_stochastic is None:
                 n_states = self.A.shape[0]
@@ -75,6 +81,10 @@ class WienerFilter(bmi.GaussianStateHMM):
 
         if not hasattr(self, 'n_taps'):
             self.n_taps = 1
+        if not hasattr(self, 'B'):
+            self.B = None
+        if not hasattr(self, 'F'):
+            self.F = None
 
         try:
             self.is_stochastic
@@ -156,6 +166,12 @@ class WienerFilter(bmi.GaussianStateHMM):
         GaussianState
             New state estimate incorporating the most recent observation
         '''
+        if Bu is None and (u is not None or x_target is not None):
+            if self.B is None:
+                raise ValueError("WienerFilter has no control input matrix B, so 'u' and 'x_target' are not supported. Use 'Bu' instead")
+            if u is None and F is None and self.F is None:
+                raise ValueError("WienerFilter has no feedback controller gains F, so they must be supplied with 'x_target'")
+
         obs_t = np.asmatrix(np.asarray(obs_t).reshape(-1, 1))
         self._add_obs(obs_t)
 
@@ -217,14 +233,16 @@ class WienerFilter(bmi.GaussianStateHMM):
         n_taps : int, optional, default=1
             Number of observations (including the current one) which the filter acts on
         include_offset : bool, optional, default=True
-            Estimate an offset term in addition to the filter weights
+            Estimate an offset term in addition to the filter weights. If False, the 
+            offset column of H is zero
         regularizer : float, optional, default=None
             Ridge penalty on the filter weights. The offset term is not penalized
 
         Returns
         -------
         H : np.mat of shape (N, M*n_taps + 1)
-            Filter weights mapping the observation history onto the hidden state
+            Filter weights mapping the observation history onto the hidden state. The last
+            column is always the offset term, as expected by WienerFilter
         """
         assert hidden_state.shape[1] == obs.shape[1], "different numbers of time samples: %s vs %s" % (str(hidden_state.shape), str(obs.shape))
 
@@ -244,6 +262,9 @@ class WienerFilter(bmi.GaussianStateHMM):
             YtY_lamb = Y.dot(Y.T) + penalty
             YtX = Y.dot(X.T)
             H = np.linalg.solve(YtY_lamb, YtX).T
+
+        if not include_offset:
+            H = np.hstack([H, np.zeros((H.shape[0], 1))])
 
         return np.asmatrix(H)
 

@@ -1188,8 +1188,8 @@ def train_WFDecoder_abstract(ssm, kin, neural_features, units, update_rate, tsli
             sdFR = np.std(neural_features, axis=1)
         neural_features = (neural_features - mFR[:, np.newaxis])*(1./sdFR[:, np.newaxis])
     else:
-        mFR = np.squeeze(np.mean(neural_features, axis=1))
-        sdFR = np.squeeze(np.std(neural_features, axis=1))
+        mFR = np.asarray(np.mean(neural_features, axis=1)).ravel()
+        sdFR = np.asarray(np.std(neural_features, axis=1)).ravel()
 
     n_features = len(mFR)
 
@@ -1204,7 +1204,7 @@ def train_WFDecoder_abstract(ssm, kin, neural_features, units, update_rate, tsli
     A, B, W = ssm.get_ssm_matrices(update_rate=update_rate)
 
     # instantiate WFdecoder
-    wf = wfdecoder.WienerFilter(A, W, H, n_taps=n_taps, is_stochastic=ssm.is_stochastic)
+    wf = wfdecoder.WienerFilter(A, W, H, n_taps=n_taps, is_stochastic=ssm.is_stochastic, B=B)
     decoder = wfdecoder.WFDecoder(wf, units, ssm, binlen=update_rate, tslice=tslice)
 
     if zscore:
@@ -1255,7 +1255,7 @@ def make_fixed_wf_decoder(units, ssm, H, dt=0.1, n_taps=1):
     assert H.shape[0] == ssm.n_states, "H must have either %d (all states) or %d (trained states) rows, not %d" % (ssm.n_states, len(train_inds), H.shape[0])
 
     A, B, W = ssm.get_ssm_matrices(update_rate=dt)
-    wf = wfdecoder.WienerFilter(A, W, H, n_taps=n_taps, is_stochastic=ssm.is_stochastic)
+    wf = wfdecoder.WienerFilter(A, W, H, n_taps=n_taps, is_stochastic=ssm.is_stochastic, B=B)
     decoder = wfdecoder.WFDecoder(wf, units, ssm, binlen=dt)
     decoder.n_features = n_features
     return decoder

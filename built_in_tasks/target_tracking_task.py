@@ -671,6 +671,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         super()._start_trajectory()
         if self.frame_index == 0:
             self.target.move_to_position(self.targs[self.frame_index])
+            self.target_location = self.target.get_position()
             if self.trajectory_type == '1d':
                 self.trajectory.move_to_position(np.array([-self.lookahead*self.lookahead_scale,0,0]))
                 # print(self.trajectory.get_position())
