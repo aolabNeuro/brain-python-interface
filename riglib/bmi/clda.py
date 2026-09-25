@@ -1398,7 +1398,6 @@ class WFSmoothbatch(Updater):
 
         info.update(rho=rho, batch_size=batch_size, H_hat=H_hat)
         self.last_fit = info # only visible from the task when multiproc=False
-        self.verbose = True
         if self.verbose:
             print("WFSmoothbatch: rho=%.3f, cost=%.4g, |H_new - H_old|=%.4g" % (rho, info['cost'], np.linalg.norm(H_new - H_old)))
 

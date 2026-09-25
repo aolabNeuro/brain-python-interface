@@ -52,12 +52,13 @@ class CLDA_WFSmoothbatch(traits.HasTraits):
     least-squares cost and blended with the previous weights (SmoothBatch).
     '''
     clda_batch_time = traits.Float(20, desc="How frequently to update weights [s]")
-    clda_update_half_life = traits.Float(20, desc="Half-life for exponential decay [s] to combine with previous weights. Equal to the batch time for a 50/50 blend")
+    clda_update_half_life = traits.Float(50, desc="Half-life for exponential decay [s] to combine with previous weights. Equal to the batch time for a 50/50 blend")
     clda_lambda_E = traits.Float(0.1, desc="Weight on the squared prediction error in the L2 cost")
-    clda_lambda_D = traits.Float(0.1, desc="Weight on the squared norm of the filter weights (ridge penalty) in the L2 cost")
+    clda_lambda_D = traits.Float(10, desc="Weight on the squared norm of the filter weights (ridge penalty) in the L2 cost")
     clda_intended_velocity_gain = traits.Float(2., desc="Intended velocity = gain * (target position - cursor position) [1/s]")
     clda_solver = traits.OptionsList(("bfgs", "exact"), desc="Estimate the new weights by gradient descent (bfgs) or in closed form (exact)")
     clda_multiproc = traits.Bool(True, desc="Estimate the new weights in a separate process so the task loop is not blocked")
+    clda_verbose = traits.Bool(False, desc="Print out information about the CLDA updates")
 
     # Task states in which the intended velocity is estimated (the target is defined and the subject
     # is trying to reach or stay on it). Covers the target capture and target tracking tasks.
@@ -79,5 +80,5 @@ class CLDA_WFSmoothbatch(traits.HasTraits):
         '''
         self.updater = clda.WFSmoothbatch(self.clda_batch_time, self.clda_update_half_life,
             lambda_E=self.clda_lambda_E, lambda_D=self.clda_lambda_D, solver=self.clda_solver,
-            multiproc=self.clda_multiproc)
+            verbose=self.clda_verbose, multiproc=self.clda_multiproc)
         self.updater.init(self.decoder)
