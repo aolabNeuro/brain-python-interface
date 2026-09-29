@@ -50,6 +50,14 @@ class Quaternion(object):
     
     def __mul__(self, other):
         if isinstance(other, Quaternion):
+            if self.quat.ndim == 1 and other.quat.ndim == 1:
+                # Single rotations: plain float math, since np.cross on 3-vectors costs ~20 us
+                w1, x1, y1, z1 = self.quat.tolist()
+                w2, x2, y2, z2 = other.quat.tolist()
+                return Quaternion(w1*w2 - x1*x2 - y1*y2 - z1*z2,
+                                  w1*x2 + w2*x1 + y1*z2 - z1*y2,
+                                  w1*y2 + w2*y1 + z1*x2 - x1*z2,
+                                  w1*z2 + w2*z1 + x1*y2 - y1*x2).norm()
             w = self.w*other.w   - (self.vec*other.vec).sum(0)
             v = self.w*other.vec + other.w*self.vec + np.cross(self.vec.T, other.vec.T).T
             return Quaternion(w, *v).norm()
@@ -57,6 +65,14 @@ class Quaternion(object):
             if isinstance(other, (list, tuple)):
                 other = np.array(other)
             #rotate a vector, will need to be implemented in GLSL eventually
+            if self.quat.ndim == 1 and other.shape == (3,):
+                # Same as below for a single vector, without np.cross
+                w, x, y, z = self.quat.tolist()
+                ox, oy, oz = other.tolist()
+                tx = y*oz - z*oy + w*ox
+                ty = z*ox - x*oz + w*oy
+                tz = x*oy - y*ox + w*oz
+                return np.array([ox + 2*(y*tz - z*ty), oy + 2*(z*tx - x*tz), oz + 2*(x*ty - y*tx)])
             cross = np.cross(self.vec.T, other) + self.w*other
             return (other + np.cross(2*self.vec.T, cross)).squeeze()
             '''

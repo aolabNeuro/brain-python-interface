@@ -223,8 +223,7 @@ class CursorPlant(Plant):
         return self.position
 
     def set_endpoint_pos(self, pt, **kwargs):
-        self.set_intrinsic_coordinates(pt)
-        self.draw()
+        self.set_intrinsic_coordinates(pt) # also redraws the cursor
 
     def get_intrinsic_coordinates(self):
         return self.position

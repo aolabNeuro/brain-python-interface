@@ -72,8 +72,21 @@ class ManualControlMixin(traits.HasTraits):
         return ts > self.reward_time
 
     def _transform_coords(self, coords):
-        ''' 
+        '''
         Returns transformed coordinates based on rotation, offset, and scale traits
+        '''
+        # The whole transform is affine, so it is collapsed into a single (4, 3) matrix that is
+        # only rebuilt when one of the traits it depends on changes (they can be set at runtime)
+        key = (tuple(self.offset), self.scale, self.rotation, self.baseline_rotation, self.exp_rotation, self.exp_gain,
+               self.pertubation_rotation, self.perturbation_rotation_z, self.perturbation_rotation_x)
+        if key != getattr(self, '_transform_key', None):
+            self._transform_mat = self._get_transform_mat()
+            self._transform_key = key
+        return np.reshape(coords, -1) @ self._transform_mat[:3] + self._transform_mat[3]
+
+    def _get_transform_mat(self):
+        '''
+        Returns the (4, 3) matrix M such that [coords, 1] @ M are the transformed coordinates
         '''
         offset = np.array(
             [[1, 0, 0, 0], 
@@ -87,12 +100,12 @@ class ManualControlMixin(traits.HasTraits):
             [0, 0, self.scale, 0], 
             [0, 0, 0, 1]]
         )
-        old = np.concatenate((np.reshape(coords, -1), [1])) # manual input (3,) plus offset term
-        new = np.linalg.multi_dot((old, offset, scale, rotations[self.rotation], baseline_rotations[self.baseline_rotation], exp_rotations[self.exp_rotation])) # screen coords (3,) plus offset term
+        # [manual input (3,), 1] @ new gives screen coords (3,) plus offset term
+        new = np.linalg.multi_dot((offset, scale, rotations[self.rotation], baseline_rotations[self.baseline_rotation], exp_rotations[self.exp_rotation]))
         pertubation_rot = R.from_euler('y', self.pertubation_rotation, degrees=True) # this is perturb_rot_y
         perturb_rot_z = R.from_euler('z', self.perturbation_rotation_z, degrees=True)
         perturb_rot_x = R.from_euler('x', self.perturbation_rotation_x, degrees=True)
-        return np.linalg.multi_dot((new[0:3] * self.exp_gain, pertubation_rot.as_matrix(), perturb_rot_z.as_matrix(), perturb_rot_x.as_matrix()))
+        return np.linalg.multi_dot((new[:, 0:3] * self.exp_gain, pertubation_rot.as_matrix(), perturb_rot_z.as_matrix(), perturb_rot_x.as_matrix()))
 
     def _get_manual_position(self):
         '''

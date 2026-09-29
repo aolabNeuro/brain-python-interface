@@ -100,10 +100,12 @@ class Renderer(object):
         return self.texunits[tex]
     
     def reset_texunits(self):
-        maxtex = glGetIntegerv(GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS)
-        # print(f"Max texture units: {maxtex}")
+        # Called every frame, so the list of texture units is only built once
+        if not hasattr(self, '_all_texunits'):
+            maxtex = glGetIntegerv(GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS)
+            self._all_texunits = [(i, globals()['GL_TEXTURE%d'%i]) for i in range(1, maxtex)]
         # glActiveTexture(GL_TEXTURE0)  # Reset to default texture unit
-        self.texavail = set((i, globals()['GL_TEXTURE%d'%i]) for i in range(1, maxtex))
+        self.texavail = set(self._all_texunits)
         self.texunits = dict() 
 
     def add_shader(self, name, stype, filename, *includes):
@@ -159,7 +161,8 @@ class Renderer(object):
                 self.programs[shader].draw(self, self.render_queue[shader], **kwargs)
         else:
             for name, program in list(self.programs.items()):
-                program.draw(self, self.render_queue[name], **kwargs)
+                if self.render_queue[name]: # skip binding and setting uniforms for programs with nothing to draw
+                    program.draw(self, self.render_queue[name], **kwargs)
 
         error = glGetError()
         if error != GL_NO_ERROR:
