@@ -2,7 +2,6 @@ import numpy as np
 from OpenGL.GL import *
 
 from .fbo import FBOrender, FBO
-from .render import get_integerv
 from ..utils import orthographic
 
 
@@ -54,8 +53,9 @@ class CompositeOverlay(FBOrender):
         if overlay_root is None:
             return
 
-        original_viewport = get_integerv(GL_VIEWPORT, 4)
-        original_framebuffer = get_integerv(GL_FRAMEBUFFER_BINDING)
+
+        original_viewport = glGetIntegerv(GL_VIEWPORT, 4)
+        original_framebuffer = glGetIntegerv(GL_FRAMEBUFFER_BINDING)
         original_clear_color = glGetFloatv(GL_COLOR_CLEAR_VALUE)
 
         glViewport(0, 0, self.overlay_size[0], self.overlay_size[1])
