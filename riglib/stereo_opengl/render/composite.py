@@ -54,7 +54,7 @@ class CompositeOverlay(FBOrender):
             return
 
 
-        original_viewport = glGetIntegerv(GL_VIEWPORT, 4)
+        original_viewport = glGetIntegerv(GL_VIEWPORT)
         original_framebuffer = glGetIntegerv(GL_FRAMEBUFFER_BINDING)
         original_clear_color = glGetFloatv(GL_COLOR_CLEAR_VALUE)
 
