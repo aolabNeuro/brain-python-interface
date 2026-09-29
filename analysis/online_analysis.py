@@ -317,13 +317,17 @@ class SaccadeAnalysisWorker(BehaviorAnalysisWorker):
             eye_pos ((2,) tuple): Current eye position and diameters
             targets (list): List of active targets in (position, radius, color) format
         '''
+        print('trying to access target.items()')
+        print(self.target_pos[0])
+        print([(self.target_pos[0], radius, color if v == 1 else 'green') for k, v in self.targets.items() if v])
         try:
             radius = self.task_params['target_radius']
             color = 'orange'
+            
             targets = [(self.target_pos[k], radius, color if v == 1 else 'green') for k, v in self.targets.items() if v]
         except:
             targets = []
-        
+
         return self.cursor_pos, self.calibrated_eye_pos, targets
 
     def draw(self):
