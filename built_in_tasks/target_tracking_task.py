@@ -109,11 +109,14 @@ class TargetTracking(Sequence):
         self.trial_record['trial'] = self.calc_trial_num()
         self.trial_record['index'] = self.gen_index
         self.trial_record['is_disturbance'] = self.disturbance_trial
-        for i in range(len(self.disturbance_path)):
-            # Update the data sinks with trial information --> bmi3d_trials
-            self.trial_record['target'] = self.targs[i]
-            self.trial_record['disturbance'] = self.disturbance_path[i]
-            self.sinks.send("trials", self.trial_record)
+
+        # Update the data sinks with trial information --> bmi3d_trials. One record per frame,
+        # sent as a single batch since sending them one at a time stalls the task for ~0.1 s
+        n_frames = len(self.disturbance_path)
+        trial_records = np.repeat(self.trial_record, n_frames)
+        trial_records['target'] = self.targs[:n_frames]
+        trial_records['disturbance'] = self.disturbance_path[:n_frames]
+        self.sinks.send("trials", trial_records)
 
         # trial is not finished
         self.trial_timed_out = False
@@ -547,6 +550,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         if hasattr(self, 'trajectory'):
             for model in self.trajectory.graphics_models:
                 self.remove_model(model)
+                model.delete() # free the GPU buffers, otherwise they leak on every trial
             del self.trajectory
         if self.trajectory_type == '1d': # self.targs is (nframes, 3)
             # print(self.lookahead_scale)
@@ -840,9 +844,9 @@ class ScreenTargetTracking(TargetTracking, Window):
 
         assert f.shape == a.shape == p.shape,"Shape of frequencies, amplitudes, and phase shifts must match"
 
-        o = np.ones(t.shape)
-        trajectory = np.sum(np.dot(o,a) * np.sin(2*np.pi*(np.dot(t,f) + np.dot(o,p))),axis=1)
-        A = np.sum(np.dot(o,a)[0])
+        # t is (N,1) and f, a, p are (1,n_freq), so these broadcast to (N,n_freq)
+        trajectory = np.sum(a * np.sin(2*np.pi*(np.dot(t,f) + p)), axis=1)
+        A = np.sum(a)
         
         return trajectory, A
 
