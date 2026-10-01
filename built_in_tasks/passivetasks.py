@@ -25,7 +25,6 @@ from built_in_tasks.bmimultitasks import BMIControlMulti
 from .target_graphics import *
 
 from .bmimultitasks import FixationBMIControlMulti
-from .bmimultitasks import FixationBMIControlMulti
 
 bmi_ssm_options = ['Endpt2D', 'Tentacle', 'Joint2L']
 
@@ -62,7 +61,13 @@ class TargetCaptureVisualFeedback(EndPostureFeedbackController, BMIControlMulti)
 
 class TargetCaptureVisualFeedbackEyeConstrained(EndPostureFeedbackController, FixationBMIControlMulti):
     """Passive viewing version of the fixation BMI task"""
-    static_states = ['wait', 'delay', 'reward', 'cursor_out_of_bounds_penalty', 'fixation_penalty', 'pause', 'delay_penalty','timeout_penalty', 'sync']
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.most_recent_open_eye = 0
+
+        for i, c in enumerate(self.__mro__):
+            print(i, c.__module__, c.__qualname__)
+    #static_states = ['wait', 'delay', 'reward', 'cursor_out_of_bounds_penalty', 'fixation_penalty', 'pause', 'delay_penalty','timeout_penalty', 'sync']
 
 
 class TargetCaptureVFB2DWindow(TargetCaptureVisualFeedback, WindowDispl2D):

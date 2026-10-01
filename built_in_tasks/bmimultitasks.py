@@ -420,6 +420,7 @@ class FixationBMIControlMulti(BMIControlMultiEyeConstrained):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        print('FixationBMIControlMulti init')
         self.most_recent_open_eye = 0
         self.cursor_bounds = (-100., 100., -100., 100., -100., 100.)
         self.show_environment_plane = True
@@ -441,6 +442,14 @@ class FixationBMIControlMulti(BMIControlMultiEyeConstrained):
         reward = dict(reward_end="wait", start_pause="pause", stoppable=False, end_state=True),
         pause = dict(end_pause="wait", end_state=True),
     )
+
+    def _start_hold(self):
+        super()._start_hold()
+        print('starting hold state')
+
+    def _start_delay(self):
+        super()._start_delay()
+        print('starting delay state')
 
     def _reset_cursor(self):
         self.decoder.filt.state.mean = self.init_decoder_mean.copy()
@@ -485,6 +494,7 @@ class FixationBMIControlMulti(BMIControlMultiEyeConstrained):
         pass
 
     def _start_target(self):
+        print('starting target state')
         self.plant.set_visibility(True)
         #target capture 
         self.target_index += 1
@@ -511,7 +521,12 @@ class FixationBMIControlMulti(BMIControlMultiEyeConstrained):
     def _start_wait(self):
         super()._start_wait()
         #self.plant_visible = False
+        print("wait state started")
         self.plant.set_visibility(True)
+
+    def _end_wait(self):
+        super()._end_wait()
+        print("wait state ended")
 
     def _end_targ_transition(self):
         self.plant.set_visibility(False)
@@ -575,6 +590,9 @@ class FixationBMIControlMulti(BMIControlMultiEyeConstrained):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.most_recent_open_eye = 0
+        for i,c in enumerate(type(self).__mro__):
+            print(i, c.__module__, c.__qualname__)
+
 
     status = dict(
         wait = dict(start_trial="target", start_pause="pause"),
