@@ -158,6 +158,7 @@ class FlashTargets(ScreenTargetCapture_Saccade):
 
     def _test_start_flash_cycle(self, time_in_state):
         #Test to see if the buffer period at the beginningof the hold has been completed so that we can start showing peripheral targets
+        
         return time_in_state > self.flash_buffer_time_s
     
     def _test_flash_complete(self, time_in_state):
