@@ -511,6 +511,7 @@ class FixationBMIControlMulti(BMIControlMultiEyeConstrained):
     def _start_wait(self):
         super()._start_wait()
         #self.plant_visible = False
+        print("start wait")
         self.plant.set_visibility(True)
 
     def _end_targ_transition(self):
@@ -541,8 +542,6 @@ class FixationBMIControlMulti(BMIControlMultiEyeConstrained):
         #Make flag that tracks the last non-zero eye diameter and check that it has occured in the last 100ms
         #First logic check: Check to see if the eye is open. If open, reset flag to 0   
         eye_within_fixation_buffer = (eye_d > self.target_radius + self.fixation_radius_buffer)
-        #eye_within_fixation_buffer_cursor = 
-        #eye_within_fixation_buffer_cursor = 
         if self.keyboard_control:
             return eye_within_fixation_buffer
         elif np.any(self.eye_diam != 0):
@@ -551,10 +550,7 @@ class FixationBMIControlMulti(BMIControlMultiEyeConstrained):
             self.most_recent_open_eye=self.get_time()
         elif (self.get_time()-self.most_recent_open_eye) > self.blink_time_threshold:
             self.most_recent_open_eye = 0
-            return True            
-    
-        #Finally check if the eye location is within the target + buffer
-        return eye_within_fixation_buffer
+            return True
     
     def _test_start_trial(self, time_in_state):
         #Check that the eye position is on the center target
