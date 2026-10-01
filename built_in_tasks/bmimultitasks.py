@@ -511,7 +511,6 @@ class FixationBMIControlMulti(BMIControlMultiEyeConstrained):
     def _start_wait(self):
         super()._start_wait()
         #self.plant_visible = False
-        print("start wait")
         self.plant.set_visibility(True)
 
     def _end_targ_transition(self):
@@ -555,12 +554,15 @@ class FixationBMIControlMulti(BMIControlMultiEyeConstrained):
     def _test_start_trial(self, time_in_state):
         #Check that the eye position is on the center target
         #return True #super()._test_start_trial
+        print('testing start trial')
         eye_pos = self.calibrated_eye_pos
         eye_d = np.linalg.norm(eye_pos - self.targs[0,[0,2]]) #target index is zero, this is only applyied during the wait period before the center target comes on
         
         blink = self.keyboard_control | np.any(self.eye_diam!=0)
 
         value = (eye_d < self.target_radius + self.fixation_radius_buffer) & blink
+        print('testing start trial')
+        print(f'eye_d: {eye_d}, target_radius: {self.target_radius}, fixation_radius_buffer: {self.fixation_radius_buffer}, blink: {blink}, value: {value}')
         return value#(eye_d > self.target_radius + self.fixation_radius_buffer)
 
 class FixationBMIControlMulti(BMIControlMultiEyeConstrained):
