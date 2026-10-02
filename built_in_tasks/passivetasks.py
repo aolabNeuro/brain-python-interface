@@ -81,11 +81,6 @@ class BMIControlVisualFeedbackEyeConstrained(BMIControlMultiEyeConstrained):
         reward = dict(reward_end="wait", start_pause="pause", stoppable=False, end_state=True),
         pause = dict(end_pause="wait", end_state=True),
     )
-    pass
-
-class TargetCaptureVisualFeedbackEyeConstrained(EndPostureFeedbackController, BMIControlVisualFeedbackEyeConstrained):
-    def move_effector(self):
-        pass
 
     def _start_target(self):
         self.plant.set_visibility(True)
@@ -96,21 +91,14 @@ class TargetCaptureVisualFeedbackEyeConstrained(EndPostureFeedbackController, BM
         # Show target if it is hidden (this is the first target, or previous state was a penalty)
         target = self.targets[self.target_index % 2]
         if self.target_index == 0:
-            #target.move_to_position(self.targs[self.target_index])
-            #target.show()
             self.sync_event('TARGET_ON', self.gen_indices[self.target_index])
         self.target_location = self.targs[self.target_index] # save for BMILoop
-
-
-        #if self.target_index == 0:
-        #    self.targets_eye[0].move_to_position(self.targs[self.target_index] - self.offset_cube)
-        #    self.targets_eye[0].show()
 
     def _start_fixation_penalty(self):
         self.plant.set_visibility(False)
         super()._start_fixation_penalty()
         self.decoder.filt.state.mean = self.init_decoder_mean.copy()
-        
+
     def _start_wait(self):
         super()._start_wait()
         #self.plant_visible = False
@@ -123,7 +111,7 @@ class TargetCaptureVisualFeedbackEyeConstrained(EndPostureFeedbackController, BM
     def _start_pause(self):
         super()._start_pause()
         self.plant.set_visibility(False)
-    
+
     def _end_pause(self):
         super()._end_pause()
         # Reset on any target transition away from the last target
@@ -166,15 +154,13 @@ class TargetCaptureVisualFeedbackEyeConstrained(EndPostureFeedbackController, BM
         blink = self.keyboard_control | np.any(self.eye_diam!=0)
 
         value = (eye_d < self.target_radius + self.fixation_radius_buffer) & blink
-        return value#(eye_d > self.target_radius + self.fixation_radius_buffer)
+        return value
 
-    #def _end_targ_transition(self):
-    #    super()._end_targ_transition()
-    #    if self.reset == 1:# and ((self.target_index == self.chain_length - 1) or (self.target_index == -1)):
-
-    #            # Reset on any target transition away from the last target
-    #            self.decoder.filt.state.mean = self.init_decoder_mean.copy()
-    #            self.hdf.sendMsg("reset")
+class TargetCaptureVisualFeedbackEyeConstrained(EndPostureFeedbackController, BMIControlVisualFeedbackEyeConstrained):
+    '''def move_effector(self):
+        #Follow up on this move_effector. I think it shouldn't be here?
+        pass'''
+    pass
 
 
 
