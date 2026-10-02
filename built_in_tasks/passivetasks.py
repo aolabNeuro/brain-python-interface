@@ -57,7 +57,9 @@ class TargetCaptureVisualFeedback(EndPostureFeedbackController, BMIControlMulti)
     def move_effector(self):
         pass
 
-class TargetCaptureVisualFeedbackEyeConstrained(EndPostureFeedbackController, BMIControlMultiEyeConstrained):
+class BMIControlVisualFeedbackEyeConstrained(BMIControlMultiEyeConstrained):
+    '''What is the plan here? I'm going to slowly transition the visual feedback task to this so I can dynamically add
+    either the automatic control or decoder control'''
     blink_time_threshold = traits.Float(0.1, desc="The amount of time in seconds that the eyes can be closed before triggering a fixation break, measured by eye_diam=0")
     assist_level = (1, 1)
     is_bmi_seed = True
@@ -79,6 +81,9 @@ class TargetCaptureVisualFeedbackEyeConstrained(EndPostureFeedbackController, BM
         reward = dict(reward_end="wait", start_pause="pause", stoppable=False, end_state=True),
         pause = dict(end_pause="wait", end_state=True),
     )
+    pass
+
+class TargetCaptureVisualFeedbackEyeConstrained(EndPostureFeedbackController, BMIControlVisualFeedbackEyeConstrained):
     def move_effector(self):
         pass
 
