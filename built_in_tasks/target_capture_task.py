@@ -60,7 +60,7 @@ class TargetCapture(Sequence):
     num_targets_per_attempt = traits.Int(2, desc="Minimum number of target acquisitions to be counted as an attempt")
 
     def init(self):
-        self.trial_dtype = np.dtype([('trial', 'u4'), ('index', 'u4'), ('target', 'f8', (3,))])
+        self.trial_dtype = np.dtype([('trial', 'u4'), ('index', 'u4'), ('target', 'f8', (3,)), ('delay_period', 'f8', (1,))])
         super().init()
         self.penalty_index = 0
         self.pause_index = 0
@@ -74,7 +74,7 @@ class TargetCapture(Sequence):
             super()._start_wait()
             self.tries = 0 # number of times this sequence of targets has been attempted
 
-        if self.tries==self.max_attempts: # The task goes to the next target after the number of reattempting is max attempts 
+        if self.tries==self.max_attempts and self.pause_index == 0: # The task goes to the next target after the number of reattempting is max attempts 
             super()._start_wait()
             self.tries = 0 # number of times this sequence of targets has been attempted
 
@@ -98,6 +98,7 @@ class TargetCapture(Sequence):
         for i in range(len(self.gen_indices)):
             self.trial_record['index'] = self.gen_indices[i]
             self.trial_record['target'] = self.targs[i]
+            self.trial_record['delay_period'] = self.delay_time
             self.sinks.send("trials", self.trial_record)
 
     def _start_target(self):
@@ -235,7 +236,7 @@ class TargetCapture(Sequence):
             - Target held for the minimum requred time (implemented here)
             - Sensorized object moved by a certain amount
             - Sensorized object moved to the required location
-            - Manually triggered by experimenter
+            - Manually triggered by experimenterplant
         '''
         return time_in_state > self.hold_time
 
@@ -302,7 +303,7 @@ class ScreenTargetCapture(TargetCapture, Window):
     limit2d = traits.Bool(True, desc="Limit cursor movement to 2D")
 
     sequence_generators = [
-        'out_2D', 'out_2D_select', 'centerout_2D', 'centeroutback_2D', 'centerout_2D_select', 'rand_target_chain_2D', 'rand_same_target_chain_2D', 
+        'center_hold_practice', 'out_2D', 'out_2D_select', 'centerout_2D', 'centeroutback_2D', 'centerout_2D_select', 'rand_target_chain_2D', 'rand_same_target_chain_2D', 
         'rand_target_chain_3D', 'corners_2D', 'centerout_tabletop', 'out_2D_square', 'centerout_2D_square'
     ]
 
@@ -425,7 +426,6 @@ class ScreenTargetCapture(TargetCapture, Window):
     #### STATE FUNCTIONS ####
     def _start_wait(self):
         super()._start_wait()
-
         if self.calc_trial_num() == 0:
 
             # Instantiate the targets here so they don't show up in any states that might come before "wait"
@@ -590,6 +590,32 @@ class ScreenTargetCapture(TargetCapture, Window):
                     distance*np.sin(theta)
                 ]).T
                 yield [idx], [pos + origin]
+
+    @staticmethod
+    def center_hold_practice(nblocks=100, ntargets=1, distance=0, origin=(0,0,0)):
+        '''
+        Generates a sequence of 2D (x and z) targets at the origin
+
+        Parameters
+        ----------
+        nblocks : int
+            The number of ntarget pairs in the sequence.
+        ntargets : int
+            The number of equally spaced targets
+        distance : float
+            The distance in cm between the center and peripheral targets.
+        origin : 3-tuple
+            Location of the central targets around which the peripheral targets span
+
+        Returns
+        -------
+        [nblocks*ntargets x 1] array of tuples containing trial indices and [1 x 3] target coordinates
+
+        '''
+        for _ in range(nblocks):
+            #idx = #np.zeros((nblocks,))
+            pos = np.zeros((3,))
+            yield [1], [pos]
 
     @staticmethod
     def out_2D_square(nblocks=100, width=10, height=10, origin=(0,0,0)):

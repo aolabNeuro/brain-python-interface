@@ -18,10 +18,11 @@ from config.rig_defaults import rig_settings
 def main(request):
     return render(request, "main.html", dict(test_db=os.environ.get('BMI3D_TEST_DATABASE')))
 
-def _list_exp_history(dbname='default', subject=None, task=None, max_entries=None, show_all_rigs=False, show_hidden=False):
+def _list_exp_history(dbname='default', subject=None, task=None, max_entries=None, show_all_rigs=False,
+                      show_hidden=False, start_datetime=None, end_datetime=None, keyword=None):
     from . import models
+    from django.db.models import Q
     # from .models import TaskEntry, Task, Subject, Feature, Generator
-    td = datetime.timedelta(days=60)
 
     filter_kwargs = {}
     if not show_hidden:
@@ -32,8 +33,19 @@ def _list_exp_history(dbname='default', subject=None, task=None, max_entries=Non
         filter_kwargs['subject__name'] = subject
     if not (task is None) and isinstance(task, str):
         filter_kwargs['task__name'] = task
+    if start_datetime is not None:
+        filter_kwargs['date__gte'] = start_datetime
+    if end_datetime is not None:
+        filter_kwargs['date__lte'] = end_datetime
 
-    entries = models.TaskEntry.objects.using(dbname).filter(**filter_kwargs).order_by("-date")
+    entries = models.TaskEntry.objects.using(dbname).filter(**filter_kwargs)
+    
+    # Apply keyword search across multiple fields
+    if keyword is not None and isinstance(keyword, str) and len(keyword.strip()) > 0:
+        keyword_query = Q(task__name__icontains=keyword) | Q(project__icontains=keyword) | Q(session__icontains=keyword) | Q(entry_name__icontains=keyword)
+        entries = entries.filter(keyword_query)
+    
+    entries = entries.order_by("-date")
     if isinstance(max_entries, int):
         entries = entries[:max_entries]
 
@@ -52,10 +64,16 @@ def _list_exp_history(dbname='default', subject=None, task=None, max_entries=Non
             ent.rowspan = k - last
             last = k
 
-    filter_kwargs['template'] = True
-    templates = models.TaskEntry.objects.using(dbname).filter(**filter_kwargs).order_by("-date")
+    template_filter_kwargs = dict(filter_kwargs)
+    template_filter_kwargs.pop('date__gte', None)
+    template_filter_kwargs.pop('date__lte', None)
+    template_filter_kwargs.pop('rig_name', None)
+    template_filter_kwargs.pop('subject__name', None)
+    template_filter_kwargs['template'] = True
+    templates = models.TaskEntry.objects.using(dbname).filter(**template_filter_kwargs).order_by("-date")
 
     tasks = models.Task.objects.filter(visible=True).order_by("name")
+    subjects = models.Subject.objects.all().order_by("name")
 
     epoch = datetime.datetime.utcfromtimestamp(0)
     for entry in entries:
@@ -72,6 +90,7 @@ def _list_exp_history(dbname='default', subject=None, task=None, max_entries=Non
     fields = dict(
         entries=entries,
         tasks=tasks,
+        subjects=subjects,
         templates=templates,
         features=features,
         generators=generators,
@@ -112,11 +131,54 @@ def list_exp_history(request, **kwargs):
     '''
     from .models import TaskEntry, Task, Subject, Feature, Generator
 
-    kwargs['show_hidden'] = request.GET.get('show_hidden') != None
-    kwargs['show_all_rigs'] = request.GET.get('show_all_rigs') != None
+    def _parse_date(value):
+        if not value:
+            return None
+        try:
+            return datetime.datetime.strptime(value, '%Y-%m-%d').date()
+        except (TypeError, ValueError):
+            return None
+
+    kwargs['show_hidden'] = request.GET.get('show_hidden') is not None
+    kwargs['show_all_rigs'] = request.GET.get('show_all_rigs') is not None
+
+    # Extract subject and task filters
+    subject_filter = request.GET.get('subject')
+    if subject_filter:
+        kwargs['subject'] = subject_filter
+    task_filter = request.GET.get('task')
+    if task_filter:
+        kwargs['task'] = task_filter
+    
+    # Extract keyword filter
+    keyword_filter = request.GET.get('keyword')
+    if keyword_filter:
+        kwargs['keyword'] = keyword_filter
+
+    start_date = _parse_date(request.GET.get('start_date'))
+    end_date = _parse_date(request.GET.get('end_date'))
+
+    # Show filters if any filter parameters are present
+    show_filters = bool(subject_filter or task_filter or keyword_filter or start_date or end_date or kwargs['show_all_rigs'])
+
+    default_days = kwargs.pop('default_days', None)
+    if start_date is None and end_date is None and isinstance(default_days, int):
+        end_date = datetime.date.today()
+        start_date = end_date - datetime.timedelta(days=default_days)
+
+    if start_date is not None:
+        kwargs['start_datetime'] = datetime.datetime.combine(start_date, datetime.time.min)
+    if end_date is not None:
+        kwargs['end_datetime'] = datetime.datetime.combine(end_date, datetime.time.max)
 
     fields = _list_exp_history(**kwargs)
     fields['hostname'] = request.get_host()
+    fields['start_date'] = start_date.strftime('%Y-%m-%d') if start_date else ''
+    fields['end_date'] = end_date.strftime('%Y-%m-%d') if end_date else ''
+    fields['subject_filter'] = kwargs.get('subject', '')
+    fields['task_filter'] = kwargs.get('task', '')
+    fields['keyword_filter'] = kwargs.get('keyword', '')
+    fields['show_filters'] = show_filters
 
     # this line is important--this is needed so the Track object knows if the task has ended in an error
     # TODO there's probably some better way of doing this within the multiprocessing lib (some code to run after the process has terminated)

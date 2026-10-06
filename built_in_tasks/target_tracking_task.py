@@ -39,7 +39,7 @@ class TargetTracking(Sequence):
         tracking_in = dict(traj_complete="tracking_in_ramp", trial_complete="reward", leave_target="tracking_out", start_pause="pause"),
         tracking_out = dict(traj_complete="tracking_out_ramp", trial_complete="reward", enter_target="tracking_in", tracking_out_timeout="tracking_out_penalty", start_pause="pause"),
         
-        timeout_penalty = dict(timeout_penalty_end="wait", start_pause="pause", end_state=True),
+        timeout_penalty = dict(timeout_penalty_end="wait", timeout_penalty_end_retry = "wait_retry", start_pause="pause", end_state=True),
         hold_penalty = dict(hold_penalty_end="wait", hold_penalty_end_retry="wait_retry", start_pause="pause", end_state=True),
         tracking_out_penalty = dict(tracking_out_penalty_end="wait", start_pause="pause", end_state=True),
         reward = dict(reward_end="wait", start_pause="pause", stoppable=False, end_state=True),
@@ -89,6 +89,7 @@ class TargetTracking(Sequence):
         # yield idx, targs, disturbance, dis_trajectory, sample_rate, ramp, ramp_down :
         self.gen_index, self.targs, self.disturbance_trial, self.disturbance_path, self.sample_rate, self.ramp_up_time, self.ramp_down_time = self.next_trial # targs and disturbance are same length
 
+
         self.targs = np.squeeze(self.targs,axis=0)
         self.disturbance_path = np.squeeze(self.disturbance_path)
 
@@ -103,7 +104,7 @@ class TargetTracking(Sequence):
             self.ramp_counter[-int(self.ramp_down_time*self.sample_rate):] = 2
     
     def tracking_task_start_wait(self):
-        # print(self.gen_index)
+        print(self.gen_index, self.tries)
 
         self.trial_record['trial'] = self.calc_trial_num()
         self.trial_record['index'] = self.gen_index
@@ -116,9 +117,6 @@ class TargetTracking(Sequence):
 
         # trial is not finished
         self.trial_timed_out = False
-
-        # number of times this trajectory has been attempted
-        self.tries = 0
 
         # index into trajectory
         self.frame_index = -1
@@ -142,6 +140,9 @@ class TargetTracking(Sequence):
                 self._parse_next_trial()
             except StopIteration:
                 self.end_task()
+        
+        # number of times this trajectory has been attempted
+        self.tries = 0
 
         self.tracking_task_start_wait()
 
@@ -150,6 +151,7 @@ class TargetTracking(Sequence):
         pass
 
     def _start_wait_retry(self):
+        print('retrying wait')
         self.tracking_task_start_wait()
 
     def _while_wait_retry(self):
@@ -343,7 +345,10 @@ class TargetTracking(Sequence):
         return time_in_state > self.tracking_out_time
 
     def _test_timeout_penalty_end(self, time_in_state):
-        return time_in_state > self.timeout_penalty_time
+        return time_in_state > self.timeout_penalty_time and (self.tries == self.max_hold_attempts)
+
+    def _test_timeout_penalty_end_retry(self, time_in_state):
+        return (time_in_state > self.timeout_penalty_time) and (self.tries < self.max_hold_attempts)
 
     def _test_hold_penalty_end(self, time_in_state):
         return (time_in_state > self.hold_penalty_time) and (self.tries==self.max_hold_attempts)
@@ -443,9 +448,6 @@ class ScreenTargetTracking(TargetTracking, Window):
         if instantiate_targets:
             # This is the center target being followed by the user
             self.target = VirtualCircularTarget(target_radius=self.target_radius, target_color=target_colors[self.target_color])
-
-            # This is the optional progress bar (off by default)
-            self.bar = VirtualRectangularTarget(target_width=1, target_height=0, target_color=(0., 1., 0., 0.75), starting_pos=[0,-15,9])
             # print('INIT TRAJ')
 
         # Declare any plant attributes which must be saved to the HDF file at the _cycle rate
@@ -531,23 +533,15 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.frame_index += 1 # increment the frame_index for the following cycle
 
     def setup_start_wait(self):
-
         # Allow 2d movement
         if not self.always_1d:
-            self.limit1d = False
-
-        # Set up for progress bar
-        self.bar_width = 12        
-        self.tracking_frame_index = 0
+            self.limit1d = False       
         
         if self.calc_trial_num() == 0:
             # Instantiate the targets here so they don't show up in any states that might come before "wait" 
             for model in self.target.graphics_models:
                 self.add_model(model)
                 self.target.hide()
-            for model in self.bar.graphics_models:
-                self.add_model(model)
-                self.bar.hide()
 
         # Set up the next trajectory
         if hasattr(self, 'trajectory'):
@@ -588,8 +582,6 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.target.reset()
         self.trajectory.hide()
         self.trajectory.reset()
-        self.bar.hide()
-        self.bar.reset()
 
     def setup_start_tracking_in(self):
         # Revert to settable trait
@@ -799,7 +791,6 @@ class ScreenTargetTracking(TargetTracking, Window):
 
         # Cue successful trial
         self.target.cue_trial_end_success()
-        self.reward_frame_index = 0
 
         # use next generated trial using other freq set
         self.repeat_freq_set = False

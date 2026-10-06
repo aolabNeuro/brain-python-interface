@@ -4,6 +4,7 @@ finite state machine representing different phases of the task
 '''
 
 import traceback
+import bisect
 import collections
 import re
 import os
@@ -11,6 +12,7 @@ import tables
 import traceback
 import numpy as np
 from collections import OrderedDict
+import time
 
 from config.rig_defaults import rig_settings
 from . import traits
@@ -180,6 +182,7 @@ class Experiment(ThreadedFSM, traits.HasTraits, metaclass=ExperimentMeta):
         # Attribute for task entry dtype, used to create a numpy record array which is updated every iteration of the FSM
         # See http://docs.scipy.org/doc/numpy/user/basics.rec.html for details on how to create a record array dtype
         self.dtype = []
+        self.add_dtype('system_time', 'f8', (1,))
 
         self.cycle_count = 0
         if pygame_avail:
@@ -407,6 +410,7 @@ class Experiment(ThreadedFSM, traits.HasTraits, metaclass=ExperimentMeta):
 
         # Send task data to any registered sinks
         if hasattr(self, 'task_data') and self.task_data is not None:
+            self.task_data['system_time'] = time.perf_counter()
             self.sinks.send("task", self.task_data)
 
         # Update report stats periodically
@@ -623,9 +627,28 @@ class LogExperiment(Experiment):
     '''
 
     def __init__(self, *args, **kwargs):
+        # Initialize incremental caches before super().__init__ in case it calls set_state
+        self._fast_state_counts = collections.Counter()
+        self._fast_state_times = collections.defaultdict(list)
+        self._fast_trial_end_times = []
         super().__init__(*args, **kwargs)
         self.reportstats['Success rate'] = "0 %"
         self.reportstats['Success rate (10 trials)'] = "0 %"
+
+    def set_state(self, condition, *args, **kwargs):
+        '''Track state counts/timestamps incrementally to avoid repeated scans of ``state_log``.'''
+        super().set_state(condition, *args, **kwargs)
+        if not hasattr(self, '_fast_state_counts'):
+            return
+        state_time = self.start_time
+        self._fast_state_counts[condition] += 1
+        self._fast_state_times[condition].append(state_time)
+        if condition in self.status.trial_end_states:
+            self._fast_trial_end_times.append(state_time)
+
+    def fast_rewards_per_min(self, window_s=120.0):
+        '''Compatibility wrapper for fast reward-rate computation.'''
+        return self.calc_events_per_min('reward', window_s)
 
     def update_report_stats(self):
         super().update_report_stats()
@@ -671,6 +694,8 @@ class LogExperiment(Experiment):
         -------
         Counts of state occurrences
         '''
+        if hasattr(self, '_fast_state_counts'):
+            return self._fast_state_counts[state_name]
         times = np.array([state[1] for state in self.state_log if state[0] == state_name])
         return len(times)
 
@@ -678,6 +703,8 @@ class LogExperiment(Experiment):
         '''
         Counts the number of trials which have finished.
         '''
+        if hasattr(self, '_fast_trial_end_times'):
+            return len(self._fast_trial_end_times)
         trialtimes = [state[1] for state in self.state_log if state[0] in self.status.trial_end_states]
         return len(trialtimes)
 
@@ -697,18 +724,31 @@ class LogExperiment(Experiment):
         rate : float
             Rate of specified event, per minute
         '''
-        times = np.array([state[1] for state in self.state_log if state[0]==event_name])
-        if (self.get_time() - self.task_start_time) < window:
-            divideby = (self.get_time() - self.task_start_time)/sec_per_min
+        now = self.get_time()
+        if hasattr(self, '_fast_state_times'):
+            times = self._fast_state_times[event_name]
+            cutoff = now - window
+            count = len(times) - bisect.bisect_left(times, cutoff)
+        else:
+            times = np.array([state[1] for state in self.state_log if state[0]==event_name])
+            count = np.sum(times >= (now - window))
+        if (now - self.task_start_time) < window:
+            divideby = (now - self.task_start_time)/sec_per_min
         else:
             divideby = window/sec_per_min
-        return np.sum(times >= (self.get_time() - window))/divideby
+        return count/divideby if divideby > 0 else 0
 
     def calc_time_since_last_event(self, event_name):
         '''
         Calculates the time elapsed since the previous instance of event_name
         '''
         start_time = self.state_log[0][1]
+        if hasattr(self, '_fast_state_times'):
+            times = self._fast_state_times[event_name]
+            if len(times):
+                return times[-1] - start_time
+            else:
+                return np.float64("0.0")
         times = np.array([state[1] for state in self.state_log if state[0]==event_name])
         if len(times):
             return times[-1] - start_time
@@ -731,15 +771,27 @@ class LogExperiment(Experiment):
         rate : float
             Rate of specified event, per trial
         '''
-        trialtimes = [state[1] for state in self.state_log if state[0] in self.status.trial_end_states]
+        if hasattr(self, '_fast_trial_end_times') and hasattr(self, '_fast_state_times'):
+            trialtimes = self._fast_trial_end_times
+            event_times = self._fast_state_times[event_name]
+        else:
+            trialtimes = [state[1] for state in self.state_log if state[0] in self.status.trial_end_states]
+            event_times = None
         if len(trialtimes) == 0:
             return 0
         elif len(trialtimes) < window:
+            if event_times is not None:
+                first_idx = bisect.bisect_right(event_times, trialtimes[0])
+                return (len(event_times) - first_idx) / max(1, len(trialtimes) - 1)
             times = np.array([state[1] for state in self.state_log if state[0]==event_name and state[1] > trialtimes[0]])
             return len(times) / max(1, len(trialtimes) - 1)
         else:
+            if event_times is not None:
+                first_idx = bisect.bisect_right(event_times, trialtimes[-window])
+                return (len(event_times) - first_idx) / (window - 1)
             times = np.array([state[1] for state in self.state_log if state[0]==event_name and state[1] > trialtimes[-window]])
             return  len(times) / (window - 1)
+
 
 class Sequence(LogExperiment):
     '''

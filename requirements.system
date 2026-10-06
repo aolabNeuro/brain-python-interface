@@ -5,3 +5,4 @@ gfortran
 libhdf5-dev
 ufw
 python3-pyaudio
+ffmpeg

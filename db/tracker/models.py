@@ -162,7 +162,7 @@ class Task(models.Model):
 
                 # look up database records which match the model type & filter parameters
                 insts = Model.objects.filter(**filter_kwargs).order_by("-date")
-                params[trait_name]['options'] = [(i.pk, i.path) for i in insts]
+                params[trait_name]['options'] = [(i.pk, os.path.basename(i.path)) for i in insts]
 
             if trait_name in values:
                 params[trait_name]['value'] = values[trait_name]
@@ -366,7 +366,7 @@ class System(models.Model):
 
     @staticmethod
     def populate():
-        for name in ["eyetracker", "hdf", "plexon", "bmi", "bmi_params", "juice_log", "blackrock"]:
+        for name in ["eyetracker", "hdf", "plexon", "bmi", "bmi_params", "juice_log", "blackrock", "visual_stimuli"]:
             try:
                 System.objects.get(name=name)
             except ObjectDoesNotExist:
@@ -1622,6 +1622,9 @@ class DataFile(models.Model):
         elif self.path[-4:] == '.pkl': # pickle file
             import pickle
             return pickle.load(open(self.get_path()))
+        elif self.system.name == 'visual_stimuli':
+            # For video files, just return the path
+            return self.get_path()
         else:
             raise ValueError("models.DataFile does not know how to open this type of file: %s" % self.path)
 
