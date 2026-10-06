@@ -217,22 +217,26 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.stuck_cycles = 0 # counter for how many cycles the cursor has been stuck in a corner
+        
+        self.auto_reset_starter = None # time when the auto-reset timer started
 
     def _cycle(self):
         super()._cycle()
         if self.auto_reset_time <= 0:
             return 
 
+        rel_time = self.get_time()
+        
         if self._cursor_at_bounds():
-            self.stuck_cycles += 1 #add to counter if cursor stuck 
+            if self.auto_reset_starter is None:
+                self.auto_reset_starter = rel_time
+            elif (rel_time - self.auto_reset_starter) > self.auto_reset_time:
+                self.hdf.sendMsg("auto-reset")
+                self.reset_cursor()
+                self.auto_reset_starter = None
         else:
-            self.stuck_cycles = 0
-
-        if self.stuck_cycles >= self.auto_reset_time * self.fps: #num cycles greater than time X frame rate 
-            self.hdf.sendMsg("auto-reset")
-            self.reset_cursor()
-            self.stuck_cycles = 0
+            self.auto_reset_starter = None
+     
 
     def _cursor_at_bounds(self, tol = 1e-3): #tolerance of 0.001 cm 
         pos = np.asarray(self.plant.get_endpoint_pos()).ravel()
