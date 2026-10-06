@@ -2280,7 +2280,7 @@ class ScreenTargetCapture_Saccade(ScreenTargetCapture):
 class ScreenTargetCapture_Saccade_withBackgroundTargets(ScreenTargetCapture_Saccade):
     background_target_radius = traits.Float(2, desc="Radius of targets in cm")
     background_target_color = traits.OptionsList("yellow", *target_colors, desc="Color of the target", bmi3d_input_options=list(target_colors.keys()))
-
+    show_pheriheral_square_target = traits.Bool(True, desc="Whether to show peripheral square target")
     def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
 
@@ -2301,7 +2301,8 @@ class ScreenTargetCapture_Saccade_withBackgroundTargets(ScreenTargetCapture_Sacc
                 target.move_to_position(cube_position)
                 bck_target.move_to_position(sphere_position)
 
-                target.show()
+                if self.show_pheriheral_square_target:
+                    target.show()
                 bck_target.show()
 
                 self.sync_event('TARGET_ON', self.gen_indices[next_idx])
