@@ -206,6 +206,7 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
     assist_noise = traits.Float(0., desc="noise added to cursor speed in cm/s")
     cursor_color = traits.OptionsList("orange", *target_colors, desc='Color of cursor endpoint', bmi3d_input_options=list(target_colors.keys()))
     save_zscore = traits.Bool(False, desc="save a decoder zscored from this task")
+    dist_tol = traits.Float(0.001, desc="distance from the edge of the workspace to trigger auto-reset")
 
     static_states = ['reward'] # states in which the decoder is not run
 
@@ -226,11 +227,12 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
             return 
 
         rel_time = self.get_time()
-        
+        # function to check if cursor is at edge of the workspace. Start timer & reset if it has been there longer than reset time 
+        # does not move cursor to bounds if far exceeding boundary, just counts the time 
         if self._cursor_at_bounds():
             if self.auto_reset_starter is None:
-                self.auto_reset_starter = rel_time
-            elif (rel_time - self.auto_reset_starter) > self.auto_reset_time:
+                self.auto_reset_starter = rel_time #start timer using current time 
+            elif (rel_time - self.auto_reset_starter) > self.auto_reset_time: #reset if cursor has been at edge for long enough 
                 self.hdf.sendMsg("auto-reset")
                 self.reset_cursor()
                 self.auto_reset_starter = None
@@ -238,12 +240,12 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
             self.auto_reset_starter = None
      
 
-    def _cursor_at_bounds(self, tol = 1e-3): #tolerance of 0.001 cm 
+    def _cursor_at_bounds(self):  
         pos = np.asarray(self.plant.get_endpoint_pos()).ravel()
         bounds = np.asarray(self.cursor_bounds)      
         lo, hi = bounds[0::2], bounds[1::2] # pair up bounds for each diimension 
         active = hi > lo # ignore an axis that has no range 
-        at_edge = (np.abs(pos - lo) < tol) | (np.abs(pos - hi) < tol)
+        at_edge = (np.abs(pos - lo) < self.dist_tol) | (np.abs(pos - hi) < self.dist_tol)
         return np.any(at_edge & active)
         
     def create_assister(self):
