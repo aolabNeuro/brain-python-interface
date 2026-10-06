@@ -201,6 +201,7 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
     Cursor movement can be assisted toward target by setting assist_level > 0.
     '''
     reset = traits.Int(0, desc='reset the decoder state to the starting configuration. 1 for always, 2 for only on timeout')
+    auto_reset = traits.Float(0, desc='automatically reset the decoder state every N seconds. 0 for no auto-reset')
     assist_speed = traits.Float(2., desc="speed of assister in cm/s")
     assist_noise = traits.Float(0., desc="noise added to cursor speed in cm/s")
     cursor_color = traits.OptionsList("orange", *target_colors, desc='Color of cursor endpoint', bmi3d_input_options=list(target_colors.keys()))
@@ -216,6 +217,30 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.stuck_cycles = 0 # counter for how many cycles the cursor has been stuck in a corner
+
+    def _cycle(self):
+        super()._cycle()
+        if self.auto_reset_time <= 0:
+            return 
+
+        if self._cursor_at_bounds():
+            self.stuck_cycles += 1 #add to counter if cursor stuck 
+        else:
+            self.stuck_cycles = 0
+
+        if self.stuck_cycles >= self.auto_reset_time * self.fps: #num cycles greater than time X frame rate 
+            self.hdf.sendMsg("auto-reset")
+            self.reset_cursor()
+            self.stuck_cycles = 0
+
+    def _cursor_at_bounds(self, tol = 1e-3): #tolerance of 0.001 cm 
+        pos = np.asarray(self.plant.get_endpoint_pos()).ravel()
+        bounds = np.asarray(self.cursor_bounds)      
+        lo, hi = bounds[0::2], bounds[1::2] # pair up bounds for each diimension 
+        active = hi > lo # ignore an axis that has no range 
+        at_edge = (np.abs(pos - lo) < tol) | (np.abs(pos - hi) < tol)
+        return np.any(at_edge & active)
         
     def create_assister(self):
         # Create the appropriate type of assister object
@@ -419,6 +444,7 @@ class BMIControlMultiDirectionConstraint(BMIControlMultiMixin, ScreenReachAngle)
 
 class BMIControlMulti_ScreenTargetTracking(BMIControlMultiMixin, ScreenTargetTracking):
 
+    
     def move_effector(self, pos_offset=[0,0,0], vel_offset=[0,0,0]):
         '''Runs after BMILoop.move_plant() has set the cursor to the decoded position.'''
         pos_offset = np.asarray(pos_offset, dtype=float)
