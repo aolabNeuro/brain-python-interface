@@ -201,7 +201,7 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
     Cursor movement can be assisted toward target by setting assist_level > 0.
     '''
     reset = traits.Int(0, desc='reset the decoder state to the starting configuration. 1 for always, 2 for only on timeout')
-    auto_reset = traits.Float(0, desc='automatically reset the decoder state every N seconds. 0 for no auto-reset')
+    auto_reset_time = traits.Float(0, desc='automatically reset the decoder state every N seconds. 0 for no auto-reset')
     assist_speed = traits.Float(2., desc="speed of assister in cm/s")
     assist_noise = traits.Float(0., desc="noise added to cursor speed in cm/s")
     cursor_color = traits.OptionsList("orange", *target_colors, desc='Color of cursor endpoint', bmi3d_input_options=list(target_colors.keys()))
