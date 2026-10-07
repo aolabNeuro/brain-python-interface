@@ -206,7 +206,7 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
     assist_noise = traits.Float(0., desc="noise added to cursor speed in cm/s")
     cursor_color = traits.OptionsList("orange", *target_colors, desc='Color of cursor endpoint', bmi3d_input_options=list(target_colors.keys()))
     save_zscore = traits.Bool(False, desc="save a decoder zscored from this task")
-    dist_tol = traits.Float(0.001, desc="distance from the edge of the workspace to trigger auto-reset")
+    dist_tol_reset = traits.Float(0.001, desc="distance from the edge of the workspace to trigger auto-reset")
 
     static_states = ['reward'] # states in which the decoder is not run
 
@@ -245,7 +245,7 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
         bounds = np.asarray(self.cursor_bounds)      
         lo, hi = bounds[0::2], bounds[1::2] # pair up bounds for each diimension 
         active = hi > lo # ignore an axis that has no range 
-        at_edge = (np.abs(pos - lo) < self.dist_tol) | (np.abs(pos - hi) < self.dist_tol)
+        at_edge = (np.abs(pos - lo) < self.dist_tol_reset) | (np.abs(pos - hi) < self.dist_tol_reset)
         return np.any(at_edge & active)
         
     def create_assister(self):
