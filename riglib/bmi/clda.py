@@ -455,6 +455,47 @@ class PositionErrorLearner(Learner):
         else:
             int_kin[vel_inds] = self.gain * pos_error
         return np.asmatrix(int_kin).reshape(-1, 1)
+    
+class SimpleEndpointIntentionLearner(Learner):
+    """
+    Minimal intention estimator for endpoint velocity decoders.
+
+    The intended state keeps position unchanged and sets velocity to point from
+    the current cursor position to the current target position.
+    """
+    def __init__(self, batch_size, *args, **kwargs):
+        self.default_speed = kwargs.pop('default_speed', 1.0)
+        super(SimpleEndpointIntentionLearner, self).__init__(batch_size, *args, **kwargs)
+
+    def calc_int_kin(self, current_state, target_state, decoder_output, task_state, state_order=None):
+        curr = np.asarray(current_state).reshape(-1)
+        targ = np.asarray(target_state).reshape(-1)
+
+        # This learner is intended for [pos(3), vel(3), offset] endpoint states.
+        if curr.size < 6 or targ.size < 3:
+            return None
+
+        cursor_pos = curr[:3]
+        target_pos = targ[:3]
+        diff = target_pos - cursor_pos
+        dist = np.linalg.norm(diff)
+
+        if not np.isfinite(dist):
+            return None
+
+        dir_to_target = diff / (np.spacing(1) + dist)
+
+        curr_speed = np.linalg.norm(curr[3:6])
+        speed = curr_speed if curr_speed > 0 else self.default_speed
+
+        intended = curr.copy()
+        intended[:3] = cursor_pos
+        intended[3:6] = speed * dir_to_target
+
+        if intended.size >= 7:
+            intended[6] = 1
+
+        return np.asmatrix(intended).reshape(-1, 1)
 
 
 class RegexKeyDict(dict):

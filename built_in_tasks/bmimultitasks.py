@@ -4,6 +4,7 @@ BMI tasks in the new structure, i.e. inheriting from manualcontrolmultitasks
 import numpy as np
 import pickle
 
+from built_in_tasks.target_tracking_task import ScreenTargetTracking
 from riglib.experiment import traits
 
 from riglib.bmi import goal_calculators, ppfdecoder, feedback_controllers
@@ -248,6 +249,9 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
         at_edge = (np.abs(pos - lo) < self.dist_tol_reset) | (np.abs(pos - hi) < self.dist_tol_reset)
         return np.any(at_edge & active)
         
+    def move_effector(self, *args, **kwargs):
+        pass
+    
     def create_assister(self):
         # Create the appropriate type of assister object
         start_level, end_level = self.assist_level
@@ -449,7 +453,9 @@ class BMIControlMultiDirectionConstraint(BMIControlMultiMixin, ScreenReachAngle)
 
 
 class BMIControlMulti_ScreenTargetTracking(BMIControlMultiMixin, ScreenTargetTracking):
-
+    '''
+    BMI control in the tracking task. 
+    '''
     
     def move_effector(self, pos_offset=[0,0,0], vel_offset=[0,0,0]):
         '''Runs after BMILoop.move_plant() has set the cursor to the decoded position.'''
@@ -462,4 +468,3 @@ class BMIControlMulti_ScreenTargetTracking(BMIControlMultiMixin, ScreenTargetTra
         bounds = np.asarray(self.cursor_bounds)       # (min0, max0, min1, max1, min2, max2)
         new_pos = np.clip(new_pos, bounds[0::2], bounds[1::2])
         self.plant.set_endpoint_pos(new_pos)
-    pass

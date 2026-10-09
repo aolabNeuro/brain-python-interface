@@ -7,7 +7,6 @@ import glob
 import os
 
 
-
 class CLDA_KFRML_IntendedVelocity(traits.HasTraits):
     clda_batch_time = traits.Float(1, desc="How frequently to update weights [s]")
     clda_update_half_life = traits.Float(60, desc="Half-life for exponential decay [s] to combine with previous weights.") #[s]
@@ -19,21 +18,21 @@ class CLDA_KFRML_IntendedVelocity(traits.HasTraits):
         action of the BMI subject and pairs this intention estimation with actual observations.
         '''
         self.learn_flag = False
-        fmatrix = np.array(self.decoder.filt.B.T/np.max(self.decoder.filt.B))
-        self.decoder.filt.F_dict = {
-            'target': fmatrix,
-            'hold': np.zeros(fmatrix.shape),
-            'timeout_penalty': np.zeros(fmatrix.shape),
-            'wait': np.zeros(fmatrix.shape),
-            'delay': np.zeros(fmatrix.shape),
-            'targ_transition': np.zeros(fmatrix.shape),
-            'hold_penalty': np.zeros(fmatrix.shape),
-            'delay_penalty': np.zeros(fmatrix.shape),
-            'reward': np.zeros(fmatrix.shape),
-        }
-
+        # fmatrix = np.array(self.decoder.filt.B.T/np.max(self.decoder.filt.B))
+        # self.decoder.filt.F_dict = {
+        #     'target': fmatrix,
+        #     'hold': np.zeros(fmatrix.shape),
+        #     'timeout_penalty': np.zeros(fmatrix.shape),
+        #     'wait': np.zeros(fmatrix.shape),
+        #     'delay': np.zeros(fmatrix.shape),
+        #     'targ_transition': np.zeros(fmatrix.shape),
+        #     'hold_penalty': np.zeros(fmatrix.shape),
+        #     'delay_penalty': np.zeros(fmatrix.shape),
+        #     'reward': np.zeros(fmatrix.shape),
+        # }
         learner_batch_size = int(self.clda_batch_time/self.decoder.binlen)
-        self.learner = clda.OFCLearnerRotateIntendedVelocity(learner_batch_size, self.decoder.filt.A, self.decoder.filt.B, self.decoder.filt.F_dict)
+        # self.learner = clda.OFCLearnerRotateIntendedVelocity(learner_batch_size, self.decoder.filt.A, self.decoder.filt.B, self.decoder.filt.F_dict)
+        self.learner = clda.SimpleEndpointIntentionLearner(learner_batch_size)
 
     def create_updater(self):
         '''
@@ -81,4 +80,26 @@ class CLDA_WFSmoothbatch(traits.HasTraits):
         self.updater = clda.WFSmoothbatch(self.clda_batch_time, self.clda_update_half_life,
             lambda_E=self.clda_lambda_E, lambda_D=self.clda_lambda_D, solver=self.clda_solver,
             verbose=self.clda_verbose, multiproc=self.clda_multiproc)
+        self.updater.init(self.decoder)
+    
+
+class CLDA_Smoothbatch_IntendedVelocity(traits.HasTraits):
+    clda_batch_time = traits.Float(60, desc="How frequently to update weights [s]")
+    clda_half_life = traits.Float(60, desc="Half-life for exponential decay [s] to combine with previous weights.") #[s]
+
+    def create_learner(self):
+        '''
+        The "learner" uses knowledge of the task goals to determine the "intended"
+        action of the BMI subject and pairs this intention estimation with actual observations.
+        '''
+        self.learn_flag = False
+        learner_batch_size = int(self.clda_batch_time/self.decoder.binlen)
+        self.learner = clda.SimpleEndpointIntentionLearner(learner_batch_size)
+
+    def create_updater(self):
+        '''
+        The "updater" uses the output batches of data from the learner and an update rule to
+        alter the decoder parameters to better match the intention estimates.
+        '''
+        self.updater = clda.KFSmoothbatch(self.clda_batch_time, self.clda_half_life)
         self.updater.init(self.decoder)
