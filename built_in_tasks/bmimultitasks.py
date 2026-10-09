@@ -302,6 +302,12 @@ class BMIControlMultiMixin(BMILoop, LinearlyDecreasingAssist):
 
     
     def move_effector(self, pos_offset=[0,0,0], vel_offset=[0,0,0]):
+
+        # only update the cursor position on screen at the specified feedback rate
+        if self.cycle_count % int(self.fps / self.cursor_fb_rate) == 0:
+
+            self.plant.set_endpoint_pos(self.current_pt)
+            self.last_pt = self.plant.get_endpoint_pos()
         pass
     
     def get_target_BMI_state(self, *args):
