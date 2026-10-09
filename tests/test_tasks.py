@@ -80,11 +80,12 @@ class TestManualControlTasks(unittest.TestCase):
     def test_tracking(self):
         print("Running tracking task test")
         seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=5, ramp=1, ramp_down=1, 
-                                                 num_primes=8, seed=42, sample_rate=60, 
+                                                 num_primes=2, seed=42, sample_rate=60, 
                                                  disturbance=False, boundaries=(-10,10,-10,10))
         exp = init_exp(TrackingTask, [HideLeftTrajectory, MouseControl, Window2D], seq, window_size=(1000,800), fullscreen=False,
                        lookahead_time=1, screen_half_height=10)
         exp.rotation = 'xzy'
+        exp.exp_rotation = 'mirror_45'
         exp.trajectory_type = '1d'
         exp.trajectory_amplitude = 5
         exp.trajectory_radius = 0.2
@@ -93,13 +94,56 @@ class TestManualControlTasks(unittest.TestCase):
     @unittest.skip("")
     def test_tracking_2d(self):
         print("Running tracking task test")
-        seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=20, ramp=1, ramp_down=1, 
-                                                 num_primes=10, seed=42, sample_rate=60, dimensions=2, 
-                                                 disturbance=True, boundaries=(-10,10,-10,10), decay_rate = 0.1)
-        exp = init_exp(TrackingTask, [Window2D, MouseControl], seq, window_size=(1000,800), fullscreen=False, 
+        seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=20, time_length=20, ramp=1, ramp_down=1, 
+                                                 num_primes=4, seed=42, sample_rate=60, dimensions=2, 
+                                                 disturbance=True, boundaries=(-10,10,-10,10), decay_rate = None)
+        exp = init_exp(TrackingTask, [Window2D, MouseControl], seq, window_size=(1000,800), fullscreen=False, tracking_out_time = 10, 
                        limit1d=False, trajectory_amplitude=5, lookahead_time=1)
+        #exp.stereo_mode = 'projection'
+        exp.rotation = 'xzy'
+        exp.trajectory_type = '2d'
+        exp.run()
+
+    @unittest.skip("")
+    def test_sine_trajectory(self):
+        print("Running tracking task test")
+        seq = TrackingTask.single_sine_chain(nblocks=1, ntrials=2, time_length=20, ramp=1, ramp_down=0, 
+                          ref_y_freq = 0.5, ref_x_freq = 0.5, dis_y_freq = 0.1, dis_x_freq = 0.15, seed=40, 
+                          sample_rate=60, dimensions = 2, disturbance=False, ref_x_phase = 0, ref_y_phase = 270)
+        exp = init_exp(TrackingTask, [Window2D, MouseControl], seq, window_size=(1000,800), fullscreen=False, 
+                       limit1d=False, trajectory_amplitude=5, lookahead_time=20)
         exp.stereo_mode = 'projection'
         exp.rotation = 'xzy'
+        #exp.exp_rotation = 'mirror_z'
+        exp.trajectory_type = '2d'
+        exp.run()
+
+    @unittest.skip("")
+    def test_circle_trajectory(self):
+        print("Running tracking task test")
+        seq = TrackingTask.circle_chain(nblocks=1, ntrials=2, time_length=20, ramp=0, ramp_down=0, 
+                          ref_freq = 0.5,  dis_y_freq = 0, dis_x_freq = 0, seed=40, 
+                          sample_rate=60, disturbance=False)
+        exp = init_exp(TrackingTask, [Window2D, MouseControl], seq, window_size=(1000,800), fullscreen=False, 
+                       limit1d=False, trajectory_amplitude=5, lookahead_time=20)
+        exp.stereo_mode = 'projection'
+        exp.rotation = 'xzy'
+        exp.exp_rotation = 'mirror_z'
+        exp.trajectory_type = '2d'
+        exp.run()
+
+
+    @unittest.skip("")
+    def test_figure8_trajectory(self):
+        print("Running tracking task test")
+        seq = TrackingTask.figure8_chain(nblocks=1, ntrials=2, time_length=20, ramp=0, ramp_down=0, 
+                          ref_freq = 0.5,  dis_y_freq = 0.1, dis_x_freq = 0.15, seed=40, 
+                          sample_rate=60, disturbance=True, ref_phase = 0)
+        exp = init_exp(TrackingTask, [Window2D, MouseControl], seq, window_size=(1000,800), fullscreen=False, 
+                       limit1d=False, trajectory_amplitude=6, lookahead_time=20)
+        exp.stereo_mode = 'projection'
+        exp.rotation = 'xzy'
+        #exp.exp_rotation = 'mirror_z'
         exp.trajectory_type = '2d'
         exp.run()
 

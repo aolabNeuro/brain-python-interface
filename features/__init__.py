@@ -99,6 +99,7 @@ built_in_features = dict(
     eye_calibration=EyeCalibration, 
     force_sensor=ForceControl,
     show_fixation_progress=Progressbar_fixation,
+    clda_smoothbatch=CLDA_Smoothbatch_IntendedVelocity,
     clda_kfrml=CLDA_KFRML_IntendedVelocity,
     clda_wf_smoothbatch=CLDA_WFSmoothbatch,
     hide_left_trajectory=HideLeftTrajectory,

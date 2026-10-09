@@ -15,6 +15,8 @@ from .target_capture_task_eye import EyeConstrainedTargetCapture, HandConstraine
 from .target_tracking_task import ScreenTargetTracking
 from .rotation_matrices import *
 
+import collections
+
 class ManualControlMixin(traits.HasTraits):
     '''Target capture task where the subject operates a joystick
     to control a cursor. Targets are captured by having the cursor
@@ -44,6 +46,12 @@ class ManualControlMixin(traits.HasTraits):
         self.reportstats['Input quality'] = "100 %"
         if self.random_rewards:
             self.reward_time_base = self.reward_time
+
+        # initialize lag buffer
+        self._cursor_lag_frames = int(round(self.cursor_lag * self.fps))
+        self._pos_buffer = collections.deque(
+            [np.array(self.starting_pos).copy()] * (self._cursor_lag_frames + 1), maxlen=self._cursor_lag_frames + 1
+        )
 
     def init(self):
         self.add_dtype('manual_input', 'f8', (3,))
@@ -175,11 +183,16 @@ class ManualControlMixin(traits.HasTraits):
             else:
                 self.current_pt = self.last_pt
 
-        # Move cursor (plant) to finalized position
-        self.plant.set_endpoint_pos(self.current_pt)
+        # only update the cursor position on screen at the specified feedback rate
+        if self.cycle_count % int(self.fps / self.cursor_fb_rate) == 0:
 
-        # Keep track of last valid cursor (plant) position
-        self.last_pt = self.plant.get_endpoint_pos()
+            self.plant.set_endpoint_pos(self.current_pt)
+            self.last_pt = self.plant.get_endpoint_pos()
+
+        self._pos_buffer.append(self.last_pt.copy())
+        self.plant.cursor.translate(*self._pos_buffer[0], reset=True)
+
+
 
     def update_report_stats(self):
         super().update_report_stats()
