@@ -976,11 +976,28 @@ class BMISystem(object):
         self.learner = learner
         self.updater = updater
         self.feature_accumulator = feature_accumulator
-        self.param_hist = []
 
         self.has_updater = not (self.updater is None)
         if self.has_updater:
             self.updater.init(self.decoder)
+
+    
+        # Entry 0 of the history is the initial decoder
+        self.param_hist = [self._initial_params()]
+        self._initial_flag_pending = True
+
+    def _initial_params(self):
+        '''
+        Copy of the decoder's model parameters before any CLDA update, keyed like the
+        updater's output (e.g. 'filt.C')
+        '''
+        params = {}
+        for attr in getattr(self.decoder.filt, 'model_attrs', []):
+            try:
+                params['filt.' + attr] = copy.deepcopy(getattr(self.decoder.filt, attr))
+            except AttributeError:
+                pass
+        return params
 
     def __call__(self, neural_obs, target_state, task_state, learn_flag=False, **kwargs):
         '''
@@ -1023,6 +1040,11 @@ class BMISystem(object):
 
         decoded_states = np.zeros([self.decoder.n_states, n_obs])
         update_flag = False
+
+        # The initial decoder counts as the first update
+        if self._initial_flag_pending:
+            update_flag = True
+            self._initial_flag_pending = False
 
         for k in range(n_obs):
             neural_obs_k = neural_obs[:,k].reshape(-1,1)
@@ -1365,7 +1387,7 @@ class BMILoop(object):
         log_file.write(str(self.state) + '\n')
         try:
             from . import clda
-            if len(self.bmi_system.param_hist) > 0 and not self.updater is None:
+            if len(self.bmi_system.param_hist) > 1 and not self.updater is None:
                 log_file.write('n_updates: %g\n' % len(self.bmi_system.param_hist))
                 ignore_none = self.learner.batch_size > 1
                 log_file.write('Ignoring "None" values: %s\n' % str(ignore_none))
@@ -1398,27 +1420,23 @@ class BMILoop(object):
 
         compfilt = tables.Filters(complevel=5, complib="zlib", shuffle=True)
         if len(data) > 0:
-            # Find the first parameter update dictionary
-            k = 0
-            first_update = data[k]
-            while first_update is None:
-                k += 1
-                first_update = data[k]
+            table_col_names = []
+            templates = {}
+            for d in data:
+                if d is None:
+                    continue
+                for key, val in d.items():
+                    if key not in templates:
+                        templates[key] = val
+                        table_col_names.append(key)
 
-            table_col_names = list(first_update.keys())
-            print(table_col_names)
             dtype = []
-            shapes = []
             for col_name in table_col_names:
-                if isinstance(first_update[col_name], float):
-                    shape = (1,)
-                else:
-                    shape = first_update[col_name].shape
+                val = templates[col_name]
+                shape = (1,) if isinstance(val, float) else np.asarray(val).shape
                 dtype.append((col_name.replace('.', '_'), 'f8', shape))
-                shapes.append(shape)
 
             log_file.write(str(dtype))
-            # Create the HDF table with the datatype above
             dtype = np.dtype(dtype)
 
             h5file = tables.open_file(hdf_fname, mode='a')
@@ -1426,20 +1444,19 @@ class BMILoop(object):
 
             null_update = np.zeros((1,), dtype=dtype)
             for col_name in table_col_names:
-                null_update[col_name.replace('.', '_')] *= np.nan
+                null_update[col_name.replace('.', '_')] = np.nan
 
             for k, param_update in enumerate(data):
                 log_file.write('%d, %s\n' % (k, str(ignore_none)))
-                if param_update == None:
+                if param_update is None:
                     if ignore_none:
                         continue
-                    else:
-                        data_row = null_update
+                    data_row = null_update
                 else:
-                    data_row = np.zeros((1,), dtype=dtype)
+                    data_row = null_update.copy()
                     for col_name in table_col_names:
-                        data_row[col_name.replace('.', '_')] = np.asarray(param_update[col_name])
-
+                        if col_name in param_update:
+                            data_row[col_name.replace('.', '_')] = np.asarray(param_update[col_name])
                 arr.append(data_row)
             h5file.close()
 
@@ -1470,7 +1487,7 @@ class BMILoop(object):
         # save out the parameter history and new decoder unless task was stopped
         # before 1st update
         try:
-            if len(self.bmi_system.param_hist) > 0  and not self.updater is None:
+            if len(self.bmi_system.param_hist) > 1  and not self.updater is None:
                 # create name for new decoder
                 now = datetime.datetime.now()
                 decoder_name = self.decoder_sequence + now.strftime('%m%d%H%M')
