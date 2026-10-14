@@ -140,6 +140,8 @@ class OnlineAnalysis(traits.HasTraits):
         '''
         super()._cycle()
         self._send_online_analysis_msg('cycle_count', self.cycle_count)
+        if hasattr(self, 'frame_index'):
+            self._send_online_analysis_msg('frame_index', self.frame_index)
         if hasattr(self, 'plant'):
             self._send_online_analysis_msg('cursor', self.plant.get_endpoint_pos())
         if hasattr(self, 'eye_pos'):
