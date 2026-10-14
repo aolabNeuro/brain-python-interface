@@ -1387,9 +1387,11 @@ class BMILoop(object):
         log_file.write(str(self.state) + '\n')
         try:
             from . import clda
-            if len(self.bmi_system.param_hist) > 1 and not self.updater is None:
-                log_file.write('n_updates: %g\n' % len(self.bmi_system.param_hist))
-                ignore_none = self.learner.batch_size > 1
+            if len(self.bmi_system.param_hist) > 0:
+                #log_file.write('n_updates: %g\n' % len(self.bmi_system.param_hist))
+                log_file.write('n_updates: %g\n' % (len(self.bmi_system.param_hist) - 1)) #update length so that fixed doesnt start at 1 update
+
+                ignore_none = getattr(self.learner, 'batch_size', 1) > 1
                 log_file.write('Ignoring "None" values: %s\n' % str(ignore_none))
 
                 self.write_clda_data_to_hdf_table(
