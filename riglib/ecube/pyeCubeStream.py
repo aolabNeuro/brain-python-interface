@@ -471,7 +471,7 @@ class eCubeStream:
 
         self.ctlsock.send_multipart([self.VERSTR, b"START"])
         reply = self.ctlsock.recv_multipart()
-        if len(reply) == 1 and reply[0] != b"OKSTART":
+        if len(reply) == 1 and reply[0] != b"OKSTART" and reply[0] != b"The acquisition is already running":
             raise RuntimeError(reply[0].decode('utf-8'))
 
         self.isstreaming = True

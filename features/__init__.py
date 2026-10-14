@@ -6,7 +6,7 @@ task/experiment by multiple inheritance.
 from features.debug_features import Profiler, OnlineAnalysis
 from features.laser_features import QwalorLaser, MultiQwalorLaser, SwitchedQwalorLaser, LaserState
 from features.quattrocento_features import QuattBMI
-from riglib.stereo_opengl.window import WindowWithExperimenterDisplay, Window2D
+from riglib.stereo_opengl.window import WindowWithExperimenterDisplay, Window2D, Window2DIn3D
 from riglib.stereo_opengl.openxr import WindowVR
 
 from .generator_features import Autostart, RandomDelay, AdaptiveGenerator, IgnoreCorrectness, PoissonWait, Progressbar_fixation, \
@@ -15,10 +15,11 @@ from .peripheral_device_features import Button, Joystick, DualJoystick, Joystick
 from .reward_features import RewardSystem, RewardSystemPulse, TTLReward, JuiceLogging, PelletReward, JackpotRewards, ProgressBar, TrackingRewards, RewardAudio, PenaltyAudio, ScoreRewards, ConsecutiveJackpot
 from .eyetracker_features import EyeCursor, EyeData, CalibratedEyeData, PupilLabStreaming, SimulatedEyeData, FixationStart, EyeConstrained, \
     AutomaticEyeCalibration, EyeCalibration, EyeStreaming
-from .touch_features import MouseEmulateTouch
+from .touch_features import MouseEmulateTouch, TabletTouch
 from .phasespace_features import MotionData, MotionSimulate, MotionAutoAlign
 from .optitrack_features import Optitrack, SpheresToCylinders
 from .plexon_features import PlexonBMI, RelayPlexon, RelayPlexByte
+from .spikerbox_features import SpikerBoxBMI
 from .hdf_features import SaveHDF
 from .video_recording_features import SingleChannelVideo, E3Video
 from .bmi_task_features import NormFiringRates
@@ -28,7 +29,7 @@ from .blackrock_features import RelayBlackrockByte
 from .ecube_features import EcubeFileBMI, EcubeBMI, RecordECube
 from .sync_features import ArduinoSync, CursorAnalogOut, ScreenSync, HDFSync
 from .neuropixel_features import RecordNeuropixels
-from .clda_features import CLDA_KFRML_IntendedVelocity
+from .clda_features import CLDA_Smoothbatch_IntendedVelocity, CLDA_KFRML_IntendedVelocity, CLDA_WFSmoothbatch
 
 built_in_features = dict(
     keyboard=KeyboardControl,
@@ -45,6 +46,7 @@ built_in_features = dict(
     rand_delay=RandomDelay,
     poisson_wait=PoissonWait,
     window2D=Window2D,
+    window2Din3D=Window2DIn3D,
     windowVR=WindowVR,
     cylinder_center_out=SpheresToCylinders,
     adaptive_generator=AdaptiveGenerator,
@@ -67,6 +69,7 @@ built_in_features = dict(
     single_video=SingleChannelVideo,
     exp_display=WindowWithExperimenterDisplay,
     relay_arduino=PlexonSerialDIORowByte,
+    spikerbox_bmi=SpikerBoxBMI,
     plexonbmi=PlexonBMI,
     relay_plexon=RelayPlexon,
     relay_plexbyte=RelayPlexByte,
@@ -96,7 +99,9 @@ built_in_features = dict(
     eye_calibration=EyeCalibration, 
     force_sensor=ForceControl,
     show_fixation_progress=Progressbar_fixation,
+    clda_smoothbatch=CLDA_Smoothbatch_IntendedVelocity,
     clda_kfrml=CLDA_KFRML_IntendedVelocity,
+    clda_wf_smoothbatch=CLDA_WFSmoothbatch,
     hide_left_trajectory=HideLeftTrajectory,
     consecutive_jackpot=ConsecutiveJackpot,
     mouse_emulate_touch=MouseEmulateTouch,
@@ -104,6 +109,7 @@ built_in_features = dict(
     start_trial_below_speed_thr=StartTrialBelowSpeedThr,
     reward_system_pulse = RewardSystemPulse,
     readyset_colorchange = ReadysetColorChange,
+    tablet_touch = TabletTouch,
     random_delay_eye_hand_sequence = DiscreteRandomDelay_EyeHandSequence,
     hide_cursor_return = HideCursorReturn,
     auto_eye_calibration = AutomaticEyeCalibration,

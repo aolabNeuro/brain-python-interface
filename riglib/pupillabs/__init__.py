@@ -10,24 +10,29 @@ from .pupillab_timesync import measure_clock_offset
 
 from riglib.source import DataSourceSystem
 
+eye_labels = ['gaze2d_x', 'gaze2d_y', 'gaze3d_x', 'gaze3d_y', 'gaze3d_z', 'gaze_timestamp', 'gaze_confidence', 'eye_id',
+              'surface_timestamp',
+              'le_2d_x', 'le_2d_y', 'le_diam', 'le_diam_timestamp', 'le_diam_confidence',
+              're_2d_x', 're_2d_y', 're_diam', 're_diam_timestamp', 're_diam_confidence',
+              'system_timestamp']
+gaze_options = ['gaze2d', 'le2d', 're2d', 'gaze3d']
+gaze_options_idx = [[0,1], [9,10], [14,15], [2,3,4]]
+
 class System(DataSourceSystem):
     '''
     Pupil-labs system for reading gaze and pupil data from Pupil Capture.
     '''
-    dtype = np.dtype((float, (19,)))
+    dtype = np.dtype((float, (20,)))
     update_freq = 250
-    name = 'pupillabs'
+    name = "pupillabs"
+    ip = "128.95.215.191"
+    port = "50020"
+    local_clock = time.perf_counter
     
-    def __init__(self, ip="128.95.215.191", port="50020"):
+    def __init__(self):
         '''
         For eye tracking, need Pupil Capture running in the background (after calibration in Pupil Capture)
-        '''
-        # define a surface AOI
-        
-        # open a req port to talk to pupil
-        self.ip = ip  # remote ip or localhost
-        self.port = port # same as in the pupil remote gui
-        
+        '''      
         # # matrix for camera distortion
         camera = RadialDistortionCamera(
             resolution=(1280, 720),
@@ -55,7 +60,7 @@ class System(DataSourceSystem):
     
     def start(self):
         '''
-        
+        Connect to Pupil Capture and start receiving data.
         '''
         self.ctx = zmq.Context()
         self.pupil_remote = self.ctx.socket(zmq.REQ)
@@ -67,9 +72,8 @@ class System(DataSourceSystem):
         # print('pupillab starting recording in Pupil Capture')
 
         # sync pupil internal clock with the local time 
-        local_clock = time.perf_counter
-        self.offset = measure_clock_offset(self.pupil_remote, clock_function=local_clock)
-        print(f"\n Pupillab Clock offset (1 measurement): {self.offset} seconds")
+        # self.offset = measure_clock_offset(self.pupil_remote, clock_function=self.local_clock)
+        # print(f"\n Pupillab Clock offset (1 measurement): {self.offset} seconds")
 
         self.pupil_remote.send_string('SUB_PORT') # Request 'SUB_PORT' for reading data
         sub_port = self.pupil_remote.recv_string()
@@ -92,14 +96,15 @@ class System(DataSourceSystem):
 
     def get(self):
         """
-        read in a batch of eye data and retun x, y on surface & pupil diameters for each eye
+        Read in all available data and retun any values received since the last call. Data that hasn't
+        been updated since the last call will be returned as NaN.
         """
         gaze = np.full((8,), np.nan)
         surface = [np.nan]
         pupil_left = np.full((5,), np.nan)
         pupil_right = np.full((5,), np.nan)
 
-        t0 = time.perf_counter()
+        t0 = self.local_clock()
 
         # read all messages in the queue
         while self.sub.poll(0) == zmq.POLLIN:
@@ -109,7 +114,7 @@ class System(DataSourceSystem):
 
             if message["topic"].startswith("surfaces"):
                 self.mapper.update_homography(message["img_to_surf_trans"])
-                surface = float(message["timestamp"]) - self.offset
+                surface = float(message["timestamp"])
 
             if message["topic"].startswith("gaze.3d"):
                     
@@ -121,7 +126,7 @@ class System(DataSourceSystem):
                         if mapped_gaze is not None:
                             gaze[:2] = np.array([mapped_gaze.norm_x, mapped_gaze.norm_y])
 
-                    gaze[5] = float(message["timestamp"]) - self.offset
+                    gaze[5] = float(message["timestamp"])
                     gaze[6] = message["confidence"]
                     eye = message["topic"].split('.')[-2]
                     gaze[7] = -1 if eye == '01' else eye # save the topic name to recover which eye(s) were used
@@ -129,20 +134,20 @@ class System(DataSourceSystem):
             if message["topic"] == "pupil.1.2d":
                 pupil_left[:2] = message["norm_pos"]
                 pupil_left[2] = float(message["diameter"]) # pupil 1 diamter, left eye, unit: pixel
-                pupil_left[3] = float(message["timestamp"]) - self.offset # timestamp for left pupil
+                pupil_left[3] = float(message["timestamp"]) # timestamp for left pupil
                 pupil_left[4] = message["confidence"] # confidence for left pupil
 
             elif message["topic"] == "pupil.0.2d":
                 pupil_right[:2] = message["norm_pos"] 
                 pupil_right[2] = float(message["diameter"])
-                pupil_right[3] = float(message["timestamp"]) - self.offset
+                pupil_right[3] = float(message["timestamp"])
                 pupil_right[4] = message["confidence"]
 
-        coords = np.hstack([gaze, surface, pupil_left, pupil_right]) 
+        coords = np.hstack([gaze, surface, pupil_left, pupil_right, [t0]]) 
         coords = np.expand_dims(coords, axis=0)
 
         # Sleep for the remainder of the update period
-        while time.perf_counter() - t0 < 1.0 / self.update_freq:
+        while self.local_clock() - t0 < 1.0 / self.update_freq:
             time.sleep(0.0001)
 
         return coords
@@ -150,15 +155,9 @@ class System(DataSourceSystem):
     
 class NoSurfaceTracking(System):
 
-    def __init__(self, ip="128.95.215.191", port="50020"):
+    def __init__(self):
         '''
         For eye tracking, need Pupil Capture running in the background (after calibration in Pupil Capture)
         '''
-        # define a surface AOI
-        
-        # open a req port to talk to pupil
-        self.ip = ip  # remote ip or localhost
-        self.port = port # same as in the pupil remote gui
-        
         self.mapper = None
         self.mapped_points = []

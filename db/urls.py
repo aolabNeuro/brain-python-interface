@@ -28,13 +28,14 @@ urlpatterns = [
     path('setup/run_upkeep', ajax.setup_run_upkeep),
     path('setup/update/generic', ajax.setup_handler),
     path('setup/update/toggle_features', ajax.toggle_features),
+    path('setup/remove/feature', ajax.remove_feature),
     path('setup/remove/task', ajax.remove_task),
     path('setup/remove/system', ajax.remove_system),
     path('setup/remove/task', ajax.remove_task),
     path('setup/remove/subject', ajax.remove_subject),
     path('setup/remove/experimenter', ajax.remove_experimenter),
     
-    path(r'exp_log/', views.list_exp_history, dict(max_entries=400)),
+    path(r'exp_log/', views.list_exp_history, dict(default_days=30)),
     path(r'exp_log/all/', views.list_exp_history),
     path("exp_log/link_data_files/<int:task_entry_id>", views.link_data_files_view_generator),
     path("exp_log/link_data_files/<int:task_entry_id>/submit", views.link_data_files_response_handler),
@@ -70,6 +71,7 @@ urlpatterns = [
     path(r'exp_log/save_entry_name', ajax.save_entry_name),
 
     path(r'exp_log/stop/', ajax.stop_experiment),
+    path(r'exp_log/all/stop/', ajax.stop_experiment),
     path(r'enable_clda/', ajax.enable_clda),
     path(r'rewarddrain/<str:onoff>/', ajax.reward_drain),
     path(r'disable_clda/', ajax.disable_clda),
