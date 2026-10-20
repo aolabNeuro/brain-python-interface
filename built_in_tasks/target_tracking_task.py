@@ -329,19 +329,19 @@ class TargetTracking(Sequence):
 
     def _test_ramp_up_complete(self, time_in_state):
         '''Test whether the ramp up is finished'''
-        return (not self.ramp_up_complete) & (self.frame_index-1 >= self.ramp_up_time*self.sample_rate)
+        return (not self.ramp_up_complete) & (self.frame_index >= self.ramp_up_time*self.sample_rate)
 
     def _test_traj_complete(self, time_in_state):
         '''Test whether the trajectory is finished and whether there is a ramp down before the trial ends'''
-        return (self.frame_index-1 >= self.trajectory_length - self.ramp_down_time*self.sample_rate) and (self.ramp_down_time > 0)
+        return (self.frame_index >= self.trajectory_length - self.ramp_down_time*self.sample_rate) and (self.ramp_down_time > 0)
 
     def _test_ramp_and_trial_complete(self, time_in_state):
         '''Test whether the ramp down is finished, ending the trial'''
-        return (self.frame_index >= self.trajectory_length) and (self.ramp_down_time > 0)
+        return (self.frame_index == self.trajectory_length) and (self.ramp_down_time > 0)
     
     def _test_trial_complete(self, time_in_state):
         '''Test whether the trajectory is finished, ending the trial'''
-        return (self.frame_index >= self.trajectory_length) and (self.ramp_down_time == 0)
+        return (self.frame_index == self.trajectory_length) and (self.ramp_down_time == 0)
 
     def _test_tracking_out_timeout(self, time_in_state):
         return time_in_state > self.tracking_out_time
@@ -468,11 +468,12 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.add_dtype('disturbance', 'f8', (3,))
         super().init()
         self.plant.set_endpoint_pos(np.array(self.starting_pos))
+
     def _cycle(self):
         '''
         Calls any update functions necessary and redraws screen
         '''
-        # Use to debug indexing into reference and disturbance trajectories
+        # # Use to debug indexing into reference and disturbance trajectories
         # if self.frame_index >= 0:
         #     print('FRAME ', self.frame_index, self.get_state(), self.trial_timed_out)
         #     print(self.target.get_position()[2], self.pos_offset[2], self.trajectory.get_position()[0])
@@ -523,22 +524,17 @@ class ScreenTargetTracking(TargetTracking, Window):
             self.plant.set_visibility(self.plant_visible)
 
     def update_frame(self):
-        if self.trial_timed_out:
-            use_frame_index = self.trajectory_length - 1
-        else:
-            use_frame_index = self.frame_index
+        if not self.trial_timed_out:
+            self.target.move_to_position(self.targs[self.frame_index])
+            # keep `target_location` in sync for BMIControlMultiMixin.get_target_BMI_state
+            self.target_location = self.target.get_position()
 
-        self.target.move_to_position(self.targs[use_frame_index])
-        # keep `target_location` in sync for BMIControlMultiMixin.get_target_BMI_state
-        self.target_location = self.target.get_position()
-        if self.trajectory_type == '1d':
-            self.trajectory.move_to_position(np.array([-use_frame_index*self.lookahead_scale - self.lookahead*self.lookahead_scale,0,0]))
-            # print(self.frame_index, use_frame_index, self.trajectory.get_position())
-            
-        elif self.trajectory_type == '2d':
-            self.trajectory.update_mask(use_frame_index, use_frame_index+self.lookahead)
-        time_in_trajectory = self.get_time() - self.trajectory_start_time
-        self.frame_index = min(int(time_in_trajectory * self.sample_rate), self.trajectory_length)
+            if self.trajectory_type == '1d':
+                self.trajectory.move_to_position(np.array([-self.frame_index*self.lookahead_scale - self.lookahead*self.lookahead_scale,0,0]))
+                # print(self.frame_index, self.frame_index, self.trajectory.get_position())
+                
+            elif self.trajectory_type == '2d':
+                self.trajectory.update_mask(self.frame_index, self.frame_index+self.lookahead)
 
     def setup_start_wait(self):
         # Allow 2d movement
@@ -616,8 +612,12 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.target.reset()
 
     def setup_while_tracking(self):
+        # Set frame index based on current elapsed tracking time
+        time_in_trajectory = self.get_time() - self.trajectory_start_time
+        self.frame_index = min(int(np.round(time_in_trajectory * self.sample_rate)), self.trajectory_length)
+        
         # Check whether there are no more target frames to display
-        if self.frame_index >= self.trajectory_length:
+        if self.frame_index == self.trajectory_length:
             self.trial_timed_out = True
             self.pos_offset = [0,0,0]
             self.vel_offset = [0,0,0]
