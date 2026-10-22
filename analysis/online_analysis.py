@@ -413,8 +413,8 @@ class TrackingErrorWorker(AnalysisWorker):
         self.n = 0 
 
         self.ax.axis('on')
-        self.ax.set_position([0.12, 0.2, 0.8, 0.8])
-        self.ax.set_xlabel('Time in trial (s)')
+        self.ax.set_position([0.12, 0.2, 0.8, 0.7])
+        self.ax.set_xlabel('Session Time (s)')
         self.ax.set_ylabel('|Error| (cm)')
         self.x_line, = self.ax.plot([], [], color='green', linewidth=0.5, alpha=0.4, label='X')
         self.y_line, = self.ax.plot([], [], color='magenta', linewidth=0.5, alpha=0.4, label='Y')
@@ -430,7 +430,7 @@ class TrackingErrorWorker(AnalysisWorker):
             self.avg_time = val 
             self.avg_n = int(val * self.task_params['fps'])
             self.x_avg.set_label(f'X ({val:g} s avg)')
-            self.y_avg.set_label(f'Y ({val:g}) s avg)')
+            self.y_avg.set_label(f'Y ({val:g} s avg)')
             self.ax.legend(loc = 'upper left')
 
         self.avg_slider.on_changed(set_avg_time)
@@ -454,7 +454,7 @@ class TrackingErrorWorker(AnalysisWorker):
             elif event_name in self.end_events:
                 if self.frame_index >= 0: 
                     t = self.cycle_count / self.task_params['fps']
-                    self.append([t, np.nan, np.nan, np.nan, np.nan])
+                    self._append([t, np.nan, np.nan, np.nan, np.nan])
                 self.frame_index = -1  # stop recording; last trial stays on screen
         elif key == 'cycle_count' and self.frame_index >= 0:
             self.frame_index += 1
@@ -465,6 +465,7 @@ class TrackingErrorWorker(AnalysisWorker):
             if self.frame_index >= 0 and self.target_pos is not None:
                 err = np.abs(self.cursor_pos - self.target_pos)
                 self.window = np.roll(self.window, -1, axis = 0)
+                self.window[-1] = err
                 avg = np.nanmean(self.window[-self.avg_n:], axis = 0)
                 t = self.cycle_count / self.task_params['fps']
                 self._append([t, err[0], err[1], avg[0], avg[1]])
