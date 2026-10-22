@@ -340,16 +340,7 @@ class TrackingAnalysisWorker(BehaviorAnalysisWorker):
         self.dist_line, = self.ax.plot([], [], 'red', linewidth=2, alpha=0.75, label='Disturbance')
         self.ax.legend()
 
-        self.ax.set_position([0, 0.33, 1, 0.6])
-        self.err_ax = self.fig.add_axes([0.1, 0.22, 0.8, 0.08])
-        self.err_ax.set_xlim(-self.buffer_time, 0)
-        self.err_ax.set_ylabel('Error (cm)')
-        self.err_ax.set_xlabel('Time (s)')
-        self.err_ax.tick_params(labelbottom=False)
-        self.err_buffer = np.full(int(self.buffer_time*self.task_params['fps']), np.nan)
-        err_t = np.arange(len(self.err_buffer)) / self.task_params['fps'] - self.buffer_time
-        self.err_plot, = self.err_ax.plot(err_t, self.err_buffer, 'purple', linewidth=0.5, alpha=0.5)
-
+    
     def handle_data(self, key, values):
         super().handle_data(key, values)
         if key == 'reference_signal':
@@ -370,20 +361,10 @@ class TrackingAnalysisWorker(BehaviorAnalysisWorker):
             self.frame_index += 1
             if self.frame_index < len(self.reference):
                 self.target_pos[0] = self.reference[self.frame_index,[0,2]]
-        elif key == 'cursor':
-            
-            err = np.nan
-            if self.frame_index >= 0 and 0 in self.target_pos:
-                err = np.linalg.norm(self.cursor_pos - self.target_pos[0])  
-        
-            self.err_buffer = np.roll(self.err_buffer, -1)
-            self.err_buffer[-1] = err
 
+       
     def draw(self):
         super().draw()
-        self.err_plot.set_ydata(self.err_buffer)
-        self.err_ax.relim()
-        self.err_ax.autoscale_view(scalex=False)
         if self.frame_index >= 0:
             start = self.frame_index
             stop = min(len(self.reference), self.frame_index + int(self.lookahead))
@@ -403,6 +384,78 @@ class TrackingAnalysisWorker(BehaviorAnalysisWorker):
             self.ref_line.set_data([], [])
             self.dist_line.set_data([], [])
 
+#separate window for tracking error 
+class TrackingErrorWorker(AnalysisWorker):
+    ''' 
+    Plots x, y error from tracking task over the whole task timescale. 
+    
+    '''
+
+    end_events = ['TRIAL_END', 'PAUSE', 'HOLD_PENALTY', 'DELAY_PENALTY', 'OTHER_PENALTY',
+                  'TIMEOUT_PENALTY', 'FIXATION_PENALTY'] # list events that end trial 
+
+    def __init__(self, task_params, data_queue, avg_time=20, **kwargs):
+        super().__init__(task_params, data_queue, **kwargs)
+        self.avg_time = avg_time  # seconds for the rolling average
+
+    def init(self):
+        super().init()
+        self.avg_n = int(self.avg_time * self.task_params['fps'])  # frames in the average
+        self.reference = None
+        self.frame_index = -1
+        self.cursor_pos = np.zeros(2)
+        self.target_pos = None
+        self.err_hist = []  # instant (x, y) error for every frame of this trial
+        self.avg_hist = []  # rolling average at every frame of this trial
+
+        self.ax.axis('on')
+        self.ax.set_position([0.12, 0.1, 0.8, 0.8])
+        self.ax.axhline(10, color='gray', linewidth=1.0, label='Threshold')
+        self.ax.set_xlabel('Time in trial (s)')
+        self.ax.set_ylabel('|Error| (cm)')
+        self.x_line, = self.ax.plot([], [], color='green', linewidth=0.5, alpha=0.4, label='X')
+        self.y_line, = self.ax.plot([], [], color='magenta', linewidth=0.5, alpha=0.4, label='Y')
+        self.x_avg, = self.ax.plot([], [], color='green', linewidth=2, label=f'X ({self.avg_time:g} s avg)')
+        self.y_avg, = self.ax.plot([], [], color='magenta', linewidth=2, label=f'Y ({self.avg_time:g} s avg)')
+        self.ax.legend(loc='upper left')
+
+    def handle_data(self, key, values):
+        super().handle_data(key, values)  # keeps cycle_count up to date
+        if key == 'reference_signal':
+            self.reference = np.array(values[0])
+        elif key == 'sync_event':
+            event_name, _ = values
+            if event_name == 'TRIAL_START':
+                self.frame_index = 0
+                self.err_hist, self.avg_hist = [], []  # start a fresh trial
+                if self.reference is not None:
+                    self.target_pos = self.reference[0, [0, 2]]
+            elif event_name in self.end_events:
+                self.frame_index = -1  # stop recording; last trial stays on screen
+        elif key == 'cycle_count' and self.frame_index >= 0:
+            self.frame_index += 1
+            if self.reference is not None and self.frame_index < len(self.reference):
+                self.target_pos = self.reference[self.frame_index, [0, 2]]
+        elif key == 'cursor':
+            self.cursor_pos = np.array(values[0])[[0, 2]]
+            if self.frame_index >= 0 and self.target_pos is not None:
+                self.err_hist.append(np.abs(self.cursor_pos - self.target_pos))
+                self.avg_hist.append(np.mean(self.err_hist[-self.avg_n:], axis=0))
+
+    def draw(self):
+        super().draw()
+        if not self.err_hist:
+            return
+        t = np.arange(len(self.err_hist)) / self.task_params['fps']
+        err = np.array(self.err_hist)
+        avg = np.array(self.avg_hist)
+        self.x_line.set_data(t, err[:, 0])
+        self.y_line.set_data(t, err[:, 1])
+        self.x_avg.set_data(t, avg[:, 0])
+        self.y_avg.set_data(t, avg[:, 1])
+        self.ax.relim()
+        self.ax.autoscale_view()
+    
 class SaccadeAnalysisWorker(BehaviorAnalysisWorker):
     '''
     Plots calibrated_eye, cursor, and target data from experiments that have them.
@@ -1155,6 +1208,8 @@ class OnlineDataServer(threading.Thread):
 
         elif self.task_params['experiment_name'] == 'TrackingTask':
             self.analysis_workers.append((TrackingAnalysisWorker(self.task_params, data_queue), data_queue))
+            err_que = mp.Queue()
+            self.analysis_workers.append((TrackingErrorWorker(self.task_params, err_que), err_que))
 
         elif self.task_params['experiment_name'] == 'EyeConstrainedManualControl':
             self.analysis_workers.append((SaccadeAnalysisWorker(self.task_params, data_queue), data_queue))
