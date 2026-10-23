@@ -387,7 +387,7 @@ class TrackingAnalysisWorker(BehaviorAnalysisWorker):
 #separate window for tracking error 
 class TrackingErrorWorker(AnalysisWorker):
     ''' 
-    Plots x, y error from tracking task over the whole task timescale. 
+    Plots x, y error from tracking task over the whole task timescale with a five min sliding window. 
     
     '''
 
@@ -397,23 +397,22 @@ class TrackingErrorWorker(AnalysisWorker):
     def __init__(self, task_params, data_queue, avg_time=20, **kwargs):
         super().__init__(task_params, data_queue, **kwargs)
         self.avg_time = avg_time  # seconds for the rolling average
-
+        self.plot_window = 300 # num of secs before starting to scroll
+    
     def init(self):
         super().init()
-        self.avg_n = int(self.avg_time * self.task_params['fps'])  # frames in the average
+        
         self.reference = None
         self.frame_index = -1
         self.cursor_pos = np.zeros(2)
         self.target_pos = None
-
-        self.max_avg_time = 60 #slider window max 
-        self.window = np.full((int(self.max_avg_time*self.task_params['fps']), 2), np.nan)
+        self.trial_start = 0 # index of start 
 
         self.data = np.full((10000,5), np.nan)
         self.n = 0 
 
         self.ax.axis('on')
-        self.ax.set_position([0.12, 0.2, 0.8, 0.7])
+        self.ax.set_position([0.12, 0.1, 0.8, 0.8])
         self.ax.set_xlabel('Session Time (s)')
         self.ax.set_ylabel('|Error| (cm)')
         self.x_line, = self.ax.plot([], [], color='green', linewidth=0.5, alpha=0.4, label='X')
@@ -422,19 +421,7 @@ class TrackingErrorWorker(AnalysisWorker):
         self.y_avg, = self.ax.plot([], [], color='magenta', linewidth=2, label=f'Y ({self.avg_time:g} s avg)')
         self.ax.legend(loc='upper left')
 
-        ax_slider = self.fig.add_axes([0.25, 0.05, 0.55, 0.03])
-        self.avg_slider = Slider(ax_slider, 'Avg window (s)', valmin = 1, valmax = self.max_avg_time, 
-                                 valinit = self.avg_time, valstep =1)
-
-        def set_avg_time(val):
-            self.avg_time = val 
-            self.avg_n = int(val * self.task_params['fps'])
-            self.x_avg.set_label(f'X ({val:g} s avg)')
-            self.y_avg.set_label(f'Y ({val:g} s avg)')
-            self.ax.legend(loc = 'upper left')
-
-        self.avg_slider.on_changed(set_avg_time)
-
+        
     def _append(self, row): #increase data history array 
         if self.n == len(self.data):
             self.data = np.vstack((self.data, np.full_like(self.data, np.nan)))
@@ -449,6 +436,7 @@ class TrackingErrorWorker(AnalysisWorker):
             event_name, _ = values
             if event_name == 'TRIAL_START':
                 self.frame_index = 0
+                self.trial_start = self.n
                 if self.reference is not None:
                     self.target_pos = self.reference[0, [0, 2]]
             elif event_name in self.end_events:
@@ -464,25 +452,29 @@ class TrackingErrorWorker(AnalysisWorker):
             self.cursor_pos = np.array(values[0])[[0, 2]]
             if self.frame_index >= 0 and self.target_pos is not None:
                 err = np.abs(self.cursor_pos - self.target_pos)
-                self.window = np.roll(self.window, -1, axis = 0)
-                self.window[-1] = err
-                avg = np.nanmean(self.window[-self.avg_n:], axis = 0)
                 t = self.cycle_count / self.task_params['fps']
-                self._append([t, err[0], err[1], avg[0], avg[1]])
+                self._append([t, err[0], err[1], np.nan, np.nan])
+                trl_avg = max(np.searchsorted(self.data[:self.n, 0], t - self.avg_time), self.trial_start)
+                self.data[self.n - 1, 3:5] = np.nanmean(self.data[trl_avg:self.n, 1:3], axis = 0)
 
 
     def draw(self):
         super().draw()
         if self.n == 0: 
             return 
-        d = self.data[:self.n]
+        t_now = self.data[self.n - 1, 0]
+        t_min = max(0, t_now - self.plot_window)
+        start_tm = np.searchsorted(self.data[:self.n, 0], t_min)
+        d = self.data[start_tm:self.n]
    
         self.x_line.set_data(d[:,0], d[:, 1])
         self.y_line.set_data(d[:,0], d[:, 2])
         self.x_avg.set_data(d[:,0], d[:, 3])
         self.y_avg.set_data(d[:,0], d[:, 4])
+        self.ax.set_xlim(t_min, max(t_now, self.plot_window))
+
         self.ax.relim()
-        self.ax.autoscale_view()
+        self.ax.autoscale_view(scalex = False, scaley = True)
     
 class SaccadeAnalysisWorker(BehaviorAnalysisWorker):
     '''
