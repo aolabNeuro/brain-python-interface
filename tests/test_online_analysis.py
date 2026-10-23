@@ -83,11 +83,11 @@ class TestOnlineAnalysis(unittest.TestCase):
             exp = Exp(seq, fps=120, session_length=28, online_analysis_ip='localhost', online_analysis_port=5000,
                     fullscreen=False, window_size=(800,600), wait_time=0, trajectory_type='2d', rotation = 'xzy', limit1d=False, trajectory_amplitude=5)
         else: # 1d
-            seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=5, ramp=1, ramp_down=1, 
-                                                 num_primes=8, seed=42, sample_rate=60, 
+            seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=5, time_length=5, ramp=1, ramp_down=1, 
+                                                 num_primes=8, seed=42, sample_rate=120, 
                                                  disturbance=False, boundaries=(-10,10,-10,10))
             Exp = experiment.make(TrackingTask, feats=[Window2D, MouseControl, OnlineAnalysis])
-            exp = Exp(seq, fps=120, session_length=28, online_analysis_ip='localhost', online_analysis_port=5000,
+            exp = Exp(seq, fps=120, session_length=0, online_analysis_ip='localhost', online_analysis_port=5000,
                     fullscreen=False, window_size=(800,600), wait_time=0, rotation = 'xzy', trajectory_amplitude=5)
 
         print(exp.dtype)
