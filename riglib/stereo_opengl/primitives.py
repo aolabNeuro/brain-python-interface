@@ -157,7 +157,7 @@ class Cable(TriMesh):
     def __init__(self,radius=.5, xyz = np.array([np.sin(x) for x in range(60)]), segments=12,**kwargs):
         self.xyz = xyz
         if np.ndim(xyz) == 1:
-            self.xyz = np.array([[x,0,xyz[x]] for x in range(len(xyz))])           
+            self.xyz = np.stack([np.arange(len(xyz)), np.zeros(len(xyz)), xyz], axis=1)
         self.center_value = [0,0,0]
         self.radius = radius
         self.segments = segments
@@ -167,52 +167,40 @@ class Cable(TriMesh):
         theta = np.linspace(0, 2 * np.pi, self.segments, endpoint=False)
         circle = np.stack([np.cos(theta), np.sin(theta)], axis=1)  # (segments, 2)
 
-        pts = []
-        normals = []
-        tcoords = []
         n_path = len(self.xyz)
-
         a = np.array([0, 1, 0])  # fixed up direction
 
         # Compute tangents along path
         tangents = np.gradient(self.xyz, axis=0)
         tangents = tangents / np.linalg.norm(tangents, axis=1, keepdims=True)
 
-        for i in range(n_path):
-            p = self.xyz[i]
-            t = tangents[i]
+        # Ring orientation at each path point, with a fallback where the tangent
+        # is parallel to the up direction
+        b = np.cross(tangents, a) # (n_path, 3)
+        norm_b = np.linalg.norm(b, axis=1, keepdims=True)
+        b = np.where(norm_b < 1e-6, [0., 0., 1.], b / np.maximum(norm_b, 1e-6))
 
-            # Ring orientation
-            b = np.cross(t, a)
-            if np.linalg.norm(b) < 1e-6:
-                b = np.array([0, 0, 1])  # fallback
-            else:
-                b = b / np.linalg.norm(b)
+        # Ring of points around each path point, (n_path, segments, 3)
+        offsets = self.radius * (circle[:,0,None] * b[:,None,:] + circle[:,1,None] * a)
 
-            for j in range(self.segments):
-                cx, cy = circle[j]
-                offset = self.radius * (cx * b + cy * a)
-                pts.append(p + offset)
-                normals.append(offset / np.linalg.norm(offset))
-                tcoords.append([j / self.segments, i / (n_path - 1)])
+        self.pts = (self.xyz[:,None,:] + offsets).reshape(-1, 3)
+        self.normals = (offsets / np.linalg.norm(offsets, axis=2, keepdims=True)).reshape(-1, 3)
+        self.tcoord = np.stack([
+            np.tile(np.arange(self.segments) / self.segments, n_path),
+            np.repeat(np.arange(n_path) / (n_path - 1), self.segments)
+        ], axis=1)
 
-        self.pts = np.array(pts)
-        self.normals = np.array(normals)
-        self.tcoord = np.array(tcoords)
-
-        # Create triangle strips between rings
-        polys = []
-        for i in range(n_path - 1):
-            for j in range(self.segments):
-                i0 = i * self.segments + j
-                i1 = i * self.segments + (j + 1) % self.segments
-                i2 = (i + 1) * self.segments + j
-                i3 = (i + 1) * self.segments + (j + 1) % self.segments
-
-                polys.append((i2, i1, i0))
-                polys.append((i3, i1, i2))
-
-        self.polys = np.array(polys)
+        # Create triangle strips between rings, (n_path-1, segments, 2 triangles, 3 verts)
+        i = np.arange(n_path - 1)[:,None] * self.segments
+        j = np.arange(self.segments)[None,:]
+        i0 = i + j
+        i1 = i + (j + 1) % self.segments
+        i2 = i0 + self.segments
+        i3 = i1 + self.segments
+        self.polys = np.stack([
+            np.stack([i2, i1, i0], axis=-1),
+            np.stack([i3, i1, i2], axis=-1)
+        ], axis=2).reshape(-1, 3)
 
         super().__init__(self.pts, self.polys, tcoords=self.tcoord,
                         normals=self.normals, **kwargs)

@@ -211,6 +211,11 @@ class TexModel(Model):
     def release(self):
         self.tex.delete()
 
+    def delete(self):
+        if self.allocated and self.tex is not None:
+            self.release()
+        super().delete()
+
     def replace_texture(self, new_tex):
         self.tex.delete()
         self.tex = new_tex
