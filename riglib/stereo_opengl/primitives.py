@@ -512,6 +512,8 @@ class Snake(Cable, TexModel):
     '''
     A Cable with a gradient texture applied along its length.
     '''
+    max_texture_height = 8192
+
     def __init__(self, radius=.5, trajectory=np.array([np.sin(x) for x in range(100)]), segments=12, **kwargs):
         self.trajectory = trajectory
         color = kwargs.pop('color', [1, 1, 1, 1])  # Default color if not provided
@@ -529,6 +531,10 @@ class Snake(Cable, TexModel):
         mask[start_frame:end_frame] = 1
         if inverse:
             mask = 1 - mask
+        if len(mask) > self.max_texture_height:
+            # Long trajectories exceed GL_MAX_TEXTURE_SIZE; texture coords are normalized so resampling is safe
+            idx = np.linspace(0, len(mask) - 1, self.max_texture_height).round().astype(int)
+            mask = mask[idx]
         mask = np.tile(mask, (4, 1)).T  # Repeat for RGBA
         mask = self.color * mask  # Apply color
         # Keep the varying dimension on texture-v (height) so the gradient runs along cable length.

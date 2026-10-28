@@ -254,7 +254,7 @@ class TriMesh(Model):
                 self.verts.astype(np.float32).ravel(), GL_STATIC_DRAW)
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ebuf)
             glBufferData(GL_ELEMENT_ARRAY_BUFFER, 
-                self.polys.astype(np.uint16).ravel(), GL_STATIC_DRAW)
+                self.polys.astype(np.uint32).ravel(), GL_STATIC_DRAW)
 
             if self.tcoords is not None:
                 self.tbuf = glGenBuffers(1)
@@ -295,7 +295,7 @@ class TriMesh(Model):
         glDrawElements(
             GL_TRIANGLES,           # mode
             len(self.polys)*3,      # count
-            GL_UNSIGNED_SHORT,      # type
+            GL_UNSIGNED_INT,        # type
             GLvoidp(0)              # element array buffer offset
         )
         glDisableVertexAttribArray(ctx.attributes['position'])
