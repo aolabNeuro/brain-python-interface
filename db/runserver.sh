@@ -47,6 +47,12 @@ elif [ "$HOST" = "booted-server" ]; then
     Xvnc $DISPLAY -securityTypes None -geometry 1920x1280 -nocursor &
     eval "$(conda shell.bash hook)"
     conda activate bmi3d
+
+    # Xvnc has no GPU, so OpenGL falls back to llvmpipe (CPU rendering). If VirtualGL and the NVIDIA
+    # driver are installed, render on the GPU with VirtualGL's EGL back end and copy frames into Xvnc.
+    if [ -x /opt/VirtualGL/bin/vglrun ] && [ -e /dev/nvidiactl ]; then
+        RUN_PREFIX="/opt/VirtualGL/bin/vglrun -d /dev/dri/card0"
+    fi
 fi
 export DISPLAY=$DISPLAY
 export BMI3D_PORT=$PORT
@@ -129,7 +135,7 @@ trap "kill 0" EXIT
 
 # Start python processes
 cd $BMI3D
-python manage.py runserver 0.0.0.0:$PORT --noreload &
+$RUN_PREFIX python manage.py runserver 0.0.0.0:$PORT --noreload & # task processes inherit vglrun's preload
 # if [ "$HOST" = "pagaiisland2" ] || [ "$HOST" = "siberut-bmi" ]; then
 #     celery -A db.tracker worker -l INFO &
 # fi
