@@ -1,7 +1,8 @@
 '''
 Helper functions for the DPS experiment notebook (DPS_experiment.ipynb):
 3D plotting of planes and targets, PCA plane fitting of reach endpoints,
-design of perturbation planes, and conversion to BMI3D perturbation params.
+design of perturbation planes, conversion to BMI3D perturbation params, and
+post-block checks that the executed mapping matches the design.
 '''
 
 import numpy as np
@@ -496,12 +497,20 @@ def _no_mirror_gap_deg(n, display_normal, display, display_targets, step=0.5, ma
 
 def bmi3d_angles(R_py):
     '''
-    Convert a design-frame rotation to BMI3D perturbation params, so that BMI3D's
-    row-vector pipeline v @ Ry @ Rz @ Rx reproduces R_py. (S swaps design y<->z;
-    then extract YZX Euler of R_bmi^T.)
+    Convert a design rotation to the BMI3D perturbation params that implement it.
+
+    The design rotation R_py places the display plane in hand space (screen -> hand, column
+    vectors: hand = R_py @ target). BMI3D needs the inverse, hand -> screen:
+    target = R_py.T @ hand. BMI3D applies its mapping to row vectors (cursor = hand @ P),
+    and in row-vector form that inverse is R_py itself: hand @ R_py = (R_py.T @ hand.T).T.
+    So P must equal R_py, with design y and z swapped into BMI3D axes:
+    R_bmi = S @ R_py @ S. BMI3D builds P as Ry @ Rz @ Rx, and
+    Rotation.from_euler('YZX', [a_y, a_z, a_x]).as_matrix() = Ry @ Rz @ Rx, so the params are
+    the YZX Euler angles of R_bmi. (Before 2026-11-02 this used R_bmi.T, which inverted the
+    mapping a second time and implemented R_py as hand -> screen.)
 
     Args:
-        R_py (3, 3): rotation in design coordinates
+        R_py (3, 3): design rotation (screen -> hand), in design coordinates
 
     Returns:
         tuple: tuple containing:
@@ -510,7 +519,7 @@ def bmi3d_angles(R_py):
             | **a_z (float):** perturbation_rotation_z, in degrees
     '''
     R_bmi = _S_DESIGN_TO_BMI3D @ R_py @ _S_DESIGN_TO_BMI3D
-    a_y, a_z, a_x = Rotation.from_matrix(R_bmi.T).as_euler('YZX', degrees=True)
+    a_y, a_z, a_x = Rotation.from_matrix(R_bmi).as_euler('YZX', degrees=True)
     return a_x, a_y, a_z
 
 
@@ -621,6 +630,133 @@ def alt_axis_plane(display, targets, target_idx, hand_traj, rotation_deg=60):
         _, n_design, R_design = best; ok = True
     return dict(n_ref=n_ref, n_design=n_design, R=R_design, compliant=ok,
                 gap_deg=0.0 if ok else _no_mirror_gap_deg(n_design, dn, display, targets))
+
+
+# ===========================================================================
+# Mapping check
+# ===========================================================================
+
+def bmi3d_mapping(a_x, a_y, a_z, exp_gain=1.):
+    '''
+    Hand -> screen mapping that BMI3D implements for the given perturbation params, in
+    design coordinates and row-vector form (cursor = hand @ M). BMI3D applies
+    hand @ Ry @ Rz @ Rx in its own axes (design y and z swapped), so
+    M = S @ (exp_gain * Ry @ Rz @ Rx) @ S. For a design rotation R,
+    bmi3d_mapping(*bmi3d_angles(R)) = R.
+
+    Args:
+        a_x (float): perturbation_rotation_x, in degrees
+        a_y (float): pertubation_rotation (about y), in degrees
+        a_z (float): perturbation_rotation_z, in degrees
+        exp_gain (float, optional): exp_gain of the mapping. Default 1.
+
+    Returns:
+        (3, 3) array: hand -> screen mapping in design coordinates
+    '''
+    P = np.linalg.multi_dot((Rotation.from_euler('y', a_y, degrees=True).as_matrix(),
+                             Rotation.from_euler('z', a_z, degrees=True).as_matrix(),
+                             Rotation.from_euler('x', a_x, degrees=True).as_matrix()))
+    return _S_DESIGN_TO_BMI3D @ (exp_gain * P) @ _S_DESIGN_TO_BMI3D
+
+
+def designed_null_lines(targets, R, n_design, extent=12.):
+    '''
+    Designed null space of each target in hand space: the line through the designed
+    target location (R @ target, screen -> hand) along the designed plane normal.
+
+    Args:
+        targets (ntarget, 3): target positions, screen (display) coordinates
+        R (3, 3): design rotation (screen -> hand)
+        n_design (3,): normal of the designed plane
+        extent (float, optional): half-length of each line, in cm. Default 12.
+
+    Returns:
+        (ntarget, 2, 3) array: start and end point of each target's line
+    '''
+    centers = np.asarray(targets, float) @ np.asarray(R).T
+    offset = extent * np.asarray(n_design, float) / np.linalg.norm(n_design)
+    return np.stack([centers - offset, centers + offset], axis=1)
+
+
+def executed_null_lines(targets, M, display_normal, extent=12.):
+    '''
+    Executed null space of each target in hand space: the hand positions that put the
+    cursor on the target for any position along the display normal, through the inverse
+    of the executed mapping: (target + s * display_normal) @ inv(M).
+
+    Args:
+        targets (ntarget, 3): target positions, screen (display) coordinates
+        M (3, 3): executed hand -> screen mapping (e.g. from bmi3d_mapping)
+        display_normal (3,): normal of the display plane
+        extent (float, optional): half-length of each line along the display normal, in screen cm. Default 12.
+
+    Returns:
+        (ntarget, 2, 3) array: start and end point of each target's line
+    '''
+    M_inv = np.linalg.inv(M)
+    offset = extent * np.asarray(display_normal, float) / np.linalg.norm(display_normal)
+    targets = np.asarray(targets, float)
+    return np.stack([(targets - offset) @ M_inv, (targets + offset) @ M_inv], axis=1)
+
+
+def line_distances(points, lines):
+    '''
+    Perpendicular distance from each point to its own (infinite) line.
+
+    Args:
+        points (npt, 3): points
+        lines (npt, 2, 3): two points on each point's line, e.g. the null-space lines
+            indexed by each trial's target index
+
+    Returns:
+        (npt,) array: distance of each point from its line
+    '''
+    points = np.asarray(points, float)
+    starts, ends = lines[:, 0], lines[:, 1]
+    directions = (ends - starts) / np.linalg.norm(ends - starts, axis=1, keepdims=True)
+    offsets = points - starts
+    perpendicular = offsets - np.sum(offsets * directions, axis=1, keepdims=True) * directions
+    return np.linalg.norm(perpendicular, axis=1)
+
+
+def plot_mapping_check(endpoints, target_idx, designed_lines, executed_lines, colors,
+                       marker_size=20, alpha=0.6, ax=None):
+    '''
+    Plot reach endpoints (dots) with each target's designed null space (solid line) and
+    executed null space (dashed line), all in the target's color. If the executed mapping
+    matches the design, the solid and dashed lines coincide and the endpoints lie on them.
+
+    Args:
+        endpoints (ntr, 3): reach endpoints relative to the reach start, design coordinates
+        target_idx (ntr): target index of each trial
+        designed_lines (ntarget, 2, 3): from designed_null_lines
+        executed_lines (ntarget, 2, 3): from executed_null_lines
+        colors (list): color for each target index
+        marker_size (float, optional): endpoint marker size. Default 20.
+        alpha (float, optional): endpoint transparency. Default 0.6.
+        ax (pyplot.Axes, optional): 3D axis to plot on. If None, creates a new figure. Default None.
+
+    Returns:
+        pyplot.Axes: the axis plotted on
+    '''
+    if ax is None:
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+
+    endpoints = np.asarray(endpoints, float)
+    target_idx = np.asarray(target_idx).astype(int)
+    for t in np.unique(target_idx):
+        for lines, linestyle, linewidth in [(designed_lines, '-', 2), (executed_lines, '--', 1.5)]:
+            line = lines[t]
+            ax.plot(line[:, 0], line[:, 1], line[:, 2], color=colors[t],
+                    linestyle=linestyle, linewidth=linewidth)
+        pts = endpoints[target_idx == t]
+        ax.scatter(pts[:, 0], pts[:, 1], pts[:, 2], color=colors[t], s=marker_size, alpha=alpha)
+
+    ax.plot([], [], color='k', linestyle='-', linewidth=2, label='designed null space')
+    ax.plot([], [], color='k', linestyle='--', linewidth=1.5, label='executed null space')
+    ax.legend(loc='upper left', fontsize=9)
+    return ax
 
 
 # ===========================================================================
