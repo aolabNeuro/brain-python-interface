@@ -459,11 +459,25 @@ class BMIControlMulti_ScreenTargetTracking(BMIControlMultiMixin, ScreenTargetTra
     
     def move_effector(self, pos_offset=[0,0,0], vel_offset=[0,0,0]):
         '''Runs after BMILoop.move_plant() has set the cursor to the decoded position.'''
-        pos_offset = np.asarray(pos_offset, dtype=float)
-        if not np.any(pos_offset):
-            return
+
         decoded_pos = np.asarray(self.plant.get_endpoint_pos()).ravel()
-        new_pos = decoded_pos + pos_offset
+        new_pos = decoded_pos
+        
+        # Restrict cursor to only move along desired dimensions
+        try:
+            if self.limit2d:
+                new_pos[1] = 0
+            if self.limit1d:
+                new_pos[1] = 0
+                new_pos[0] = 0
+
+        except:
+            if self.limit2d:
+                new_pos[1] = 0
+
+        pos_offset = np.asarray(pos_offset, dtype=float)
+        if np.any(pos_offset):
+            new_pos = decoded_pos + pos_offset
 
         bounds = np.asarray(self.cursor_bounds)       # (min0, max0, min1, max1, min2, max2)
         new_pos = np.clip(new_pos, bounds[0::2], bounds[1::2])
