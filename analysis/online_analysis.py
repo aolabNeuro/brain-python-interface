@@ -340,16 +340,7 @@ class TrackingAnalysisWorker(BehaviorAnalysisWorker):
         self.dist_line, = self.ax.plot([], [], 'red', linewidth=2, alpha=0.75, label='Disturbance')
         self.ax.legend()
 
-        self.ax.set_position([0, 0.33, 1, 0.6])
-        self.err_ax = self.fig.add_axes([0.1, 0.22, 0.8, 0.08])
-        self.err_ax.set_xlim(-self.buffer_time, 0)
-        self.err_ax.set_ylabel('Error (cm)')
-        self.err_ax.set_xlabel('Time (s)')
-        self.err_ax.tick_params(labelbottom=False)
-        self.err_buffer = np.full(int(self.buffer_time*self.task_params['fps']), np.nan)
-        err_t = np.arange(len(self.err_buffer)) / self.task_params['fps'] - self.buffer_time
-        self.err_plot, = self.err_ax.plot(err_t, self.err_buffer, 'purple', linewidth=0.5, alpha=0.5)
-
+    
     def handle_data(self, key, values):
         super().handle_data(key, values)
         if key == 'reference_signal':
@@ -370,20 +361,10 @@ class TrackingAnalysisWorker(BehaviorAnalysisWorker):
             self.frame_index += 1
             if self.frame_index < len(self.reference):
                 self.target_pos[0] = self.reference[self.frame_index,[0,2]]
-        elif key == 'cursor':
-            
-            err = np.nan
-            if self.frame_index >= 0 and 0 in self.target_pos:
-                err = np.linalg.norm(self.cursor_pos - self.target_pos[0])  
-        
-            self.err_buffer = np.roll(self.err_buffer, -1)
-            self.err_buffer[-1] = err
 
+       
     def draw(self):
         super().draw()
-        self.err_plot.set_ydata(self.err_buffer)
-        self.err_ax.relim()
-        self.err_ax.autoscale_view(scalex=False)
         if self.frame_index >= 0:
             start = self.frame_index
             stop = min(len(self.reference), self.frame_index + int(self.lookahead))
@@ -403,6 +384,98 @@ class TrackingAnalysisWorker(BehaviorAnalysisWorker):
             self.ref_line.set_data([], [])
             self.dist_line.set_data([], [])
 
+#separate window for tracking error 
+class TrackingErrorWorker(AnalysisWorker):
+    ''' 
+    Plots x, y error from tracking task over the whole task timescale with a five min sliding window. 
+    
+    '''
+
+    end_events = ['TRIAL_END', 'PAUSE', 'HOLD_PENALTY', 'DELAY_PENALTY', 'OTHER_PENALTY',
+                  'TIMEOUT_PENALTY', 'FIXATION_PENALTY'] # list events that end trial 
+
+    def __init__(self, task_params, data_queue, avg_time=20, **kwargs):
+        super().__init__(task_params, data_queue, **kwargs)
+        self.avg_time = avg_time  # seconds for the rolling average
+        self.plot_window = 300 # num of secs before starting to scroll
+    
+    def init(self):
+        super().init()
+        
+        self.reference = None
+        self.frame_index = -1
+        self.cursor_pos = np.zeros(2)
+        self.target_pos = None
+        self.trial_start = 0 # index of start 
+
+        self.data = np.full((10000,5), np.nan)
+        self.n = 0 
+
+        self.ax.axis('on')
+        self.ax.set_position([0.12, 0.1, 0.8, 0.8])
+        self.ax.set_xlabel('Session Time (s)')
+        self.ax.set_ylabel('|Error| (cm)')
+        self.x_line, = self.ax.plot([], [], color='green', linewidth=0.5, alpha=0.4, label='X')
+        self.y_line, = self.ax.plot([], [], color='magenta', linewidth=0.5, alpha=0.4, label='Y')
+        self.x_avg, = self.ax.plot([], [], color='green', linewidth=2, label=f'X ({self.avg_time:g} s avg)')
+        self.y_avg, = self.ax.plot([], [], color='magenta', linewidth=2, label=f'Y ({self.avg_time:g} s avg)')
+        self.ax.legend(loc='upper left')
+
+        
+    def _append(self, row): #increase data history array 
+        if self.n == len(self.data):
+            self.data = np.vstack((self.data, np.full_like(self.data, np.nan)))
+        self.data[self.n] = row
+        self.n += 1
+
+    def handle_data(self, key, values):
+        super().handle_data(key, values)  # keeps cycle_count up to date
+        if key == 'reference_signal':
+            self.reference = np.array(values[0])
+        elif key == 'sync_event':
+            event_name, _ = values
+            if event_name == 'TRIAL_START':
+                self.frame_index = 0
+                self.trial_start = self.n
+                if self.reference is not None:
+                    self.target_pos = self.reference[0, [0, 2]]
+            elif event_name in self.end_events:
+                if self.frame_index >= 0: 
+                    t = self.cycle_count / self.task_params['fps']
+                    self._append([t, np.nan, np.nan, np.nan, np.nan])
+                self.frame_index = -1  # stop recording; last trial stays on screen
+        elif key == 'cycle_count' and self.frame_index >= 0:
+            self.frame_index += 1
+            if self.reference is not None and self.frame_index < len(self.reference):
+                self.target_pos = self.reference[self.frame_index, [0, 2]]
+        elif key == 'cursor':
+            self.cursor_pos = np.array(values[0])[[0, 2]]
+            if self.frame_index >= 0 and self.target_pos is not None:
+                err = np.abs(self.cursor_pos - self.target_pos)
+                t = self.cycle_count / self.task_params['fps']
+                self._append([t, err[0], err[1], np.nan, np.nan])
+                trl_avg = max(np.searchsorted(self.data[:self.n, 0], t - self.avg_time), self.trial_start)
+                self.data[self.n - 1, 3:5] = np.nanmean(self.data[trl_avg:self.n, 1:3], axis = 0)
+
+
+    def draw(self):
+        super().draw()
+        if self.n == 0: 
+            return 
+        t_now = self.data[self.n - 1, 0]
+        t_min = max(0, t_now - self.plot_window)
+        start_tm = np.searchsorted(self.data[:self.n, 0], t_min)
+        d = self.data[start_tm:self.n]
+   
+        self.x_line.set_data(d[:,0], d[:, 1])
+        self.y_line.set_data(d[:,0], d[:, 2])
+        self.x_avg.set_data(d[:,0], d[:, 3])
+        self.y_avg.set_data(d[:,0], d[:, 4])
+        self.ax.set_xlim(t_min, max(t_now, self.plot_window))
+
+        self.ax.relim()
+        self.ax.autoscale_view(scalex = False, scaley = True)
+    
 class SaccadeAnalysisWorker(BehaviorAnalysisWorker):
     '''
     Plots calibrated_eye, cursor, and target data from experiments that have them.
@@ -1155,6 +1228,8 @@ class OnlineDataServer(threading.Thread):
 
         elif self.task_params['experiment_name'] == 'TrackingTask':
             self.analysis_workers.append((TrackingAnalysisWorker(self.task_params, data_queue), data_queue))
+            err_que = mp.Queue()
+            self.analysis_workers.append((TrackingErrorWorker(self.task_params, err_que), err_que))
 
         elif self.task_params['experiment_name'] == 'EyeConstrainedManualControl':
             self.analysis_workers.append((SaccadeAnalysisWorker(self.task_params, data_queue), data_queue))

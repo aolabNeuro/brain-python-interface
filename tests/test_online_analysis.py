@@ -75,12 +75,12 @@ class TestOnlineAnalysis(unittest.TestCase):
 
         # Start exp 1
         os.environ['DISPLAY'] = ':0.0'
-        if False: # 2d
+        if True: # 2d
             seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=20, ramp=1, ramp_down=1, 
                                                     num_primes=10, seed=42, sample_rate=60, dimensions=2, 
                                                     disturbance=True, boundaries=(-10,10,-10,10), decay_rate = 0.1)
             Exp = experiment.make(TrackingTask, feats=[Window2D, MouseControl, OnlineAnalysis])
-            exp = Exp(seq, fps=120, session_length=28, online_analysis_ip='localhost', online_analysis_port=5000,
+            exp = Exp(seq, fps=120, session_length=60, online_analysis_ip='localhost', online_analysis_port=5000,
                     fullscreen=False, window_size=(800,600), wait_time=0, trajectory_type='2d', rotation = 'xzy', limit1d=False, trajectory_amplitude=5)
         else: # 1d
             seq = TrackingTask.tracking_target_chain(nblocks=1, ntrials=2, time_length=5, ramp=1, ramp_down=1, 
