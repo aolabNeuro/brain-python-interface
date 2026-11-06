@@ -357,10 +357,11 @@ class TrackingAnalysisWorker(BehaviorAnalysisWorker):
                 self.frame_index = 0
             elif event_name == 'TRIAL_END':
                 self.frame_index = -1
-        elif key == 'cycle_count' and self.frame_index >= 0:
-            self.frame_index += 1
-            if self.frame_index < len(self.reference):
-                self.target_pos[0] = self.reference[self.frame_index,[0,2]]
+        elif key == 'frame_index' and self.frame_index >= 0 and self.reference is not None:
+            # The task advances along the trajectory in real time (not once per cycle),
+            # so follow its frame index instead of counting cycles
+            self.frame_index = min(max(int(values[0]), 0), len(self.reference) - 1)
+            self.target_pos[0] = self.reference[self.frame_index,[0,2]]
 
        
     def draw(self):
@@ -444,10 +445,11 @@ class TrackingErrorWorker(AnalysisWorker):
                     t = self.cycle_count / self.task_params['fps']
                     self._append([t, np.nan, np.nan, np.nan, np.nan])
                 self.frame_index = -1  # stop recording; last trial stays on screen
-        elif key == 'cycle_count' and self.frame_index >= 0:
-            self.frame_index += 1
-            if self.reference is not None and self.frame_index < len(self.reference):
-                self.target_pos = self.reference[self.frame_index, [0, 2]]
+        elif key == 'frame_index' and self.frame_index >= 0 and self.reference is not None:
+            # The task advances along the trajectory in real time (not once per cycle),
+            # so follow its frame index instead of counting cycles
+            self.frame_index = min(max(int(values[0]), 0), len(self.reference) - 1)
+            self.target_pos = self.reference[self.frame_index, [0, 2]]
         elif key == 'cursor':
             self.cursor_pos = np.array(values[0])[[0, 2]]
             if self.frame_index >= 0 and self.target_pos is not None:
