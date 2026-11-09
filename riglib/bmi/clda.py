@@ -380,8 +380,12 @@ class PositionErrorLearner(Learner):
     where 'gain' here corresponds to gain/sampling_rate there. Position states of the intended
     kinematics are set to the current position and all other states (e.g., the offset) are copied
     from the current state, so only the velocity states carry information about the intention.
+
+    Optionally, the intended velocities of each batch are rescaled (preserving their directions)
+    so that the maximum intended speed within the batch is a fixed value 'max_speed'. The gain then
+    only sets the relative speeds within a batch.
     '''
-    def __init__(self, batch_size, gain=1., zero_tol=0.01, learn_states=None, *args, **kwargs):
+    def __init__(self, batch_size, gain=1., zero_tol=0.01, learn_states=None, max_speed=None, *args, **kwargs):
         '''
         Constructor for PositionErrorLearner
 
@@ -396,6 +400,10 @@ class PositionErrorLearner(Learner):
         learn_states : list of strings, optional
             Task states during which the intention is estimated. By default, intention is estimated
             during every state in which the task specifies a target state
+        max_speed : float, optional
+            If specified (and positive), the intended velocities of each batch are scaled so that
+            the maximum intended speed (norm of the velocity states) within the batch equals this
+            value, in the units of the decoder velocity states. By default, no scaling is applied.
         *args, **kwargs : additional args
             Passed to the Learner constructor (e.g., done_states, reset_states)
 
@@ -407,6 +415,8 @@ class PositionErrorLearner(Learner):
         self.gain = gain
         self.zero_tol = zero_tol
         self.learn_states = learn_states
+        self.max_speed = max_speed
+        self.vel_inds = None
 
     def calc_int_kin(self, current_state, target_state, decoder_output, task_state, state_order=None):
         '''
@@ -447,6 +457,7 @@ class PositionErrorLearner(Learner):
         pos_inds = np.nonzero(state_order == 0)[0]
         vel_inds = np.nonzero(state_order == 1)[0]
         assert len(pos_inds) == len(vel_inds), "position and velocity states must pair up"
+        self.vel_inds = vel_inds # saved so that get_batch can find the velocity states
 
         pos_error = target_state[pos_inds] - current_state[pos_inds]
         int_kin = current_state.copy()
@@ -455,6 +466,43 @@ class PositionErrorLearner(Learner):
         else:
             int_kin[vel_inds] = self.gain * pos_error
         return np.asmatrix(int_kin).reshape(-1, 1)
+
+    @staticmethod
+    def scale_max_speed(intended_kin, vel_inds, max_speed):
+        '''
+        Scale the velocity states of a batch of intended kinematics so that the maximum speed
+        in the batch equals 'max_speed', preserving the direction of each velocity
+
+        Parameters
+        ----------
+        intended_kin : np.ndarray of shape (N, T)
+            Batch of intended kinematics
+        vel_inds : np.ndarray
+            Indices of the velocity states
+        max_speed : float
+            Target for the maximum speed within the batch
+
+        Returns
+        -------
+        np.mat of shape (N, T)
+            Scaled batch of intended kinematics. If the batch has no nonzero velocity, it is returned unscaled
+        '''
+        kin = np.array(intended_kin, dtype=np.float64)
+        speed = np.linalg.norm(kin[vel_inds, :], axis=0)
+        peak = np.max(speed)
+        if peak > 0:
+            kin[vel_inds, :] *= max_speed / peak
+        return np.asmatrix(kin)
+
+    def get_batch(self):
+        '''
+        Returns the last batch of intended kinematics and neural data (see Learner.get_batch),
+        with the intended velocities scaled to the maximum speed if 'max_speed' was specified
+        '''
+        batch = super(PositionErrorLearner, self).get_batch()
+        if self.max_speed is not None and self.max_speed > 0 and self.vel_inds is not None:
+            batch['intended_kin'] = self.scale_max_speed(batch['intended_kin'], self.vel_inds, self.max_speed)
+        return batch
     
 class SimpleEndpointIntentionLearner(Learner):
     """

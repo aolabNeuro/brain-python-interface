@@ -59,6 +59,45 @@ class TestPositionErrorLearner(unittest.TestCase):
         np.testing.assert_array_equal(batch['spike_counts'][0, :], np.arange(10))
         self.assertFalse(self.learner.is_ready())
 
+    def test_max_speed(self):
+        learner = clda.PositionErrorLearner(4, gain=2., max_speed=10.)
+        current = np.zeros((7, 1))
+        obs = np.ones((4, 1))
+        # targets at increasing distances, in different directions; the last one is the farthest (distance 5)
+        targets = [[1., 0.], [0., 2.], [-3., 0.], [3., 4.]]
+        for tx, ty in targets:
+            target = np.zeros((7, 1))
+            target[0] = tx
+            target[2] = ty
+            learner(obs, current, target, current, 'target', state_order=self.ssm.state_order)
+        self.assertTrue(learner.is_ready())
+        batch = learner.get_batch()
+        vel = np.asarray(batch['intended_kin'])[[3, 5], :]
+
+        # the fastest sample is scaled to the max speed and the others keep their relative speed and direction
+        speed = np.linalg.norm(vel, axis=0)
+        np.testing.assert_allclose(speed, [2., 4., 6., 10.])
+        np.testing.assert_allclose(vel[:, 3], [6., 8.])
+        np.testing.assert_allclose(vel[:, 2], [-6., 0.])
+        # the other states are untouched
+        np.testing.assert_array_equal(np.asarray(batch['intended_kin'])[[0, 1, 2, 4, 6], :], 0.)
+
+        # a batch with zero intended velocity everywhere is left as is
+        for k in range(4):
+            learner(obs, current, current, current, 'target', state_order=self.ssm.state_order)
+        batch = learner.get_batch()
+        np.testing.assert_array_equal(np.asarray(batch['intended_kin']), 0.)
+
+        # without max_speed the velocities are unscaled
+        for tx, ty in targets:
+            target = np.zeros((7, 1))
+            target[0] = tx
+            target[2] = ty
+            self.learner(obs, current, target, current, 'target', state_order=self.ssm.state_order)
+        self.learner.passed_done_state = True
+        vel = np.asarray(self.learner.get_batch()['intended_kin'])[[3, 5], :]
+        np.testing.assert_allclose(np.linalg.norm(vel, axis=0), [2., 4., 6., 10.])
+
 
 class TestWFSmoothbatch(unittest.TestCase):
 

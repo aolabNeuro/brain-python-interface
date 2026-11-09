@@ -55,6 +55,7 @@ class CLDA_WFSmoothbatch(traits.HasTraits):
     clda_lambda_E = traits.Float(0.1, desc="Weight on the squared prediction error in the L2 cost")
     clda_lambda_D = traits.Float(10, desc="Weight on the squared norm of the filter weights (ridge penalty) in the L2 cost")
     clda_intended_velocity_gain = traits.Float(2., desc="Intended velocity = gain * (target position - cursor position) [1/s]")
+    clda_max_intended_speed = traits.Float(0., desc="If > 0, scale the intended velocities of each batch so that the maximum intended speed within the batch is this value [cm/s]. The gain then only sets the relative speeds within a batch")
     clda_solver = traits.OptionsList(("bfgs", "exact"), desc="Estimate the new weights by gradient descent (bfgs) or in closed form (exact)")
     clda_multiproc = traits.Bool(True, desc="Estimate the new weights in a separate process so the task loop is not blocked")
     clda_verbose = traits.Bool(False, desc="Print out information about the CLDA updates")
@@ -70,8 +71,9 @@ class CLDA_WFSmoothbatch(traits.HasTraits):
         '''
         self.learn_flag = False
         learner_batch_size = int(self.clda_batch_time/self.decoder.binlen)
+        max_speed = self.clda_max_intended_speed if self.clda_max_intended_speed > 0 else None
         self.learner = clda.PositionErrorLearner(learner_batch_size, gain=self.clda_intended_velocity_gain,
-            learn_states=self.clda_learn_states)
+            learn_states=self.clda_learn_states, max_speed=max_speed)
 
     def create_updater(self):
         '''
