@@ -1,8 +1,10 @@
 '''
-Helper functions for the DPS experiment notebook (DPS_experiment.ipynb):
-3D plotting of planes and targets, PCA plane fitting of reach endpoints,
-design of perturbation planes, conversion to BMI3D perturbation params, and
-post-block checks that the executed mapping matches the design.
+Functions for the DPS experiment notebook (DPS_experiment.ipynb): 3D plotting of planes
+and targets, PCA plane fitting of reach endpoints, design of perturbation planes,
+conversion to BMI3D perturbation params, and post-block checks that the executed mapping
+matches the design. Holds only what the experiment notebook needs. Functions shared with
+the DPS analysis code are kept identical to their versions in
+~/victoria/projects/DPS/DPS_utils.py (same names, signatures, and logic).
 '''
 
 import numpy as np
@@ -11,7 +13,7 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from scipy.spatial.transform import Rotation
 from IPython.display import HTML
 
-from aopy import visualization as aovis
+import aopy
 
 
 # ===========================================================================
@@ -31,6 +33,10 @@ _S_DESIGN_TO_BMI3D = np.array([[1., 0., 0.], [0., 0., 1.], [0., 1., 0.]])
 # Plotting functions
 # ===========================================================================
 
+# NOTE: not yet pushed to aopy. Local version of aopy.visualization.plot_plane (same name and
+# behavior for the arguments aopy has) that adds a bounds argument (clips the surface and sets
+# the axis limits) and, for plane equations, solves for whichever axis has the largest normal
+# component so near-vertical planes don't blow up. Same as plot_plane in DPS_exp_utils.py.
 def plot_plane(plane, gain=1.0, color='grey', alpha=0.15, resolution=100,
                bounds=None, ax=None, **kwargs):
     '''
@@ -103,25 +109,29 @@ def plot_plane(plane, gain=1.0, color='grey', alpha=0.15, resolution=100,
 
     return ax
 
+# NOTE: not yet pushed to aopy. Local version of aopy.visualization.color_targets (same name)
+# that draws each target as a flat disk in 3D, with alpha and a transform_matrix to orient the
+# disks (aopy's draws spheres in 3D and has no transform). Same as color_targets in
+# CES_subject.ipynb and DPS_exp_utils.py.
 def color_targets(target_locations, target_idx, colors, target_radius, alpha=1, transform_matrix=None, bounds=None, ax=None, **kwargs):
     '''
-    Plot each unique target as a filled disk on a 3D axis, colored by its target index.
+    Draw each target as a filled circle in its index's color on a 3D axis, optionally
+    oriented by a transform matrix. Ported from CES_subject.ipynb.
 
     Args:
-        target_locations (ntarget, 3): position of each target
-        target_idx (ntarget): target index of each location, used to pick its color
-        colors (list): colors indexed by target index. Must have at least as many
-            entries as there are unique target indices.
-        target_radius (float): radius of each disk
-        alpha (float, optional): disk transparency. Default 1.
-        transform_matrix ((3, 3) array, optional): rotation applied to each disk, which
-            starts in the xy-plane. Default None (no rotation).
-        bounds (tuple, optional): (xmin, xmax, ymin, ymax, zmin, zmax) axis limits. Default None.
+        target_locations (ntarget, 3): target center positions
+        target_idx (ntarget,): index of each target, used to pick its color
+        colors (list): color for each target index
+        target_radius (float): circle radius, in cm
+        alpha (float, optional): circle transparency. Default 1.
+        transform_matrix ((3, 3) array, optional): applied to circles drawn in the xy-plane
+            (transform_matrix @ points). Default None (xy-plane).
+        bounds (tuple, optional): axis bounds passed to plot_circles. Default None.
         ax (pyplot.Axes, optional): 3D axis to plot on. If None, creates a new figure. Default None.
         kwargs (dict, optional): additional keyword arguments passed to Poly3DCollection
 
     Returns:
-        None: targets are plotted on the axis
+        None: plots on ax
     '''
     assert len(target_locations) == len(target_idx), "Locations must be the same length as indices"
 
@@ -142,26 +152,33 @@ def color_targets(target_locations, target_idx, colors, target_radius, alpha=1, 
 
     ax.set_box_aspect([1, 1, 1])
 
+# NOTE: not yet pushed to aopy. Local version of aopy.visualization.plot_circles (same name)
+# that draws flat disks in 3D, oriented by transform_matrix (aopy's draws spheres in 3D or
+# circles in 2D). Same as plot_circles in CES_subject.ipynb and DPS_exp_utils.py.
 def plot_circles(circle_positions, circle_radius, circle_color='b', transform_matrix=None, bounds=None, alpha=1, ax=None, **kwargs):
     '''
-    Plot filled disks at the given positions on a 3D axis. Each disk starts in the
-    xy-plane and is rotated by transform_matrix before being translated into place.
+    Draw filled circles on a 3D axis, optionally oriented by a transform matrix. Ported from
+    CES_subject.ipynb; set_bounds refers to aopy.visualization.set_bounds (CES called it
+    unqualified), and a new 3D figure is created when ax is None (CES's
+    plt.gca(projection='3d') no longer works in matplotlib >= 3.4).
 
     Args:
-        circle_positions (ncircle, 3): center of each disk
-        circle_radius (float): radius of each disk
-        circle_color (str, optional): disk color. Default 'b'.
-        transform_matrix ((3, 3) array, optional): rotation applied to each disk. Default None (no rotation).
-        bounds (tuple, optional): (xmin, xmax, ymin, ymax, zmin, zmax) axis limits. Default None.
-        alpha (float, optional): disk transparency. Default 1.
-        ax (pyplot.Axes, optional): 3D axis to plot on. Default None (current axis).
+        circle_positions (ncircle, 3): circle center positions
+        circle_radius (float): circle radius
+        circle_color (str, optional): fill color. Default 'b'.
+        transform_matrix ((3, 3) array, optional): applied to circles drawn in the xy-plane
+            (transform_matrix @ points). Default None (xy-plane).
+        bounds (tuple, optional): if given, passed to aopy.visualization.set_bounds. Default None.
+        alpha (float, optional): fill transparency. Default 1.
+        ax (pyplot.Axes, optional): 3D axis to plot on. If None, creates a new figure. Default None.
         kwargs (dict, optional): additional keyword arguments passed to Poly3DCollection
 
     Returns:
-        None: disks are plotted on the axis
+        None: plots on ax
     '''
     if ax is None:
-        ax = plt.gca(projection='3d')
+        fig = plt.figure(figsize=(8, 8))
+        ax = fig.add_subplot(111, projection='3d')
 
     # Generate a 2D circle in the XY plane
     theta = np.linspace(0, 2 * np.pi, 100)
@@ -192,7 +209,7 @@ def plot_circles(circle_positions, circle_radius, circle_color='b', transform_ma
         ax.add_collection3d(poly)
 
     if bounds is not None:
-        aovis.set_bounds(bounds, ax)
+        aopy.visualization.set_bounds(bounds, ax)
 
 
 # ===========================================================================
@@ -633,80 +650,111 @@ def alt_axis_plane(display, targets, target_idx, hand_traj, rotation_deg=60):
 
 
 # ===========================================================================
-# Mapping check
+# Mapping check (identical to DPS_utils.py)
 # ===========================================================================
 
-def bmi3d_mapping(a_x, a_y, a_z, exp_gain=1.):
+# NOTE: not yet pushed to aopy. Local version of aopy.postproc.bmi3d.get_world_to_screen_mapping
+# (same name, signature, and output convention) that composes the perturbation rotations in
+# the order BMI3D applies them.
+def get_world_to_screen_mapping(exp_rotation='none', x_rot=0, y_rot=0, z_rot=0, exp_gain=1, baseline_rotation='none'):
     '''
-    Hand -> screen mapping that BMI3D implements for the given perturbation params, in
-    design coordinates and row-vector form (cursor = hand @ M). BMI3D applies
-    hand @ Ry @ Rz @ Rx in its own axes (design y and z swapped), so
-    M = S @ (exp_gain * Ry @ Rz @ Rx) @ S. For a design rotation R,
-    bmi3d_mapping(*bmi3d_angles(R)) = R.
+    Returns the mapping :math:`M` that transforms 3D centered user input from world to screen coordinates.
+    World coordinates (x: right/left, y: up/down, z: forward/backward) and screen coordinates
+    (x: right/left, y: up/down, z: into/out of the screen) differ only in that the screen may be
+    placed arbitrarily in the world. However the mapping :math:`M` can arbitrarily rotate and scale the
+    user input before projecting it to the screen.
+    The mapping :math:`M` is related to the mapping :math:`M_{q}` used by bmi3d, but with
+    axes swapped through multiplication with :math:`T_{q\\rightarrow w} = T_{w\\rightarrow q}`,
+    the transformation that converts bmi3d coordinates to world coordinates
+    (it happens to be its own inverse). The full mapping :math:`M` returned by this function is:
+    :math:`M = T_{w\\rightarrow q} M_q T_{q\\rightarrow w}`
+
+    Proposed fix for aopy.postproc.bmi3d.get_world_to_screen_mapping (same signature and
+    output). BMI3D (built_in_tasks/manualcontrolmultitasks.py, _transform_coords) applies the
+    fixed perturbation rotations to the row-vector input as ``v @ Ry @ Rz @ Rx``, so
+    :math:`M_q` must compose them in that order. The aopy version builds them with
+    ``R.from_euler('xyz', [x_rot, y_rot, z_rot])``, which is ``Rz @ Ry @ Rx`` and differs from
+    BMI3D whenever y_rot and z_rot are both nonzero. Mappings with at most one of y_rot and
+    z_rot nonzero, and named exp/baseline rotations, are unchanged.
 
     Args:
-        a_x (float): perturbation_rotation_x, in degrees
-        a_y (float): pertubation_rotation (about y), in degrees
-        a_z (float): perturbation_rotation_z, in degrees
-        exp_gain (float, optional): exp_gain of the mapping. Default 1.
+        exp_rotation (str, optional): desired experimental rotation from exp_metadata['exp_rotation']. Default 'none'.
+        x_rot (float, optional): rotation about the bmi3d x-axis in degrees from exp_metadata['perturbation_rotation_x']. Default 0.
+        y_rot (float, optional): rotation about the bmi3d y-axis in degrees from exp_metadata['pertubation_rotation']. Default 0.
+        z_rot (float, optional): rotation about the bmi3d z-axis in degrees from exp_metadata['perturbation_rotation_z']. Default 0.
+        exp_gain (float, optional): gain scaling factor of the mapping from exp_metadata['exp_gain']. Default 1.
+        baseline_rotation (str, optional): baseline rotation from exp_metadata['baseline_rotation']. Default 'none'.
 
     Returns:
-        (3, 3) array: hand -> screen mapping in design coordinates
+        (3, 3): mapping from centered world coordinates to screen coordinates
+
+    Examples:
+        To reproduce how the mapping was used online, multiply position data in world coordinates (:math:`r_w`)
+        by the mapping :math:`M` to get coordinates in screen space (:math:`r_s`).
+
+        .. math::
+
+            r_{s} = r_{w} M
+
+        Alternatively, to transform screen space coordinates to world coordinates, multiply by the
+        inverse mapping :math:`M^{-1}`:
+
+        .. math::
+
+            r_{w} = r_{s} M^{-1}
+
+        This can be useful for example to find the plane on which the user data should have been moving if the
+        mapping was correctly learned.
+
+    Changes:
+        2026-11-02: Compose the perturbation rotations in the order bmi3d applies them (y, then z, then x).
     '''
-    P = np.linalg.multi_dot((Rotation.from_euler('y', a_y, degrees=True).as_matrix(),
-                             Rotation.from_euler('z', a_z, degrees=True).as_matrix(),
-                             Rotation.from_euler('x', a_x, degrees=True).as_matrix()))
-    return _S_DESIGN_TO_BMI3D @ (exp_gain * P) @ _S_DESIGN_TO_BMI3D
+    from built_in_tasks.rotation_matrices import baseline_rotations, exp_rotations
+
+    # Fixed perturbation rotations, in the order bmi3d applies them: v @ Ry @ Rz @ Rx
+    perturbation_rotation = np.linalg.multi_dot((
+        Rotation.from_euler('y', y_rot, degrees=True).as_matrix(),
+        Rotation.from_euler('z', z_rot, degrees=True).as_matrix(),
+        Rotation.from_euler('x', x_rot, degrees=True).as_matrix()))
+    bmi3d_mapping = exp_gain * np.linalg.multi_dot((baseline_rotations[baseline_rotation][:3,:3],
+                                                    exp_rotations[exp_rotation][:3,:3],
+                                                    perturbation_rotation))
+
+    return bmi3d_mapping[[0, 2, 1], :][:, [0, 2, 1]] # return mapping in right-handed coordinates
 
 
-def designed_null_lines(targets, R, n_design, extent=12.):
+def get_target_lines(target_locations, mapping, null_col, extent=15.):
     '''
-    Designed null space of each target in hand space: the line through the designed
-    target location (R @ target, screen -> hand) along the designed plane normal.
+    Axis of each target's cylinder in hand space: the line of hand positions that put the
+    cursor on the target center for any position along the display's null axis, through the
+    inverse of the mapping. Pass the executed mapping for the executed null space, or a
+    designed mapping (e.g. the 'designed_mapping' column from DPS_preproc.ipynb) for the
+    designed null space.
 
     Args:
-        targets (ntarget, 3): target positions, screen (display) coordinates
-        R (3, 3): design rotation (screen -> hand)
-        n_design (3,): normal of the designed plane
-        extent (float, optional): half-length of each line, in cm. Default 12.
+        target_locations (ntarget, 3): target positions, screen coordinates
+        mapping (3, 3): world-to-screen mapping
+        null_col (int): the display's null axis
+        extent (float, optional): half-length of each line along the null axis, in screen cm. Default 15.
 
     Returns:
-        (ntarget, 2, 3) array: start and end point of each target's line
+        (ntarget, 2, 3) array: start and end point of each line, world coordinates
     '''
-    centers = np.asarray(targets, float) @ np.asarray(R).T
-    offset = extent * np.asarray(n_design, float) / np.linalg.norm(n_design)
-    return np.stack([centers - offset, centers + offset], axis=1)
+    mapping_inv = np.linalg.inv(mapping)
+    null_dir = np.eye(3)[null_col] * extent
+    starts = (np.asarray(target_locations, float) - null_dir) @ mapping_inv
+    ends = (np.asarray(target_locations, float) + null_dir) @ mapping_inv
+    return np.stack([starts, ends], axis=1)
 
 
-def executed_null_lines(targets, M, display_normal, extent=12.):
-    '''
-    Executed null space of each target in hand space: the hand positions that put the
-    cursor on the target for any position along the display normal, through the inverse
-    of the executed mapping: (target + s * display_normal) @ inv(M).
-
-    Args:
-        targets (ntarget, 3): target positions, screen (display) coordinates
-        M (3, 3): executed hand -> screen mapping (e.g. from bmi3d_mapping)
-        display_normal (3,): normal of the display plane
-        extent (float, optional): half-length of each line along the display normal, in screen cm. Default 12.
-
-    Returns:
-        (ntarget, 2, 3) array: start and end point of each target's line
-    '''
-    M_inv = np.linalg.inv(M)
-    offset = extent * np.asarray(display_normal, float) / np.linalg.norm(display_normal)
-    targets = np.asarray(targets, float)
-    return np.stack([(targets - offset) @ M_inv, (targets + offset) @ M_inv], axis=1)
-
-
-def line_distances(points, lines):
+def calc_point_to_line_distances(points, lines):
     '''
     Perpendicular distance from each point to its own (infinite) line.
 
     Args:
         points (npt, 3): points
-        lines (npt, 2, 3): two points on each point's line, e.g. the null-space lines
-            indexed by each trial's target index
+        lines (npt, 2, 3): two points on each point's line, e.g. rows of
+            get_designed_target_null_space_lines indexed by each trial's target index
 
     Returns:
         (npt,) array: distance of each point from its line
@@ -719,44 +767,50 @@ def line_distances(points, lines):
     return np.linalg.norm(perpendicular, axis=1)
 
 
-def plot_mapping_check(endpoints, target_idx, designed_lines, executed_lines, colors,
-                       marker_size=20, alpha=0.6, ax=None):
+def plot_target_lines(target_lines, target_idx, colors, ax, linestyle='-', linewidth=2, **kwargs):
     '''
-    Plot reach endpoints (dots) with each target's designed null space (solid line) and
-    executed null space (dashed line), all in the target's color. If the executed mapping
-    matches the design, the solid and dashed lines coincide and the endpoints lie on them.
+    Plot each target's hand-space line (from get_designed_target_null_space_lines or get_target_lines) on a
+    3D axis, colored by target. Only targets that appear in target_idx are drawn.
 
     Args:
-        endpoints (ntr, 3): reach endpoints relative to the reach start, design coordinates
+        target_lines (ntarget, 2, 3): line start/end for each target index
         target_idx (ntr): target index of each trial
-        designed_lines (ntarget, 2, 3): from designed_null_lines
-        executed_lines (ntarget, 2, 3): from executed_null_lines
         colors (list): color for each target index
-        marker_size (float, optional): endpoint marker size. Default 20.
-        alpha (float, optional): endpoint transparency. Default 0.6.
-        ax (pyplot.Axes, optional): 3D axis to plot on. If None, creates a new figure. Default None.
+        ax (pyplot.Axes): 3D axis to plot on
+        linestyle (str, optional): line style. Default '-'.
+        linewidth (float, optional): line width. Default 2.
+        kwargs (dict, optional): additional keyword arguments passed to ax.plot
 
     Returns:
-        pyplot.Axes: the axis plotted on
+        None: plots on ax
     '''
-    if ax is None:
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
+    for t in np.unique(np.asarray(target_idx).astype(int)):
+        line = target_lines[t]
+        ax.plot(line[:, 0], line[:, 1], line[:, 2], color=colors[t], linestyle=linestyle,
+                linewidth=linewidth, **kwargs)
 
+
+def plot_reach_endpoints_3d(endpoints, target_idx, colors, ax, marker_size=15, alpha=0.6, **kwargs):
+    '''
+    Scatter hand endpoints on a 3D axis, colored by target.
+
+    Args:
+        endpoints (ntr, 3): hand endpoints, world coordinates
+        target_idx (ntr): target index of each trial
+        colors (list): color for each target index
+        ax (pyplot.Axes): 3D axis to plot on
+        marker_size (float, optional): marker size. Default 15.
+        alpha (float, optional): marker transparency. Default 0.6.
+        kwargs (dict, optional): additional keyword arguments passed to ax.scatter
+
+    Returns:
+        None: plots on ax
+    '''
     endpoints = np.asarray(endpoints, float)
     target_idx = np.asarray(target_idx).astype(int)
     for t in np.unique(target_idx):
-        for lines, linestyle, linewidth in [(designed_lines, '-', 2), (executed_lines, '--', 1.5)]:
-            line = lines[t]
-            ax.plot(line[:, 0], line[:, 1], line[:, 2], color=colors[t],
-                    linestyle=linestyle, linewidth=linewidth)
         pts = endpoints[target_idx == t]
-        ax.scatter(pts[:, 0], pts[:, 1], pts[:, 2], color=colors[t], s=marker_size, alpha=alpha)
-
-    ax.plot([], [], color='k', linestyle='-', linewidth=2, label='designed null space')
-    ax.plot([], [], color='k', linestyle='--', linewidth=1.5, label='executed null space')
-    ax.legend(loc='upper left', fontsize=9)
-    return ax
+        ax.scatter(pts[:, 0], pts[:, 1], pts[:, 2], color=colors[t], s=marker_size, alpha=alpha, **kwargs)
 
 
 # ===========================================================================
