@@ -65,6 +65,10 @@ class Model(object):
         self.allocated = True
         return allocated
 
+    def delete(self):
+        '''Free any GPU resources allocated by init(). Must be called from the drawing thread.'''
+        self.allocated = False
+
     def rotate(self, q, reset=False):
         '''
         Rotate the model by a quaternion q
@@ -254,7 +258,7 @@ class TriMesh(Model):
                 self.verts.astype(np.float32).ravel(), GL_STATIC_DRAW)
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ebuf)
             glBufferData(GL_ELEMENT_ARRAY_BUFFER, 
-                self.polys.astype(np.uint16).ravel(), GL_STATIC_DRAW)
+                self.polys.astype(np.uint32).ravel(), GL_STATIC_DRAW)
 
             if self.tcoords is not None:
                 self.tbuf = glGenBuffers(1)
@@ -268,6 +272,17 @@ class TriMesh(Model):
                 glBufferData(GL_ARRAY_BUFFER,
                     self.normals.astype(np.float32).ravel(), GL_STATIC_DRAW)
         return allocated
+
+    def delete(self):
+        if self.allocated:
+            buffers = [self.vbuf, self.ebuf]
+            if self.tcoords is not None:
+                buffers.append(self.tbuf)
+            if self.normals is not None:
+                buffers.append(self.nbuf)
+            glDeleteBuffers(len(buffers), buffers)
+            glDeleteVertexArrays(1, [self.vao])
+        super().delete()
     
     def draw(self, ctx):
         super(TriMesh, self).draw(ctx)
@@ -295,7 +310,7 @@ class TriMesh(Model):
         glDrawElements(
             GL_TRIANGLES,           # mode
             len(self.polys)*3,      # count
-            GL_UNSIGNED_SHORT,      # type
+            GL_UNSIGNED_INT,        # type
             GLvoidp(0)              # element array buffer offset
         )
         glDisableVertexAttribArray(ctx.attributes['position'])

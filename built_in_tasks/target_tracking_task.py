@@ -33,8 +33,8 @@ class TargetTracking(Sequence):
         trajectory = dict(enter_target="hold", timeout="timeout_penalty", start_pause="pause"),
         hold = dict(hold_complete_go_ramp="tracking_in_ramp", hold_complete_no_ramp="tracking_in", leave_target="hold_penalty", start_pause="pause"),
 
-        tracking_in_ramp = dict(ramp_complete="tracking_in", ramp_and_trial_complete="reward", leave_target="tracking_out_ramp", start_pause="pause"),
-        tracking_out_ramp = dict(ramp_complete="tracking_out", ramp_and_trial_complete="reward", enter_target="tracking_in_ramp", tracking_out_timeout="tracking_out_penalty", start_pause="pause"),
+        tracking_in_ramp = dict(ramp_up_complete="tracking_in", ramp_and_trial_complete="reward", leave_target="tracking_out_ramp", start_pause="pause"),
+        tracking_out_ramp = dict(ramp_up_complete="tracking_out", ramp_and_trial_complete="reward", enter_target="tracking_in_ramp", tracking_out_timeout="tracking_out_penalty", start_pause="pause"),
         
         tracking_in = dict(traj_complete="tracking_in_ramp", trial_complete="reward", leave_target="tracking_out", start_pause="pause"),
         tracking_out = dict(traj_complete="tracking_out_ramp", trial_complete="reward", enter_target="tracking_in", tracking_out_timeout="tracking_out_penalty", start_pause="pause"),
@@ -109,17 +109,22 @@ class TargetTracking(Sequence):
         self.trial_record['trial'] = self.calc_trial_num()
         self.trial_record['index'] = self.gen_index
         self.trial_record['is_disturbance'] = self.disturbance_trial
-        for i in range(len(self.disturbance_path)):
-            # Update the data sinks with trial information --> bmi3d_trials
-            self.trial_record['target'] = self.targs[i]
-            self.trial_record['disturbance'] = self.disturbance_path[i]
-            self.sinks.send("trials", self.trial_record)
+
+        # Update the data sinks with trial information --> bmi3d_trials. One record per frame,
+        # sent as a single batch since sending them one at a time stalls the task for ~0.1 s
+        n_frames = len(self.disturbance_path)
+        trial_records = np.repeat(self.trial_record, n_frames)
+        trial_records['target'] = self.targs[:n_frames]
+        trial_records['disturbance'] = self.disturbance_path[:n_frames]
+        self.sinks.send("trials", trial_records)
 
         # trial is not finished
         self.trial_timed_out = False
+        self.ramp_up_complete = False
 
         # index into trajectory
         self.frame_index = -1
+        self.trajectory_start_time = None
 
         # number of frames in trajectory
         '''Nothing generic to do.'''
@@ -160,7 +165,7 @@ class TargetTracking(Sequence):
 
     def _start_trajectory(self):
         self.tries += 1
-        self.frame_index += 1
+        self.frame_index = 0
 
     def _while_trajectory(self):
         '''Nothing generic to do.'''
@@ -183,8 +188,8 @@ class TargetTracking(Sequence):
         pass
 
     def _start_tracking_in_ramp(self):
-        '''Nothing generic to do.'''
-        pass
+        if self.trajectory_start_time is None:
+            self.trajectory_start_time = self.get_time()
 
     def _while_tracking_in_ramp(self):
         '''Nothing generic to do.'''
@@ -207,8 +212,9 @@ class TargetTracking(Sequence):
         pass
 
     def _start_tracking_in(self):
-        '''Nothing generic to do.'''
-        pass
+        if self.trajectory_start_time is None:
+            self.trajectory_start_time = self.get_time()
+        self.ramp_up_complete = True
 
     def _while_tracking_in(self):
         '''Nothing generic to do.'''
@@ -219,8 +225,7 @@ class TargetTracking(Sequence):
         pass
 
     def _start_tracking_out(self):
-        '''Nothing generic to do.'''
-        pass
+        self.ramp_up_complete = True
 
     def _while_tracking_out(self):
         '''Nothing generic to do.'''
@@ -325,21 +330,21 @@ class TargetTracking(Sequence):
         '''Test whether the target is held long enough and whether to go straight into the trajectory'''
         return (time_in_state > self.hold_time) and (self.ramp_up_time == 0)
 
-    def _test_ramp_complete(self, time_in_state):
+    def _test_ramp_up_complete(self, time_in_state):
         '''Test whether the ramp up is finished'''
-        return self.frame_index-1 == self.ramp_up_time*self.sample_rate
+        return (not self.ramp_up_complete) & (self.frame_index >= self.ramp_up_time*self.sample_rate)
 
     def _test_traj_complete(self, time_in_state):
         '''Test whether the trajectory is finished and whether there is a ramp down before the trial ends'''
-        return (self.frame_index-1 == self.trajectory_length - self.ramp_down_time*self.sample_rate) and (self.ramp_down_time > 0)
+        return (self.frame_index >= self.trajectory_length - self.ramp_down_time*self.sample_rate) and (self.ramp_down_time > 0)
 
     def _test_ramp_and_trial_complete(self, time_in_state):
         '''Test whether the ramp down is finished, ending the trial'''
-        return (self.frame_index > self.trajectory_length) and (self.ramp_down_time > 0)
+        return (self.frame_index == self.trajectory_length) and (self.ramp_down_time > 0)
     
     def _test_trial_complete(self, time_in_state):
         '''Test whether the trajectory is finished, ending the trial'''
-        return (self.frame_index > self.trajectory_length) and (self.ramp_down_time == 0)
+        return (self.frame_index == self.trajectory_length) and (self.ramp_down_time == 0)
 
     def _test_tracking_out_timeout(self, time_in_state):
         return time_in_state > self.tracking_out_time
@@ -466,11 +471,12 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.add_dtype('disturbance', 'f8', (3,))
         super().init()
         self.plant.set_endpoint_pos(np.array(self.starting_pos))
+
     def _cycle(self):
         '''
         Calls any update functions necessary and redraws screen
         '''
-        # Use to debug indexing into reference and disturbance trajectories
+        # # Use to debug indexing into reference and disturbance trajectories
         # if self.frame_index >= 0:
         #     print('FRAME ', self.frame_index, self.get_state(), self.trial_timed_out)
         #     print(self.target.get_position()[2], self.pos_offset[2], self.trajectory.get_position()[0])
@@ -521,21 +527,17 @@ class ScreenTargetTracking(TargetTracking, Window):
             self.plant.set_visibility(self.plant_visible)
 
     def update_frame(self):
-        if self.trial_timed_out:
-            use_frame_index = self.trajectory_length - 1
-        else:
-            use_frame_index = self.frame_index
+        if not self.trial_timed_out:
+            self.target.move_to_position(self.targs[self.frame_index])
+            # keep `target_location` in sync for BMIControlMultiMixin.get_target_BMI_state
+            self.target_location = self.target.get_position()
 
-        self.target.move_to_position(self.targs[use_frame_index])
-        # keep `target_location` in sync for BMIControlMultiMixin.get_target_BMI_state
-        self.target_location = self.target.get_position()
-        if self.trajectory_type == '1d':
-            self.trajectory.move_to_position(np.array([-use_frame_index*self.lookahead_scale - self.lookahead*self.lookahead_scale,0,0]))
-            # print(self.frame_index, use_frame_index, self.trajectory.get_position())
-            
-        elif self.trajectory_type == '2d':
-            self.trajectory.update_mask(use_frame_index, use_frame_index+self.lookahead)
-        self.frame_index += 1 # increment the frame_index for the following cycle
+            if self.trajectory_type == '1d':
+                self.trajectory.move_to_position(np.array([-self.frame_index*self.lookahead_scale - self.lookahead*self.lookahead_scale,0,0]))
+                # print(self.frame_index, self.frame_index, self.trajectory.get_position())
+                
+            elif self.trajectory_type == '2d':
+                self.trajectory.update_mask(self.frame_index, self.frame_index+self.lookahead)
 
     def setup_start_wait(self):
         # Allow 2d movement
@@ -552,6 +554,7 @@ class ScreenTargetTracking(TargetTracking, Window):
         if hasattr(self, 'trajectory'):
             for model in self.trajectory.graphics_models:
                 self.remove_model(model)
+                model.delete() # free the GPU buffers, otherwise they leak on every trial
             del self.trajectory
         if self.trajectory_type == '1d': # self.targs is (nframes, 3)
             # print(self.lookahead_scale)
@@ -613,6 +616,10 @@ class ScreenTargetTracking(TargetTracking, Window):
         self.target.reset()
 
     def setup_while_tracking(self):
+        # Set frame index based on current elapsed tracking time
+        time_in_trajectory = self.get_time() - self.trajectory_start_time
+        self.frame_index = min(int(np.round(time_in_trajectory * self.sample_rate)), self.trajectory_length)
+        
         # Check whether there are no more target frames to display
         if self.frame_index == self.trajectory_length:
             self.trial_timed_out = True
@@ -846,9 +853,9 @@ class ScreenTargetTracking(TargetTracking, Window):
 
         assert f.shape == a.shape == p.shape,"Shape of frequencies, amplitudes, and phase shifts must match"
 
-        o = np.ones(t.shape)
-        trajectory = np.sum(np.dot(o,a) * np.sin(2*np.pi*(np.dot(t,f) + np.dot(o,p))),axis=1)
-        A = np.sum(np.dot(o,a)[0])
+        # t is (N,1) and f, a, p are (1,n_freq), so these broadcast to (N,n_freq)
+        trajectory = np.sum(a * np.sin(2*np.pi*(np.dot(t,f) + p)), axis=1)
+        A = np.sum(a)
         
         return trajectory, A
 

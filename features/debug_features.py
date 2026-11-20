@@ -33,6 +33,8 @@ class OnlineAnalysis(traits.HasTraits):
         '''
         Helper function to send messages to the online analysis server
         '''
+        if self.online_analysis_sock.closed:
+            return # task has finished running
         processed_values = []
         for v in values:
             if isinstance(v, np.ndarray):
@@ -110,6 +112,16 @@ class OnlineAnalysis(traits.HasTraits):
         self._send_online_analysis_msg('init', True)
         print('...done!')
 
+    def run(self):
+        '''
+        Close the socket when the task ends, after giving queued messages a chance to send
+        '''
+        try:
+            super().run()
+        finally:
+            self.online_analysis_sock.close(linger=1000)
+            self.zmq_context.term()
+
     def _start_wait(self):
         if hasattr(super(), '_start_wait'):
             super()._start_wait()
@@ -140,6 +152,8 @@ class OnlineAnalysis(traits.HasTraits):
         '''
         super()._cycle()
         self._send_online_analysis_msg('cycle_count', self.cycle_count)
+        if hasattr(self, 'frame_index'):
+            self._send_online_analysis_msg('frame_index', self.frame_index)
         if hasattr(self, 'plant'):
             self._send_online_analysis_msg('cursor', self.plant.get_endpoint_pos())
         if hasattr(self, 'eye_pos'):
