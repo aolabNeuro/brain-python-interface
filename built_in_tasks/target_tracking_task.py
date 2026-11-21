@@ -1073,10 +1073,22 @@ class ScreenTargetTracking(TargetTracking, Window):
         return trials, trial_order
 
     @staticmethod
-    def generate_trajectory(primes, base_period, ramp = 0.0):
+    def generate_trajectory(primes, base_period, ramp = 0.0, velocity_mode=False):
         '''
         Sets up variables and uses prime numbers to call the above functions and generate then trajectories
         ramp is time length for preparatory lines
+
+        Parameters
+        ----------
+        primes : array-like
+            Prime frequencies for the sum of sines
+        base_period : float
+            Base period in seconds
+        ramp : float
+            Ramp duration in seconds
+        velocity_mode : bool
+            If True, generates sum of sines in velocity space and integrates to position.
+            If False (default), generates sum of sines directly in position space.
         '''
         hz = 60 # Hz -- sampling rate
         dt = 1/hz # sec -- sampling period
@@ -1099,9 +1111,19 @@ class ScreenTargetTracking(TargetTracking, Window):
 
         N = t.size # = T/dt -- number of samples
 
-        #trajectory = ScreenTargetTracking.calc_sum_of_sines_ramp(t, r, f, a, o/(2*np.pi))
-        trajectory = ScreenTargetTracking.calc_sum_of_sines_ramp(t, r, f, a, o)
-        normalized_trajectory = trajectory/np.sum(a)
+        if velocity_mode:
+            # Generate velocity as sum of sines, then integrate to position
+            velocity = ScreenTargetTracking.calc_sum_of_sines_ramp(t, r, 0, f, a, o)
+            velocity_normalized = velocity / np.sum(a)
+            # Integrate velocity to get position (cumulative sum times dt)
+            trajectory = np.cumsum(velocity_normalized) * dt
+            # Normalize the final trajectory amplitude
+            normalized_trajectory = trajectory / np.max(np.abs(trajectory)) if np.max(np.abs(trajectory)) > 0 else trajectory
+        else:
+            #trajectory = ScreenTargetTracking.calc_sum_of_sines_ramp(t, r, f, a, o/(2*np.pi))
+            trajectory = ScreenTargetTracking.calc_sum_of_sines_ramp(t, r, f, a, o)
+            normalized_trajectory = trajectory/np.sum(a)
+
         return normalized_trajectory
     
     ### Generator functions ####
