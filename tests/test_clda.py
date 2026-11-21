@@ -99,6 +99,102 @@ class TestPositionErrorLearner(unittest.TestCase):
         np.testing.assert_allclose(np.linalg.norm(vel, axis=0), [2., 4., 6., 10.])
 
 
+class TestWFOFCLearner(unittest.TestCase):
+
+    def setUp(self):
+        self.ssm = state_space_models.StateSpaceEndptVel2D()
+        self.n_units = 4
+        self.units = np.vstack([np.arange(1, self.n_units+1), np.zeros(self.n_units)]).T.astype(np.int32)
+
+    def _make_decoder(self, dt=0.1):
+        H = np.zeros((2, self.n_units))
+        return train.make_fixed_wf_decoder(self.units, self.ssm, H, dt=dt)
+
+    def test_effective_dynamics(self):
+        decoder = self._make_decoder()
+        A, B = clda.WFOFCLearner.effective_dynamics(decoder)
+        A_dec = np.asarray(decoder.filt.A)
+        A = np.asarray(A)
+        # the velocity decay of the estimated states is removed, everything else is unchanged
+        stoch = np.nonzero(decoder.filt.is_stochastic)[0]
+        np.testing.assert_array_equal(A[np.ix_(stoch, stoch)], 0.)
+        mask = np.ones_like(A, dtype=bool)
+        mask[np.ix_(stoch, stoch)] = False
+        np.testing.assert_array_equal(A[mask], A_dec[mask])
+        np.testing.assert_array_equal(np.asarray(B), np.asarray(decoder.filt.B))
+
+        # decoders without a stored B fall back on the state-space model
+        decoder.filt.B = None
+        _, B2 = clda.WFOFCLearner.effective_dynamics(decoder)
+        np.testing.assert_array_equal(np.asarray(B2), np.asarray(B))
+
+    def test_gain_independent_of_binlen(self):
+        current = np.array([0., 0., 0., 0., 0., 0., 1.]).reshape(-1, 1)
+        target = np.array([0.1, 0., -0.1, 0., 0., 0., 1.]).reshape(-1, 1)
+        for dt in [0.1, 0.05, 1./60]:
+            for cost in [0.25, 1.]:
+                learner = clda.WFOFCLearner(10, self._make_decoder(dt), control_cost=cost)
+                v = np.asarray(learner.calc_int_kin(current, target, current, 'target', state_order=self.ssm.state_order)).ravel()[[3, 5]]
+                # intended velocity points at the target with speed ~ distance/sqrt(cost)
+                np.testing.assert_allclose(v / np.array([0.1, -0.1]), 1/np.sqrt(cost), rtol=0.1)
+
+    def test_intended_kin(self):
+        decoder = self._make_decoder()
+        learner = clda.WFOFCLearner(10, decoder, control_cost=0.25)
+        current = np.array([1., 0., 2., 5., 0., 5., 1.]).reshape(-1, 1)
+        target = np.array([4., 0., -2., 0., 0., 0., 1.]).reshape(-1, 1)
+        int_kin = learner.calc_int_kin(current, target, current, 'target', state_order=self.ssm.state_order)
+        self.assertEqual(int_kin.shape, (7, 1))
+        expected = learner.A*np.asmatrix(current) + learner.B*learner.F*(np.asmatrix(target) - np.asmatrix(current))
+        np.testing.assert_allclose(np.asarray(int_kin), np.asarray(expected))
+        int_kin = np.asarray(int_kin).ravel()
+        # the velocity points (roughly) toward the target and the offset is preserved
+        self.assertGreater(int_kin[3], 0)
+        self.assertLess(int_kin[5], 0)
+        self.assertEqual(int_kin[6], 1.)
+
+        # a cursor already moving toward the target is assigned a lower intended speed
+        moving = current.copy()
+        moving[[3, 5], 0] = [3., -4.]
+        int_kin_moving = np.asarray(learner.calc_int_kin(moving, target, moving, 'target', state_order=self.ssm.state_order)).ravel()
+        self.assertLess(np.linalg.norm(int_kin_moving[[3, 5]]), np.linalg.norm(int_kin[[3, 5]]))
+
+    def test_learn_states_and_no_target(self):
+        decoder = self._make_decoder()
+        current = np.zeros((7, 1))
+        target = np.ones((7, 1))
+        learner = clda.WFOFCLearner(10, decoder, learn_states=['target'])
+        self.assertIsNotNone(learner.calc_int_kin(current, target, current, 'target', state_order=self.ssm.state_order))
+        self.assertIsNone(learner.calc_int_kin(current, target, current, 'wait', state_order=self.ssm.state_order))
+
+        learner = clda.WFOFCLearner(10, decoder)
+        self.assertIsNotNone(learner.calc_int_kin(current, target, current, 'wait', state_order=self.ssm.state_order))
+        self.assertIsNone(learner.calc_int_kin(current, target*np.nan, current, 'no_target', state_order=self.ssm.state_order))
+
+    def test_max_speed(self):
+        decoder = self._make_decoder()
+        learner = clda.WFOFCLearner(4, decoder, max_speed=10.)
+        current = np.zeros((7, 1))
+        current[6] = 1
+        obs = np.ones((self.n_units, 1))
+        for tx, tz in [[1., 0.], [0., 2.], [-3., 0.], [3., 4.]]:
+            target = current.copy()
+            target[0] = tx
+            target[2] = tz
+            learner(obs, current, target, current, 'target', state_order=self.ssm.state_order)
+        self.assertTrue(learner.is_ready())
+        vel = np.asarray(learner.get_batch()['intended_kin'])[[3, 5], :]
+        speed = np.linalg.norm(vel, axis=0)
+        self.assertAlmostEqual(np.max(speed), 10.)
+        np.testing.assert_allclose(speed / speed[-1], [0.2, 0.4, 0.6, 1.], rtol=1e-6)
+
+    def test_wrong_decoder(self):
+        C = np.zeros([self.n_units, 7])
+        decoder = train.make_fixed_kf_decoder(self.units, self.ssm, C, dt=0.1)
+        with self.assertRaises(TypeError):
+            clda.WFOFCLearner(10, decoder)
+
+
 class TestWFSmoothbatch(unittest.TestCase):
 
     def setUp(self):
@@ -296,6 +392,12 @@ class TestWFSmoothbatch(unittest.TestCase):
             updater.init(decoder)
 
     def test_closed_loop_adaptation(self):
+        self._closed_loop_adaptation('position_error')
+
+    def test_closed_loop_adaptation_ofc(self):
+        self._closed_loop_adaptation('ofc')
+
+    def _closed_loop_adaptation(self, learner_type):
         '''
         Simulate a subject whose neural features encode the intended velocity toward the target, and
         check that CLDA improves a poorly seeded decoder in closed loop
@@ -306,7 +408,10 @@ class TestWFSmoothbatch(unittest.TestCase):
 
         gain = 2.
         batch_time = 5.
-        learner = clda.PositionErrorLearner(int(batch_time/decoder.binlen), gain=gain)
+        if learner_type == 'ofc':
+            learner = clda.WFOFCLearner(int(batch_time/decoder.binlen), decoder, control_cost=1/gain**2)
+        else:
+            learner = clda.PositionErrorLearner(int(batch_time/decoder.binlen), gain=gain)
         updater = clda.WFSmoothbatch(batch_time, batch_time, lambda_E=0.1, lambda_D=0.1, solver='bfgs')
         bmi_system = BMISystem(decoder, learner, updater, accumulator.NullAccumulator(1))
 

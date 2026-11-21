@@ -10,6 +10,7 @@ import os
 class CLDA_KFRML_IntendedVelocity(traits.HasTraits):
     clda_batch_time = traits.Float(1, desc="How frequently to update weights [s]")
     clda_update_half_life = traits.Float(60, desc="Half-life for exponential decay [s] to combine with previous weights.") #[s]
+    clda_auto_enable = traits.Bool(False, desc="Enable CLDA automatically when the experiment starts (rather than requiring a toggle_clda button press)")
     # clda_update_batch_time = traits.Float(60, desc="How frequently to update weights [s]")
     # clda_learner_batch_time = traits.Float(60, desc="How much data to update the learner with [s]") # Samples to update intended kinematics with
     def create_learner(self):
@@ -17,7 +18,7 @@ class CLDA_KFRML_IntendedVelocity(traits.HasTraits):
         The "learner" uses knowledge of the task goals to determine the "intended"
         action of the BMI subject and pairs this intention estimation with actual observations.
         '''
-        self.learn_flag = False
+        self.learn_flag = self.clda_auto_enable
         # fmatrix = np.array(self.decoder.filt.B.T/np.max(self.decoder.filt.B))
         # self.decoder.filt.F_dict = {
         #     'target': fmatrix,
@@ -46,19 +47,26 @@ class CLDA_KFRML_IntendedVelocity(traits.HasTraits):
 class CLDA_WFSmoothbatch(traits.HasTraits):
     '''
     CLDA for Wiener filter decoders (WFDecoder), following the labgraph EMG Wiener filter CLDA:
-    the intended velocity points at the target with a speed proportional to the distance from it,
-    and the filter weights are periodically re-estimated by gradient descent on a regularized
-    least-squares cost and blended with the previous weights (SmoothBatch).
+    the intended velocity points at the target, and the filter weights are periodically
+    re-estimated by gradient descent on a regularized least-squares cost and blended with the
+    previous weights (SmoothBatch).
+
+    The intended velocity is estimated by one of two learners ('clda_learner'):
+      - position_error: speed proportional to the distance from the target (PositionErrorLearner)
+      - ofc: an LQR controller on the decoder dynamics (WFOFCLearner), x_int = A*x + B*F*(x_target - x)
     '''
     clda_batch_time = traits.Float(20, desc="How frequently to update weights [s]")
     clda_update_half_life = traits.Float(50, desc="Half-life for exponential decay [s] to combine with previous weights. Equal to the batch time for a 50/50 blend")
     clda_lambda_E = traits.Float(0.1, desc="Weight on the squared prediction error in the L2 cost")
     clda_lambda_D = traits.Float(10, desc="Weight on the squared norm of the filter weights (ridge penalty) in the L2 cost")
-    clda_intended_velocity_gain = traits.Float(2., desc="Intended velocity = gain * (target position - cursor position) [1/s]")
+    clda_learner = traits.OptionsList(("position_error", "ofc"), desc="Intention estimate: velocity proportional to the distance from the target (position_error) or from an optimal feedback controller (ofc)")
+    clda_intended_velocity_gain = traits.Float(2., desc="position_error learner only. Intended velocity = gain * (target position - cursor position) [1/s]")
+    clda_ofc_control_cost = traits.Float(0.25, desc="ofc learner only. Cost of the intended speed relative to the distance from the target [s^2]. The intended speed is about distance/sqrt(cost), so 0.25 is comparable to a gain of 2")
     clda_max_intended_speed = traits.Float(0., desc="If > 0, scale the intended velocities of each batch so that the maximum intended speed within the batch is this value [cm/s]. The gain then only sets the relative speeds within a batch")
     clda_solver = traits.OptionsList(("bfgs", "exact"), desc="Estimate the new weights by gradient descent (bfgs) or in closed form (exact)")
     clda_multiproc = traits.Bool(True, desc="Estimate the new weights in a separate process so the task loop is not blocked")
     clda_verbose = traits.Bool(False, desc="Print out information about the CLDA updates")
+    clda_auto_enable = traits.Bool(False, desc="Enable CLDA automatically when the experiment starts (rather than requiring a toggle_clda button press)")
 
     # Task states in which the intended velocity is estimated (the target is defined and the subject
     # is trying to reach or stay on it). Covers the target capture and target tracking tasks.
@@ -69,11 +77,15 @@ class CLDA_WFSmoothbatch(traits.HasTraits):
         '''
         The "learner" pairs the intended velocity, pointing from the cursor to the target, with the observed neural features.
         '''
-        self.learn_flag = False
+        self.learn_flag = self.clda_auto_enable
         learner_batch_size = int(self.clda_batch_time/self.decoder.binlen)
         max_speed = self.clda_max_intended_speed if self.clda_max_intended_speed > 0 else None
-        self.learner = clda.PositionErrorLearner(learner_batch_size, gain=self.clda_intended_velocity_gain,
-            learn_states=self.clda_learn_states, max_speed=max_speed)
+        if self.clda_learner == 'ofc':
+            self.learner = clda.WFOFCLearner(learner_batch_size, self.decoder, control_cost=self.clda_ofc_control_cost,
+                learn_states=self.clda_learn_states, max_speed=max_speed)
+        else:
+            self.learner = clda.PositionErrorLearner(learner_batch_size, gain=self.clda_intended_velocity_gain,
+                learn_states=self.clda_learn_states, max_speed=max_speed)
 
     def create_updater(self):
         '''
@@ -88,13 +100,14 @@ class CLDA_WFSmoothbatch(traits.HasTraits):
 class CLDA_Smoothbatch_IntendedVelocity(traits.HasTraits):
     clda_batch_time = traits.Float(60, desc="How frequently to update weights [s]")
     clda_half_life = traits.Float(60, desc="Half-life for exponential decay [s] to combine with previous weights.") #[s]
+    clda_auto_enable = traits.Bool(False, desc="Enable CLDA automatically when the experiment starts (rather than requiring a toggle_clda button press)")
 
     def create_learner(self):
         '''
         The "learner" uses knowledge of the task goals to determine the "intended"
         action of the BMI subject and pairs this intention estimation with actual observations.
         '''
-        self.learn_flag = False
+        self.learn_flag = self.clda_auto_enable
         learner_batch_size = int(self.clda_batch_time/self.decoder.binlen)
         self.learner = clda.SimpleEndpointIntentionLearner(learner_batch_size)
 

@@ -503,7 +503,161 @@ class PositionErrorLearner(Learner):
         if self.max_speed is not None and self.max_speed > 0 and self.vel_inds is not None:
             batch['intended_kin'] = self.scale_max_speed(batch['intended_kin'], self.vel_inds, self.max_speed)
         return batch
-    
+
+
+class WFOFCLearner(OFCLearner):
+    '''
+    OFCLearner for Wiener filter decoders (wfdecoder.WFDecoder). The subject is modeled as an
+    infinite-horizon LQR controller acting on the effective dynamics of the decoder, and the
+    intended kinematics are (see OFCLearner.calc_int_kin)
+
+        x_int = A*x + B*F*(x_target - x)
+
+    A and B are taken from the decoder's WienerFilter, except that the dynamics of the states
+    estimated from the observations (e.g., velocity) are zeroed in A. The Wiener filter
+    overwrites those states every bin with H*obs (plus the control input), so the previous
+    velocity does not carry over to the next bin as the velocity decay in A would suggest.
+
+    F is the LQR gain for the per-bin cost
+
+        ||p_target - p||^2 + control_cost * ||v||^2
+
+    where p are the position states and v = B_v*u is the velocity the controller commands
+    (B_v are the velocity rows of B), i.e. R = control_cost * B_v^T*B_v. Both terms accrue every
+    bin, so the controller does not depend on the bin length: the intended velocity is
+    approximately (p_target - p) / sqrt(control_cost), i.e. 1/sqrt(control_cost) plays the
+    role of the gain of the PositionErrorLearner. Because F also acts on the velocity error,
+    the intended velocity is lowered slightly when the cursor is already moving toward the
+    target, anticipating the movement in the next bin.
+
+    As with the PositionErrorLearner, the intended velocities of each batch can optionally be
+    scaled so that the maximum intended speed within the batch is 'max_speed'.
+    '''
+    def __init__(self, batch_size, decoder, control_cost=0.25, learn_states=None, max_speed=None, *args, **kwargs):
+        '''
+        Constructor for WFOFCLearner
+
+        Parameters
+        ----------
+        batch_size : int
+            Size of batch of samples to pass to the Updater to estimate new decoder parameters
+        decoder : wfdecoder.WFDecoder instance
+            Decoder to be adapted. Its WienerFilter supplies A, B and which states are estimated
+            from the observations, and its state-space model supplies the position states
+        control_cost : float, optional, default=0.25
+            Ratio of the cost of the intended speed to the cost of the distance from the target [s^2].
+            The intended speed per unit of distance from the target is about 1/sqrt(control_cost) [1/s]
+        learn_states : list of strings, optional
+            Task states during which the intention is estimated. By default, intention is estimated
+            in every state in which the task specifies a target state
+        max_speed : float, optional
+            If specified (and positive), scale the intended velocities of each batch so that the
+            maximum intended speed within the batch is this value (see PositionErrorLearner.scale_max_speed)
+        *args, **kwargs : additional args
+            Passed to the Learner constructor (e.g., done_states, reset_states)
+
+        Returns
+        -------
+        WFOFCLearner instance
+        '''
+        if control_cost <= 0:
+            raise ValueError("control_cost must be positive")
+        A, B = self.effective_dynamics(decoder)
+        F = self.calc_feedback_gain(A, B, decoder.ssm.state_order, control_cost)
+
+        if learn_states is None:
+            F_dict = RegexKeyDict({'.*': F})
+        else:
+            F_dict = dict((state, F) for state in learn_states)
+
+        super(WFOFCLearner, self).__init__(batch_size, A, B, F_dict, *args, **kwargs)
+        self.F = F
+        self.control_cost = control_cost
+        self.learn_states = learn_states
+        self.max_speed = max_speed
+        self.vel_inds = np.nonzero(np.asarray(decoder.ssm.state_order, dtype=np.float64) == 1)[0]
+
+    @staticmethod
+    def effective_dynamics(decoder):
+        '''
+        State transition and control input matrices of a WFDecoder, with the dynamics of the
+        states estimated from the observations zeroed in A (see the class documentation)
+
+        Parameters
+        ----------
+        decoder : wfdecoder.WFDecoder instance
+
+        Returns
+        -------
+        A, B : np.mat
+        '''
+        if not isinstance(decoder.filt, wfdecoder.WienerFilter):
+            raise TypeError("WFOFCLearner needs a WienerFilter decoder, not %s" % type(decoder.filt))
+        A = np.asmatrix(np.array(decoder.filt.A, dtype=np.float64))
+        B = decoder.filt.B
+        if B is None: # decoders trained before the WienerFilter stored the control input matrix
+            _, B, _ = decoder.ssm.get_ssm_matrices(update_rate=decoder.binlen)
+        B = np.asmatrix(np.array(B, dtype=np.float64))
+
+        inds, = np.nonzero(decoder.filt.is_stochastic)
+        A[np.ix_(inds, inds)] = 0
+        return A, B
+
+    @staticmethod
+    def calc_feedback_gain(A, B, state_order, control_cost):
+        '''
+        Infinite-horizon LQR gain for the cost ||p_target - p||^2 + control_cost * ||v||^2 per bin,
+        where v = B_v*u is the commanded velocity
+
+        Parameters
+        ----------
+        A, B : np.mat
+            State transition and control input matrices
+        state_order : np.ndarray of shape (N,)
+            Order of each state (0 = position), see riglib.bmi.state_space_models.State
+        control_cost : float
+            Ratio of the cost of the intended speed to the cost of the distance from the target [s^2]
+
+        Returns
+        -------
+        np.mat of shape (n_inputs, N)
+        '''
+        from .feedback_controllers import LQRController
+        state_order = np.asarray(state_order, dtype=np.float64)
+        Q = np.asmatrix(np.diag((state_order == 0).astype(np.float64)))
+
+        # cost on the commanded velocity v = B_v*u, i.e., R = control_cost * B_v^T*B_v. Since both
+        # cost terms accrue every bin, the gain is independent of the bin length
+        vel_inds = np.nonzero(state_order == 1)[0]
+        B_v = np.asarray(B)[vel_inds, :]
+        R = np.asmatrix(control_cost * B_v.T.dot(B_v))
+
+        return LQRController.dlqr(A, B, Q, R)
+
+    def calc_int_kin(self, current_state, target_state, decoder_output, task_state, state_order=None):
+        '''
+        Calculate the intended kinematics as x_int = A*x + B*F*(x_target - x). See OFCLearner.calc_int_kin
+
+        Returns
+        -------
+        np.mat of shape (N, 1) or None
+            Estimate of intended next state for the BMI, or None outside of the 'learn_states' or without a target
+        '''
+        if np.any(np.isnan(np.asarray(target_state, dtype=np.float64))):
+            return None
+        return super(WFOFCLearner, self).calc_int_kin(current_state, target_state, decoder_output, task_state, state_order=state_order)
+
+    def get_batch(self):
+        '''
+        Returns the last batch of intended kinematics and neural data (see Learner.get_batch),
+        with the intended velocities scaled to the maximum speed if 'max_speed' was specified
+        '''
+        batch = super(WFOFCLearner, self).get_batch()
+        if self.max_speed is not None and self.max_speed > 0:
+            batch['intended_kin'] = PositionErrorLearner.scale_max_speed(batch['intended_kin'], self.vel_inds, self.max_speed)
+        return batch
+
+
 class SimpleEndpointIntentionLearner(Learner):
     """
     Minimal intention estimator for endpoint velocity decoders.
