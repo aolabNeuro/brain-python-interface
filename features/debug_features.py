@@ -33,8 +33,8 @@ class OnlineAnalysis(traits.HasTraits):
         '''
         Helper function to send messages to the online analysis server
         '''
-        if self.online_analysis_sock.closed:
-            return # task has finished running
+        if self.online_analysis_sock.closed or not self._online_analysis_enabled:
+            return # task has finished running, or no server to talk to
         processed_values = []
         for v in values:
             if isinstance(v, np.ndarray):
@@ -48,6 +48,12 @@ class OnlineAnalysis(traits.HasTraits):
             # Send as a single JSON object
             # ZMQ's send_json handles the encoding/decoding for you
             self.online_analysis_sock.send_json({'key': key, 'values': processed_values})
+        except zmq.Again:
+            # Server disconnected or not keeping up. Online analysis is best-effort, so drop the
+            # message rather than stalling the task loop.
+            if not self._online_analysis_dropping:
+                print(f'Online analysis server not accepting messages, dropping data (first dropped key: {key})')
+                self._online_analysis_dropping = True
         except Exception as e:
             print(f'ZMQ Send Error for key {key}: {e}')
 
@@ -61,12 +67,28 @@ class OnlineAnalysis(traits.HasTraits):
         self.zmq_context = zmq.Context()
         self.online_analysis_sock = self.zmq_context.socket(zmq.PUSH)
         
-        # Connect to the server
+        # Only queue messages once a server is actually connected, otherwise the send buffer fills
+        # up and every send blocks until SNDTIMEO.
+        self.online_analysis_sock.setsockopt(zmq.IMMEDIATE, 1)
+        self.online_analysis_sock.setsockopt(zmq.SNDHWM, 10000)
+
+        # Connect to the server. Allow up to a second for the first message so the connection
+        # has time to come up; if it fails, assume the server isn't running.
         addr = f"tcp://{self.online_analysis_ip}:{self.online_analysis_port}"
+        self.online_analysis_sock.setsockopt(zmq.SNDTIMEO, 1000)
         self.online_analysis_sock.connect(addr)
-        self.online_analysis_sock.setsockopt(zmq.SNDTIMEO, 1000) 
-        self._send_online_analysis_msg('init', False) 
-        
+        self._online_analysis_enabled = True
+        self._online_analysis_dropping = False
+        try:
+            self.online_analysis_sock.send_json({'key': 'init', 'values': [False]})
+        except zmq.Again:
+            print(f'No online analysis server at {addr}, disabling online analysis')
+            self._online_analysis_enabled = False
+            return
+
+        # From here on, never block the task loop
+        self.online_analysis_sock.setsockopt(zmq.SNDTIMEO, 0)
+
         # Send entry metadata
         try:
             self._send_online_analysis_msg('param', 'experiment_name', self.__class__.__name__)
